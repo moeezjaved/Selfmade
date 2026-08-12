@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 
 const Storyboard = dynamic(() => import('@/components/video/Storyboard'), {
   ssr: false,
-  loading: () => <div style={{ fontSize: 14, color: '#68756b' }}>Loading the storyboard…</div>,
+  loading: () => <div style={{ fontSize: 14, color: '#6f6d5a' }}>Loading the storyboard…</div>,
 })
 
 export default function StoryboardPage() {

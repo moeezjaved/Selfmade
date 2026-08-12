@@ -66,20 +66,20 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
   return (
     <div ref={wrapRef} style={{ position: 'relative', display: 'inline-flex' }}>
       <button aria-label={`Project: ${label}`} title={`Switch project — currently ${label}`} onClick={() => setOpen(o => !o)}
-        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${open ? '#9fb98a' : '#e2e8dd'}`, borderRadius: 100, padding: '5px 12px 5px 6px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(23,37,28,0.04)' }}>
-        <span style={{ width: 22, height: 22, borderRadius: 7, background: '#17251c', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12 }}>{tile}</span>
-        <span style={{ fontSize: 13, fontWeight: 750, color: '#17251c', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${open ? '#9fb98a' : '#e2e8dd'}`, borderRadius: 100, padding: '5px 12px 5px 6px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(20,29,21,0.04)' }}>
+        <span style={{ width: 22, height: 22, borderRadius: 7, background: '#141d15', color: '#ff5a2c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12 }}>{tile}</span>
+        <span style={{ fontSize: 13, fontWeight: 750, color: '#141d15', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{label}</span>
         <span style={{ color: '#8a968a', fontSize: 10, marginLeft: -2 }}>▾</span>
       </button>
       {open && (
         <div style={{ position: 'absolute', left: 0, top: '100%', paddingTop: 6, zIndex: 70 }}>
-          <div style={{ width: 220, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
+          <div style={{ width: 220, background: '#fff', border: '1px solid #efece2', borderRadius: 14, boxShadow: '0 18px 50px rgba(20,29,21,0.16)', padding: '10px 8px' }}>
             <div style={{ padding: '2px 10px 7px', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>Project</div>
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {multi && <button onClick={() => pick('')} style={rowStyle(!active)}>◎&nbsp;&nbsp;All brands</button>}
               {brands.map(b => (
                 <button key={b.id} onClick={() => pick(b.id)} style={rowStyle(active === b.id)}>
-                  <span style={{ width: 18, height: 18, borderRadius: 6, background: '#17251c', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, marginRight: 9, flexShrink: 0 }}>{b.name.trim().charAt(0).toUpperCase()}</span>
+                  <span style={{ width: 18, height: 18, borderRadius: 6, background: '#141d15', color: '#ff5a2c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, marginRight: 9, flexShrink: 0 }}>{b.name.trim().charAt(0).toUpperCase()}</span>
                   <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
                 </button>
               ))}
@@ -99,5 +99,5 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
 }
 
 function rowStyle(on: boolean): React.CSSProperties {
-  return { display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', border: 'none', background: on ? '#f2f7ec' : 'transparent', color: on ? '#17251c' : '#3c473c', borderRadius: 9, padding: '8px 10px', fontSize: 13, fontWeight: on ? 750 : 600, fontFamily: 'inherit', cursor: 'pointer' }
+  return { display: 'flex', alignItems: 'center', width: '100%', textAlign: 'left', border: 'none', background: on ? '#f2f7ec' : 'transparent', color: on ? '#141d15' : '#3c473c', borderRadius: 9, padding: '8px 10px', fontSize: 13, fontWeight: on ? 750 : 600, fontFamily: 'inherit', cursor: 'pointer' }
 }

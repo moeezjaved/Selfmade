@@ -10,7 +10,7 @@ import { getPostBySlug, getPublishedPosts, renderMarkdown, readingTimeMin, SITE_
 import { coverStyle, catStyle, categoryOf } from '../_style'
 
 export const revalidate = 300
-const BG = '#0a0d0c', LIME = '#dffe95', CARD = '#121614'
+const BG = '#0a0d0c', LIME = '#ff5a2c', CARD = '#121614'
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
 function img(url: string, w = 1200) {
@@ -55,7 +55,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
   }
 
   return (
-    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(223,254,149,.045) 1.1px, transparent 1.1px), radial-gradient(1100px 560px at 10% -8%, rgba(223,254,149,.10), transparent 58%), radial-gradient(860px 460px at 98% 0%, rgba(34,197,94,.11), transparent 58%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat', color: '#e8ece7', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(255,90,44,.045) 1.1px, transparent 1.1px), radial-gradient(1100px 560px at 10% -8%, rgba(255,90,44,.10), transparent 58%), radial-gradient(860px 460px at 98% 0%, rgba(34,197,94,.11), transparent 58%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat', color: '#e8ece7', minHeight: '100vh' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
       <style>{`
         .prose{font-size:18px;line-height:1.8;color:#c7cdc6}
@@ -68,7 +68,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .prose li{margin:7px 0}
         .prose strong{color:#f4f7f4}
         .prose blockquote{margin:26px 0;padding:10px 22px;border-left:4px solid ${LIME};background:#121614;color:#e8ece7;font-style:italic;font-size:20px;border-radius:0 10px 10px 0}
-        .prose code{background:#1a201d;padding:2px 6px;border-radius:6px;font-size:.9em;font-family:ui-monospace,monospace;color:#dffe95}
+        .prose code{background:#1a201d;padding:2px 6px;border-radius:6px;font-size:.9em;font-family:ui-monospace,monospace;color:#ff5a2c}
         .prose pre{background:#050706;border:1px solid rgba(255,255,255,.08);color:#e5e7eb;padding:18px 20px;border-radius:12px;overflow-x:auto;margin:0 0 22px}
         .prose pre code{background:none;padding:0;color:inherit}
         .prose img{max-width:100%;border-radius:14px;margin:8px 0}

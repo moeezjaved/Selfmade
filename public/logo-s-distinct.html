@@ -1,0 +1,101 @@
+<meta charset="utf-8">
+<title>Selfmade — an S that isn't just a letter</title>
+<style>
+  :root{ --orange:#EF4A1E; --cream:#FFF7EC; --night:#14140f; --paper:#F3EEE3; --muted:#6f6d5a;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace }
+  *{box-sizing:border-box}
+  .pg{background:var(--paper);color:var(--night);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:56px 24px 110px}
+  .kick{font:700 12px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}
+  h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.035em;line-height:1.03;margin:16px 0 0;font-weight:800}
+  h1 em{font-style:normal;color:var(--orange)}
+  .lede{color:var(--muted);margin:16px 0 0;max-width:66ch;font-size:16px;line-height:1.55}
+  .lede b{color:var(--night)}
+  h2{font:700 12.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;margin:60px 0 20px;padding-top:18px;border-top:1.5px solid #ded6c4}
+  h2 span{color:var(--orange)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:16px}
+  .card{background:#fff;border:1px solid #e6dfcd;border-radius:14px;overflow:hidden}
+  .card.bad{opacity:.9}
+  .card.good{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+  .big{aspect-ratio:1.15/1;background:var(--orange);color:var(--cream);display:grid;place-items:center;position:relative}
+  .big svg{width:52%;height:52%}
+  .big .fl{position:absolute;left:12px;top:10px;font:800 13px var(--sans);color:var(--cream)}
+  .m{padding:13px 15px 15px}
+  .m b{font-size:14px}
+  .m .verdict{font:600 10.5px/1.4 var(--mono);margin-top:4px}
+  .m .verdict.no{color:#b8462f}.m .verdict.yes{color:#3f7d52}
+  .m p{margin:7px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+  .row{display:flex;gap:8px;margin-top:11px;align-items:center}
+  .f{width:16px;height:16px;border-radius:3px;background:var(--orange);color:var(--cream);display:grid;place-items:center;flex:none}
+  .f svg{width:12px;height:12px}
+  .ni{width:26px;height:26px;border-radius:6px;background:var(--night);color:var(--cream);display:grid;place-items:center}
+  .ni svg{width:60%;height:60%}
+  .oc{width:26px;height:26px;border-radius:6px;background:var(--cream);color:var(--orange);display:grid;place-items:center;border:1px solid #ecdfc7}
+  .oc svg{width:60%;height:60%}
+  .row .lbl{font:600 9px/1 var(--mono);color:#b8b39c;letter-spacing:.04em;margin-left:2px}
+  .note{margin-top:26px;font-size:13.5px;color:var(--muted);border-top:1px solid #ded6c4;padding-top:18px;max-width:76ch;line-height:1.6}
+  .note b{color:var(--night)}
+</style>
+
+<div class="pg"><div class="wrap">
+  <div class="kick">Selfmade &middot; making the S a mark, not a letter</div>
+  <h1>The difference between an S <em>and a symbol.</em></h1>
+  <p class="lede">A smooth continuous S is just a font glyph &mdash; anyone can type it. A <b>mark</b> earns a second look: the S is built from parts, has a <b>break</b>, or has <b>direction</b> baked in. Here&rsquo;s the plain version you saw, three ways to give it a system, and the filled &ldquo;Channel&rdquo; S for comparison &mdash; all in your bold, rounded, cream-on-orange language.</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <!-- 0 plain continuous S (the &quot;too simple&quot; one) -->
+    <symbol id="d0" viewBox="0 0 120 120"><path d="M78 44 A17 17 0 1 0 60 61 A17 17 0 1 1 42 78" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/></symbol>
+    <!-- 1 BROKEN WAIST: two hooks with a clean gap where they meet -->
+    <symbol id="d1" viewBox="0 0 120 120"><path d="M79 45 A18 18 0 1 0 60 58" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round"/><path d="M79 45 A18 18 0 1 0 60 58" fill="none" stroke="currentColor" stroke-width="16" stroke-linecap="round" transform="rotate(180 60 60)"/></symbol>
+    <!-- 2 ARROW-S: terminals are chevrons — motion / self-driving -->
+    <symbol id="d2" viewBox="0 0 120 120">
+      <path d="M74 46 A17 17 0 1 0 60 61 A17 17 0 1 1 46 76" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="butt"/>
+      <path d="M62 34 L78 46 L64 55" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M62 34 L78 46 L64 55" fill="none" stroke="currentColor" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" transform="rotate(180 60 60)"/>
+    </symbol>
+    <!-- 3 TWIN-BRACKET S: your two brackets, offset and joined into an S -->
+    <symbol id="d3" viewBox="0 0 120 120">
+      <path d="M50 34 A20 20 0 0 1 70 54" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+      <path d="M50 34 A20 20 0 0 1 70 54" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round" transform="rotate(180 60 60)"/>
+      <path d="M70 54 L50 66" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+    </symbol>
+    <!-- 4 CHANNEL (filled split-disc S) -->
+    <symbol id="d4" viewBox="0 0 120 120">
+      <g><path d="M60 24 A36 36 0 0 0 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(-7 0)"/>
+      <path d="M60 24 A36 36 0 0 1 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(7 0)"/></g></symbol>
+    <!-- 5 NOTCH-S: a filled S with a slice cut across the waist -->
+    <symbol id="d5" viewBox="0 0 120 120">
+      <path d="M60 24 A36 36 0 0 0 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(-4 -4)"/>
+      <path d="M60 24 A36 36 0 0 1 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(4 4)"/></symbol>
+  </defs></svg>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="note"><b>Honest read:</b> the plain S (00) is the one that felt like &ldquo;just an S&rdquo; &mdash; correct instinct, drop it. Of the marks, <b>04 &middot; Channel</b> is still the strongest symbol: it&rsquo;s filled and bold like an app icon, the S is <b>discovered</b> in the gap rather than typed, and it owns a shape (orange split-S) no one else has. If you want to keep the <b>stroke</b> character of the bracket icon instead, <b>01 &middot; Broken-waist</b> is the best of those &mdash; two hooks with a real break, so it reads as two parts, not a letter. My recommendation: go with <b>Channel</b> as the symbol and let the bracket live on as a secondary/animated motif. Want me to wire Channel in as the live favicon so you can judge it in a real browser tab &mdash; that&rsquo;s the honest test.</p>
+</div></div>
+
+<script>
+const G=[
+ ["d0","00 &middot; Plain S","no","Reads as a font glyph","A smooth continuous stroke. Correct, legible &mdash; but anyone can type it. No second look.",false,false],
+ ["d1","01 &middot; Broken-waist","yes","Two parts, a real break","Two hooks that stop short of each other. The gap says &lsquo;two systems&rsquo; and stops it being a letter.",false,true],
+ ["d2","02 &middot; Arrow-S","yes","Direction baked in","The terminals become chevrons &mdash; the S is moving, self-driving. Keeps the arrow DNA of your icon.",false,false],
+ ["d3","03 &middot; Twin-bracket","yes","Your brackets, restacked","The two curved brackets offset and joined by a short spine. Most literal descendant of the icon.",false,false],
+ ["d4","04 &middot; Channel","yes","S discovered in a gap","Filled split disc; the S is negative space. Boldest app-icon presence and most ownable silhouette.",true,true],
+ ["d5","05 &middot; Notch-S","yes","Filled, sheared","Like Channel but tighter &mdash; a solid S sliced across the waist. Chunky and strong at 16px.",false,false],
+];
+document.getElementById('grid').innerHTML=G.map(([id,n,ok,vd,p,win,good])=>`
+ <div class="card ${win?'good':''} ${ok==='no'?'bad':''}">
+   <div class="big"><span class="fl">${n.split('&middot;')[0].trim()}</span><svg><use href="#${id}"/></svg></div>
+   <div class="m"><b>${n.split('&middot;')[1].trim()}</b>
+     <div class="verdict ${ok==='no'?'no':'yes'}">${ok==='no'?'&times;':'&check;'} ${vd}</div>
+     <p>${p}</p>
+     <div class="row">
+       <div class="f"><svg><use href="#${id}"/></svg></div><span class="lbl">16px</span>
+       <div class="oc"><svg><use href="#${id}"/></svg></div>
+       <div class="ni"><svg><use href="#${id}"/></svg></div>
+       <span class="lbl">cream / night</span>
+     </div>
+   </div>
+ </div>`).join('');
+</script>

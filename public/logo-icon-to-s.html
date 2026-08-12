@@ -1,0 +1,112 @@
+<meta charset="utf-8">
+<title>Selfmade — your icon, as an S</title>
+<style>
+  :root{ --orange:#EF4A1E; --cream:#FFF7EC; --night:#14140f; --paper:#F3EEE3; --muted:#6f6d5a;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;
+    --mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace }
+  *{box-sizing:border-box}
+  .pg{background:var(--paper);color:var(--night);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1000px;margin:0 auto;padding:56px 24px 110px}
+  .kick{font:700 12px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}
+  h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.035em;line-height:1.03;margin:16px 0 0;font-weight:800}
+  h1 em{font-style:normal;color:var(--orange)}
+  .lede{color:var(--muted);margin:16px 0 0;max-width:64ch;font-size:16px;line-height:1.55}
+  .lede b{color:var(--night)}
+  h2{font:700 12.5px/1 var(--mono);letter-spacing:.2em;text-transform:uppercase;margin:64px 0 22px;padding-top:20px;border-top:1.5px solid #ded6c4}
+  h2 span{color:var(--orange)}
+
+  .flow{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:8px}
+  .big{width:150px;height:150px;border-radius:22px;background:var(--orange);color:var(--cream);display:grid;place-items:center;flex:none}
+  .big svg{width:60%;height:60%}
+  .arrow{font-size:30px;color:#c9bfa6}
+  .fl-cap{font:600 10px/1.5 var(--mono);color:#a49f88;letter-spacing:.05em;text-transform:uppercase;text-align:center;margin-top:8px}
+
+  .opt{background:#fff;border:1px solid #e6dfcd;border-radius:16px;padding:22px;margin-bottom:16px;display:grid;grid-template-columns:170px 1fr;gap:26px;align-items:center}
+  @media(max-width:640px){.opt{grid-template-columns:1fr}}
+  .opt.win{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+  .hero{aspect-ratio:1/1;border-radius:14px;background:var(--orange);color:var(--cream);display:grid;place-items:center;position:relative}
+  .hero svg{width:60%;height:60%}
+  .hero .n{position:absolute;left:13px;top:11px;font:800 14px var(--sans);color:var(--cream)}
+  .hero .tg-win{position:absolute;right:11px;top:10px;font:700 8.5px/1 var(--mono);color:var(--orange);background:var(--cream);padding:5px 8px;border-radius:20px;letter-spacing:.06em}
+  .cl b{font-size:17px;font-weight:800}
+  .cl p{margin:8px 0 0;font-size:13.5px;color:#4c4a3c;line-height:1.55;max-width:60ch}
+  .mx{display:flex;gap:14px;flex-wrap:wrap;align-items:flex-end;margin-top:16px}
+  .u{display:flex;flex-direction:column;align-items:center;gap:6px}
+  .u .cap{font:600 8.5px/1 var(--mono);color:#b8b39c;letter-spacing:.04em;text-transform:uppercase}
+  .tab{width:150px;height:30px;background:#e5e0d3;border-radius:7px 7px 0 0;display:flex;align-items:center;gap:7px;padding:0 10px}
+  .tab .f{width:16px;height:16px;border-radius:3px;background:var(--orange);color:var(--cream);display:grid;place-items:center;flex:none}
+  .tab .f svg{width:12px;height:12px}
+  .tab span{font:500 10px var(--sans);color:#6d6a5c}
+  .ic{width:58px;height:58px;border-radius:13px;background:var(--orange);color:var(--cream);display:grid;place-items:center}
+  .ic svg{width:60%;height:60%}
+  .ch{width:56px;height:56px;border-radius:12px;display:grid;place-items:center;border:1px solid #e6dfcd}
+  .ch svg{width:60%;height:60%}
+  .oc{background:var(--cream);color:var(--orange)} .ni{background:var(--night);color:var(--cream);border-color:transparent}
+  .stk{width:58px;height:58px;border-radius:12px;display:grid;place-items:center;background:repeating-linear-gradient(45deg,#20301f 0 4px,#25361f 4px 8px)}
+  .stk .b{width:42px;height:42px;border-radius:50%;background:var(--orange);border:3px solid #fff;display:grid;place-items:center;transform:rotate(-7deg)}
+  .stk .b svg{width:60%;height:60%;color:var(--cream)}
+  .note{margin-top:22px;font-size:13.5px;color:var(--muted);border-top:1px solid #ded6c4;padding-top:18px;max-width:74ch;line-height:1.6}
+  .note b{color:var(--night)}
+</style>
+
+<div class="pg"><div class="wrap">
+  <div class="kick">Selfmade &middot; keeping the icon you love, as an S</div>
+  <h1>Same two arms. <em>Restacked into an S.</em></h1>
+  <p class="lede">Your icon is <b>two bold rounded arms</b> facing each other. To make it an S we don&rsquo;t redraw it &mdash; we take the exact same two arms, same weight, same rounded caps, and <b>counter-rotate them</b>: one becomes the top of the S, the other the bottom. Two systems working together, now spelling the initial of the name. Nothing about the character changes.</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <!-- reference: the icon you have — two facing bracket-arms + bar -->
+    <symbol id="ref" viewBox="0 0 120 120">
+      <path d="M46 33 A29 29 0 0 0 46 87" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+      <path d="M74 33 A29 29 0 0 1 74 87" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+      <path d="M40 60 H80" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+    </symbol>
+    <!-- A · continuous S (the two arms fused into one flowing stroke) -->
+    <symbol id="sA" viewBox="0 0 120 120">
+      <path d="M78 44 A17 17 0 1 0 60 61 A17 17 0 1 1 42 78" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+    </symbol>
+    <!-- B · two-arm S — same two arms, a seam where they meet (WINNER) -->
+    <symbol id="sB" viewBox="0 0 120 120">
+      <path d="M78 44 A17 17 0 1 0 62.5 59" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+      <path d="M78 44 A17 17 0 1 0 62.5 59" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round" transform="rotate(180 60 60)"/>
+    </symbol>
+    <!-- C · open two-arm S — arms further apart, more motion -->
+    <symbol id="sC" viewBox="0 0 120 120">
+      <path d="M80 42 A18 18 0 1 0 66 60" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round"/>
+      <path d="M80 42 A18 18 0 1 0 66 60" fill="none" stroke="currentColor" stroke-width="14" stroke-linecap="round" transform="rotate(180 60 60)"/>
+    </symbol>
+  </defs></svg>
+
+  <div class="flow">
+    <div><div class="big"><svg><use href="#ref"/></svg></div><div class="fl-cap">Icon you have</div></div>
+    <div class="arrow">&rarr;</div>
+    <div><div class="big"><svg><use href="#sB"/></svg></div><div class="fl-cap">Same arms, as an S</div></div>
+  </div>
+
+  <h2><span>Three ways</span> to make the S from your arms</h2>
+  <div id="opts"></div>
+
+  <p class="note"><b>My pick: B &middot; the two-arm S.</b> It&rsquo;s the most faithful to what you already love &mdash; still visibly <b>two</b> bold rounded arms working together (your &ldquo;two systems&rdquo; idea intact), but the small seam where they meet keeps the S discovered rather than a plain letter. A is the cleanest if you want one flowing stroke; C is the most energetic but gets loose at 16px. Tell me B (or A) and I&rsquo;ll lock the geometry, cut the SVG/PNG set, and drop it in as the live favicon and nav mark &mdash; keeping the wordmark exactly as is.</p>
+</div></div>
+
+<script>
+const O=[
+ ["sA","A &middot; Continuous","One flowing stroke — the two arms fused into a single, seamless S. The most classic and calm.",false],
+ ["sB","B &middot; Two-arm (seam)","The exact two arms of your icon, counter-rotated, meeting at a small seam. Still reads as two forms — the most faithful to what you love.",true],
+ ["sC","C &middot; Open","The arms pulled further apart for more motion and air. Most dynamic, but the loosest at tiny sizes.",false],
+];
+document.getElementById('opts').innerHTML=O.map(([id,n,p,win])=>`
+ <div class="opt ${win?'win':''}">
+   <div class="hero"><span class="n">${n.split(' ')[0]}</span>${win?'<span class="tg-win">Pick</span>':''}<svg><use href="#${id}"/></svg></div>
+   <div class="cl">
+     <b>${n}</b><p>${p}</p>
+     <div class="mx">
+       <div class="u"><div class="tab"><div class="f"><svg><use href="#${id}"/></svg></div><span>Selfmade</span></div><div class="cap">Favicon 16px</div></div>
+       <div class="u"><div class="ic"><svg><use href="#${id}"/></svg></div><div class="cap">App icon</div></div>
+       <div class="u"><div class="stk"><div class="b"><svg><use href="#${id}"/></svg></div></div><div class="cap">Sticker</div></div>
+       <div class="u"><div class="ch oc"><svg><use href="#${id}"/></svg></div><div class="cap">Orange/cream</div></div>
+       <div class="u"><div class="ch ni"><svg><use href="#${id}"/></svg></div><div class="cap">Night</div></div>
+     </div>
+   </div>
+ </div>`).join('');
+</script>

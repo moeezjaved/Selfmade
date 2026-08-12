@@ -42,7 +42,7 @@ export default function DashboardError({
   return (
     <div style={{
       minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-      justifyContent: 'center', gap: 16, background: '#1a3a1a', color: '#fff',
+      justifyContent: 'center', gap: 16, background: '#141d15', color: '#fff',
       fontFamily: 'Hanken Grotesk, sans-serif', padding: 24, textAlign: 'center',
     }}>
       <div className="selfmade-loading" />
@@ -55,7 +55,7 @@ export default function DashboardError({
       <button
         onClick={() => { setRetrying(true); reset() }}
         style={{
-          marginTop: 4, padding: '9px 20px', borderRadius: 8, background: '#dffe95',
+          marginTop: 4, padding: '9px 20px', borderRadius: 8, background: '#ff5a2c',
           color: '#243d20', border: 'none', fontWeight: 700, fontSize: 14,
           fontFamily: 'inherit', cursor: 'pointer',
         }}

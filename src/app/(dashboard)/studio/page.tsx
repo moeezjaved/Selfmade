@@ -23,7 +23,7 @@ import MelloFace from '@/components/MelloFace'
 import Working from '@/components/Working'
 import InlineVideoRemake from './InlineVideoRemake'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 type Brand = { id: string; name: string; website?: string; brand_type?: string; brand_kit?: any; products?: { image_urls?: string[] }[] }
@@ -375,7 +375,7 @@ function StudioInner() {
         <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
           {chat.messages.map((m, i) => (
             <div key={i} style={{ marginBottom: 14, display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
-              <div style={{ maxWidth: '88%', fontSize: 13.5, lineHeight: 1.6, padding: '10px 13px', borderRadius: 14, background: m.role === 'user' ? FOREST : '#f2f5f0', color: m.role === 'user' ? '#eef5eb' : INK, whiteSpace: 'pre-wrap' }}>
+              <div style={{ maxWidth: '88%', fontSize: 13.5, lineHeight: 1.6, padding: '10px 13px', borderRadius: 14, background: m.role === 'user' ? FOREST : '#f2f5f0', color: m.role === 'user' ? '#f3eee3' : INK, whiteSpace: 'pre-wrap' }}>
                 {m.content || (m.streaming ? <span style={{ opacity: .6 }}>…</span> : '')}
                 {m.error && <span style={{ color: '#d64545' }}>{m.error}</span>}
               </div>
@@ -573,7 +573,7 @@ function StudioInner() {
           {/* result actions (image shown in the two-col above for remake; standalone for fresh) */}
           {result && (
             <div ref={resultRef} style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(23,37,28,.4)', display: 'block' }} />}
+              {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(20,29,21,.4)', display: 'block' }} />}
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{remake ? 'Your version is ready.' : 'Here’s your ad.'}</div>
                 <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>

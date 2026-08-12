@@ -83,7 +83,7 @@ function EmptyState() {
         {steps.map(s => (
           <div key={s.n} style={{ background: '#fff', border: '1px solid rgba(0,0,0,.08)', borderRadius: 12, padding: '18px 16px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-              <span style={{ width: 22, height: 22, borderRadius: 6, background: '#dffe95', color: '#0e1b12', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.n}</span>
+              <span style={{ width: 22, height: 22, borderRadius: 6, background: '#ff5a2c', color: '#0e1b12', fontSize: 12, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{s.n}</span>
               <span style={{ fontSize: 20 }}>{s.icon}</span>
             </div>
             <div style={{ fontSize: 13.5, color: '#3a4636', lineHeight: 1.5 }}>{s.text}</div>

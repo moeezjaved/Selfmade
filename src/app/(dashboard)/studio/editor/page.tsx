@@ -9,7 +9,7 @@ import dynamic from 'next/dynamic'
 
 const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor'), {
   ssr: false,
-  loading: () => <div style={{ fontSize: 14, color: '#68756b' }}>Loading the editor…</div>,
+  loading: () => <div style={{ fontSize: 14, color: '#6f6d5a' }}>Loading the editor…</div>,
 })
 
 export default function EditorPage() {

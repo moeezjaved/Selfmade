@@ -9,13 +9,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        dark:    '#2d5a27',
+        dark:    '#141d15',
         dark2:   '#ffffff',
-        dark3:   '#f0f7ee',
-        dark4:   '#e0edd9',
-        lime:    '#dffe95',
-        lime2:   '#cef57e',
-        cream:   '#f0f7ee',
+        dark3:   '#f4f0e6',
+        dark4:   '#e7e1d3',
+        lime:    '#ff5a2c',
+        lime2:   '#f2622c',
+        cream:   '#f4f0e6',
         white: {
           DEFAULT: '#111827',
           10: 'rgba(17,24,39,0.06)',

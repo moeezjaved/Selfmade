@@ -12,7 +12,7 @@ import PricingSection from '@/components/pricing/PricingSection'
 import LandingHero from '@/components/motion/LandingHero'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
-const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const LIME = '#ff5a2c', INK = '#0e1b12', GREEN = '#16a34a'
 
 /** R2 loads directly; anything else via weserv (resized, hotlink-safe). */
 function adImg(url: string, w = 400): string {
@@ -112,7 +112,7 @@ function Panel({ children, grad, style, className }: { children: React.ReactNode
 /** Browser mockup of the REAL discovery grid — images + playable videos (Discovery-style player) and
  * a Remake button on every card that sends visitors to sign up. */
 function HeroMock({ slots }: { slots: ({ image: string; video: string | null } | null)[] }) {
-  const fallback = [['#c7f0a3', '#a8e63d'], ['#bfe0ff', '#7fb8f5'], ['#f7c9e8', '#ec8fd0'], ['#ffe6b0', '#f5c15c'], ['#d7c9ff', '#a98ff0'], ['#c7f0a3', '#8fd66a']]
+  const fallback = [['#c7f0a3', '#a8e63d'], ['#bfe0ff', '#7fb8f5'], ['#f7c9e8', '#ec8fd0'], ['#ffe6b0', '#f5c15c'], ['#d7c9ff', '#a98ff0'], ['#c7f0a3', '#ff7a4c']]
   const cells = Array.from({ length: 6 }, (_, i) => slots[i] || null)
   return (
     <div style={{ position: 'relative' }}>
@@ -369,7 +369,7 @@ export default function HomeLanding() {
               <Reveal delay={620}>
                 <div style={{ display: 'flex', gap: 8, paddingLeft: 58 }}>
                   <Link href="/signup" className="btn" style={{ background: INK, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ Review my work</Link>
-                  <Link href="/signup" className="btn" style={{ background: '#fff', color: INK, border: '1.5px solid #e7ece7', fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>See the ads</Link>
+                  <Link href="/signup" className="btn" style={{ background: '#fff', color: INK, border: '1.5px solid #efece2', fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>See the ads</Link>
                 </div>
               </Reveal>
             </div>
@@ -427,7 +427,7 @@ export default function HomeLanding() {
             <div key={i} className="lift" style={{ border: '1px solid #eef0ee', borderRadius: 20, padding: 22, background: '#fff' }}>
               <p style={{ fontSize: 15, color: INK, margin: '0 0 16px', lineHeight: 1.5, fontWeight: 500 }}>{q}</p>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <span style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} />
+                <span style={{ width: 34, height: 34, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#ff7a4c)` }} />
                 <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>{n}</div><div style={{ fontSize: 12, color: '#9ca3af' }}>{r}</div></div>
               </div>
             </div>
@@ -480,7 +480,7 @@ export default function HomeLanding() {
               ) : (
                 <tr key={i} style={{ borderTop: '1px solid #f2f4f1' }}>
                   <td style={{ padding: '12px 14px', color: '#374151', fontWeight: 500 }}>{label}</td>
-                  {cells.map((c, j) => <td key={j} style={{ textAlign: 'center', padding: '12px 10px', background: j === 0 ? 'rgba(223,254,149,.28)' : 'transparent' }}>{c ? <Check /> : <X />}</td>)}
+                  {cells.map((c, j) => <td key={j} style={{ textAlign: 'center', padding: '12px 10px', background: j === 0 ? 'rgba(255,90,44,.28)' : 'transparent' }}>{c ? <Check /> : <X />}</td>)}
                 </tr>
               ))}
             </tbody>
@@ -541,7 +541,7 @@ export default function HomeLanding() {
           <p style={{ color: 'rgba(255,255,255,.72)', maxWidth: 560, margin: '0 auto 22px', fontSize: 16 }}>Stop stitching together a spy tool, a designer, and a launcher. Selfmade is all three — talking to each other.</p>
           <Link href="/signup" style={btnPrimary}>Start for free <Arrow /></Link>
           <div style={{ marginTop: 40, background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: 20, padding: 26, maxWidth: 620, margin: '40px auto 0', display: 'flex', gap: 16, alignItems: 'center', textAlign: 'left' }}>
-            <span style={{ width: 54, height: 54, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)`, flexShrink: 0 }} />
+            <span style={{ width: 54, height: 54, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#ff7a4c)`, flexShrink: 0 }} />
             <div><p style={{ margin: '0 0 8px', fontSize: 16, lineHeight: 1.5 }}>“We replaced three tools and our freelance designer. Our ad output tripled and everything finally lives in one place.”</p><div style={{ fontSize: 13, color: 'rgba(255,255,255,.6)' }}>— Priya M., Head of Growth</div></div>
           </div>
         </Panel>
@@ -624,7 +624,7 @@ export default function HomeLanding() {
             {[...Array(2)].flatMap((_, k) => ['Remade a competitor’s top ad in a minute — it converted better than our agency’s.', 'The industry insights are unreal. I know what to make before I open the editor.', 'Mello wrote the angle, the Studio designed it, I launched it. Same afternoon.', 'Finally one tool instead of five tabs.', 'The 4K exports look agency-grade.', 'Brand Spy is addictive — I check it every morning.'].map((t, i) => (
               <div key={t + k} className="lift" style={{ width: 300, flexShrink: 0, border: '1px solid #eef0ee', borderRadius: 16, padding: 18, background: '#fff' }}>
                 <p style={{ margin: '0 0 12px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>“{t}”</p>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#8fd66a)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user</span></div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ width: 26, height: 26, borderRadius: '50%', background: `linear-gradient(135deg,${LIME},#ff7a4c)` }} /><span style={{ fontSize: 12.5, color: '#9ca3af' }}>Verified user</span></div>
               </div>
             )))}
           </div>
@@ -635,7 +635,7 @@ export default function HomeLanding() {
       <section style={{ ...wrap, padding: '30px 24px' }}>
         <Reveal>
           <div className="lift" style={{ position: 'relative', borderRadius: 24, aspectRatio: '16/8', overflow: 'hidden', background: 'linear-gradient(135deg,#0e1b12,#12331f)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 14, cursor: 'pointer' }}>
-            <span className="soft-pulse" style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'rgba(223,254,149,.14)' }} />
+            <span className="soft-pulse" style={{ position: 'absolute', width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,90,44,.14)' }} />
             <span style={{ position: 'relative', width: 66, height: 66, borderRadius: '50%', background: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 10px 30px rgba(0,0,0,.3)' }}><svg width="24" height="24" viewBox="0 0 24 24" fill={INK}><path d="M8 5v14l11-7z" /></svg></span>
             <div style={{ position: 'relative', color: '#fff', fontWeight: 800, fontSize: 18 }}>See Selfmade in 90 seconds</div>
             <div style={{ position: 'relative', color: 'rgba(255,255,255,.6)', fontSize: 13 }}>Product walkthrough</div>

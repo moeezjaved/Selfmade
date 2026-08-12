@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Bell } from 'lucide-react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15'
 
 type Notif = { id: string; type?: string; page_id?: string; brand_name?: string; ad_count?: number; read_at?: string | null; created_at?: string }
 
@@ -51,7 +51,7 @@ export default function BriefAlerts({ exclude = [] }: { exclude?: string[] }) {
               <div style={{ fontSize: 11.5, color: MUTED, fontWeight: 600, marginTop: 2 }}>{ago(n.created_at)} · worth a look before they scale it</div>
             </div>
             {n.page_id && (
-              <Link href={`/knowledge/brand/${n.page_id}`} style={{ flexShrink: 0, background: FOREST, color: '#dffe95', fontSize: 12, fontWeight: 800, padding: '8px 15px', borderRadius: 100, textDecoration: 'none' }}>See &amp; remake →</Link>
+              <Link href={`/knowledge/brand/${n.page_id}`} style={{ flexShrink: 0, background: FOREST, color: '#ff5a2c', fontSize: 12, fontWeight: 800, padding: '8px 15px', borderRadius: 100, textDecoration: 'none' }}>See &amp; remake →</Link>
             )}
           </div>
         ))}

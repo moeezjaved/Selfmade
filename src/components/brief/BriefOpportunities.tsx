@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { oppColor, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
 
-const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#17251c', LIME = '#dffe95', FAINT = '#9aa79a'
+const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#141d15', LIME = '#ff5a2c', FAINT = '#9aa79a'
 const GOOD = '#2f7d3a', WARN = '#b7791f'
 const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
@@ -194,7 +194,7 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
         <div style={{ fontSize: 20, fontWeight: 750, letterSpacing: '-.02em', color: INK }}>What Mello would do</div>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 12 }}>
           <button onClick={() => load(accountId)} disabled={busy} title="Refresh live from Meta" style={{ background: 'none', border: 'none', color: '#9aa79a', fontSize: 12, fontWeight: 700, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', padding: 0 }}>{busy ? 'refreshing…' : '↻'}</button>
-          <Link href="/reports" style={{ fontSize: 12.5, color: '#3f8f4f', fontWeight: 800, textDecoration: 'none' }}>See the full report →</Link>
+          <Link href="/reports" style={{ fontSize: 12.5, color: '#ef4a1e', fontWeight: 800, textDecoration: 'none' }}>See the full report →</Link>
         </span>
       </div>
       <div style={{ fontSize: 13.5, color: MUTED, margin: '0 0 16px' }}>The {ops.length} move{ops.length === 1 ? '' : 's'} that matter — each with what it's worth and how sure I am.</div>
@@ -220,7 +220,7 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
       </div>
 
       {ops.length > 3 && (
-        <button onClick={() => setShowAll(s => !s)} style={{ marginTop: 12, background: 'none', border: 'none', color: '#3f8f4f', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+        <button onClick={() => setShowAll(s => !s)} style={{ marginTop: 12, background: 'none', border: 'none', color: '#ef4a1e', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
           {showAll ? 'Show fewer' : `Show ${ops.length - 3} more move${ops.length - 3 === 1 ? '' : 's'}`} →
         </button>
       )}

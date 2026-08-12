@@ -153,7 +153,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
   }
 
   if (err) return <div style={{ color: '#a33', fontSize: 14 }}>Couldn’t load a storyboard: {err}</div>
-  if (!board || !mounted) return <div style={{ fontSize: 14, color: '#68756b' }}>Loading the storyboard…</div>
+  if (!board || !mounted) return <div style={{ fontSize: 14, color: '#6f6d5a' }}>Loading the storyboard…</div>
 
   const chip: React.CSSProperties = { fontSize: 12, color: '#20321c', background: '#eef7d6', borderRadius: 999, padding: '4px 11px', fontWeight: 700 }
 
@@ -177,7 +177,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         <span style={chip}>{(mode ? mode === 'cinematic' : board.suggestedMode === 'faithful') ? 'Cinematic' : 'UGC'}</span>
         <span style={chip}>{scenes.length || board.sceneCount} scenes</span>
         {board.durationSeconds && <span style={chip}>~{Math.round(board.durationSeconds)}s</span>}
-        <span style={{ ...chip, background: board.editable ? '#dffe95' : '#f0efe8', color: board.editable ? '#17251c' : '#68756b' }}>
+        <span style={{ ...chip, background: board.editable ? '#ff5a2c' : '#f0efe8', color: board.editable ? '#141d15' : '#6f6d5a' }}>
           {board.editable ? 'Editable — nothing generated yet' : 'Already generated (read-only)'}
         </span>
         {showKeyframes && board.editable && boardIncomplete && (
@@ -191,7 +191,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         {scenes.map((s, i) => (
           <div key={s.index} style={{ display: 'grid', gridTemplateColumns: showKeyframes ? '56px 96px 1fr' : '56px 1fr', gap: 14, border: '1px solid #e6ece2', borderRadius: 12, padding: '14px 16px', background: '#fff', alignItems: 'start' }}>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-              <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{i + 1}</div>
+              <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#141d15', lineHeight: 1 }}>{i + 1}</div>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>{ROLE_LABEL[s.role] || 'Scene'}</div>
               {s.time && <div style={{ fontSize: 10, color: '#a7b09e', fontFamily: 'ui-monospace, Menlo, monospace' }}>{s.time}</div>}
               {board.editable && (
@@ -207,7 +207,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
                 {(s.preview || s.thumb)
                   ? <img src={s.preview || s.thumb || ''} alt="" onClick={() => s.preview && setZoom(s.preview)} title={s.preview ? 'Click to enlarge' : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: s.preview ? 'zoom-in' : 'default' }} />
                   : <span style={{ fontSize: 20, color: '#b4bdad' }}>▦</span>}
-                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#17251c', background: '#dffe95', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
+                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#141d15', background: '#ff5a2c', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
                 {busy[s.index] && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3a7d2c', fontWeight: 700 }}>…</div>}
               </div>
               {board.editable && (
@@ -244,7 +244,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
       {!embedded && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 18, flexWrap: 'wrap' }}>
           <button onClick={generate} disabled={!board.editable || generating || drawing}
-            style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: (board.editable && !drawing) ? 'pointer' : 'default', border: 'none', background: (board.editable && !drawing) ? '#17251c' : '#d7ddd2', color: '#fff' }}>
+            style={{ fontSize: 14, fontWeight: 800, padding: '11px 22px', borderRadius: 999, cursor: (board.editable && !drawing) ? 'pointer' : 'default', border: 'none', background: (board.editable && !drawing) ? '#141d15' : '#d7ddd2', color: '#fff' }}>
             {generating ? 'Starting generation…' : drawing ? `Drawing your storyboard… ${drawnCount}/${scenes.length}` : board.editable ? 'Approve & generate →' : 'Already generated'}
           </button>
           <span style={{ fontSize: 12, color: '#8a9880' }}>Review the storyboard first — editing it is free. Seedance only shoots once you approve.</span>

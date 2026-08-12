@@ -21,7 +21,7 @@ import {
 } from 'recharts'
 import { Copy, Film } from 'lucide-react'
 
-const ACCENT = '#dffe95'
+const ACCENT = '#ff5a2c'
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, padding: 18 }
 const label: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }
 const FMT_COLORS: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
@@ -60,7 +60,7 @@ function ChipRow({ icon, label, items }: { icon: string; label: string; items?: 
       <div style={{ width: isMobile ? 'auto' : 150, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
       <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {items.slice(0, 8).map((it) => (
-          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#141d15', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
             {it.label} <span style={{ opacity: 0.55, fontWeight: 700 }}>{it.count}</span>
           </span>
         ))}
@@ -88,7 +88,7 @@ function DnaList({ title, items }: { title: string; items?: { label: string; cou
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: '#111', marginBottom: 4 }}>{it.label}</div>
               <div style={{ height: 6, background: '#f1f5f9', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${Math.round((it.count / max) * 100)}%`, height: '100%', background: '#1a3a1a', borderRadius: 4 }} />
+                <div style={{ width: `${Math.round((it.count / max) * 100)}%`, height: '100%', background: '#141d15', borderRadius: 4 }} />
               </div>
             </div>
             <div style={{ width: 64, textAlign: 'right', fontSize: 13, fontWeight: 700, color: '#374151', flexShrink: 0 }}>{it.count} ads</div>
@@ -237,7 +237,7 @@ function LandingPages({ d }: { d: Spy }) {
         {d.landingPages.map((p) => {
           const on = sel?.url === p.url
           return (
-            <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #cde87a' : '1px solid transparent', background: on ? 'rgba(223,254,149,0.25)' : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
+            <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #cde87a' : '1px solid transparent', background: on ? 'rgba(255,90,44,0.25)' : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
               <div style={{ fontSize: 13, color: '#2075ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔗 {p.url}</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}><span style={{ color: '#16a34a', fontWeight: 700 }}>● {p.active} Active</span> · {p.inactive} Inactive</div>
             </button>
@@ -249,7 +249,7 @@ function LandingPages({ d }: { d: Spy }) {
           <div style={{ flex: 1, fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel?.fullUrl}</div>
           <button onClick={() => { if (sel) { navigator.clipboard.writeText(sel.fullUrl); setCopied(true); setTimeout(() => setCopied(false), 1200) } }} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: '#fff', cursor: 'pointer' }}>{copied ? 'Copied ✓' : 'Copy URL'}</button>
           {(['mobile', 'desktop'] as const).map((dv) => (
-            <button key={dv} onClick={() => setDevice(dv)} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: device === dv ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', textTransform: 'capitalize' }}>{dv}</button>
+            <button key={dv} onClick={() => setDevice(dv)} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: device === dv ? 'rgba(255,90,44,0.5)' : '#fff', cursor: 'pointer', textTransform: 'capitalize' }}>{dv}</button>
           ))}
           <a href={sel?.fullUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', textDecoration: 'none' }}>Open ↗</a>
         </div>
@@ -331,7 +331,7 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
         <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
         {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
         {/* Remake pill — identical style to the Discovery grid (keep it the same everywhere). */}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}>{isVideo ? <Film size={14} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={2.4} />} Remake</button>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ff5a2c', color: '#14281a', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}>{isVideo ? <Film size={14} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={2.4} />} Remake</button>}
       </div>
     </div>
   )
@@ -360,7 +360,7 @@ function AdInsightPanel({ adId }: { adId: string }) {
   return (
     <div style={{ margin: '18px', marginTop: 4, background: 'linear-gradient(180deg,#f7fbef,#ffffff)', border: '1px solid #dcebc4', borderRadius: 16, padding: '16px 18px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-        <span style={{ width: 24, height: 24, borderRadius: 7, background: '#17251c', color: ACCENT, display: 'grid', placeItems: 'center', fontSize: 13 }}>✨</span>
+        <span style={{ width: 24, height: 24, borderRadius: 7, background: '#141d15', color: ACCENT, display: 'grid', placeItems: 'center', fontSize: 13 }}>✨</span>
         <b style={{ fontSize: 14, color: '#111' }}>Mello studied this ad</b>
         {r?.confidence != null && <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 800, color: '#16663a', background: '#e7f6ec', borderRadius: 100, padding: '4px 11px' }}>{r.confidence}% sure it works</span>}
       </div>
@@ -376,7 +376,7 @@ function AdInsightPanel({ adId }: { adId: string }) {
       {r && (
         <>
           {r.headline && r.headline !== 'Why this ad works' && (
-            <div style={{ fontSize: 15, fontWeight: 850, color: '#17251c', letterSpacing: '-.01em', marginBottom: 10 }}>{r.headline}</div>
+            <div style={{ fontSize: 15, fontWeight: 850, color: '#141d15', letterSpacing: '-.01em', marginBottom: 10 }}>{r.headline}</div>
           )}
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 12 }}>
             <Tag k="Hook" v={r.hook} /><Tag k="Emotion" v={r.emotion} /><Tag k="Who" v={r.audience} />
@@ -462,7 +462,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
   )
 }
 
-const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', color: '#111' })
+const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(255,90,44,0.5)' : '#fff', cursor: 'pointer', color: '#111' })
 
 function FilterBar({ days, setDays, format, setFormat, status, setStatus, sort, setSort, total }: any) {
   const Sel = (val: string, set: (v: string) => void, opts: [string, string][]) => (
@@ -688,7 +688,7 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
       </div>
 
       <div style={{ marginTop: 12 }}><TimelineGantt pageId={pageId} onOpen={onOpen} /></div>
-      <div style={{ marginTop: 14, padding: 12, background: 'rgba(223,254,149,0.18)', border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#3f6212' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
+      <div style={{ marginTop: 14, padding: 12, background: 'rgba(255,90,44,0.18)', border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#3f6212' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
     </div>
   )
 }
@@ -759,12 +759,12 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
       <button onClick={toggleSpy} disabled={busy}
         title={spied ? 'Stop tracking this brand' : 'Track this brand — re-crawls every 6h and alerts you to new ads'}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, padding: '6px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer',
-          border: '1px solid', borderColor: spied ? '#d1d5db' : '#1a3a1a', background: spied ? '#fff' : '#1a3a1a', color: spied ? '#6b7280' : '#dffe95', opacity: busy ? 0.6 : 1 }}>
+          border: '1px solid', borderColor: spied ? '#d1d5db' : '#141d15', background: spied ? '#fff' : '#141d15', color: spied ? '#6b7280' : '#ff5a2c', opacity: busy ? 0.6 : 1 }}>
         {spied ? 'Stop spying' : '＋ Spy this brand'}
       </button>
       {spied && (
         <button onClick={toggleEmail} disabled={busy} title="Get emailed when this brand launches new ads (2 credits per email)"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', border: '1px solid', borderColor: emailOn ? '#1a3a1a' : '#d1d5db', background: emailOn ? '#1a3a1a' : '#fff', color: emailOn ? '#dffe95' : '#374151' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', border: '1px solid', borderColor: emailOn ? '#141d15' : '#d1d5db', background: emailOn ? '#141d15' : '#fff', color: emailOn ? '#ff5a2c' : '#374151' }}>
           🔔 {emailOn ? 'Email alerts on' : 'Email me new ads'} <span style={{ opacity: 0.7, fontWeight: 600 }}>· 2 cr</span>
         </button>
       )}
@@ -785,7 +785,7 @@ function PullBrand({ name, pageId, pulling, onPull, capMsg }: { name: string; pa
           <>
             <div style={{ fontSize: 14, color: '#374151', marginBottom: 18 }}>Pulling this brand’s ads into your catalog… they’ll appear here as we find them. This first-time spy usually takes under a minute.</div>
             <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, color: '#6b7280', fontSize: 13 }}>
-              <span style={{ width: 14, height: 14, border: '2px solid #dfe4d8', borderTopColor: '#1a3a1a', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Searching Meta for {name}’s ads…
+              <span style={{ width: 14, height: 14, border: '2px solid #dfe4d8', borderTopColor: '#141d15', borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} /> Searching Meta for {name}’s ads…
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 10, marginTop: 24 }}>
               {[0, 1, 2].map(i => <div key={i} style={{ width: 86, height: 150, borderRadius: 10, background: 'linear-gradient(100deg,#f2f4f0 30%,#e9ede6 50%,#f2f4f0 70%)', backgroundSize: '200% 100%', animation: 'shimmer 1.3s infinite' }} />)}
@@ -794,8 +794,8 @@ function PullBrand({ name, pageId, pulling, onPull, capMsg }: { name: string; pa
         ) : (
           <>
             <div style={{ fontSize: 14, color: '#374151', marginBottom: 22, lineHeight: 1.55 }}>We don’t have {name}’s ads in your catalog yet. Pull them now — we’ll crawl their full ad history, then apply thumbnails, posters and AI creative-DNA automatically, just like every ad in Discovery.</div>
-            {capMsg && <div style={{ margin: '0 auto 16px', maxWidth: 440, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600 }}>⚡ {capMsg} <a href="/settings" style={{ color: '#1a3a1a', textDecoration: 'underline' }}>Upgrade →</a></div>}
-            <button onClick={onPull} style={{ background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
+            {capMsg && <div style={{ margin: '0 auto 16px', maxWidth: 440, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600 }}>⚡ {capMsg} <a href="/settings" style={{ color: '#141d15', textDecoration: 'underline' }}>Upgrade →</a></div>}
+            <button onClick={onPull} style={{ background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
             <div style={{ marginTop: 14 }}>
               <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&view_all_page_id=${pageId}`} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: '#9ca3af', textDecoration: 'none' }}>or view raw in Meta Ad Library ↗</a>
             </div>
@@ -870,7 +870,7 @@ export default function BrandSpyDetail() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <Link href="/discovery/brand-spy" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All spied brands</Link>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: 'rgba(223,254,149,0.6)', border: '1px solid #cde87a', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
+          <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: 'rgba(255,90,44,0.6)', border: '1px solid #cde87a', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
           <button onClick={() => setTab('library')} style={{ fontSize: 13, fontWeight: 700, color: '#2075ff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View all ads →</button>
         </div>
       </div>
@@ -894,7 +894,7 @@ export default function BrandSpyDetail() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
         {TABS.map(([id, lbl]) => (
-          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', color: tab === id ? '#111' : '#6b7280', background: tab === id ? 'rgba(223,254,149,0.5)' : '#f3f4f6' }}>{lbl}</button>
+          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', color: tab === id ? '#111' : '#6b7280', background: tab === id ? 'rgba(255,90,44,0.5)' : '#f3f4f6' }}>{lbl}</button>
         ))}
       </div>
 

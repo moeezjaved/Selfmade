@@ -16,7 +16,7 @@ export default function Image() {
     (
       <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 76, background: '#faf9f4', color: '#171d18', fontFamily: 'Georgia, serif', position: 'relative' }}>
         {/* lime rule — the one accent, top edge */}
-        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#dffe95' }} />
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#ff5a2c' }} />
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'sans-serif' }}>
           <div style={{ display: 'flex', fontSize: 30, fontWeight: 800, letterSpacing: -1, color: '#171d18' }}>Selfmade</div>
@@ -29,7 +29,7 @@ export default function Image() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'sans-serif' }}>
-          <div style={{ display: 'flex', background: '#17251c', color: '#dffe95', fontSize: 24, fontWeight: 800, padding: '14px 30px', borderRadius: 100 }}>tryselfmade.ai</div>
+          <div style={{ display: 'flex', background: '#141d15', color: '#ff5a2c', fontSize: 24, fontWeight: 800, padding: '14px 30px', borderRadius: 100 }}>tryselfmade.ai</div>
           <div style={{ display: 'flex', fontSize: 20, fontWeight: 600, color: '#8a927f' }}>$49/mo · starts tonight</div>
         </div>
       </div>

@@ -6,7 +6,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-const INK = '#0e1b12', LIME = '#dffe95'
+const INK = '#0e1b12', LIME = '#ff5a2c'
 
 export default function JoinPage() {
   const [state, setState] = useState<'working' | 'ok' | 'authneeded' | 'error'>('working')

@@ -1,0 +1,94 @@
+<meta charset="utf-8">
+<title>Selfmade — the S, made into a craft</title>
+<style>
+  :root{ --orange:#EF4A1E; --cream:#FFF7EC; --night:#14140f; --paper:#F3EEE3; --muted:#6f6d5a;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; --mono:ui-monospace,Menlo,monospace }
+  *{box-sizing:border-box}
+  .pg{background:var(--paper);color:var(--night);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:56px 24px 110px}
+  .kick{font:700 12px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}
+  h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.035em;line-height:1.03;margin:16px 0 0;font-weight:800}
+  h1 em{font-style:normal;color:var(--orange)}
+  .lede{color:var(--muted);margin:16px 0 0;max-width:66ch;font-size:16px;line-height:1.55}
+  .lede b{color:var(--night)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:32px}
+  .card{background:#fff;border:1px solid #e6dfcd;border-radius:14px;overflow:hidden}
+  .card.win{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+  .big{aspect-ratio:1.05/1;background:var(--orange);color:var(--cream);display:grid;place-items:center;position:relative}
+  .big svg{width:56%;height:56%}
+  .big .fl{position:absolute;left:12px;top:10px;font:800 13px var(--sans);color:var(--cream)}
+  .big .pk{position:absolute;right:11px;top:10px;font:700 8.5px/1 var(--mono);color:var(--orange);background:var(--cream);padding:5px 8px;border-radius:20px}
+  .m{padding:13px 15px 15px}.m b{font-size:14.5px}.m p{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+  .row{display:flex;gap:8px;margin-top:12px;align-items:center}
+  .f{width:16px;height:16px;border-radius:3px;background:var(--orange);color:var(--cream);display:grid;place-items:center;flex:none}.f svg{width:12px;height:12px}
+  .oc{width:26px;height:26px;border-radius:6px;background:var(--cream);color:var(--orange);display:grid;place-items:center;border:1px solid #ecdfc7}.oc svg{width:60%;height:60%}
+  .ni{width:26px;height:26px;border-radius:6px;background:var(--night);color:var(--cream);display:grid;place-items:center}.ni svg{width:60%;height:60%}
+  .stk{width:28px;height:28px;border-radius:50%;background:var(--orange);border:2.5px solid #fff;display:grid;place-items:center;box-shadow:0 3px 6px -2px rgba(0,0,0,.4)}.stk svg{width:56%;height:56%;color:var(--cream)}
+  .lbl{font:600 9px/1 var(--mono);color:#b8b39c;letter-spacing:.04em;margin-left:2px}
+  .note{margin-top:26px;font-size:13.5px;color:var(--muted);border-top:1px solid #ded6c4;padding-top:18px;max-width:76ch;line-height:1.6}.note b{color:var(--night)}
+</style>
+
+<div class="pg"><div class="wrap">
+  <div class="kick">Selfmade &middot; S first &mdash; craft second</div>
+  <h1>An S <em>that happens to be a ship.</em></h1>
+  <p class="lede">Every one of these is the <b>filled Channel S</b> &mdash; unmistakably the letter &mdash; with the lightest possible spaceship cue added: a <b>porthole</b> (the one signal that says vessel), and on some, a <b>sharpened nose</b>. You read S, then you notice the craft. Nothing bolted on.</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <!-- base Channel S = two lobes -->
+    <!-- 1 PORTHOLE-S: the S with a cockpit window -->
+    <symbol id="k1" viewBox="0 0 120 120">
+      <path d="M60 24 A36 36 0 0 0 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(-7 0)"/>
+      <path d="M60 24 A36 36 0 0 1 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(7 0)"/>
+      <circle cx="46" cy="42" r="7" fill="var(--bgc,#EF4A1E)"/>
+    </symbol>
+    <!-- 2 NOSE-S: pointed nose at the top + porthole -->
+    <symbol id="k2" viewBox="0 0 120 120">
+      <path d="M53 26 L60 12 L67 26 Z" fill="currentColor"/>
+      <path d="M60 24 A36 36 0 0 0 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(-7 0)"/>
+      <path d="M60 24 A36 36 0 0 1 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(7 0)"/>
+      <circle cx="46" cy="42" r="6.5" fill="var(--bgc,#EF4A1E)"/>
+    </symbol>
+    <!-- 3 TILT-S: the S banking, pointed nose + tail, porthole — a craft in a turn -->
+    <symbol id="k3" viewBox="0 0 120 120">
+      <g transform="rotate(-16 60 60)">
+        <path d="M53 24 L60 10 L67 24 Z" fill="currentColor"/>
+        <path d="M60 24 A34 34 0 0 0 60 96 A17 17 0 0 0 60 61 A17 17 0 0 1 60 26 Z" fill="currentColor" transform="translate(-6 0)"/>
+        <path d="M60 24 A34 34 0 0 1 60 96 A17 17 0 0 0 60 61 A17 17 0 0 1 60 26 Z" fill="currentColor" transform="translate(6 0)"/>
+        <path d="M53 96 L60 110 L67 96 Z" fill="currentColor"/>
+        <circle cx="47" cy="42" r="6.5" fill="var(--bgc,#EF4A1E)"/>
+      </g>
+    </symbol>
+    <!-- 4 STROKE-S CRAFT: bold stroke S, pointed nose cap + porthole -->
+    <symbol id="k4" viewBox="0 0 120 120">
+      <path d="M74 46 A17 17 0 1 0 60 61 A17 17 0 1 1 46 76" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="round"/>
+      <path d="M74 46 L84 34 L80 50 Z" fill="currentColor"/>
+      <circle cx="60" cy="46" r="4.6" fill="var(--bgc,#EF4A1E)"/>
+    </symbol>
+  </defs></svg>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="note"><b>My pick: 01 &middot; Porthole-S.</b> It stays 100% the S you already approved &mdash; the boldest, most legible version &mdash; and the single cream-orange porthole is enough to make it read as a vessel once you clock it. It never stops being an S, even at 16px. <b>02 &middot; Nose-S</b> adds a small pointed nose if you want the &lsquo;pointing up / launch&rsquo; energy to be more obvious; <b>03 &middot; Tilt-S</b> banks it like a craft mid-turn (nose + tail points). Tell me which and I&rsquo;ll refine and wire it in as the live favicon + nav mark.</p>
+</div></div>
+
+<script>
+const G=[
+ ["k1","01 &middot; Porthole-S","The exact Channel S + one porthole. Reads S first, ship second. Zero compromise on the letter.",true],
+ ["k2","02 &middot; Nose-S","The S with a small pointed nose at the top + porthole. More obviously &lsquo;launching&rsquo;.",false],
+ ["k3","03 &middot; Tilt-S","The S banking through a turn &mdash; nose and tail points, porthole. A craft in motion.",false],
+ ["k4","04 &middot; Stroke-craft","The lighter stroke S with a nose point and porthole, if you prefer the thinner mark.",false],
+];
+document.getElementById('grid').innerHTML=G.map(([id,n,p,win])=>`
+ <div class="card ${win?'win':''}">
+   <div class="big"><span class="fl">${n.split('&middot;')[0].trim()}</span>${win?'<span class="pk">Pick</span>':''}<svg><use href="#${id}"/></svg></div>
+   <div class="m"><b>${n.split('&middot;')[1].trim()}</b><p>${p}</p>
+     <div class="row">
+       <div class="f"><svg><use href="#${id}"/></svg></div><span class="lbl">16px</span>
+       <div class="oc"><svg><use href="#${id}"/></svg></div>
+       <div class="ni"><svg><use href="#${id}"/></svg></div>
+       <div class="stk"><svg><use href="#${id}"/></svg></div>
+       <span class="lbl">cream / night / sticker</span>
+     </div>
+   </div>
+ </div>`).join('');
+</script>

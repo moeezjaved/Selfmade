@@ -15,7 +15,7 @@ import ReportsNarrative from '@/components/reports/ReportsNarrative'
 export const dynamic = 'force-dynamic'
 
 // ── Theme (matches the app: cream page, ink text, forest/lime, soft-elevation cards) ──
-const INK = '#17251c', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
 const SERIF = "'Instrument Serif', Georgia, serif"
 // One card look everywhere — white on the cream page, separated by elevation, not a hairline border.
 const CARD: React.CSSProperties = { background: '#fff', borderRadius: 18, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 12px 32px -20px rgba(17,24,17,.14)' }
@@ -188,7 +188,7 @@ function ReportsPage() {
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
           <img src='/favicon.png' alt='' style={{ width: 44, height: 44, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 16px', display: 'block' }} />
-          <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Loading your reports...</div>
+          <div style={{ color: '#141d15', fontWeight: 700 }}>Loading your reports...</div>
         </div>
       ) : error ? (
         <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 24, color: '#c0392b' }}>{error}</div>
@@ -418,16 +418,16 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
     <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>🎨 Best Creatives</div>
-          <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>Top ads by performance</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#141d15' }}>🎨 Best Creatives</div>
+          <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 1 }}>Top ads by performance</div>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f0f7ee', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} ads</div>
+        <div style={{ fontSize: 10, fontWeight: 700, color: '#8b8a72', background: '#f4f0e6', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} ads</div>
       </div>
 
       {shown.map((c: any, i: number) => (
         <div key={i} style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.05)', display: 'flex', alignItems: 'center', gap: 14 }}>
           {/* Thumbnail */}
-          <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.08)', position: 'relative' }}>
+          <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flexShrink: 0, background: '#f4f0e6', border: '1px solid rgba(0,0,0,0.08)', position: 'relative' }}>
             {c.thumbnail_url ? (
               <a href={c.preview_url || c.thumbnail_url} target="_blank" rel="noopener noreferrer" style={{display:'block',width:'100%',height:'100%'}}>
                 <img src={c.thumbnail_url} alt={c.name}
@@ -444,13 +444,13 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
           {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#8aaa8a' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
-              <span style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
+              <span style={{ fontSize: 11, color: '#8b8a72' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: '#141d15', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <span style={{ fontSize: 11, color: '#8aaa8a' }}>Spent: {fmt(c.spend)}</span>
-              <span style={{ fontSize: 11, color: '#8aaa8a' }}>Conv: {c.conversions}</span>
-              <span style={{ fontSize: 11, color: '#8aaa8a' }}>CTR: {c.ctr.toFixed(2)}%</span>
+              <span style={{ fontSize: 11, color: '#8b8a72' }}>Spent: {fmt(c.spend)}</span>
+              <span style={{ fontSize: 11, color: '#8b8a72' }}>Conv: {c.conversions}</span>
+              <span style={{ fontSize: 11, color: '#8b8a72' }}>CTR: {c.ctr.toFixed(2)}%</span>
             </div>
             {/* Progress bar */}
             <div style={{ height: 3, background: 'rgba(0,0,0,0.06)', borderRadius: 100, marginTop: 6, overflow: 'hidden' }}>
@@ -465,7 +465,7 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
             </span>
             {c.preview_url ? (
               <a href={c.preview_url} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, color: '#1a3a1a', background: '#dffe95', padding: '4px 12px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                style={{ fontSize: 11, fontWeight: 700, color: '#141d15', background: '#ff5a2c', padding: '4px 12px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                 👁 View Ad
               </a>
             ) : null}
@@ -474,7 +474,7 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
       ))}
 
       {creatives.length > 3 && (
-        <button onClick={toggle} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <button onClick={toggle} style={{ width: '100%', padding: '12px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#141d15', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
           {expanded ? '▲ Show Less' : `▼ Show ${creatives.length - 3} More`}
         </button>
       )}
@@ -498,16 +498,16 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
     <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
       <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#1a3a1a' }}>🎯 Creative × Audience Intelligence</div>
-          <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>Which audiences Meta serves each creative to — click any row to expand</div>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#141d15' }}>🎯 Creative × Audience Intelligence</div>
+          <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 1 }}>Which audiences Meta serves each creative to — click any row to expand</div>
         </div>
-        {!loading && creatives.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#8aaa8a', background: '#f0f7ee', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} creatives</div>}
+        {!loading && creatives.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#8b8a72', background: '#f4f0e6', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} creatives</div>}
       </div>
 
       {loading ? (
-        <div style={{ padding: '24px 20px', textAlign: 'center', color: '#8aaa8a', fontSize: 12 }}>⏳ Analysing audience breakdowns…</div>
+        <div style={{ padding: '24px 20px', textAlign: 'center', color: '#8b8a72', fontSize: 12 }}>⏳ Analysing audience breakdowns…</div>
       ) : creatives.length === 0 ? (
-        <div style={{ padding: '24px 20px', textAlign: 'center', color: '#8aaa8a', fontSize: 12 }}>No creative data yet — needs active campaigns with spend.</div>
+        <div style={{ padding: '24px 20px', textAlign: 'center', color: '#8b8a72', fontSize: 12 }}>No creative data yet — needs active campaigns with spend.</div>
       ) : (
         <>
           {visible.map((c: any, idx: number) => (
@@ -517,7 +517,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                 onMouseEnter={e => (e.currentTarget.style.background = '#fafcfa')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
                 onClick={() => toggle(c.creative_id)}>
-                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#f0f7ee', border: '1px solid #e8f0e8', flexShrink: 0 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#f4f0e6', border: '1px solid #e8f0e8', flexShrink: 0 }}>
                   {c.thumbnail_url
                     ? <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎨</div>}
@@ -535,22 +535,22 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                       </span>
                     )}
                   </div>
-                  <div style={{ fontSize: 12, color: '#1a3a1a', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 12, color: '#141d15', fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {c.primary_text ? c.primary_text.slice(0, 90) + (c.primary_text.length > 90 ? '…' : '') : c.headline || '(no copy)'}
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: 14, alignItems: 'center', flexShrink: 0 }}>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: '#1a3a1a' }}>{fmtN(c.total_spend)}</div>
-                    <div style={{ fontSize: 10, color: '#8aaa8a' }}>spent</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: '#141d15' }}>{fmtN(c.total_spend)}</div>
+                    <div style={{ fontSize: 10, color: '#8b8a72' }}>spent</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
                     <div style={{ fontSize: 12, fontWeight: 800, color: c.conversions > 0 ? '#2e7d32' : '#9ca3af' }}>{c.conversions > 0 ? c.conversions : '—'}</div>
-                    <div style={{ fontSize: 10, color: '#8aaa8a' }}>conv</div>
+                    <div style={{ fontSize: 10, color: '#8b8a72' }}>conv</div>
                   </div>
                   {c.preview_url && (
                     <a href={c.preview_url} target="_blank" rel="noopener noreferrer" onClick={(e: any) => e.stopPropagation()}
-                      style={{ background: '#dffe95', color: '#1a3a1a', padding: '4px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>👁</a>
+                      style={{ background: '#ff5a2c', color: '#141d15', padding: '4px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>👁</a>
                   )}
                   <span style={{ fontSize: 10, color: '#bbb' }}>{expanded[c.creative_id] ? '▲' : '▼'}</span>
                 </div>
@@ -561,7 +561,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', borderTop: '1px solid #f0f5f0' }}>
                   {/* Left: Who */}
                   <div style={{ padding: '14px 20px', borderRight: '1px solid #f0f5f0' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: '#1a3a1a', marginBottom: 10 }}>👤 Audience breakdown</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#141d15', marginBottom: 10 }}>👤 Audience breakdown</div>
                     {c.genderSplit.length > 0 && (
                       <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
                         {c.genderSplit.map((g: any) => (
@@ -592,13 +592,13 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
 
                   {/* Right: Placements + Why */}
                   <div style={{ padding: '14px 20px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: '#1a3a1a', marginBottom: 10 }}>📍 Placements</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: '#141d15', marginBottom: 10 }}>📍 Placements</div>
                     {c.topPlacements.length > 0 && (
                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
                         {c.topPlacements.map((p: any, i: number) => (
                           <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 7 }}>
                             <span style={{ fontSize: 12 }}>{PLATFORM_EMOJI[p.platform] || '📱'}</span>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#1a3a1a' }}>{p.platform}</span>
+                            <span style={{ fontSize: 11, fontWeight: 600, color: '#141d15' }}>{p.platform}</span>
                             <span style={{ fontSize: 10, color: '#6b7280' }}>{p.position}</span>
                             <span style={{ fontSize: 11, fontWeight: 800, color: '#4caf50', marginLeft: 2 }}>{p.pct}%</span>
                           </div>
@@ -606,9 +606,9 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                       </div>
                     )}
                     {c.why && (
-                      <div style={{ background: '#f0f7ee', border: '1px solid #c8e6c0', borderRadius: 9, padding: '9px 12px' }}>
+                      <div style={{ background: '#f4f0e6', border: '1px solid #c8e6c0', borderRadius: 9, padding: '9px 12px' }}>
                         <div style={{ fontSize: 10, fontWeight: 800, color: '#2e7d32', marginBottom: 3 }}>✨ Why this audience</div>
-                        <div style={{ fontSize: 12, color: '#1a3a1a', lineHeight: 1.55 }}>{c.why}</div>
+                        <div style={{ fontSize: 12, color: '#141d15', lineHeight: 1.55 }}>{c.why}</div>
                       </div>
                     )}
                   </div>
@@ -619,7 +619,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
 
           {creatives.length > 2 && (
             <button onClick={() => setShowAll(s => !s)}
-              style={{ width: '100%', padding: '11px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+              style={{ width: '100%', padding: '11px', background: 'rgba(0,0,0,0.02)', border: 'none', borderTop: '1px solid rgba(0,0,0,0.04)', color: '#141d15', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
               {showAll ? '▲ Show Less' : `▼ Show ${creatives.length - 2} More Creatives`}
             </button>
           )}
@@ -654,7 +654,7 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   const metricColor = (item: ReportItem) => {
     if (sortKey === 'roas') return roasColor(item.roas)
     if (sortKey === 'cpa') return item.cpa > 0 ? '#fbbf24' : 'rgba(255,255,255,0.5)'
-    return '#dffe95'
+    return '#ff5a2c'
   }
 
   const maxVal = Math.max(...items.map(i => {
@@ -691,7 +691,7 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
           return (
             <div key={i} style={{ padding: '10px 20px', borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a', flex: 1, marginRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: '#141d15', flex: 1, marginRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {i === 0 && <span style={{ marginRight: 6 }}>🥇</span>}
                   {i === 1 && <span style={{ marginRight: 6 }}>🥈</span>}
                   {i === 2 && <span style={{ marginRight: 6 }}>🥉</span>}
@@ -705,15 +705,15 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
                 </div>
               </div>
               {/* Progress bar */}
-              <div style={{ height: 4, background: '#f8fcf6', borderRadius: 100, overflow: 'hidden' }}>
+              <div style={{ height: 4, background: '#f9f5ec', borderRadius: 100, overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: barWidth + '%', background: roasColor(item.roas), borderRadius: 100, transition: 'width .3s' }} />
               </div>
               {/* Sub metrics */}
               <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                <span style={{ fontSize: 10, color: '#8aaa8a' }}>Revenue: {fmt(item.revenue, currency)}</span>
-                <span style={{ fontSize: 10, color: '#8aaa8a' }}>Conv: {item.conversions}</span>
-                <span style={{ fontSize: 10, color: '#8aaa8a' }}>CTR: {item.ctr.toFixed(2)}%</span>
-                <span style={{ fontSize: 10, color: '#8aaa8a' }}>CPA: {fmt(item.cpa, currency)}</span>
+                <span style={{ fontSize: 10, color: '#8b8a72' }}>Revenue: {fmt(item.revenue, currency)}</span>
+                <span style={{ fontSize: 10, color: '#8b8a72' }}>Conv: {item.conversions}</span>
+                <span style={{ fontSize: 10, color: '#8b8a72' }}>CTR: {item.ctr.toFixed(2)}%</span>
+                <span style={{ fontSize: 10, color: '#8b8a72' }}>CPA: {fmt(item.cpa, currency)}</span>
               </div>
             </div>
           )
@@ -722,7 +722,7 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
 
       {/* Show More */}
       {rest.length > 0 && (
-        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.02)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', color: '#1a3a1a', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.02)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', color: '#141d15', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
           {isExpanded ? '▲ Show Less' : `▼ Show ${rest.length} More`}
         </button>
       )}

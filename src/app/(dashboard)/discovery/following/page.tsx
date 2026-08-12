@@ -49,7 +49,7 @@ export default function FollowingPage() {
   if (brands.length === 0) return (
     <div style={{ padding: 48, maxWidth: 560, margin: '30px auto', textAlign: 'center' }}>
       <EmptyState heading="You're not following any brands yet" sub="Hover a brand in Discovery and hit Follow to build a feed of just their new ads." />
-      <Link href="/discovery" style={{ display: 'inline-block', marginTop: 6, padding: '10px 18px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>Find brands to follow →</Link>
+      <Link href="/discovery" style={{ display: 'inline-block', marginTop: 6, padding: '10px 18px', background: '#141d15', color: '#ff5a2c', borderRadius: 10, fontWeight: 700, fontSize: 14, textDecoration: 'none' }}>Find brands to follow →</Link>
     </div>
   )
 

@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { Search, Target, ExternalLink, Eye } from 'lucide-react'
 
-const DARK = '#1a3a1a'
+const DARK = '#141d15'
 
 interface Brand {
   pageId: string; name: string; avatar: string | null; industry: string | null; adCount: number
@@ -175,7 +175,7 @@ export default function BrandsPage() {
                 <ExternalLink size={13} /> Ad Library
               </a>
               <button onClick={() => spy(b)} disabled={spying === b.pageId}
-                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#dffe95', background: DARK, border: 'none', cursor: spying === b.pageId ? 'default' : 'pointer', padding: '6px 12px', borderRadius: 7, fontFamily: 'inherit' }}>
+                style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12.5, fontWeight: 700, color: '#ff5a2c', background: DARK, border: 'none', cursor: spying === b.pageId ? 'default' : 'pointer', padding: '6px 12px', borderRadius: 7, fontFamily: 'inherit' }}>
                 {b.isSpied ? <Eye size={13} /> : <Target size={13} />} {spying === b.pageId ? 'Starting…' : b.isSpied ? 'Spying' : 'Spy'}
               </button>
             </div>
@@ -192,11 +192,11 @@ export default function BrandsPage() {
                 placeholder="https://www.facebook.com/ads/library/?...view_all_page_id=123..."
                 style={{ flex: 1, minWidth: 240, padding: '10px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13.5, outline: 'none', color: '#111' }} />
               <button onClick={importFromUrl} disabled={importing || !manualUrl.trim()}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: DARK, color: '#dffe95', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, cursor: importing || !manualUrl.trim() ? 'default' : 'pointer', opacity: importing || !manualUrl.trim() ? 0.6 : 1, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: DARK, color: '#ff5a2c', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13.5, fontWeight: 700, cursor: importing || !manualUrl.trim() ? 'default' : 'pointer', opacity: importing || !manualUrl.trim() ? 0.6 : 1, fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
                 <Target size={14} /> {importing ? 'Importing…' : 'Spy this brand'}
               </button>
             </div>
-            <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>Open the brand on the <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener noreferrer" style={{ color: '#1a3a1a', fontWeight: 600 }}>Meta Ad Library</a>, copy the page URL, and paste it above.</div>
+            <div style={{ fontSize: 11.5, color: '#9ca3af', marginTop: 8 }}>Open the brand on the <a href="https://www.facebook.com/ads/library" target="_blank" rel="noopener noreferrer" style={{ color: '#141d15', fontWeight: 600 }}>Meta Ad Library</a>, copy the page URL, and paste it above.</div>
           </div>
         )}
         <div ref={sentinel} style={{ height: 1 }} />
@@ -212,7 +212,7 @@ export default function BrandsPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={() => doSpy(confirmSpy)} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
+              <button onClick={() => doSpy(confirmSpy)} style={{ background: '#141d15', color: '#ff5a2c', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
             </div>
           </div>
         </div>

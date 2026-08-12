@@ -163,7 +163,7 @@ export default function AssetsPage() {
         </div>
         {limitGb != null && (
           <div style={{ height: 7, borderRadius: 100, background: '#eef0ee', overflow: 'hidden' }}>
-            <div style={{ width: `${pct}%`, height: '100%', background: near ? '#dc2626' : '#84cc16', transition: 'width .3s' }} />
+            <div style={{ width: `${pct}%`, height: '100%', background: near ? '#dc2626' : '#ef4a1e', transition: 'width .3s' }} />
           </div>
         )}
       </div>
@@ -256,7 +256,7 @@ export default function AssetsPage() {
                     {a.file_type === 'video' ? <Film size={12} /> : a.file_type === 'audio' ? <Music size={12} /> : <ImageIcon size={12} />}
                   </span>
                   {a.status === 'processing' && (
-                    <span style={{ position: 'absolute', bottom: 7, left: 7, background: 'rgba(14,27,18,0.85)', color: '#dffe95', borderRadius: 6, padding: '2px 7px', fontSize: 9.5, fontWeight: 800 }}>✨ AI tagging…</span>
+                    <span style={{ position: 'absolute', bottom: 7, left: 7, background: 'rgba(14,27,18,0.85)', color: '#ff5a2c', borderRadius: 6, padding: '2px 7px', fontSize: 9.5, fontWeight: 800 }}>✨ AI tagging…</span>
                   )}
                   <button onClick={() => del(a.id)} title="Delete"
                     style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,0.55)', border: 'none', borderRadius: 6, padding: 4, cursor: 'pointer', color: '#fecaca', display: 'flex' }}>
@@ -267,14 +267,14 @@ export default function AssetsPage() {
                         was removed, so its button is gone. Download shows for ALL types (below). */}
                     {a.file_type === 'image' && (
                       <button onClick={() => { window.location.href = `/studio?src=asset&img=${encodeURIComponent(a.file_url)}` }} title="Remake this creative with your product"
-                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        style={{ background: '#ff5a2c', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Sparkles size={11} /> Remake
                       </button>
                     )}
                     {/* Video assets: remake into a new video ad with your product (opens the video wizard). */}
                     {a.file_type === 'video' && a.status !== 'processing' && (
                       <button onClick={() => { window.location.href = `/studio?src=asset&type=video&vid=${encodeURIComponent(a.file_url)}` }} title="Remake this video with your product"
-                        style={{ background: '#dffe95', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
+                        style={{ background: '#ff5a2c', color: '#14281a', border: 'none', borderRadius: 6, padding: '3px 8px', cursor: 'pointer', fontSize: 9.5, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 3 }}>
                         <Sparkles size={11} /> Remake
                       </button>
                     )}

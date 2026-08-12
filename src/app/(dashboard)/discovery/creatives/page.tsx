@@ -93,7 +93,7 @@ export default function CreativesPage() {
     <div style={{ padding: 24, maxWidth: 1600, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Creatives Library</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Creatives Library</h1>
         <p style={{ fontSize: 13, color: '#7a9a7a' }}>
           Unique visual creatives grouped from all indexed ads. Ads sharing the same image are merged into one entry.
         </p>
@@ -104,7 +104,7 @@ export default function CreativesPage() {
         <Link href="/discovery" style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, color: '#6b7280', textDecoration: 'none' }}>
           🔍 Explore
         </Link>
-        <Link href="/discovery/creatives" style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, color: '#1a3a1a', borderBottom: '2px solid #1a3a1a', textDecoration: 'none' }}>
+        <Link href="/discovery/creatives" style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, color: '#141d15', borderBottom: '2px solid #141d15', textDecoration: 'none' }}>
           🎨 Creatives
         </Link>
         <Link href="/discovery?tab=saved" style={{ padding: '10px 16px', fontSize: 14, fontWeight: 700, color: '#6b7280', textDecoration: 'none' }}>
@@ -120,8 +120,8 @@ export default function CreativesPage() {
             <button key={o.value} onClick={() => setType(o.value as any)}
               style={{
                 padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                background: type === o.value ? '#1a3a1a' : 'transparent',
-                color: type === o.value ? '#dffe95' : '#6b7280',
+                background: type === o.value ? '#141d15' : 'transparent',
+                color: type === o.value ? '#ff5a2c' : '#6b7280',
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               }}>
               {o.label}
@@ -172,7 +172,7 @@ export default function CreativesPage() {
       {hasMore && !loading && (
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <button onClick={() => load(page + 1, false)}
-            style={{ padding: '10px 24px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '10px 24px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             Load more
           </button>
         </div>
@@ -207,7 +207,7 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
         )}
 
         {/* Ad count badge */}
-        <div style={{ position: 'absolute', top: 8, right: 8, background: '#1a3a1a', color: '#dffe95', fontSize: 12, fontWeight: 800, padding: '4px 10px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ position: 'absolute', top: 8, right: 8, background: '#141d15', color: '#ff5a2c', fontSize: 12, fontWeight: 800, padding: '4px 10px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 4 }}>
           ×{c.ad_count}
         </div>
 

@@ -16,7 +16,7 @@ import { useRouter } from 'next/navigation'
 import { Loader2, Check, ExternalLink, Copy } from 'lucide-react'
 import { META_LIVE } from '@/lib/flags'
 
-const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
+const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', GREEN = '#ef4a1e'
 type Acct = { account_id: string; name: string; currency: string; timezone: string; active: boolean }
 
 export default function ConnectMetaByo() {

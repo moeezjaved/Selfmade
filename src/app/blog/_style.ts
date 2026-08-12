@@ -11,7 +11,7 @@ const GRADS: [string, string][] = [
   ['#6ee7d7', '#0ea5e9'], // teal → blue
   ['#fca5a5', '#f97316'], // coral → orange
   ['#c4b5fd', '#6366f1'], // lavender → indigo
-  ['#bef264', '#22c55e'], // lime → green
+  ['#ff5a2c', '#22c55e'], // lime → green
   ['#fde68a', '#f59e0b'], // yellow → amber
   ['#f9a8d4', '#db2777'], // pink → magenta
   ['#93c5fd', '#3b82f6'], // sky → blue

@@ -10,7 +10,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PLANS, TOPUP_PACKS, type PlanId } from '@/lib/plans'
 
-const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#dffe95'
+const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#ff5a2c'
 const CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
 
 function CardCheckout() {

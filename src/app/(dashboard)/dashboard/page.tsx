@@ -263,19 +263,19 @@ function DashboardPage() {
       <div className="p-4 sm:p-8">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-2xl font-black tracking-tight" style={{color:"#1a3a1a"}}>Dashboard</h1>
-            <p className="text-sm mt-0.5" style={{color:"#8aaa8a"}}>No ad account connected</p>
+            <h1 className="text-2xl font-black tracking-tight" style={{color:"#141d15"}}>Dashboard</h1>
+            <p className="text-sm mt-0.5" style={{color:"#8b8a72"}}>No ad account connected</p>
           </div>
         </div>
         <div style={{background:'#fff',border:'1px solid #e2ecdf',borderRadius:20,padding:'56px 32px',textAlign:'center',maxWidth:540,margin:'32px auto'}}>
           <div style={{width:56,height:56,borderRadius:16,background:'#f0f7e6',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 20px'}}>
-            <Zap size={26} style={{color:'#1a3a1a'}}/>
+            <Zap size={26} style={{color:'#141d15'}}/>
           </div>
-          <h2 style={{fontSize:20,fontWeight:800,color:'#1a3a1a',marginBottom:8}}>No ad account connected</h2>
+          <h2 style={{fontSize:20,fontWeight:800,color:'#141d15',marginBottom:8}}>No ad account connected</h2>
           <p style={{fontSize:14,color:'#6f8a6f',marginBottom:24,lineHeight:1.5,maxWidth:400,marginLeft:'auto',marginRight:'auto'}}>
             Connect your Meta account to see spend, ROAS, and live campaign performance here.
           </p>
-          <a href="/connect-meta" style={{display:'inline-flex',alignItems:'center',gap:8,background:'#dffe95',color:'#0e1b12',fontWeight:800,fontSize:14,padding:'12px 22px',borderRadius:12,textDecoration:'none'}}>
+          <a href="/connect-meta" style={{display:'inline-flex',alignItems:'center',gap:8,background:'#ff5a2c',color:'#0e1b12',fontWeight:800,fontSize:14,padding:'12px 22px',borderRadius:12,textDecoration:'none'}}>
             <Zap size={15}/> Connect Meta account
           </a>
         </div>
@@ -289,8 +289,8 @@ function DashboardPage() {
       {/* ── TOPBAR ── */}
       <div className="flex items-center justify-between mb-8">
         <div>
-          <h1 className="text-2xl font-black tracking-tight" style={{color:"#1a3a1a"}}>Dashboard</h1>
-          <p className="text-sm mt-0.5" style={{color:"#8aaa8a"}}>
+          <h1 className="text-2xl font-black tracking-tight" style={{color:"#141d15"}}>Dashboard</h1>
+          <p className="text-sm mt-0.5" style={{color:"#8b8a72"}}>
             {data.lastSynced ? `Last synced ${timeAgo(data.lastSynced)}` : 'Not yet synced'}
           </p>
         </div>
@@ -318,23 +318,23 @@ function DashboardPage() {
             <TrendingUp size={20} className="text-dark"/>
           </div>
           <div className="flex-1">
-            <div className="text-base font-bold flex items-center gap-2" style={{color:"#1a3a1a"}}>
+            <div className="text-base font-bold flex items-center gap-2" style={{color:"#141d15"}}>
               Scale & Insights
               <span className="text-[10px] font-bold bg-lime text-dark px-2 py-0.5 rounded-full">NEW</span>
             </div>
-            <div className="text-xs" style={{color:"#8aaa8a"}}>Scale winners, pause losers, track ROAS live</div>
+            <div className="text-xs" style={{color:"#8b8a72"}}>Scale winners, pause losers, track ROAS live</div>
           </div>
-          <ChevronRight size={16} className="transition-colors" style={{color:"#8aaa8a"}}/>
+          <ChevronRight size={16} className="transition-colors" style={{color:"#8b8a72"}}/>
         </Link>
         <Link href="/reports" className="flex items-center gap-4 bg-dark2 border border-white/10 rounded-2xl px-5 py-4 hover:border-lime/30 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-lime/10 border border-lime/20 flex items-center justify-center flex-shrink-0">
             <Sparkles size={20} className="text-lime"/>
           </div>
           <div className="flex-1">
-            <div className="text-base font-bold" style={{color:"#1a3a1a"}}>Deep Reports</div>
-            <div className="text-xs" style={{color:"#8aaa8a"}}>Age, gender, placement, device breakdowns</div>
+            <div className="text-base font-bold" style={{color:"#141d15"}}>Deep Reports</div>
+            <div className="text-xs" style={{color:"#8b8a72"}}>Age, gender, placement, device breakdowns</div>
           </div>
-          <ChevronRight size={16} className="transition-colors" style={{color:"#8aaa8a"}}/>
+          <ChevronRight size={16} className="transition-colors" style={{color:"#8b8a72"}}/>
         </Link>
       </div>
 
@@ -351,7 +351,7 @@ function DashboardPage() {
             {kpi.featured && (
               <div className="absolute top-0 left-0 right-0 h-0.5 bg-gradient-to-r from-transparent via-lime to-transparent"/>
             )}
-            <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{color:"#8aaa8a"}}>
+            <div className="text-[11px] font-bold uppercase tracking-wider mb-2" style={{color:"#8b8a72"}}>
               {kpi.label}
             </div>
             <div className={cn(
@@ -382,8 +382,8 @@ function DashboardPage() {
           {/* Winners from Scale & Insights */}
           <div className="card">
             <div className="flex items-center justify-between px-6 py-4" style={{borderBottom:"1px solid rgba(0,0,0,0.07)"}}>
-              <div className="font-black text-base" style={{color:"#1a3a1a"}}>🚀 Winning Ad Sets</div>
-              <Link href="/insights" className="text-sm font-semibold" style={{color:"#5a7a5a"}}>View Scale & Insights →</Link>
+              <div className="font-black text-base" style={{color:"#141d15"}}>🚀 Winning Ad Sets</div>
+              <Link href="/insights" className="text-sm font-semibold" style={{color:"#6b6a58"}}>View Scale & Insights →</Link>
             </div>
             {winnersLoading ? (
               <div className="px-6 py-4 flex flex-col gap-3">
@@ -401,9 +401,9 @@ function DashboardPage() {
                 ))}
               </div>
             ) : winners.length === 0 ? (
-              <div className="px-6 py-10 text-center text-sm" style={{color:"#8aaa8a"}}>
+              <div className="px-6 py-10 text-center text-sm" style={{color:"#8b8a72"}}>
                 No winners detected yet.{' '}
-                <Link href="/insights" style={{color:"#1a3a1a",fontWeight:700}}>Open Scale & Insights</Link>
+                <Link href="/insights" style={{color:"#141d15",fontWeight:700}}>Open Scale & Insights</Link>
                 {' '}to analyse your campaigns.
               </div>
             ) : (
@@ -411,19 +411,19 @@ function DashboardPage() {
                 <div key={i} style={{padding:"14px 24px",borderBottom:"1px solid rgba(0,0,0,0.05)"}}>
                   <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:6}}>
                     <div>
-                      <div style={{fontSize:13,fontWeight:700,color:"#1a3a1a"}}>{w.name}</div>
-                      <div style={{fontSize:11,color:"#8aaa8a",marginTop:2}}>{w.campaignName}</div>
+                      <div style={{fontSize:13,fontWeight:700,color:"#141d15"}}>{w.name}</div>
+                      <div style={{fontSize:11,color:"#8b8a72",marginTop:2}}>{w.campaignName}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
                       <span style={{background:"rgba(45,122,45,0.1)",border:"1px solid rgba(45,122,45,0.2)",color:"#2d7a2d",padding:"3px 10px",borderRadius:100,fontSize:11,fontWeight:700}}>
                         🏆 {w.roas?.toFixed(2)}x ROAS
                       </span>
-                      <Link href="/insights" style={{background:"#1a3a1a",color:"#dffe95",padding:"5px 14px",borderRadius:100,fontSize:11,fontWeight:800,textDecoration:"none"}}>
+                      <Link href="/insights" style={{background:"#141d15",color:"#ff5a2c",padding:"5px 14px",borderRadius:100,fontSize:11,fontWeight:800,textDecoration:"none"}}>
                         Scale Now →
                       </Link>
                     </div>
                   </div>
-                  <div style={{fontSize:12,color:"#6b8f6b",background:"#f0f7ee",borderLeft:"3px solid #2d7a2d",padding:"8px 12px",borderRadius:"0 8px 8px 0"}}>
+                  <div style={{fontSize:12,color:"#6b8f6b",background:"#f4f0e6",borderLeft:"3px solid #2d7a2d",padding:"8px 12px",borderRadius:"0 8px 8px 0"}}>
                     {w.recommendation}
                   </div>
                 </div>
@@ -434,19 +434,19 @@ function DashboardPage() {
           {/* Campaigns table */}
           <div className="card">
             <div className="flex items-center justify-between px-6 py-5 border-b" style={{borderColor:"rgba(0,0,0,0.07)"}}>
-              <div className="text-lg font-black" style={{color:"#1a3a1a"}}>Campaigns</div>
-              <Link href="/campaigns" className="text-sm font-semibold" style={{color:"#5a7a5a"}}>View Campaigns →</Link>
+              <div className="text-lg font-black" style={{color:"#141d15"}}>Campaigns</div>
+              <Link href="/campaigns" className="text-sm font-semibold" style={{color:"#6b6a58"}}>View Campaigns →</Link>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="bg-dark3">
-                    <th className="text-left px-6 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Campaign</th>
-                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8aaa8a"}}>Status</th>
-                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>Spend</th>
-                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>ROAS</th>
-                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>CPA</th>
-                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8aaa8a"}}>CTR</th>
+                    <th className="text-left px-6 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8b8a72"}}>Campaign</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-bold uppercase tracking-wider" style={{color:"#8b8a72"}}>Status</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8b8a72"}}>Spend</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8b8a72"}}>ROAS</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8b8a72"}}>CPA</th>
+                    <th className="text-left px-3 py-3 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap" style={{color:"#8b8a72"}}>CTR</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -462,7 +462,7 @@ function DashboardPage() {
                       <tr key={campaign.id} className="hover:bg-dark3 transition-colors" style={{borderTop:"1px solid rgba(0,0,0,0.04)"}}>
                         <td className="px-6 py-4">
                           <div style={{display:'flex',alignItems:'center',gap:10}}>
-                            <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f0f7ee',border:'1px solid rgba(0,0,0,0.08)'}}>
+                            <div style={{width:40,height:40,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f4f0e6',border:'1px solid rgba(0,0,0,0.08)'}}>
                               {topAd?.thumbnail_url ? (
                                 <img src={topAd.thumbnail_url} alt={campaign.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e:any)=>{e.target.style.display='none'}} />
                               ) : (
@@ -470,9 +470,9 @@ function DashboardPage() {
                               )}
                             </div>
                             <div style={{minWidth:0}}>
-                              <div className="text-sm font-bold truncate max-w-[160px]" style={{color:'#1a3a1a'}}>{campaign.name}</div>
+                              <div className="text-sm font-bold truncate max-w-[160px]" style={{color:'#141d15'}}>{campaign.name}</div>
                               {topAd?.preview_url && (
-                                <a href={topAd.preview_url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,fontWeight:700,color:'#5a7a5a',textDecoration:'none'}}>👁 View Ad</a>
+                                <a href={topAd.preview_url} target="_blank" rel="noopener noreferrer" style={{fontSize:11,fontWeight:700,color:'#6b6a58',textDecoration:'none'}}>👁 View Ad</a>
                               )}
                             </div>
                           </div>
@@ -485,10 +485,10 @@ function DashboardPage() {
                             {campaign.status === 'ACTIVE' ? '● Active' : '⏸ Paused'}
                           </span>
                         </td>
-                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.spend || 0, currency)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#141d15"}}>{formatCurrency(insights?.spend || 0, currency)}</td>
                         <td className="px-3 py-4 text-sm font-bold whitespace-nowrap text-status-green">{formatROAS(insights?.roas || 0)}</td>
-                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatCurrency(insights?.cpa || 0, currency)}</td>
-                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#1a3a1a"}}>{formatPercent(insights?.ctr || 0)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#141d15"}}>{formatCurrency(insights?.cpa || 0, currency)}</td>
+                        <td className="px-3 py-4 text-sm font-bold whitespace-nowrap" style={{color:"#141d15"}}>{formatPercent(insights?.ctr || 0)}</td>
                       </tr>
                     )
                   })}
@@ -523,7 +523,7 @@ function DashboardPage() {
                   <span className="text-2xl font-black" style={{color:healthColor}}>{healthScore}</span>
                 </div>
               </div>
-              <div className="text-sm mb-2" style={{color:"#8aaa8a"}}>Account Health Score</div>
+              <div className="text-sm mb-2" style={{color:"#8b8a72"}}>Account Health Score</div>
               <div className="inline-flex items-center gap-2 bg-green/10 border border-green/20 text-status-green text-xs font-bold px-3 py-1 rounded-full">
                 {healthScore >= 80 ? "● Excellent" : healthScore >= 60 ? "● Good" : healthScore >= 40 ? "● Fair" : "● Needs work"}
               </div>

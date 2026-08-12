@@ -9,7 +9,7 @@ import { getPublishedPosts, SITE_URL } from '@/lib/blog'
 import { coverStyle, catStyle, categoryOf } from './_style'
 
 export const revalidate = 300
-const BG = '#0a0d0c', LIME = '#dffe95', CARD = '#121614'
+const BG = '#0a0d0c', LIME = '#ff5a2c', CARD = '#121614'
 
 export const metadata: Metadata = {
   title: { absolute: 'Blog — Winning Meta Ad Strategies & Teardowns | Selfmade' },
@@ -30,7 +30,7 @@ export default async function BlogIndex() {
   } : null
 
   return (
-    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(223,254,149,.05) 1.1px, transparent 1.1px), radial-gradient(1000px 520px at 12% -8%, rgba(223,254,149,.12), transparent 58%), radial-gradient(820px 460px at 97% 0%, rgba(34,197,94,.14), transparent 58%), radial-gradient(700px 600px at 55% 120%, rgba(125,211,120,.06), transparent 60%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat, no-repeat', color: '#f4f7f4', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(255,90,44,.05) 1.1px, transparent 1.1px), radial-gradient(1000px 520px at 12% -8%, rgba(255,90,44,.12), transparent 58%), radial-gradient(820px 460px at 97% 0%, rgba(34,197,94,.14), transparent 58%), radial-gradient(700px 600px at 55% 120%, rgba(125,211,120,.06), transparent 60%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat, no-repeat', color: '#f4f7f4', minHeight: '100vh' }}>
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
       <nav style={{ borderBottom: '1px solid rgba(255,255,255,.07)', position: 'sticky', top: 0, background: 'rgba(10,13,12,.8)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '15px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>

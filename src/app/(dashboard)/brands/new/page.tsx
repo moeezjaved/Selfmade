@@ -15,8 +15,8 @@ import { BRAND_COOKIE } from '@/lib/brand/cookie'
 
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
-const INK = '#17251c', SUB = '#6b776b', LINE = '#e2e8dd', FOREST = '#17251c', LIME = '#dffe95'
-const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, boxShadow: '0 1px 2px rgba(23,37,28,0.04)' }
+const INK = '#141d15', SUB = '#6b776b', LINE = '#e2e8dd', FOREST = '#141d15', LIME = '#ff5a2c'
+const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, boxShadow: '0 1px 2px rgba(20,29,21,0.04)' }
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: `1px solid ${LINE}`, borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#fbfcfa', color: INK }
 const primary: React.CSSProperties = { padding: '10px 18px', borderRadius: 100, border: 'none', background: FOREST, color: LIME, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
 const ghost: React.CSSProperties = { padding: '10px 16px', borderRadius: 100, border: `1px solid ${LINE}`, background: '#fff', color: SUB, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }
@@ -76,7 +76,7 @@ export default function NewBrandPage() {
     <div style={{ maxWidth: 640, margin: '0 auto', padding: '32px 20px 80px' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
         {[1, 2, 3].map(n => (
-          <div key={n} style={{ height: 4, flex: 1, borderRadius: 4, background: step >= n ? FOREST : '#e7ece7' }} />
+          <div key={n} style={{ height: 4, flex: 1, borderRadius: 4, background: step >= n ? FOREST : '#efece2' }} />
         ))}
       </div>
       <div style={{ fontSize: 12, fontWeight: 700, color: SUB, letterSpacing: '.04em', marginBottom: 18 }}>Step {step} of 3</div>

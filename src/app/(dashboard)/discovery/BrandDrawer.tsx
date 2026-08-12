@@ -53,7 +53,7 @@ const TIME_FILTERS = [
   { label: '180d', days: 180 },
 ]
 
-const AVATAR_COLORS = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
+const AVATAR_COLORS = ['#141d15','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
 function avatarColor(name: string) {
   let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
   return AVATAR_COLORS[h]
@@ -71,7 +71,7 @@ function relativeDate(iso: string | null) {
 }
 
 // ── FrequencyBar ─────────────────────────────────────────────────
-function FreqBar({ label, count, max, color = '#1a3a1a' }: { label: string; count: number; max: number; color?: string }) {
+function FreqBar({ label, count, max, color = '#141d15' }: { label: string; count: number; max: number; color?: string }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
       <div style={{ width: 140, fontSize: 12, color: '#374151', fontWeight: 500, flexShrink: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={label}>{label}</div>
@@ -84,7 +84,7 @@ function FreqBar({ label, count, max, color = '#1a3a1a' }: { label: string; coun
 }
 
 // ── TagCloud ─────────────────────────────────────────────────────
-function TagCloud({ items, color = '#1a3a1a', bg = '#f0fdf4', border = '#bbf7d0' }: {
+function TagCloud({ items, color = '#141d15', bg = '#f0fdf4', border = '#bbf7d0' }: {
   items: { text: string; count: number }[]
   color?: string; bg?: string; border?: string
 }) {
@@ -133,7 +133,7 @@ function MiniCreativeCard({ ad }: { ad: any }) {
       >
         {/* Image */}
         <div style={{ position: 'relative', aspectRatio: '4/3', background: bg, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-          <span style={{ fontSize: 32, fontWeight: 800, color: '#dffe95' }}>{initials}</span>
+          <span style={{ fontSize: 32, fontWeight: 800, color: '#ff5a2c' }}>{initials}</span>
           {thumb && !imgErr && (
             <img src={thumb} alt="" onError={() => setImgErr(true)}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -182,7 +182,7 @@ function OverviewTab({ data }: { data: BrandData }) {
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px,100%), 1fr))', gap: 12 }}>
         {[
-          { icon: '📦', label: 'Total Ads', value: brand.total_ads.toLocaleString(), color: '#1a3a1a' },
+          { icon: '📦', label: 'Total Ads', value: brand.total_ads.toLocaleString(), color: '#141d15' },
           { icon: '🟢', label: 'Active Now', value: brand.active_ads.toLocaleString(), color: '#16a34a' },
           { icon: '📅', label: 'Avg Runtime', value: `${brand.avg_days_running}d`, color: '#7c3aed' },
           { icon: '🎬', label: 'Video Ads', value: brand.video_ads.toLocaleString(), color: '#0891b2' },
@@ -202,7 +202,7 @@ function OverviewTab({ data }: { data: BrandData }) {
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 12 }}>Top Hooks</div>
           {hooks.slice(0, 6).map(h => (
-            <FreqBar key={h.type} label={h.type} count={h.count} max={maxHook} color="#1a3a1a" />
+            <FreqBar key={h.type} label={h.type} count={h.count} max={maxHook} color="#141d15" />
           ))}
         </div>
       )}
@@ -241,7 +241,7 @@ function HooksTab({ hooks }: { hooks: BrandData['hooks'] }) {
         <div key={hook.type} style={{ background: '#f8fafc', borderRadius: 12, padding: 16, border: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{hook.type}</div>
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: '#1a3a1a', color: '#dffe95', borderRadius: 100 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: '#141d15', color: '#ff5a2c', borderRadius: 100 }}>
               {hook.count} ads
             </span>
           </div>
@@ -284,7 +284,7 @@ function TextListTab({ items, emptyMsg }: {
             padding: '12px 14px', background: '#fff', borderRadius: 10, border: '1px solid #f1f5f9',
             transition: 'border-color 0.15s, box-shadow 0.15s',
           }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = '#141d15'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.06)' }}
             onMouseLeave={e => { e.currentTarget.style.borderColor = '#f1f5f9'; e.currentTarget.style.boxShadow = 'none' }}
           >
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
@@ -370,7 +370,7 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
   const renderTab = () => {
     if (loading) return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, flexDirection: 'column', gap: 12 }}>
-        <div style={{ width: 28, height: 28, border: '3px solid #e2e8f0', borderTopColor: '#1a3a1a', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+        <div style={{ width: 28, height: 28, border: '3px solid #e2e8f0', borderTopColor: '#141d15', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
         <div style={{ fontSize: 13, color: '#9ca3af' }}>Loading brand data…</div>
       </div>
     )
@@ -470,7 +470,7 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
           {/* Top row */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16 }}>
             {/* Avatar */}
-            <div style={{ width: 48, height: 48, borderRadius: '50%', background: avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#dffe95', flexShrink: 0, letterSpacing: -0.5 }}>
+            <div style={{ width: 48, height: 48, borderRadius: '50%', background: avatarBg, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 800, color: '#ff5a2c', flexShrink: 0, letterSpacing: -0.5 }}>
               {initials}
             </div>
 
@@ -506,14 +506,14 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
                 onClick={() => setFollowed(f => !f)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px',
-                  background: followed ? '#1a3a1a' : '#fff',
-                  border: `1.5px solid ${followed ? '#1a3a1a' : '#e2e8f0'}`,
+                  background: followed ? '#141d15' : '#fff',
+                  border: `1.5px solid ${followed ? '#141d15' : '#e2e8f0'}`,
                   borderRadius: 8, fontSize: 13, fontWeight: 700,
-                  color: followed ? '#dffe95' : '#374151',
+                  color: followed ? '#ff5a2c' : '#374151',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}
               >
-                <Heart size={13} fill={followed ? '#dffe95' : 'none'} />
+                <Heart size={13} fill={followed ? '#ff5a2c' : 'none'} />
                 {followed ? 'Following' : 'Follow'}
               </button>
               <a
@@ -535,8 +535,8 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
                   padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                  background: timeDays === f.days ? '#1a3a1a' : 'transparent',
-                  color: timeDays === f.days ? '#dffe95' : '#6b7280',
+                  background: timeDays === f.days ? '#141d15' : 'transparent',
+                  color: timeDays === f.days ? '#ff5a2c' : '#6b7280',
                   border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 }}>
                 {f.label}
@@ -552,8 +552,8 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
                 style={{
                   padding: '10px 14px', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
                   background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit',
-                  color: activeTab === tab.id ? '#1a3a1a' : '#6b7280',
-                  borderBottom: `2px solid ${activeTab === tab.id ? '#1a3a1a' : 'transparent'}`,
+                  color: activeTab === tab.id ? '#141d15' : '#6b7280',
+                  borderBottom: `2px solid ${activeTab === tab.id ? '#141d15' : 'transparent'}`,
                   transition: 'color 0.15s, border-color 0.15s',
                 }}>
                 {tab.label}

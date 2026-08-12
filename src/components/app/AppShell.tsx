@@ -106,7 +106,7 @@ function RailIcon({ href, active, title, accent, label, children }: {
 
 const ACCT_ITEM: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none' }
 function AcctItem({ href, icon: Icon, label, accent, external }: { href: string; icon: React.ElementType; label: string; accent?: boolean; external?: boolean }) {
-  const style = { ...ACCT_ITEM, color: accent ? '#3f8f4f' : '#333d35', fontSize: 13, fontWeight: accent ? 700 : 500 }
+  const style = { ...ACCT_ITEM, color: accent ? '#ef4a1e' : '#333d35', fontSize: 13, fontWeight: accent ? 700 : 500 }
   if (external) return <a href={href} target="_blank" rel="noopener noreferrer" className="sm-acct-item" style={style}><Icon size={16} style={{ flexShrink: 0 }} /><span>{label}</span></a>
   return <Link href={href} className="sm-acct-item" style={style}><Icon size={16} style={{ flexShrink: 0 }} /><span>{label}</span></Link>
 }
@@ -196,7 +196,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
   const AcctMenu = ({ style }: { style: React.CSSProperties }) => (
     <>
       <div onClick={() => setAcctOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
-      <div style={{ ...style, width: 264, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 14px 44px rgba(23,37,28,0.16)', zIndex: 60, overflow: 'hidden' }}>
+      <div style={{ ...style, width: 264, background: '#fff', border: '1px solid #efece2', borderRadius: 14, boxShadow: '0 14px 44px rgba(20,29,21,0.16)', zIndex: 60, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px 12px', borderBottom: '1px solid #eef1ec' }}>
           <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
           <div style={{ minWidth: 0 }}>
@@ -242,17 +242,17 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
       {/* ── MOBILE TOP BAR ── */}
       {isMobile && (
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 52, zIndex: 45, background: '#f7f8f6', borderBottom: '1px solid #e9ece8', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 12px' }}>
-          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#17251c', background: 'transparent', border: 'none', borderRadius: 9 }}>
+          <button onClick={() => setNavOpen(true)} aria-label="Open menu" style={{ width: 38, height: 38, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#141d15', background: 'transparent', border: 'none', borderRadius: 9 }}>
             <Menu size={22} />
           </button>
           <Link href="/brief" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: '#141d15', color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 16, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center' }}><NotificationBell /></div>
         </div>
       )}
       {isMobile && navOpen && (
-        <div onClick={() => setNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(23,37,28,0.35)', backdropFilter: 'blur(2px)', zIndex: 49 }} />
+        <div onClick={() => setNavOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,29,21,0.35)', backdropFilter: 'blur(2px)', zIndex: 49 }} />
       )}
 
       {isMobile ? (
@@ -260,7 +260,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
         <aside style={{ width: 290, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, background: '#f7f8f6', borderRight: '1px solid #e9ece8', display: 'flex', flexDirection: 'column', transform: navOpen ? 'translateX(0)' : 'translateX(-100%)', transition: 'transform 0.25s ease', boxShadow: navOpen ? '0 0 40px rgba(0,0,0,0.4)' : 'none' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 16px 8px' }}>
             <div style={{ fontWeight: 850, fontSize: 16, letterSpacing: '-.02em', color: '#161c17' }}>Selfmade</div>
-            <button onClick={() => setNavOpen(false)} aria-label="Close menu" style={{ background: 'transparent', border: 'none', color: '#17251c', padding: 6 }}><X size={18} /></button>
+            <button onClick={() => setNavOpen(false)} aria-label="Close menu" style={{ background: 'transparent', border: 'none', color: '#141d15', padding: 6 }}><X size={18} /></button>
           </div>
           <div style={{ padding: '0 16px 6px' }}><RemakeStarter /></div>
           <nav className="flex-1 overflow-y-auto" style={{ padding: '2px 10px 12px' }}>
@@ -294,7 +294,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           onMouseLeave={() => setFlyout(null)}
           style={{ width: RAIL_W, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, background: '#f7f8f6', borderRight: '1px solid #e9ece8', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0 12px', gap: 3 }}>
           <Link href="/brief" title="Home" style={{ marginBottom: 8 }} onMouseEnter={() => setFlyout(null)}>
-            <div style={{ width: 34, height: 34, borderRadius: 11, background: '#17251c', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
+            <div style={{ width: 34, height: 34, borderRadius: 11, background: '#141d15', color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 18, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</div>
           </Link>
 
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
@@ -318,7 +318,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
                 {/* hover flyout — the old permanent panel, now on demand */}
                 {flyout === a.key && hasFlyout && (
                   <div style={{ position: 'absolute', left: '100%', top: -6, paddingLeft: 10, zIndex: 70 }}>
-                    <div style={{ width: 226, background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, boxShadow: '0 18px 50px rgba(23,37,28,0.16)', padding: '10px 8px' }}>
+                    <div style={{ width: 226, background: '#fff', border: '1px solid #efece2', borderRadius: 14, boxShadow: '0 18px 50px rgba(20,29,21,0.16)', padding: '10px 8px' }}>
                       <div style={{ padding: '2px 10px 7px', fontSize: 10, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#a2aca2' }}>{a.label}</div>
                       {a.items.map((item, i) => item.section
                         ? <div key={`s:${item.section}`} style={{ padding: '9px 10px 3px', fontSize: 9, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#b8c0b6' }}>{item.section}</div>

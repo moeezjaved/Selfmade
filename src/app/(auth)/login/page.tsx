@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import toast from 'react-hot-toast'
 
-const LIME = '#dffe95', INK = '#0e1b12'
+const LIME = '#ff5a2c', INK = '#0e1b12'
 
 export default function LoginPage() {
   const router = useRouter()

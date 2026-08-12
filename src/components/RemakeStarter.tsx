@@ -18,7 +18,7 @@ const CloneVideoModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneV
 const CloneModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneModal'), { ssr: false })
 const MakeAdsModal = dynamic(() => import('@/components/MakeAdsModal'), { ssr: false })
 
-const LIME = '#dffe95', FOREST = '#17251c', L_INK = '#161c17', L_MUTED = '#68756b', L_LINE = '#e7ece7', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', GREEN = '#3f8f4f'
+const LIME = '#ff5a2c', FOREST = '#141d15', L_INK = '#161c17', L_MUTED = '#6f6d5a', L_LINE = '#efece2', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', GREEN = '#ef4a1e'
 
 export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' | 'icon' }) {
   const router = useRouter()
@@ -67,7 +67,7 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
       {variant === 'icon' ? (
         // The rail's ＋ — the single bold thing on the quiet shell; opens the same chooser.
         <button onClick={() => { setErr(null); setOpen(true) }} title="Create an ad" aria-label="Create an ad"
-          style={{ width: 38, height: 38, borderRadius: 12, background: LIME, color: FOREST, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 8px 18px -8px rgba(23,37,28,.4)', padding: 0 }}>
+          style={{ width: 38, height: 38, borderRadius: 12, background: LIME, color: FOREST, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 8px 18px -8px rgba(20,29,21,.4)', padding: 0 }}>
           <Plus size={20} strokeWidth={2.4} />
         </button>
       ) : (
@@ -76,7 +76,7 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
           style={{
             display: 'flex', alignItems: 'center', gap: 11, width: '100%', textAlign: 'left',
             margin: '0 0 4px', padding: '13px 14px', borderRadius: 14, cursor: 'pointer',
-            background: 'radial-gradient(120% 140% at 85% 0%, #fdf6c9 0%, transparent 55%), radial-gradient(130% 120% at 0% 100%, #d9f7d0 0%, transparent 60%), linear-gradient(135deg, #eefbd2 0%, #dffe95 55%, #d3f4e2 100%)',
+            background: 'radial-gradient(120% 140% at 85% 0%, #fdf6c9 0%, transparent 55%), radial-gradient(130% 120% at 0% 100%, #d9f7d0 0%, transparent 60%), linear-gradient(135deg, #eefbd2 0%, #ff5a2c 55%, #d3f4e2 100%)',
             border: '1px solid #cfe9a4', color: FOREST,
             boxShadow: '0 6px 18px rgba(190,240,90,.25)',
           }}
@@ -92,10 +92,10 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
       {open && (
         <div onClick={() => !busy && setOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 20, border: '1px solid #dfe4de', boxShadow: '0 30px 90px -30px rgba(23,37,28,.4)', overflow: 'hidden' }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: '100%', maxWidth: 560, background: '#fff', borderRadius: 20, border: '1px solid #dfe4de', boxShadow: '0 30px 90px -30px rgba(20,29,21,.4)', overflow: 'hidden' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 20px', borderBottom: '1px solid #e0eecb', background: 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)' }}>
               <b style={{ fontSize: 16.5, color: L_INK, letterSpacing: '-.01em' }}>What do you want to make?</b>
-              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,.8)', color: '#3c473e', cursor: 'pointer', display: 'grid', placeItems: 'center', flex: '0 0 auto', padding: 0 }}><X size={16} /></button>
+              <button onClick={() => !busy && setOpen(false)} aria-label="Close" style={{ width: 30, height: 30, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,.8)', color: '#3a382f', cursor: 'pointer', display: 'grid', placeItems: 'center', flex: '0 0 auto', padding: 0 }}><X size={16} /></button>
             </div>
 
             <div style={{ padding: 18 }}>

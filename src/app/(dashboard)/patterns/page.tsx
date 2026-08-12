@@ -26,7 +26,7 @@ function Bar({ b, max }: { b: Bucket; max: number }) {
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
       <div style={{ width: 130, fontSize: 12, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flexShrink: 0 }} title={b.value}>{b.value}</div>
       <div style={{ flex: 1, height: 18, background: '#f1f5f9', borderRadius: 5, overflow: 'hidden' }}>
-        <div style={{ width: `${max ? (100 * b.count) / max : 0}%`, height: '100%', background: '#1a3a1a', borderRadius: 5 }} />
+        <div style={{ width: `${max ? (100 * b.count) / max : 0}%`, height: '100%', background: '#141d15', borderRadius: 5 }} />
       </div>
       <div style={{ width: 38, textAlign: 'right', fontSize: 12, fontWeight: 700, color: '#111', flexShrink: 0 }}>{b.pct}%</div>
     </div>
@@ -81,7 +81,7 @@ function PatternsInner() {
 
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center', marginBottom: 18 }}>
         <select value={niche} onChange={e => setNiche(e.target.value)}
-          style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #1a3a1a', fontSize: 14, fontWeight: 700, color: '#1a3a1a', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+          style={{ padding: '9px 12px', borderRadius: 10, border: '1.5px solid #141d15', fontSize: 14, fontWeight: 700, color: '#141d15', background: '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
           {NICHES.map(n => <option key={n} value={n}>{n}</option>)}
         </select>
         <form onSubmit={e => { e.preventDefault(); setTopic(topicInput.trim()) }} style={{ display: 'flex', gap: 6 }}>
@@ -97,7 +97,7 @@ function PatternsInner() {
       )}
       {!loading && data && data.sampleSize > 0 && (
         <>
-          <div style={{ background: '#1a3a1a', color: '#dffe95', borderRadius: 14, padding: '16px 18px', marginBottom: 18 }}>
+          <div style={{ background: '#141d15', color: '#ff5a2c', borderRadius: 14, padding: '16px 18px', marginBottom: 18 }}>
             <div style={{ fontSize: 12, opacity: 0.85, marginBottom: 4 }}>WINNING FORMULA · {niche}{topic ? ` · "${topic}"` : ''} · {data.sampleSize} winning creatives</div>
             <div style={{ fontSize: 16, fontWeight: 700, lineHeight: 1.5 }}>{formula}</div>
           </div>

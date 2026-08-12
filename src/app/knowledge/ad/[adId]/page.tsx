@@ -13,7 +13,7 @@ import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 3600
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', LIME = '#ff5a2c', FOREST = '#141d15'
 
 async function getAd(adId: string) {
   const admin = createAdminClient() as any
@@ -129,7 +129,7 @@ export default async function AdKnowledgePage({ params, searchParams }: { params
           {/* REMAKE — the entire business in one button; routes into the logged-in remake flow */}
           <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap', alignItems: 'center' }}>
             {/* Both image and video winners open the two-pane studio; video adds type=video (+ mp4) so it launches the video-clone flow there */}
-            <Link href={`/studio?ad=${encodeURIComponent(params.adId)}${m?.isVideo ? '&type=video' : ''}${m?.image ? `&img=${encodeURIComponent(m.image)}` : ''}${m?.videoUrl ? `&vid=${encodeURIComponent(m.videoUrl)}` : ''}${ad.page_name ? `&brand=${encodeURIComponent(ad.page_name)}` : ''}`} style={{ background: LIME, color: FOREST, fontSize: 14.5, fontWeight: 850, padding: '13px 24px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 14px 30px -14px rgba(23,37,28,.45)' }}>✨ Remake for my brand</Link>
+            <Link href={`/studio?ad=${encodeURIComponent(params.adId)}${m?.isVideo ? '&type=video' : ''}${m?.image ? `&img=${encodeURIComponent(m.image)}` : ''}${m?.videoUrl ? `&vid=${encodeURIComponent(m.videoUrl)}` : ''}${ad.page_name ? `&brand=${encodeURIComponent(ad.page_name)}` : ''}`} style={{ background: LIME, color: FOREST, fontSize: 14.5, fontWeight: 850, padding: '13px 24px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 14px 30px -14px rgba(20,29,21,.45)' }}>✨ Remake for my brand</Link>
             <Link href={`/knowledge/brand/${ad.page_id}`} style={{ background: '#fff', border: `1.5px solid ${LINE}`, color: INK, fontSize: 13, fontWeight: 800, padding: '11px 18px', borderRadius: 100, textDecoration: 'none' }}>The brand&rsquo;s full file →</Link>
           </div>
         </div>

@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { planEntitlements, firstPlanWith, PLANS, type PlanEntitlements, type PlanId } from '@/lib/plans'
 
-const DARK = '#14281a', LIME = '#dffe95', ACCENT = '#3a7000'
+const DARK = '#14281a', LIME = '#ff5a2c', ACCENT = '#3a7000'
 
 // One-plan model: every gated feature unlocks on Creator ($49). Perks describe what Creator turns on.
 const CREATOR_PERKS = ['The full Meta cockpit — Launch, Campaigns, Scale & Insights', 'Winning-ad Patterns & AI Insights + Ask Mello', '10 video ads/mo + free unlimited image ads', 'Deep reports, exports & API access']
@@ -62,7 +62,7 @@ export default function UpgradeGate({ feature, name, children }: {
           <div className="ug-lock" style={{ width: 66, height: 66, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🔒</div>
         </div>
 
-        <div style={{ display: 'inline-block', background: '#eef5eb', color: ACCENT, fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>{PLANS[need].label} feature</div>
+        <div style={{ display: 'inline-block', background: '#f3eee3', color: ACCENT, fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>{PLANS[need].label} feature</div>
         <h1 style={{ fontSize: 25, fontWeight: 800, color: '#111', margin: '0 0 8px', letterSpacing: '-0.02em' }}>Unlock {name}</h1>
         <p style={{ fontSize: 14.5, color: '#6b7280', lineHeight: 1.6, margin: '0 0 22px' }}>
           {name} is on the <b style={{ color: DARK }}>{PLANS[need].label}</b> plan. Upgrade to turn it on — your credits and saved work carry over.

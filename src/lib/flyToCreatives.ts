@@ -14,7 +14,7 @@ export function flyToCreatives(srcUrl?: string) {
     const w = 120, h = 120
 
     const el = document.createElement('div')
-    el.style.cssText = `position:fixed;left:${startX - w / 2}px;top:${startY - h / 2}px;width:${w}px;height:${h}px;border-radius:16px;z-index:5000;pointer-events:none;box-shadow:0 16px 48px rgba(0,0,0,.45);border:2px solid #dffe95;background:#1a3a1a center/cover no-repeat;`
+    el.style.cssText = `position:fixed;left:${startX - w / 2}px;top:${startY - h / 2}px;width:${w}px;height:${h}px;border-radius:16px;z-index:5000;pointer-events:none;box-shadow:0 16px 48px rgba(0,0,0,.45);border:2px solid #ff5a2c;background:#141d15 center/cover no-repeat;`
     if (srcUrl) el.style.backgroundImage = `url("${srcUrl}")`
     document.body.appendChild(el)
 
@@ -29,9 +29,9 @@ export function flyToCreatives(srcUrl?: string) {
       el.remove()
       if (target) {
         target.animate([
-          { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(223,254,149,0)' },
-          { transform: 'scale(1.12)', boxShadow: '0 0 0 6px rgba(223,254,149,.35)' },
-          { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(223,254,149,0)' },
+          { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(255,90,44,0)' },
+          { transform: 'scale(1.12)', boxShadow: '0 0 0 6px rgba(255,90,44,.35)' },
+          { transform: 'scale(1)', boxShadow: '0 0 0 0 rgba(255,90,44,0)' },
         ], { duration: 550, easing: 'ease-out' })
       }
     }
@@ -39,7 +39,7 @@ export function flyToCreatives(srcUrl?: string) {
     // Tiny toast near the nav so it reads even if the modal covers the sidebar.
     const toast = document.createElement('div')
     toast.textContent = '✓ Saved to My Creatives'
-    toast.style.cssText = 'position:fixed;left:24px;bottom:24px;z-index:5001;background:#1a3a1a;color:#dffe95;font:600 13px/1.2 system-ui,sans-serif;padding:11px 15px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);border:1px solid rgba(223,254,149,.3);pointer-events:none;'
+    toast.style.cssText = 'position:fixed;left:24px;bottom:24px;z-index:5001;background:#141d15;color:#ff5a2c;font:600 13px/1.2 system-ui,sans-serif;padding:11px 15px;border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,.35);border:1px solid rgba(255,90,44,.3);pointer-events:none;'
     document.body.appendChild(toast)
     toast.animate([
       { opacity: 0, transform: 'translateY(8px)' },

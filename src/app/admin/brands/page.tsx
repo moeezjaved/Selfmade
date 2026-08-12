@@ -333,22 +333,22 @@ export default function BrandsPage() {
     <div style={{ padding: 24, maxWidth: 1400, margin: '0 auto' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 18 }}>
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a' }}>Brand Crawl Schedule</h1>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15' }}>Brand Crawl Schedule</h1>
           <p style={{ fontSize: 13, color: '#7a9a7a', marginTop: 4 }}>
             Brands tracked. Auto re-crawl every 7 days. Add more to expand the index.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button onClick={() => { setShowUrlLookup(s => !s); setShowAdd(false); setShowImport(false) }}
-            style={{ padding: '9px 18px', background: '#fff', color: '#1a3a1a', border: '1px solid #1a3a1a', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '9px 18px', background: '#fff', color: '#141d15', border: '1px solid #141d15', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showUrlLookup ? '× Cancel' : '🔗 Add by URL'}
           </button>
           <button onClick={() => { setShowImport(s => !s); setShowAdd(false); setShowUrlLookup(false) }}
-            style={{ padding: '9px 18px', background: '#fff', color: '#1a3a1a', border: '1px solid #1a3a1a', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '9px 18px', background: '#fff', color: '#141d15', border: '1px solid #141d15', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showImport ? '× Cancel import' : '📥 Bulk import CSV'}
           </button>
           <button onClick={() => { setShowAdd(s => !s); setShowImport(false); setShowUrlLookup(false) }}
-            style={{ padding: '9px 18px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '9px 18px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showAdd ? '× Cancel' : '+ Add brand'}
           </button>
         </div>
@@ -377,7 +377,7 @@ export default function BrandsPage() {
               style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={lookupFromUrl} disabled={!urlInput.trim() || urlLookupLoading}
-              style={{ padding: '8px 16px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: urlLookupLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '8px 16px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: urlLookupLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
               {urlLookupLoading ? '⏳ Looking up…' : '🔍 Lookup'}
             </button>
           </div>
@@ -439,7 +439,7 @@ export default function BrandsPage() {
 
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={confirmAddFromUrl}
-                      style={{ padding: '9px 18px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ padding: '9px 18px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                       ✓ Add this brand
                     </button>
                     <button onClick={() => { setUrlLookupResult(null); setUrlInput(''); setEditableCats([]) }}
@@ -469,7 +469,7 @@ export default function BrandsPage() {
           />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
             <button onClick={runBulkImport} disabled={importing || !importCsv.trim()}
-              style={{ padding: '9px 18px', background: importing ? '#ccc' : '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: importing ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '9px 18px', background: importing ? '#ccc' : '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: importing ? 'not-allowed' : 'pointer', fontFamily: 'inherit' }}>
               {importing ? '⏳ Importing… (may take 30-60s)' : '🚀 Import & lookup page IDs'}
             </button>
             <span style={{ fontSize: 11, color: '#888' }}>Brands without page_id will be auto-looked up via Meta Search.</span>
@@ -537,13 +537,13 @@ export default function BrandsPage() {
                 style={inputStyle} />
             </Field>
             <button onClick={addBrand} disabled={!newBrand.term.trim()}
-              style={{ padding: '8px 18px', background: newBrand.term.trim() ? '#1a3a1a' : '#ccc', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: newBrand.term.trim() ? 'pointer' : 'not-allowed', height: 36, fontFamily: 'inherit' }}>
+              style={{ padding: '8px 18px', background: newBrand.term.trim() ? '#141d15' : '#ccc', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: newBrand.term.trim() ? 'pointer' : 'not-allowed', height: 36, fontFamily: 'inherit' }}>
               Add
             </button>
           </div>
           <div style={{ marginTop: 8, fontSize: 11, color: '#888' }}>
             💡 Find Page ID: open the brand on Facebook, view source, search for &quot;page_id&quot;. Or use{' '}
-            <a href="https://findmyfbid.in/" target="_blank" rel="noopener noreferrer" style={{ color: '#1a3a1a' }}>findmyfbid.in</a>.
+            <a href="https://findmyfbid.in/" target="_blank" rel="noopener noreferrer" style={{ color: '#141d15' }}>findmyfbid.in</a>.
           </div>
         </div>
       )}
@@ -621,7 +621,7 @@ export default function BrandsPage() {
                           {(Date.now() - new Date(t.created_at).getTime()) < 86_400_000 && (
                             <span style={{
                               fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100,
-                              background: '#dffe95', color: '#1a3a1a',
+                              background: '#ff5a2c', color: '#141d15',
                               textTransform: 'uppercase', letterSpacing: 0.5,
                             }}>NEW</span>
                           )}
@@ -670,7 +670,7 @@ export default function BrandsPage() {
                     <div style={{ display: 'flex', gap: 6 }}>
                       {t.page_id && (
                         <button onClick={() => openPreview(t.page_id!, t.brand_name)}
-                          style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#1a3a1a', fontFamily: 'inherit' }}>
+                          style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#141d15', fontFamily: 'inherit' }}>
                           🔍 Preview
                         </button>
                       )}
@@ -682,7 +682,7 @@ export default function BrandsPage() {
                       )}
                       {t.page_id && view !== 'removed' && (
                         <button onClick={() => forceRecrawl(t.page_id!, t.brand_name)}
-                          style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#1a3a1a', fontFamily: 'inherit' }}>
+                          style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#141d15', fontFamily: 'inherit' }}>
                           Re-crawl now
                         </button>
                       )}
@@ -755,7 +755,7 @@ function CategoryEditor({ categories, onSave }: { categories: string[]; onSave: 
           onSave(text.split(',').map(s => s.trim()).filter(Boolean))
           setEditing(false)
         }}
-        style={{ width: 160, padding: '4px 8px', fontSize: 11, border: '1px solid #1a3a1a', borderRadius: 4, outline: 'none', fontFamily: 'inherit' }}
+        style={{ width: 160, padding: '4px 8px', fontSize: 11, border: '1px solid #141d15', borderRadius: 4, outline: 'none', fontFamily: 'inherit' }}
       />
     </div>
   )

@@ -51,7 +51,7 @@ export default function ActivityPage() {
   }
   // Actor: user actions = "You"; agent actions = "AI"; everything else (OAuth, syncs, webhooks) = "System".
   const byOf = (log:any): { label:string; color:string; bg:string } => {
-    if (log.performed_by === 'user') return { label:'You', color:'#3a7a3a', bg:'rgba(223,254,149,0.35)' }
+    if (log.performed_by === 'user') return { label:'You', color:'#3a7a3a', bg:'rgba(255,90,44,0.35)' }
     if (log.performed_by === 'ai' || log.performed_by === 'assistant' || log.performed_by === 'agent') return { label:'AI', color:'#2563eb', bg:'rgba(147,197,253,0.18)' }
     return { label:'System', color:'#6b7280', bg:'rgba(0,0,0,0.05)' }
   }
@@ -59,7 +59,7 @@ export default function ActivityPage() {
   return (
     <div style={{padding:28}}>
       <div style={{marginBottom:24}}>
-        <h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a'}}>Activity Log</h1>
+        <h1 style={{fontSize:22,fontWeight:800,color:'#141d15'}}>Activity Log</h1>
         <p style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Complete audit trail of every action in Selfmade.</p>
       </div>
       {/* overflowX:auto so By/Time stay reachable on mobile — the card's overflow:hidden was clipping them */}
@@ -71,8 +71,8 @@ export default function ActivityPage() {
           <div style={{padding:48,textAlign:'center',color:'#7a9a7a'}}>No activity yet.</div>
         ) : (
           <table style={{width:'100%',borderCollapse:'collapse',minWidth:560}}>
-            <thead><tr style={{background:'#f0f7ee'}}>
-              {['Action','Description','By','Time'].map(h => <th key={h} style={{textAlign:'left',padding:'10px 16px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'#7a9a7a',borderBottom:'1px solid rgba(223,254,149,0.08)'}}>{h}</th>)}
+            <thead><tr style={{background:'#f4f0e6'}}>
+              {['Action','Description','By','Time'].map(h => <th key={h} style={{textAlign:'left',padding:'10px 16px',fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'.07em',color:'#7a9a7a',borderBottom:'1px solid rgba(255,90,44,0.08)'}}>{h}</th>)}
             </tr></thead>
             <tbody>
               {logs.map(log => (
@@ -85,7 +85,7 @@ export default function ActivityPage() {
                   </td>
                   <td style={{padding:'12px 16px',fontSize:13,color:'#3a5a3a'}}>{describe(log)}</td>
                   <td style={{padding:'12px 16px'}}>{(() => { const b = byOf(log); return <span style={{fontSize:11,fontWeight:700,padding:'2px 8px',borderRadius:100,background:b.bg,color:b.color}}>{b.label}</span> })()}</td>
-                  <td style={{padding:'12px 16px',fontSize:11,color:'#8aaa8a',whiteSpace:'nowrap'}}>{new Date(log.created_at).toLocaleString()}</td>
+                  <td style={{padding:'12px 16px',fontSize:11,color:'#8b8a72',whiteSpace:'nowrap'}}>{new Date(log.created_at).toLocaleString()}</td>
                 </tr>
               ))}
             </tbody>

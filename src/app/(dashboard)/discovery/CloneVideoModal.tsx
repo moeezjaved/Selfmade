@@ -16,7 +16,7 @@ import { X, Upload, Loader2, Check, Film, Sparkles, Pencil, ChevronLeft, Chevron
 import CloneGeneration from '@/components/motion/CloneGeneration'
 import { refreshCredits } from '@/components/credits/CreditCounter'
 
-const LIME = '#dffe95'
+const LIME = '#ff5a2c'
 type Photo = { id: string; src: string }
 // Proxy external product URLs (hotlink-protected → raw <img> breaks). data:/R2 pass through.
 const cdn = (u: string) => (!u || u.startsWith('data:') || u.includes('.r2.dev') || u.includes('r2.cloudflarestorage') || u.includes('cdn.tryselfmade'))
@@ -399,11 +399,11 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const wide = phase === 'done'
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: wide ? 'min(980px,96vw)' : 'min(940px,96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #dfe4de', borderRadius: 20, color: L_INK, boxShadow: '0 30px 90px -30px rgba(23,37,28,0.4)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: wide ? 'min(980px,96vw)' : 'min(940px,96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #dfe4de', borderRadius: 20, color: L_INK, boxShadow: '0 30px 90px -30px rgba(20,29,21,0.4)' }}>
         {/* header */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '15px 22px', borderBottom: '1px solid #e0eecb', background: HEADER_BG }}>
           <Film size={17} color={GREEN} /> <span style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.01em' }}>Remake as a video ad</span>
-          <button onClick={onClose} aria-label="Close" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,0.8)', color: '#3c473e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={17} /></button>
+          <button onClick={onClose} aria-label="Close" style={{ marginLeft: 'auto', width: 32, height: 32, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,0.8)', color: '#3a382f', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={17} /></button>
         </div>
 
         {phase === 'generating' ? (
@@ -598,17 +598,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
               {STEPS.map((s, i) => {
                 const clickable = railClickable(i)
                 return (
-                  <button key={i} disabled={!clickable} onClick={() => clickable && setStep(i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 11, cursor: clickable ? 'pointer' : 'default', opacity: clickable ? 1 : 0.5, border: '1px solid ' + (i === step ? L_LINE : 'transparent'), background: i === step ? '#fff' : 'transparent', textAlign: 'left', fontFamily: 'inherit', width: '100%', boxShadow: i === step ? '0 1px 3px rgba(23,37,28,.07)' : 'none' }}>
+                  <button key={i} disabled={!clickable} onClick={() => clickable && setStep(i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 11, cursor: clickable ? 'pointer' : 'default', opacity: clickable ? 1 : 0.5, border: '1px solid ' + (i === step ? L_LINE : 'transparent'), background: i === step ? '#fff' : 'transparent', textAlign: 'left', fontFamily: 'inherit', width: '100%', boxShadow: i === step ? '0 1px 3px rgba(20,29,21,.07)' : 'none' }}>
                     <span style={{ width: 23, height: 23, borderRadius: 99, background: i < step ? '#d8efc7' : (i === step ? FOREST : '#e8ede7'), color: i < step ? SEL_TEXT : (i === step ? LIME : L_MUTED), fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i < step ? '✓' : i + 1}</span>
                     <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 650, color: i === step ? FOREST : '#3c473e' }}>{s.t}</span>
+                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 650, color: i === step ? FOREST : '#3a382f' }}>{s.t}</span>
                       <span style={{ display: 'block', fontSize: 10, color: L_FAINT }}>{s.s}</span>
                     </span>
                   </button>
                 )
               })}
               <div style={{ marginTop: 'auto', fontSize: 11, color: L_FAINT, lineHeight: 1.55, padding: '10px 8px 0', borderTop: `1px solid ${L_LINE}` }}>
-                <b style={{ color: '#3c473e' }}>You approve before you pay.</b><br />We write your script free first. Credits are only used when you say go — and refund if a render fails.
+                <b style={{ color: '#3a382f' }}>You approve before you pay.</b><br />We write your script free first. Credits are only used when you say go — and refund if a render fails.
               </div>
             </div>
 
@@ -717,7 +717,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         {VOICES.map((v) => <button key={v.id} onClick={() => setVoice(v.id)} style={chip(voice === v.id)}>{v.label}</button>)}
                       </div>
                     </div>
-                    {phase === 'analyzing' && <div style={{ fontSize: 14.5, fontWeight: 700, color: GREEN, display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, background: '#f4fbe6', border: '1px solid #d8ebb9', borderRadius: 12, padding: '13px 16px' }}><Loader2 size={18} className="spin" /> <span>Watching the winning ad &amp; writing your script…<br /><span style={{ fontSize: 12, fontWeight: 500, color: '#5a7a5a' }}>This is free — no credits used until you approve it.</span></span></div>}
+                    {phase === 'analyzing' && <div style={{ fontSize: 14.5, fontWeight: 700, color: GREEN, display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, background: '#f4fbe6', border: '1px solid #d8ebb9', borderRadius: 12, padding: '13px 16px' }}><Loader2 size={18} className="spin" /> <span>Watching the winning ad &amp; writing your script…<br /><span style={{ fontSize: 12, fontWeight: 500, color: '#6b6a58' }}>This is free — no credits used until you approve it.</span></span></div>}
                   </section>
                 )}
 
@@ -926,7 +926,7 @@ function SourceCard({ sourceVideoUrl, sourcePoster, hasSource }: { sourceVideoUr
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={cdn(sourcePoster)} alt="source ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : <span style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 22 }}>🎬</span>}
-        <span style={{ position: 'absolute', bottom: 4, left: 4, right: 4, background: 'rgba(23,37,28,0.85)', color: LIME, fontSize: 7.5, fontWeight: 800, textAlign: 'center', borderRadius: 5, padding: '2px 0', letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}><Trophy size={8} /> WINNING</span>
+        <span style={{ position: 'absolute', bottom: 4, left: 4, right: 4, background: 'rgba(20,29,21,0.85)', color: LIME, fontSize: 7.5, fontWeight: 800, textAlign: 'center', borderRadius: 5, padding: '2px 0', letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}><Trophy size={8} /> WINNING</span>
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700 }}>{hasSource ? 'The winning ad you’re remaking' : 'Your video'}</div>
@@ -945,14 +945,14 @@ function Switch({ on }: { on: boolean }) {
 }
 
 // ── light-theme tokens + primitives ──
-const L_INK = '#161c17', L_MUTED = '#68756b', L_FAINT = '#94a096', L_LINE = '#e7ece7', L_SIDE = '#f6f8f5'
-const FOREST = '#17251c', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#3f8f4f'
+const L_INK = '#161c17', L_MUTED = '#6f6d5a', L_FAINT = '#94a096', L_LINE = '#efece2', L_SIDE = '#f6f8f5'
+const FOREST = '#141d15', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#ef4a1e'
 const HEADER_BG = 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)'
 
 function Kicker({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', color: GREEN, textTransform: 'uppercase', marginBottom: 6 }}>{children}</div> }
 function H2({ children }: { children: React.ReactNode }) { return <h2 style={{ fontSize: 21, fontWeight: 800, letterSpacing: '-.015em', margin: '0 0 6px' }}>{children}</h2> }
 function Lead({ children }: { children: React.ReactNode }) { return <p style={{ fontSize: 13.5, color: L_MUTED, lineHeight: 1.6, maxWidth: 560, margin: '0 0 20px' }}>{children}</p> }
-function FieldLabel({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 6 }}>{children}</div> }
+function FieldLabel({ children }: { children: React.ReactNode }) { return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3a382f', marginBottom: 6 }}>{children}</div> }
 function InfoBar({ children }: { children: React.ReactNode }) { return <div style={{ display: 'flex', gap: 9, alignItems: 'flex-start', background: SEL_BG, border: '1px solid #d8ebb9', borderRadius: 12, padding: '11px 13px', fontSize: 12.5, color: SEL_TEXT, lineHeight: 1.55, marginTop: 18 }}>{children}</div> }
 function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () => void; last?: boolean }) {
   return (
@@ -963,7 +963,7 @@ function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () =
   )
 }
 const input: React.CSSProperties = { background: '#fff', border: `1.5px solid ${L_LINE}`, borderRadius: 12, padding: '11px 14px', color: L_INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
-const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3c473e', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
+const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3a382f', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
 const photoAdd: React.CSSProperties = { width: 88, height: 88, borderRadius: 13, border: '1.5px dashed #c4d0c2', background: '#fcfdfb', color: GREEN, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const errBox: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#b42318', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }

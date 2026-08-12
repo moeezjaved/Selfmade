@@ -153,7 +153,7 @@ export default function AdDetailPage() {
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={handleSave} disabled={saving}
             title={selectedBoard ? 'Save to the selected board' : 'Pick a board under “Save Details” first'}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#dffe95', color: '#1a3a1a', border: 'none', fontWeight: 800, fontSize: 13, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#ff5a2c', color: '#141d15', border: 'none', fontWeight: 800, fontSize: 13, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
             <Bookmark size={14} /> {saving ? 'Saving…' : 'Save'}
           </button>
           <button onClick={copyLink}
@@ -171,7 +171,7 @@ export default function AdDetailPage() {
         {/* ── LEFT: ad preview ── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
           <div style={{ padding: '14px 16px', display: 'flex', alignItems: 'center', gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#1a3a1a', overflow: 'hidden', flexShrink: 0 }}>
+            <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#141d15', overflow: 'hidden', flexShrink: 0 }}>
               {brandPicture && <img src={brandPicture} alt={ad.pageName} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
             </div>
             <div style={{ flex: 1 }}>
@@ -254,7 +254,7 @@ export default function AdDetailPage() {
               {boards.map(b => <option key={b.id} value={b.id}>{b.emoji ? `${b.emoji} ` : ''}{b.name}</option>)}
             </select>
             <button onClick={handleSave} disabled={saving || !selectedBoard}
-              style={{ width: '100%', padding: '10px', background: '#dffe95', color: '#1a3a1a', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: (saving || !selectedBoard) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (saving || !selectedBoard) ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '10px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: (saving || !selectedBoard) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (saving || !selectedBoard) ? 0.6 : 1 }}>
               {saving ? 'Saving…' : 'Confirm'}
             </button>
           </div>
@@ -333,7 +333,7 @@ function AiPanel({ ad }: { ad: Ad }) {
   }
 
   const cardS: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }
-  const ctaS: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg,#1a3a1a,#2d5a2d 50%,#dffe95)', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }
+  const ctaS: React.CSSProperties = { width: '100%', padding: '12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: 'linear-gradient(135deg,#141d15,#2d5a2d 50%,#ff5a2c)', color: '#fff', fontWeight: 800, fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }
 
   return (
     <div style={cardS}>
@@ -357,7 +357,7 @@ function AiPanel({ ad }: { ad: Ad }) {
           // Enabled 2026-07-30 — the transcribe→framework flow is live (was gated 'Coming soon' for the
           // clone-first launch). Show the cost up front so the price isn't a surprise after clicking.
           <>
-          <button style={{ ...ctaS, background: '#eef7dc', color: '#1a3a1a' }}
+          <button style={{ ...ctaS, background: '#eef7dc', color: '#141d15' }}
             onClick={() => run('/api/scripts/transcribe', { adId: ad.id }, 'transcribe', 0, d => { setScript(d.script); setThin(!!d.thinSpeech) })}>
             <Sparkles size={16} /> Generate Script · Free
           </button>
@@ -366,13 +366,13 @@ function AiPanel({ ad }: { ad: Ad }) {
         ) : (
           <div>
             {thin && <div style={{ fontSize: 11, color: '#92400e', background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 8, padding: '6px 8px', marginBottom: 8 }}>⚠ Mostly on-screen text / little speech — analyzed from the ad copy. Full on-screen transcription coming soon.</div>}
-            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Framework: <span style={{ color: '#1a3a1a' }}>{script.framework || '—'}</span></div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: '#374151', marginBottom: 6 }}>Framework: <span style={{ color: '#141d15' }}>{script.framework || '—'}</span></div>
             {script.hooks?.length > 0 && <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 8 }}>Hooks: {script.hooks.join(' · ')}</div>}
             <div style={{ maxHeight: 150, overflowY: 'auto', fontSize: 12, color: '#374151', background: '#f8fafc', borderRadius: 8, padding: 10, marginBottom: 10, whiteSpace: 'pre-wrap' }}>
               {(script.transcript || []).map((s: any, i: number) => <div key={i}>{s.text}</div>)}
             </div>
             {brands.length === 0 ? (
-              <a href="/brands" style={{ fontSize: 12, color: '#1a3a1a', fontWeight: 700 }}>+ Create a brand to duplicate this script →</a>
+              <a href="/brands" style={{ fontSize: 12, color: '#141d15', fontWeight: 700 }}>+ Create a brand to duplicate this script →</a>
             ) : (
               <>
                 <select value={brandId} onChange={e => setBrandId(e.target.value)} style={{ width: '100%', padding: 8, borderRadius: 8, border: '1px solid #d1d5db', fontSize: 13, marginBottom: 8 }}>

@@ -9,7 +9,7 @@
 import { useEffect, useState } from 'react'
 import toast from 'react-hot-toast'
 
-const INK = '#17251c', SUB = '#7a9a7a', MUTED = '#6b6b6b', LINE = 'rgba(0,0,0,0.08)', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const INK = '#141d15', SUB = '#7a9a7a', MUTED = '#6b6b6b', LINE = 'rgba(0,0,0,0.08)', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
 
 type Creator = {

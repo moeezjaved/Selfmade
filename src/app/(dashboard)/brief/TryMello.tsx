@@ -15,7 +15,7 @@ const CloneVideoModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneV
 const CloneModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneModal'), { ssr: false })
 const MakeAdsModal = dynamic(() => import('@/components/MakeAdsModal'), { ssr: false })
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', GREEN = '#3f8f4f', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', GREEN = '#ef4a1e', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f'
 const DISMISS_KEY = 'brief_trymello_v1'
 
 type Tone = 'try' | 'opp'
@@ -142,7 +142,7 @@ export default function TryMello({ compact = false }: { compact?: boolean }) {
                 <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', borderRadius: 100, padding: '3px 9px', background: c.tone === 'opp' ? '#eaf6df' : '#fff6d6', color: c.tone === 'opp' ? '#2c4a1f' : '#7a5a12' }}>{c.badge}</span>
                 <div style={{ fontSize: 15, fontWeight: 800, color: INK, letterSpacing: '-.012em', margin: '9px 0 3px' }}>{c.title}</div>
                 <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.55, maxWidth: '52ch' }}>{c.desc}</div>
-                <button onClick={c.run} disabled={busy && c.id === 'upload'} style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: '#dffe95', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button onClick={c.run} disabled={busy && c.id === 'upload'} style={{ marginTop: 12, display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: '#ff5a2c', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                   {busy && c.id === 'upload' && <Loader2 size={13} className="spin" />}{c.cta}
                 </button>
               </div>

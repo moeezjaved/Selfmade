@@ -24,18 +24,18 @@ export default function RadarSearch({ caption = 'Scanning 4.3M ads' }: { caption
 
       <div style={{ position: 'relative', width: 140, height: 140 }}>
         {/* radar disc */}
-        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle at 50% 50%, #16301c 0%, #0e1b12 100%)', border: '1.5px solid rgba(223,254,149,.28)', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: 'radial-gradient(circle at 50% 50%, #16301c 0%, #0e1b12 100%)', border: '1.5px solid rgba(255,90,44,.28)', overflow: 'hidden' }}>
           {[75, 50, 25].map(s => (
-            <div key={s} style={{ position: 'absolute', left: '50%', top: '50%', width: `${s}%`, height: `${s}%`, transform: 'translate(-50%,-50%)', borderRadius: '50%', border: '1px solid rgba(223,254,149,.15)' }} />
+            <div key={s} style={{ position: 'absolute', left: '50%', top: '50%', width: `${s}%`, height: `${s}%`, transform: 'translate(-50%,-50%)', borderRadius: '50%', border: '1px solid rgba(255,90,44,.15)' }} />
           ))}
-          <div className="rd-anim" style={{ position: 'absolute', inset: 0, borderRadius: '50%', transformOrigin: 'center', background: 'conic-gradient(from 0deg, rgba(223,254,149,.5) 0deg, rgba(223,254,149,.12) 34deg, rgba(223,254,149,0) 62deg, transparent 360deg)', animation: 'rd-sweep 2s linear infinite' }} />
-          <div style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, transform: 'translate(-50%,-50%)', borderRadius: '50%', background: '#dffe95' }} />
+          <div className="rd-anim" style={{ position: 'absolute', inset: 0, borderRadius: '50%', transformOrigin: 'center', background: 'conic-gradient(from 0deg, rgba(255,90,44,.5) 0deg, rgba(255,90,44,.12) 34deg, rgba(255,90,44,0) 62deg, transparent 360deg)', animation: 'rd-sweep 2s linear infinite' }} />
+          <div style={{ position: 'absolute', left: '50%', top: '50%', width: 5, height: 5, transform: 'translate(-50%,-50%)', borderRadius: '50%', background: '#ff5a2c' }} />
         </div>
         {/* blips */}
         {BLIPS.map((b, i) => (
           <div key={i} style={{ position: 'absolute', left: b.left, top: b.top, transform: 'translate(-50%,-50%)' }}>
-            <div className="rd-anim rd-blip" style={{ width: 10, height: 13, borderRadius: 2, background: '#dffe95', opacity: 0.28, animation: `rd-ping 2s linear ${b.delay} infinite` }} />
-            <div className="rd-anim" style={{ position: 'absolute', left: '50%', top: '50%', width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #dffe95', transform: 'translate(-50%,-50%)', opacity: 0, animation: `rd-ringpulse 2s linear ${b.delay} infinite` }} />
+            <div className="rd-anim rd-blip" style={{ width: 10, height: 13, borderRadius: 2, background: '#ff5a2c', opacity: 0.28, animation: `rd-ping 2s linear ${b.delay} infinite` }} />
+            <div className="rd-anim" style={{ position: 'absolute', left: '50%', top: '50%', width: 14, height: 14, borderRadius: '50%', border: '1.5px solid #ff5a2c', transform: 'translate(-50%,-50%)', opacity: 0, animation: `rd-ringpulse 2s linear ${b.delay} infinite` }} />
           </div>
         ))}
       </div>

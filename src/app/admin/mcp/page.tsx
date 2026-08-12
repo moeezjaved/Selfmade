@@ -5,7 +5,7 @@
 import { useEffect, useState, useCallback } from 'react'
 
 type Key = { id: string; label: string; token: string; created_at: string; last_used_at: string | null; revoked: boolean }
-const INK = '#0e1b12', LIME = '#dffe95'
+const INK = '#0e1b12', LIME = '#ff5a2c'
 
 export default function AdminMcp() {
   const [keys, setKeys] = useState<Key[]>([])

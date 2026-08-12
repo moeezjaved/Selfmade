@@ -18,7 +18,7 @@ export default function CompanyPage() {
   const node = (role: string, name: string, accent?: boolean): React.ReactNode => (
     <div style={{ background: accent ? '#eef8d6' : '#fff', border: `1px solid ${accent ? '#cbe88a' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: '10px 22px', textAlign: 'center', minWidth: 190 }}>
       <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: '#3e5c43' }}>{role}</div>
-      <div style={{ fontSize: 19, color: '#1a3a1a', marginTop: 1, fontWeight: 600 }}>{name}</div>
+      <div style={{ fontSize: 19, color: '#141d15', marginTop: 1, fontWeight: 600 }}>{name}</div>
     </div>
   )
   const conn = <div style={{ width: 2, height: 20, background: '#e2e8e0', margin: '0 auto' }} />
@@ -27,7 +27,7 @@ export default function CompanyPage() {
     <div style={{ background: '#fff', border: '1px solid rgba(0,0,0,0.08)', borderRadius: 14, padding: '14px 16px', opacity: d.live ? 1 : 0.72 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         <span style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', background: DOT[d.status], border: d.status === 'hiring' ? '1.5px solid #c5cdc5' : 'none', boxShadow: d.status === 'waiting' ? '0 0 0 3px rgba(197,138,30,0.2)' : 'none' }} />
-        <div style={{ fontSize: 15, fontWeight: 700, color: '#1a3a1a', flex: 1 }}>{d.name}</div>
+        <div style={{ fontSize: 15, fontWeight: 700, color: '#141d15', flex: 1 }}>{d.name}</div>
         <div style={{ fontSize: 10.5, fontFamily: 'ui-monospace,monospace', letterSpacing: '.05em', textTransform: 'uppercase', color: d.status === 'waiting' ? '#c58a1e' : d.status === 'warning' ? '#b4530a' : '#8b958c' }}>{LABEL[d.status]}</div>
       </div>
       <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 6, lineHeight: 1.5 }}>{d.status === 'hiring' ? d.detail : (d.detail || d.role)}</div>
@@ -47,7 +47,7 @@ export default function CompanyPage() {
 
   return (
     <div style={{ padding: 28, maxWidth: 820 }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Your team</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Your team</h1>
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 22 }}>
         {ov?.needsYou ? `${ov.needsYou} thing${ov.needsYou === 1 ? '' : 's'} need you.` : 'Everything’s handled.'} You run it; Mello runs everyone else.
         {' '}<Link href="/brain" style={{ color: '#3e5c43' }}>Company Brain →</Link>

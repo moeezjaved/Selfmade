@@ -37,8 +37,8 @@ export function buildTimelineFromJob(row: Row, brand?: Brand): { timeline: Timel
     logo: kit.logo || null,
     colors: {
       cta: kit.palette?.cta || (Array.isArray(kit.colors) ? kit.colors[0] : undefined) || '#639922',
-      text: kit.palette?.heading || '#17251c',
-      accent: kit.palette?.accent || '#dffe95',
+      text: kit.palette?.heading || '#141d15',
+      accent: kit.palette?.accent || '#ff5a2c',
     },
     font: { heading: kit.fonts?.heading || null, body: kit.fonts?.body || null },
   }

@@ -21,7 +21,7 @@ async function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
 }
 
-const DARK = '#1a3a1a', LIME = '#dffe95'
+const DARK = '#141d15', LIME = '#ff5a2c'
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }
 const btn: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 9, border: 'none', background: DARK, color: LIME, fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost: React.CSSProperties = { ...btn, background: '#fff', color: DARK, border: '1px solid #cbd5cb' }
@@ -186,7 +186,7 @@ function Generations() {
 }
 
 function Badge({ children, tone }: { children: React.ReactNode; tone?: 'pro' }) {
-  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, textTransform: 'capitalize', background: tone === 'pro' ? DARK : '#eef5eb', color: tone === 'pro' ? LIME : '#3f6b3f' }}>{children}</span>
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, textTransform: 'capitalize', background: tone === 'pro' ? DARK : '#f3eee3', color: tone === 'pro' ? LIME : '#3f6b3f' }}>{children}</span>
 }
 
 /* Full-view + re-edit (reuses the credit-charged edit endpoint; new edits are saved as generations). */
@@ -224,7 +224,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
   // Captions add-on (high-margin blade). Burns TikTok-style captions onto this finished video.
   const [capStyle, setCapStyle] = useState<'bold' | 'minimal' | 'boxed'>('bold')
   const [capLang, setCapLang] = useState('en')
-  const [capColor, setCapColor] = useState('#dffe95')   // accent (highlight word, or box for 'boxed')
+  const [capColor, setCapColor] = useState('#ff5a2c')   // accent (highlight word, or box for 'boxed')
   const [capSize, setCapSize] = useState<'s' | 'm' | 'l'>('m')
   const [capBusy, setCapBusy] = useState(false)
   const [capErr, setCapErr] = useState<string | null>(null)

@@ -12,8 +12,8 @@ export function showSavedToast(label = 'Saved to Board') {
 }
 
 const CONFETTI = [
-  { tx: '0px', ty: '-22px', c: '#dffe95', d: '0s' }, { tx: '20px', ty: '-8px', c: '#1a3a1a', d: '.04s' },
-  { tx: '15px', ty: '16px', c: '#dffe95', d: '.02s' }, { tx: '-16px', ty: '14px', c: '#fff', d: '.06s' },
+  { tx: '0px', ty: '-22px', c: '#ff5a2c', d: '0s' }, { tx: '20px', ty: '-8px', c: '#141d15', d: '.04s' },
+  { tx: '15px', ty: '16px', c: '#ff5a2c', d: '.02s' }, { tx: '-16px', ty: '14px', c: '#fff', d: '.06s' },
   { tx: '-20px', ty: '-9px', c: '#8fbf3d', d: '0s' },
 ]
 const KEYFRAMES = `
@@ -36,9 +36,9 @@ export function SavedToastHost() {
   return (
     <div key={toast.key} style={{ position: 'fixed', left: '50%', bottom: 34, zIndex: 9998, display: 'flex', alignItems: 'center', gap: 8, background: '#0e1b12', padding: '9px 16px 9px 12px', borderRadius: 999, boxShadow: '0 12px 30px -10px rgba(0,0,0,.5)', fontFamily: 'Inter, sans-serif', animation: 'sv-toast 1.6s ease both' }}>
       <style>{KEYFRAMES}</style>
-      <span className="sv-anim" style={{ position: 'relative', width: 18, height: 18, borderRadius: '50%', background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center', animation: 'sv-catch .5s cubic-bezier(.34,1.56,.64,1) both' }}>
+      <span className="sv-anim" style={{ position: 'relative', width: 18, height: 18, borderRadius: '50%', background: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', transformOrigin: 'center', animation: 'sv-catch .5s cubic-bezier(.34,1.56,.64,1) both' }}>
         <svg width={10} height={10} viewBox="0 0 10 10" fill="none"><path d="M1.5 5.2l2.2 2.3L8.5 2.5" stroke="#0e1b12" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" /></svg>
-        <span className="sv-ring" style={{ position: 'absolute', top: '50%', left: '50%', width: 24, height: 24, borderRadius: '50%', border: '2px solid #dffe95', animation: 'sv-ring .6s ease-out both' }} />
+        <span className="sv-ring" style={{ position: 'absolute', top: '50%', left: '50%', width: 24, height: 24, borderRadius: '50%', border: '2px solid #ff5a2c', animation: 'sv-ring .6s ease-out both' }} />
         {CONFETTI.map((c, i) => (
           <span key={i} className="sv-confetti" style={{ position: 'absolute', top: '50%', left: '50%', width: 5, height: 5, borderRadius: 1, background: c.c, ['--tx' as string]: c.tx, ['--ty' as string]: c.ty, animation: `sv-confetti .6s ease-out ${c.d} both` } as React.CSSProperties} />
         ))}

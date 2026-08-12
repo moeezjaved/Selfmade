@@ -12,7 +12,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e3e2da', GREEN = '#3f8f4f', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#e3e2da', GREEN = '#ef4a1e', FOREST = '#141d15', LIME = '#ff5a2c'
 const SELBG = '#f4fbe6', SELBORDER = '#a8cf6f'
 
 type Comp = { pageId: string; name: string; avatar?: string | null; adCount?: number | null }

@@ -20,7 +20,7 @@ import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 1800
 
-const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#2f7a3f', AMBER = '#9a3412'
+const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#2f7a3f', AMBER = '#9a3412'
 
 const CSS = `
 .disc-root{overflow-x:hidden}
@@ -33,7 +33,7 @@ const CSS = `
 .ad{position:relative;display:block;overflow:hidden;background:#20241f;border-radius:10px}
 .admedia-scrim{position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(0,0,0,.16));pointer-events:none}
 .admedia-play{position:absolute;right:8px;bottom:7px;z-index:2;font-size:10px;color:#fff;background:rgba(0,0,0,.42);border-radius:6px;padding:2px 7px;font-weight:800;letter-spacing:.04em}
-.admedia-badge{position:absolute;left:8px;top:8px;z-index:2;font-size:9px;color:${LIME};background:#17251cd9;border-radius:7px;padding:3px 8px;font-weight:800}
+.admedia-badge{position:absolute;left:8px;top:8px;z-index:2;font-size:9px;color:${LIME};background:#141d15d9;border-radius:7px;padding:3px 8px;font-weight:800}
 .lift{transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s ease}
 .lift:hover{transform:translateY(-4px)}
 
@@ -332,7 +332,7 @@ export default async function DiscoverPage() {
 
       {/* ══ THE LOGIN MOMENT ══ */}
       <section data-reveal className="wrap w-read" style={{ padding: '70px 26px 0' }}>
-        <div style={{ background: FOREST, borderRadius: 22, padding: '30px 32px', color: '#eef5eb' }}>
+        <div style={{ background: FOREST, borderRadius: 22, padding: '30px 32px', color: '#f3eee3' }}>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#fff', letterSpacing: '-.012em' }}>This is the world&rsquo;s edition. Yours is different.</div>
           <div style={{ fontSize: 13.5, color: '#b9c6b6', margin: '7px 0 17px', maxWidth: '52ch', lineHeight: 1.6 }}>
             Hire Mello and every morning this page is rewritten around your brand — your competitors, your niche, your next ad. It reads the market while you sleep.

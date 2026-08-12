@@ -61,7 +61,7 @@ export default function ExtensionPrivacyPage() {
       </Section>
 
       <Section title="Contact">
-        Questions? Email <a href="mailto:support@tryselfmade.ai" style={{ color: '#2d6a00', fontWeight: 700 }}>support@tryselfmade.ai</a>.
+        Questions? Email <a href="mailto:support@tryselfmade.ai" style={{ color: '#c2410c', fontWeight: 700 }}>support@tryselfmade.ai</a>.
       </Section>
     </div>
   )

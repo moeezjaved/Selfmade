@@ -9,7 +9,7 @@
  * Every expression is carried by the eyes alone (a three-word vocabulary), so state reads at 20px
  * without reading any text. Pure SVG, no hooks — safe in server and client components alike.
  */
-const FOREST = '#17251c', LIME = '#dffe95'
+const FOREST = '#141d15', LIME = '#ff5a2c'
 
 export type MelloState = 'delivered' | 'awake' | 'resting'
 

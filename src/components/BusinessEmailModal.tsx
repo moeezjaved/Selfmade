@@ -1,7 +1,7 @@
 'use client'
 /** Friendly popup shown when someone tries to sign up with a disposable/throwaway email (form or Google). */
 export default function BusinessEmailModal({ email, onClose }: { email?: string; onClose: () => void }) {
-  const INK = '#0e1b12', LIME = '#dffe95'
+  const INK = '#0e1b12', LIME = '#ff5a2c'
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(14,27,18,0.55)', backdropFilter: 'blur(3px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 20, fontFamily: "'Inter',-apple-system,sans-serif" }}>
       <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 20, boxShadow: '0 24px 70px rgba(14,27,18,0.28)', padding: '32px 30px', textAlign: 'center' }}>

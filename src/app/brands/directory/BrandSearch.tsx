@@ -35,7 +35,7 @@ export default function BrandSearch() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Search a brand — e.g. Gymshark, Nike…"
           autoFocus
-          style={{ flex: 1, border: '1.5px solid #cfe0c0', borderRadius: 100, padding: '12px 20px', fontSize: 15, color: '#1a3a1a', background: '#f8fcf6', outline: 'none', fontFamily: 'inherit' }}
+          style={{ flex: 1, border: '1.5px solid #cfe0c0', borderRadius: 100, padding: '12px 20px', fontSize: 15, color: '#141d15', background: '#f9f5ec', outline: 'none', fontFamily: 'inherit' }}
         />
       </div>
       {q.trim().length >= 2 && (
@@ -48,12 +48,12 @@ export default function BrandSearch() {
           {results.map((b) => (
             <Link key={b.slug} href={`/brands/${b.slug}`}
               style={{ display: 'flex', alignItems: 'center', gap: 12, border: '0.5px solid #e6e6e6', borderRadius: 12, padding: 14, textDecoration: 'none' }}>
-              <div style={{ width: 40, height: 40, borderRadius: 9, background: '#eef6e6', color: '#2d6a00', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>{initial(b.name)}</div>
+              <div style={{ width: 40, height: 40, borderRadius: 9, background: '#eef6e6', color: '#c2410c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0 }}>{initial(b.name)}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, color: '#1a2e1a', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleCase(b.name)}</div>
+                <div style={{ fontWeight: 700, color: '#141d15', fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{titleCase(b.name)}</div>
                 <div style={{ fontSize: 12, color: '#8a9a8a' }}>{b.adCount.toLocaleString()} ads</div>
               </div>
-              <span style={{ color: '#2d6a00', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>View →</span>
+              <span style={{ color: '#c2410c', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>View →</span>
             </Link>
           ))}
         </div>

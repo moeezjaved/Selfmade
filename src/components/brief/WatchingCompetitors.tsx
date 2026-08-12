@@ -9,7 +9,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-const INK = '#17251c', GREEN = '#3f8f4f', LINE = 'rgba(0,0,0,0.08)', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#141d15', GREEN = '#ef4a1e', LINE = 'rgba(0,0,0,0.08)', FOREST = '#141d15', LIME = '#ff5a2c'
 
 type Ad = { adId: string; image: string | null; isVideo: boolean; videoUrl: string | null }
 type Row = { pageId: string; brand: string; adCount: number; status: 'live' | 'crawling' | 'queued' | 'empty'; lastCrawledAt: string | null; topAds?: Ad[]; newAds?: Ad[] }

@@ -15,13 +15,13 @@ import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 900
 
-const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#141d15', LIME = '#ff5a2c'
 
 const CSS = `
 .ad{position:relative;display:block;overflow:hidden;background:#20241f;border-radius:12px}
 .admedia-scrim{position:absolute;inset:0;background:linear-gradient(160deg,rgba(255,255,255,.07),rgba(0,0,0,.14));pointer-events:none}
 .admedia-play{position:absolute;right:8px;bottom:7px;z-index:2;font-size:10px;color:#fff;background:rgba(0,0,0,.42);border-radius:6px;padding:2px 7px;font-weight:800}
-.admedia-badge{position:absolute;left:8px;top:8px;z-index:2;font-size:9px;color:${LIME};background:#17251cd9;border-radius:7px;padding:3px 8px;font-weight:800}
+.admedia-badge{position:absolute;left:8px;top:8px;z-index:2;font-size:9px;color:${LIME};background:#141d15d9;border-radius:7px;padding:3px 8px;font-weight:800}
 /* Netflix rail */
 .rail{display:flex;gap:14px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 2px 16px;scrollbar-width:none}
 .rail::-webkit-scrollbar{display:none}
@@ -174,7 +174,7 @@ export default async function PlaybookPage({ params }: { params: { slug: string 
 
       {/* funnel close */}
       <div style={{ maxWidth: 760, margin: '0 auto', padding: '20px 26px 110px' }}>
-        <div style={{ background: FOREST, borderRadius: 20, padding: '28px 30px', color: '#eef5eb' }}>
+        <div style={{ background: FOREST, borderRadius: 20, padding: '28px 30px', color: '#f3eee3' }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>Found one you&rsquo;d run?</div>
           <div style={{ fontSize: 13.5, color: '#b9c6b6', margin: '6px 0 16px', maxWidth: '52ch', lineHeight: 1.6 }}>Hit Remake on any ad and Mello rebuilds it around your product — your brand, your offer, minutes not weeks.</div>
           <Link href="/hire" style={{ display: 'inline-block', background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>

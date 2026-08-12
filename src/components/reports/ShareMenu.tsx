@@ -60,7 +60,7 @@ export default function ShareMenu({ payload, onClose, savedId }: {
         {([['once', 'Share once'], ['partner', 'Share with partner']] as const).map(([k, label]) => (
           <button key={k} onClick={() => { setTab(k); setErr(''); setSent(''); setLink('') }}
             style={{ padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit', fontSize: 13, fontWeight: 700,
-              color: tab === k ? '#1a3a1a' : '#9ab09a', borderBottom: tab === k ? '2px solid #1a3a1a' : '2px solid transparent', marginBottom: -1 }}>
+              color: tab === k ? '#141d15' : '#9ab09a', borderBottom: tab === k ? '2px solid #141d15' : '2px solid transparent', marginBottom: -1 }}>
             {label}
           </button>
         ))}
@@ -69,13 +69,13 @@ export default function ShareMenu({ payload, onClose, savedId }: {
       <div style={{ padding: 16 }}>
         {tab === 'once' ? (
           <>
-            <div style={{ fontSize: 12.5, color: '#5a7a5a', lineHeight: 1.5, marginBottom: 10 }}>Share a link with your report’s current data. Snapshots won’t update over time.</div>
+            <div style={{ fontSize: 12.5, color: '#6b6a58', lineHeight: 1.5, marginBottom: 10 }}>Share a link with your report’s current data. Snapshots won’t update over time.</div>
             <textarea value={note} onChange={e => setNote(e.target.value)} placeholder={'E.g. "The ROAS is looking great for our unboxing campaign"'}
               rows={3} style={taStyle} />
             {link ? (
               <div style={{ marginTop: 10 }}>
                 {/* Confirmation — tell the user the snapshot is filed on the Snapshots page. */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#f0f7ee', border: '1px solid #cfe6c4', borderRadius: 10, padding: '8px 11px', marginBottom: 8 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#f4f0e6', border: '1px solid #cfe6c4', borderRadius: 10, padding: '8px 11px', marginBottom: 8 }}>
                   <span style={{ fontSize: 14 }}>📸</span>
                   <span style={{ fontSize: 12.5, color: '#2d5a2d', fontWeight: 600, flex: 1 }}>Snapshot created</span>
                   <a href="/snapshots" style={{ fontSize: 12, fontWeight: 700, color: '#2d7a2d', textDecoration: 'none' }}>View in Snapshots →</a>
@@ -93,7 +93,7 @@ export default function ShareMenu({ payload, onClose, savedId }: {
           </>
         ) : (
           <>
-            <div style={{ fontSize: 12.5, color: '#5a7a5a', lineHeight: 1.5, marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, color: '#6b6a58', lineHeight: 1.5, marginBottom: 10 }}>
               {savedId
                 ? 'Invite a client or partner to collaborate. They accept into their own workspace and see this report update live.'
                 : 'A snapshot link will be emailed. Tip: Save this report first to invite a partner who sees live updates.'}
@@ -114,8 +114,8 @@ export default function ShareMenu({ payload, onClose, savedId }: {
   )
 }
 
-const taStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: '#1a3a1a' }
-const inStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', boxSizing: 'border-box', color: '#1a3a1a' }
-const lblStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#5a7a5a', marginBottom: 5 }
-const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }
-const btnGhost: React.CSSProperties = { padding: '8px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: '#5a7a5a', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }
+const taStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: '#141d15' }
+const inStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', boxSizing: 'border-box', color: '#141d15' }
+const lblStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6b6a58', marginBottom: 5 }
+const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 100, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }
+const btnGhost: React.CSSProperties = { padding: '8px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: '#6b6a58', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }

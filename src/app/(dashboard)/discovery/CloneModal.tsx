@@ -21,7 +21,7 @@ import { imagesAreFree } from '@/lib/plans'
 type Photo = { id: string; src: string; label?: string } // src = data: URL (upload) or http URL (detected/brand)
 type Brand = { id: string; name: string; website?: string | null; brand_type?: string; products?: { image_urls?: string[] }[] }
 
-const LIME = '#dffe95'
+const LIME = '#ff5a2c'
 const uid = () => Math.random().toString(36).slice(2)
 // Scraped store URLs / R2-fallback hotlinks are often referrer-protected → a raw <img> renders
 // broken. Route thumbnails through the weserv proxy (same as every other image surface). data: URLs
@@ -443,13 +443,13 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
   // transform + overflow:hidden (which otherwise clipped it into a narrow strip).
   return createPortal(
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,0.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: hasResults ? 'min(980px, 96vw)' : 'min(920px, 96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #dfe4de', borderRadius: 20, color: L_INK, boxShadow: '0 30px 90px -30px rgba(23,37,28,0.4)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: hasResults ? 'min(980px, 96vw)' : 'min(920px, 96vw)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: '#fff', border: '1px solid #dfe4de', borderRadius: 20, color: L_INK, boxShadow: '0 30px 90px -30px rgba(20,29,21,0.4)' }}>
         {/* header — pastel gradient band */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '15px 22px', borderBottom: '1px solid #e0eecb', background: HEADER_BG }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontWeight: 800, fontSize: 16.5, letterSpacing: '-.01em' }}>
             <Sparkles size={17} color={GREEN} /> Remake this ad — make it yours
           </div>
-          <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,0.8)', color: '#3c473e', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={17} /></button>
+          <button onClick={onClose} aria-label="Close" style={{ width: 32, height: 32, borderRadius: 9, border: '1px solid #dcebc4', background: 'rgba(255,255,255,0.8)', color: '#3a382f', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><X size={17} /></button>
         </div>
 
         {busy && !hasResults ? (
@@ -527,16 +527,16 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
             <div style={{ width: 226, flexShrink: 0, background: L_SIDE, borderRight: `1px solid ${L_LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2 }} className="sm-rail">
               <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', color: L_FAINT, margin: '0 6px 10px', textTransform: 'uppercase' }}>5 quick steps</div>
               {STEPS.map((s, i) => (
-                <button key={i} onClick={() => setStep(i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, cursor: 'pointer', border: '1px solid ' + (i === step ? L_LINE : 'transparent'), background: i === step ? '#fff' : 'transparent', textAlign: 'left', fontFamily: 'inherit', width: '100%', boxShadow: i === step ? '0 1px 3px rgba(23,37,28,.07)' : 'none' }}>
+                <button key={i} onClick={() => setStep(i)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 10px', borderRadius: 11, cursor: 'pointer', border: '1px solid ' + (i === step ? L_LINE : 'transparent'), background: i === step ? '#fff' : 'transparent', textAlign: 'left', fontFamily: 'inherit', width: '100%', boxShadow: i === step ? '0 1px 3px rgba(20,29,21,.07)' : 'none' }}>
                   <span style={{ width: 24, height: 24, borderRadius: 99, background: i < step ? '#d8efc7' : (i === step ? FOREST : '#e8ede7'), color: i < step ? SEL_TEXT : (i === step ? LIME : L_MUTED), fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>{i < step ? '✓' : i + 1}</span>
                   <span style={{ minWidth: 0 }}>
-                    <span style={{ display: 'block', fontSize: 13, fontWeight: 650, color: i === step ? FOREST : '#3c473e' }}>{s.t}</span>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 650, color: i === step ? FOREST : '#3a382f' }}>{s.t}</span>
                     <span style={{ display: 'block', fontSize: 10.5, color: L_FAINT }}>{s.s}</span>
                   </span>
                 </button>
               ))}
               <div style={{ marginTop: 'auto', fontSize: 11, color: L_FAINT, lineHeight: 1.55, padding: '10px 8px 0', borderTop: `1px solid ${L_LINE}` }}>
-                <b style={{ color: '#3c473e' }}>Your exact product, every time.</b><br />We never invent a different bottle, label or price.
+                <b style={{ color: '#3a382f' }}>Your exact product, every time.</b><br />We never invent a different bottle, label or price.
               </div>
             </div>
 
@@ -663,7 +663,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                             <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: on ? 1 : 0.5 }} />
                             {on && <span style={{ position: 'absolute', bottom: 4, right: 4, background: LIME, color: FOREST, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
                             <button onClick={(e) => { e.stopPropagation(); removePhoto(p.id) }} title="Remove photo" aria-label="Remove photo"
-                              style={{ position: 'absolute', top: 4, right: 4, width: 19, height: 19, borderRadius: '50%', background: 'rgba(23,37,28,0.75)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
+                              style={{ position: 'absolute', top: 4, right: 4, width: 19, height: 19, borderRadius: '50%', background: 'rgba(20,29,21,0.75)', border: 'none', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 }}>
                               <X size={11} strokeWidth={2.75} />
                             </button>
                           </div>
@@ -795,7 +795,7 @@ function SourceCard({ ad, brandName }: { ad: { pageName: string; assetImageUrl?:
           // eslint-disable-next-line @next/next/no-img-element
           ? <img src={cdn(thumb)} alt="source ad" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           : (ad.pageName || '?').charAt(0).toUpperCase()}
-        <span style={{ position: 'absolute', bottom: 4, left: 4, right: 4, background: 'rgba(23,37,28,0.85)', color: LIME, fontSize: 7.5, fontWeight: 800, textAlign: 'center', borderRadius: 5, padding: '2px 0', letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}><Trophy size={8} /> WINNING</span>
+        <span style={{ position: 'absolute', bottom: 4, left: 4, right: 4, background: 'rgba(20,29,21,0.85)', color: LIME, fontSize: 7.5, fontWeight: 800, textAlign: 'center', borderRadius: 5, padding: '2px 0', letterSpacing: '.04em', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 }}><Trophy size={8} /> WINNING</span>
       </div>
       <div style={{ minWidth: 0 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700 }}>The ad you’re remaking — {ad.pageName || 'this brand'}</div>
@@ -806,8 +806,8 @@ function SourceCard({ ad, brandName }: { ad: { pageName: string; assetImageUrl?:
 }
 
 // ── light-theme tokens + primitives ──
-const L_INK = '#161c17', L_MUTED = '#68756b', L_FAINT = '#94a096', L_LINE = '#e7ece7', L_SIDE = '#f6f8f5'
-const FOREST = '#17251c', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#3f8f4f'
+const L_INK = '#161c17', L_MUTED = '#6f6d5a', L_FAINT = '#94a096', L_LINE = '#efece2', L_SIDE = '#f6f8f5'
+const FOREST = '#141d15', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#ef4a1e'
 const HEADER_BG = 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)'
 
 function Label({ children }: { children: React.ReactNode }) {
@@ -823,7 +823,7 @@ function Lead({ children }: { children: React.ReactNode }) {
   return <p style={{ fontSize: 13.5, color: L_MUTED, lineHeight: 1.6, maxWidth: 560, margin: '0 0 20px' }}>{children}</p>
 }
 function FieldLabel({ children }: { children: React.ReactNode }) {
-  return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 6 }}>{children}</div>
+  return <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3a382f', marginBottom: 6 }}>{children}</div>
 }
 function InfoBar({ children }: { children: React.ReactNode }) {
   // Children include inline <b> tags — wrap in ONE span so the flex container doesn't turn each
@@ -839,7 +839,7 @@ function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () =
   )
 }
 const input: React.CSSProperties = { background: '#fff', border: `1.5px solid ${L_LINE}`, borderRadius: 12, padding: '11px 14px', color: L_INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
-const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3c473e', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
+const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3a382f', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
 const photoAdd: React.CSSProperties = { width: 88, height: 88, borderRadius: 13, border: '1.5px dashed #c4d0c2', background: '#fcfdfb', color: GREEN, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const errBox: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#b42318', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }

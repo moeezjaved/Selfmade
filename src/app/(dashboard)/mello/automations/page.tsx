@@ -66,7 +66,7 @@ export default function AutomationsPage() {
         <h1 style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 24, fontWeight: 800, color: '#26331f', margin: 0 }}>
           <Zap size={22} color="#7aa856" /> Automations
         </h1>
-        <button onClick={() => setShowForm(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 9, border: 'none', background: '#2d5a27', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+        <button onClick={() => setShowForm(s => !s)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 14px', borderRadius: 9, border: 'none', background: '#141d15', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
           <Plus size={16} /> New automation
         </button>
       </div>
@@ -87,7 +87,7 @@ export default function AutomationsPage() {
                 <option value="0 8 * * *">Daily · 8am</option>
                 <option value="0 9 1 * *">Monthly · 1st 9am</option>
               </select>
-              <button onClick={() => create(form)} disabled={!form.name.trim() || !form.prompt.trim()} style={{ padding: '0 18px', borderRadius: 9, border: 'none', background: (!form.name.trim() || !form.prompt.trim()) ? '#cdd8c5' : '#2d5a27', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Create</button>
+              <button onClick={() => create(form)} disabled={!form.name.trim() || !form.prompt.trim()} style={{ padding: '0 18px', borderRadius: 9, border: 'none', background: (!form.name.trim() || !form.prompt.trim()) ? '#cdd8c5' : '#141d15', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Create</button>
             </div>
           </div>
         </div>
@@ -104,7 +104,7 @@ export default function AutomationsPage() {
                 <div style={{ fontSize: 12.5, color: '#6c7a66', margin: '4px 0 10px', lineHeight: 1.4 }}>{t.prompt.slice(0, 90)}…</div>
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, fontSize: 11.5, color: '#8a9583' }}><Clock size={12} /> {t.schedule_label}</span>
-                  <button onClick={() => create(t)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d3e0cb', background: '#f1f6ec', color: '#2d5a27', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Use</button>
+                  <button onClick={() => create(t)} style={{ padding: '5px 12px', borderRadius: 7, border: '1px solid #d3e0cb', background: '#f1f6ec', color: '#141d15', fontWeight: 700, fontSize: 12, cursor: 'pointer' }}>Use</button>
                 </div>
               </div>
             ))}
@@ -118,7 +118,7 @@ export default function AutomationsPage() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <span style={{ fontWeight: 700, fontSize: 15, color: '#26331f' }}>{a.name}</span>
-              <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: a.is_active ? '#dffe95' : '#eceee9', color: a.is_active ? '#3d5a25' : '#8a9583' }}>{a.is_active ? 'ACTIVE' : 'PAUSED'}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 800, padding: '2px 8px', borderRadius: 99, background: a.is_active ? '#ff5a2c' : '#eceee9', color: a.is_active ? '#3d5a25' : '#8a9583' }}>{a.is_active ? 'ACTIVE' : 'PAUSED'}</span>
             </div>
             <div style={{ fontSize: 13, color: '#6c7a66', margin: '5px 0', lineHeight: 1.45 }}>{a.prompt}</div>
             <div style={{ display: 'flex', gap: 16, fontSize: 12, color: '#9aa593' }}>

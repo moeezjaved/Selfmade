@@ -148,18 +148,18 @@ export async function sendEmail(to: string, subject: string, html: string): Prom
 /** Branded Selfmade email shell (dark green + lime), with optional CTA and confirm strip. */
 export function emailShell(opts: { title: string; intro: string; ctaText?: string; ctaUrl?: string; confirmUrl?: string; imageUrl?: string }): string {
   const { title, intro, ctaText, ctaUrl, confirmUrl, imageUrl } = opts
-  return `<!doctype html><html><body style="margin:0;background:#eef5eb;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
+  return `<!doctype html><html><body style="margin:0;background:#f3eee3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:28px 12px;"><tr><td align="center">
     <table role="presentation" width="100%" style="max-width:520px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #e2e8f0;">
-      <tr><td style="background:#1a3a1a;padding:20px 28px;"><span style="color:#dffe95;font-weight:800;font-size:18px;letter-spacing:-.02em;">Selfmade</span></td></tr>
+      <tr><td style="background:#141d15;padding:20px 28px;"><span style="color:#ff5a2c;font-weight:800;font-size:18px;letter-spacing:-.02em;">Selfmade</span></td></tr>
       ${imageUrl ? `<tr><td><img src="${imageUrl}" alt="" style="width:100%;display:block;"/></td></tr>` : ''}
       <tr><td style="padding:28px;">
         <h1 style="margin:0 0 12px;color:#111;font-size:22px;font-weight:800;line-height:1.25;">${title}</h1>
         <p style="margin:0 0 20px;color:#374151;font-size:15px;line-height:1.6;">${intro}</p>
-        ${ctaText && ctaUrl ? `<a href="${ctaUrl}" style="display:inline-block;background:#1a3a1a;color:#dffe95;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;">${ctaText}</a>` : ''}
+        ${ctaText && ctaUrl ? `<a href="${ctaUrl}" style="display:inline-block;background:#141d15;color:#ff5a2c;text-decoration:none;font-weight:700;font-size:15px;padding:12px 22px;border-radius:10px;">${ctaText}</a>` : ''}
         ${confirmUrl ? `<div style="margin-top:22px;padding:14px 16px;background:#f3f8f1;border:1px solid #d8e6d4;border-radius:12px;">
           <p style="margin:0 0 10px;color:#375a33;font-size:13px;line-height:1.5;"><b>One quick thing:</b> confirm your email so we can send you fresh winning-ad picks. It keeps us out of your spam folder too.</p>
-          <a href="${confirmUrl}" style="display:inline-block;background:#dffe95;color:#14281a;text-decoration:none;font-weight:700;font-size:13px;padding:9px 16px;border-radius:8px;">Confirm my email</a>
+          <a href="${confirmUrl}" style="display:inline-block;background:#ff5a2c;color:#14281a;text-decoration:none;font-weight:700;font-size:13px;padding:9px 16px;border-radius:8px;">Confirm my email</a>
         </div>` : ''}
       </td></tr>
       <tr><td style="padding:0 28px 26px;"><p style="margin:0;color:#9ca3af;font-size:12px;">Selfmade · You're receiving this because you have an account. Manage emails in Settings.</p></td></tr>

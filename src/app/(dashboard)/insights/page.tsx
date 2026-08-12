@@ -112,12 +112,12 @@ function InsightsPage() {
 
       <div style={{display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:28, flexWrap:'wrap', gap:16}}>
         <div>
-          <h1 style={{fontSize:24, fontWeight:900, color:'#1a3a1a', marginBottom:4}}>Scale & Insights</h1>
+          <h1 style={{fontSize:24, fontWeight:900, color:'#141d15', marginBottom:4}}>Scale & Insights</h1>
           <p style={{fontSize:13, color:'#7a9a7a'}}>{accountName} — Daily action center. Scale winners, pause losers.</p>
         </div>
         <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
           {['last_3d','last_7d','last_14d','last_30d'].map(d => (
-            <button key={d} onClick={() => setDateRange(d)} style={{background:dateRange===d?'#1a3a1a':'#f0f7ee',border:dateRange===d?'1px solid #1a3a1a':'1px solid rgba(0,0,0,0.1)',color:dateRange===d?'#dffe95':'#5a7a5a',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+            <button key={d} onClick={() => setDateRange(d)} style={{background:dateRange===d?'#141d15':'#f4f0e6',border:dateRange===d?'1px solid #141d15':'1px solid rgba(0,0,0,0.1)',color:dateRange===d?'#ff5a2c':'#6b6a58',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
               {d.replace('last_','').replace('d',' days')}
             </button>
           ))}
@@ -142,14 +142,14 @@ function InsightsPage() {
       {loading ? (
         <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
           <img src='/favicon.png' alt='' style={{width:44,height:44,borderRadius:11,animation:'spin 1s linear infinite',margin:'0 auto 16px',display:'block'}}/>
-          <div style={{fontSize:15,color:'#1a3a1a',fontWeight:700}}>Analyzing your campaigns...</div>
+          <div style={{fontSize:15,color:'#141d15',fontWeight:700}}>Analyzing your campaigns...</div>
         </div>
       ) : campaigns.length === 0 ? (
         <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
           <div style={{fontSize:32,marginBottom:12}}>📊</div>
-          <div style={{fontSize:16,fontWeight:700,color:'#1a3a1a',marginBottom:8}}>No campaign data yet</div>
+          <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No campaign data yet</div>
           <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Launch your first M4 campaign, let it run for a few days, then come back here.</div>
-          <a href='/m4' style={{background:'#dffe95',color:'#1a3a1a',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,textDecoration:'none',display:'inline-block'}}>Launch M4 Campaign</a>
+          <a href='/m4' style={{background:'#ff5a2c',color:'#141d15',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,textDecoration:'none',display:'inline-block'}}>Launch M4 Campaign</a>
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
@@ -160,15 +160,15 @@ function InsightsPage() {
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                   <div style={{width:8,height:8,borderRadius:'50%',background:campaign.status==='ACTIVE'?'#2d7a2d':'rgba(255,255,255,0.2)',flexShrink:0}}/>
                   <div>
-                    <div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>{campaign.name}</div>
-                    <div style={{fontSize:11,color:'#8aaa8a',marginTop:2}}>{campaign.status} · {campaign.objective?.replace('OUTCOME_','')} · {campaign.adsets.length} ad sets</div>
+                    <div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>{campaign.name}</div>
+                    <div style={{fontSize:11,color:'#8b8a72',marginTop:2}}>{campaign.status} · {campaign.objective?.replace('OUTCOME_','')} · {campaign.adsets.length} ad sets</div>
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:12}}>
                   {campaign.adsets.some(a=>a.rec_type==='scale') && (
                     <div style={{background:'rgba(134,239,172,0.15)',border:'1px solid rgba(134,239,172,0.3)',borderRadius:100,padding:'4px 12px',fontSize:11,fontWeight:700,color:'#2d7a2d'}}>🚀 Has Winner</div>
                   )}
-                  <div style={{fontSize:18,color:'#8aaa8a'}}>{expanded[campaign.id]?'▲':'▼'}</div>
+                  <div style={{fontSize:18,color:'#8b8a72'}}>{expanded[campaign.id]?'▲':'▼'}</div>
                 </div>
               </div>
 
@@ -181,7 +181,7 @@ function InsightsPage() {
                     <div style={{padding:'14px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:10}}>
                       <div style={{display:'flex',alignItems:'center',gap:10}}>
                         {/* Top ad thumbnail */}
-                        <div style={{width:44,height:44,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f0f7ee',border:'1px solid rgba(0,0,0,0.08)'}}>
+                        <div style={{width:44,height:44,borderRadius:8,overflow:'hidden',flexShrink:0,background:'#f4f0e6',border:'1px solid rgba(0,0,0,0.08)'}}>
                           {adset.top_thumbnail_url ? (
                             <img src={adset.top_thumbnail_url} alt={adset.name} style={{width:'100%',height:'100%',objectFit:'cover'}} onError={(e:any)=>{e.target.style.display='none'}} />
                           ) : (
@@ -190,12 +190,12 @@ function InsightsPage() {
                         </div>
                         <div style={{width:6,height:6,borderRadius:'50%',background:adset.status==='ACTIVE'?'#2d7a2d':'rgba(255,255,255,0.15)',flexShrink:0}}/>
                         <div>
-                          <div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{adset.name}</div>
-                          <div style={{fontSize:11,color:'#8aaa8a',display:'flex',alignItems:'center',gap:8}}>
+                          <div style={{fontSize:13,fontWeight:700,color:'#141d15'}}>{adset.name}</div>
+                          <div style={{fontSize:11,color:'#8b8a72',display:'flex',alignItems:'center',gap:8}}>
                             <span>{adset.status}</span>
                             {adset.top_preview_url && (
                               <a href={adset.top_preview_url} target="_blank" rel="noopener noreferrer"
-                                style={{fontSize:11,fontWeight:700,color:'#1a3a1a',background:'#dffe95',padding:'2px 10px',borderRadius:100,textDecoration:'none'}}>
+                                style={{fontSize:11,fontWeight:700,color:'#141d15',background:'#ff5a2c',padding:'2px 10px',borderRadius:100,textDecoration:'none'}}>
                                 👁 View Ad
                               </a>
                             )}
@@ -207,7 +207,7 @@ function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -227,9 +227,9 @@ function InsightsPage() {
                         {label:'CTR', value:adset.ctr.toFixed(2)+'%'},
                         {label:'CPA', value:fmt(adset.cpa,adset.currency)},
                       ].map(m => (
-                        <div key={m.label} style={{textAlign:'center',background:'#f8fcf6',borderRadius:10,padding:'10px 6px'}}>
-                          <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>{m.label}</div>
-                          <div style={{fontSize:14,fontWeight:800,color:m.color||'#1a3a1a'}}>{m.value}</div>
+                        <div key={m.label} style={{textAlign:'center',background:'#f9f5ec',borderRadius:10,padding:'10px 6px'}}>
+                          <div style={{fontSize:10,fontWeight:700,color:'#8b8a72',textTransform:'uppercase',letterSpacing:'.06em',marginBottom:4}}>{m.label}</div>
+                          <div style={{fontSize:14,fontWeight:800,color:m.color||'#141d15'}}>{m.value}</div>
                         </div>
                       ))}
                     </div>
@@ -252,9 +252,9 @@ function InsightsPage() {
             
             {/* Fixed Header */}
             <div style={{padding:'20px 24px 16px',borderBottom:'1px solid rgba(0,0,0,0.06)',flexShrink:0}}>
-              <div style={{fontSize:18,fontWeight:900,color:'#1a3a1a',marginBottom:4}}>Scale This Winner</div>
+              <div style={{fontSize:18,fontWeight:900,color:'#141d15',marginBottom:4}}>Scale This Winner</div>
               <div style={{fontSize:13,color:'#6b8f6b'}}>
-                <strong style={{color:'#1a3a1a'}}>{scaleModal.adset.name}</strong> is beating your account average.
+                <strong style={{color:'#141d15'}}>{scaleModal.adset.name}</strong> is beating your account average.
               </div>
             </div>
 
@@ -265,15 +265,15 @@ function InsightsPage() {
               <div style={{background:'rgba(134,239,172,0.06)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:12,padding:14,marginBottom:16}}>
                 <div style={{fontSize:11,fontWeight:700,color:'#2d7a2d',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>What Scale Does</div>
                 <div style={{display:'flex',flexDirection:'column',gap:6,fontSize:12,color:'#3a5a3a'}}>
-                  <div>✅ <strong style={{color:'#1a3a1a'}}>Duplicate this ad set</strong> — same creative + audience, higher budget, goes ACTIVE</div>
-                  <div>✅ <strong style={{color:'#1a3a1a'}}>Original stays untouched</strong> — your control data keeps running</div>
+                  <div>✅ <strong style={{color:'#141d15'}}>Duplicate this ad set</strong> — same creative + audience, higher budget, goes ACTIVE</div>
+                  <div>✅ <strong style={{color:'#141d15'}}>Original stays untouched</strong> — your control data keeps running</div>
                 </div>
               </div>
 
               {/* First time vs already scaled */}
               {scaleModal && (scaleModal.adset.name.includes('Scale') || scaleModal.adset.name.includes('Duplic')) ? (
                 <div style={{display:'flex',gap:8,marginBottom:16}}>
-                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#1a3a1a':'#e2e8f0'),background:!isBudgetIncrease?'#1a3a1a':'#f8fafc',color:!isBudgetIncrease?'#dffe95':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#141d15':'#e2e8f0'),background:!isBudgetIncrease?'#141d15':'#f8fafc',color:!isBudgetIncrease?'#ff5a2c':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Duplicate Again
                   </button>
                   <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#b45309':'#e2e8f0'),background:isBudgetIncrease?'#fef3c7':'#f8fafc',color:isBudgetIncrease?'#92400e':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
@@ -292,12 +292,12 @@ function InsightsPage() {
                   <div style={{fontSize:11,fontWeight:700,color:'#6b8f6b',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</div>
                   <div style={{display:'grid',gridTemplateColumns:grid(4),gap:8,marginBottom:8}}>
                     {['1.5','2','3','5'].map(x=>(
-                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#1a3a1a':'#e2e8f0'),background:scaleFactor===x?'#1a3a1a':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#dffe95':'#374151'}}>
+                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#141d15':'#e2e8f0'),background:scaleFactor===x?'#141d15':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#ff5a2c':'#374151'}}>
                         {x}x
                       </div>
                     ))}
                   </div>
-                  <div style={{fontSize:11,color:'#8aaa8a'}}>
+                  <div style={{fontSize:11,color:'#8b8a72'}}>
                     Current: {fmt(scaleModal.campaign.budget||scaleModal.adset.budget, scaleModal.adset.currency)}/day → Duplicate gets: {fmt((scaleModal.campaign.budget||scaleModal.adset.budget)*parseFloat(scaleFactor||'2'), scaleModal.adset.currency)}/day
                   </div>
                 </div>
@@ -322,7 +322,7 @@ function InsightsPage() {
             {/* Fixed Footer */}
             <div style={{padding:'14px 24px',borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',gap:10,flexShrink:0,background:'#ffffff',borderRadius:'0 0 20px 20px'}}>
               <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.15)',color:'#6b8f6b',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
-              <button onClick={executeScale} style={{flex:2,background:'#dffe95',color:'#1a3a1a',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+              <button onClick={executeScale} style={{flex:2,background:'#ff5a2c',color:'#141d15',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                 {isBudgetIncrease ? 'Increase Budget +'+scaleFactor+'%' : 'Scale '+scaleFactor+'x — Duplicate Now'}
               </button>
             </div>

@@ -11,7 +11,7 @@ type Post = {
   author?: string; tags?: string[]; meta_description?: string; status?: string; published_at?: string | null; updated_at?: string
 }
 const BLANK: Post = { title: '', body_md: '', excerpt: '', cover_image_url: '', author: 'Selfmade', tags: [], meta_description: '', status: 'draft' }
-const LIME = '#dffe95', INK = '#0e1b12'
+const LIME = '#ff5a2c', INK = '#0e1b12'
 
 export default function AdminBlog() {
   const [posts, setPosts] = useState<Post[]>([])

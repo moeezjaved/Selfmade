@@ -65,7 +65,7 @@ export function ChatInput({ value, onChange, onSend, disabled, onOpenLibrary, pl
         <button
           onClick={() => value.trim() && !disabled && onSend()}
           disabled={disabled || !value.trim()}
-          style={{ width: 34, height: 34, borderRadius: 10, border: 'none', background: (disabled || !value.trim()) ? '#cdd8c5' : '#2d5a27', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (disabled || !value.trim()) ? 'default' : 'pointer' }}
+          style={{ width: 34, height: 34, borderRadius: 10, border: 'none', background: (disabled || !value.trim()) ? '#cdd8c5' : '#141d15', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: (disabled || !value.trim()) ? 'default' : 'pointer' }}
         >
           <ArrowUp size={18} />
         </button>

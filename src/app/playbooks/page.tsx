@@ -12,7 +12,7 @@ import KnowledgeChrome from '@/components/app/KnowledgeChrome'
 
 export const revalidate = 1800
 
-const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#111514', MUTED = '#7a827c', FAINT = '#adb3ae', LINE = '#eef0ee', FOREST = '#141d15', LIME = '#ff5a2c'
 
 export const metadata: Metadata = {
   title: 'Marketing Playbooks — walls of winning ads, continuously updated | Selfmade',
@@ -90,7 +90,7 @@ export default async function PlaybooksPage() {
           ))}
         </div>
 
-        <div style={{ marginTop: 60, background: FOREST, borderRadius: 20, padding: '26px 28px', color: '#eef5eb', maxWidth: 640 }}>
+        <div style={{ marginTop: 60, background: FOREST, borderRadius: 20, padding: '26px 28px', color: '#f3eee3', maxWidth: 640 }}>
           <div style={{ fontSize: 16.5, fontWeight: 800, color: '#fff' }}>See one you&rsquo;d run?</div>
           <div style={{ fontSize: 13.5, color: '#b9c6b6', margin: '6px 0 15px', lineHeight: 1.6 }}>Every ad in every playbook has a Remake button — Mello rebuilds it around your product in minutes.</div>
           <Link href="/hire" style={{ display: 'inline-block', background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, textDecoration: 'none' }}>Hire Mello →</Link>

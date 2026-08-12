@@ -106,11 +106,11 @@ export default function TrendingPage() {
               const on = drill?.kind === 'brand' && drill.id === b.pageId
               return (
                 <button key={b.pageId} onClick={() => setDrill(on ? null : { kind: 'brand', id: b.pageId, label: b.pageName })}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 22, border: `1px solid ${on ? DARK : '#e5e7eb'}`, background: on ? '#eef5eb' : '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '6px 12px 6px 6px', borderRadius: 22, border: `1px solid ${on ? DARK : '#e5e7eb'}`, background: on ? '#f3eee3' : '#fff', cursor: 'pointer', fontFamily: 'inherit' }}>
                   {b.image
                     // eslint-disable-next-line @next/next/no-img-element
                     ? <img src={img(b.image, 64)} alt="" style={{ width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                    : <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>{initials(b.pageName)}</span>}
+                    : <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#141d15', color: '#ff5a2c', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800 }}>{initials(b.pageName)}</span>}
                   <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{b.pageName}</span>
                   <span style={{ fontSize: 11.5, color: '#9ca3af' }}>{b.adCount} ads</span>
                 </button>
@@ -156,12 +156,12 @@ export default function TrendingPage() {
                   {ad.format && <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(255,255,255,.92)', color: '#374151', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '3px 7px', textTransform: 'capitalize' }}>{ad.format}</span>}
                   {/* Clone CTA — bottom-LEFT so it never sits over the video's play/pause control (which is
                       on the bottom-right). Rank badge is top-left, format top-right, so bottom-left is clear. */}
-                  <button onClick={() => setCloneAd(ad)} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 12, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: DARK, border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>
+                  <button onClick={() => setCloneAd(ad)} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 12, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#ff5a2c', color: DARK, border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>
                     <Sparkles size={12} /> Remake
                   </button>
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', height: 44 }}>
-                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{initials(ad.pageName)}</div>
+                  <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#141d15', color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{initials(ad.pageName)}</div>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{ad.pageName}</span>
                   {ad.isActive && <span title="Currently running" style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />}
                 </div>
@@ -211,4 +211,4 @@ export default function TrendingPage() {
   )
 }
 
-const nOpt = (on: boolean): React.CSSProperties => ({ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 7, border: 'none', background: on ? '#eef5eb' : 'transparent', color: on ? DARK : '#374151', fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit' })
+const nOpt = (on: boolean): React.CSSProperties => ({ display: 'block', width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 7, border: 'none', background: on ? '#f3eee3' : 'transparent', color: on ? DARK : '#374151', fontSize: 13, fontWeight: on ? 700 : 500, cursor: 'pointer', fontFamily: 'inherit' })

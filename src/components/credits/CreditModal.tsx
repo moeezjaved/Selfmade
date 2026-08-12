@@ -16,8 +16,8 @@ import { createPortal } from 'react-dom'
 import { X, Zap, Plus, Check, Loader2, Infinity as InfinityIcon } from 'lucide-react'
 import { PLANS, TOPUP_PACKS, normalizePlan } from '@/lib/plans'
 
-const LIME = '#dffe95'
-const INK = '#1a3a1a'
+const LIME = '#ff5a2c'
+const INK = '#141d15'
 
 export const OPEN_EVENT = 'credits:open'
 /** Open the modal from anywhere (e.g. after an insufficient-credits error). */
@@ -172,14 +172,14 @@ export function CreditModal() {
               <div style={{ fontSize: 34, fontWeight: 800, color: INK, lineHeight: 1 }}>{total.toLocaleString()}</div>
               <div style={{ fontSize: 12, color: '#6b8f6b', marginTop: 2 }}>total credits</div>
               <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
-                <div style={{ flex: 1, background: '#f8fcf6', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ flex: 1, background: '#f9f5ec', borderRadius: 10, padding: '10px 12px' }}>
                   <div style={{ fontSize: 11, color: '#6b8f6b', fontWeight: 600 }}>Monthly-refreshed</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: INK, marginTop: 2 }}>
                     {planCredits.toLocaleString()}{monthlyLimit != null ? <span style={{ color: '#9ca3af', fontWeight: 600 }}> / {monthlyLimit.toLocaleString()}</span> : ''}
                   </div>
                   {resetDate && <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>Resets {resetDate}</div>}
                 </div>
-                <div style={{ flex: 1, background: '#f8fcf6', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ flex: 1, background: '#f9f5ec', borderRadius: 10, padding: '10px 12px' }}>
                   <div style={{ fontSize: 11, color: '#6b8f6b', fontWeight: 600 }}>Non-expiring</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: INK, marginTop: 2 }}>{topupCredits.toLocaleString()}</div>
                   <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>From top-ups</div>
@@ -211,9 +211,9 @@ export function CreditModal() {
                     const loading = busy === p.id
                     return (
                       <button key={p.id} onClick={() => buy(p.id)} disabled={!!busy}
-                        style={{ position: 'relative', border: `2px solid ${best ? INK : '#e5e9e5'}`, borderRadius: 16, padding: '22px 12px 16px', background: best ? 'linear-gradient(180deg,#f4fbe8,#ffffff)' : '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, boxShadow: best ? '0 8px 24px rgba(26,58,26,0.12)' : 'none', transition: 'transform .12s, box-shadow .12s, border-color .12s', opacity: busy && !loading ? 0.5 : 1 }}
-                        onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(26,58,26,0.16)'; e.currentTarget.style.borderColor = INK } }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = best ? '0 8px 24px rgba(26,58,26,0.12)' : 'none'; e.currentTarget.style.borderColor = best ? INK : '#e5e9e5' }}>
+                        style={{ position: 'relative', border: `2px solid ${best ? INK : '#e5e9e5'}`, borderRadius: 16, padding: '22px 12px 16px', background: best ? 'linear-gradient(180deg,#f4fbe8,#ffffff)' : '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, boxShadow: best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none', transition: 'transform .12s, box-shadow .12s, border-color .12s', opacity: busy && !loading ? 0.5 : 1 }}
+                        onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(20,29,21,0.16)'; e.currentTarget.style.borderColor = INK } }}
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none'; e.currentTarget.style.borderColor = best ? INK : '#e5e9e5' }}>
                         {badge && (
                           <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', color: best ? INK : '#6b8f6b', background: best ? LIME : '#eef7dc', border: `1px solid ${best ? '#cde87a' : '#dcecc0'}`, padding: '3px 10px', borderRadius: 100 }}>{badge}</span>
                         )}
