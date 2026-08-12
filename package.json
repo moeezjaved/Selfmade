@@ -10,7 +10,7 @@
     "db:migrate": "supabase db push",
     "db:types": "supabase gen types typescript --local > src/types/database.ts",
     "search-eval": "node scripts/search-eval.mjs",
-    "test:mello": "tsx scripts/mello-tests.ts"
+    "test:mello": "tsx scripts/mello-tests.ts && tsx scripts/mello-integration.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.25.2",

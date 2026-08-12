@@ -155,20 +155,37 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })(), []),
   ])
 
+  // Brief↔chat number parity: refresh the Meta card from the SAME live audit service Mello's chat uses
+  // (auditAccount — brand-scoped, 10-min cached, last_30d), so the number the founder reads on the card
+  // and the number Mello quotes in chat are IDENTICAL. Fail-soft to the frozen nightly payload if the
+  // live read is slow or unavailable (never blocks the brief). Fetched once (at most one Meta card).
+  let liveMeta: any = null
+  if ((spine as any[]).some((e: any) => e.kind === 'meta_audit')) {
+    liveMeta = await soft((async () => {
+      const [{ resolveBrandScopedAccount }, { auditAccount }] = await Promise.all([import('@/lib/meta/scope'), import('@/lib/meta/audit')])
+      const acct = (await resolveBrandScopedAccount(admin, userId, opts.brandId ?? undefined))?.account_id
+      return await auditAccount(admin, userId, acct, 'last_30d')
+    })(), null, 4000)
+  }
+
   for (const e of spine) {
     // The Meta audit carries structured numbers in payload → render as the dedicated Facebook Ads card
     // (kind 'meta_ads'), not a generic prose item. Everything else passes through by kind verbatim.
     if (e.kind === 'meta_audit' && e.payload && typeof e.payload === 'object') {
       const p: any = e.payload
+      // Prefer the live audit (same source as chat) for the numbers + graded lists; keep opportunities +
+      // account selection from the frozen payload (those come only from the nightly opportunities fetch).
+      const m: any = (liveMeta && liveMeta.spend != null) ? liveMeta : p
       items.push({
         id: e.id, kind: 'meta_ads', importance: e.importance ?? 96, title: e.title, body: e.body || undefined,
         cta_label: e.cta_label || 'See the full report', cta_href: e.cta_href || '/reports', at: e.created_at,
         metaAudit: {
-          total: Number(p.total || 0), spend: Number(p.spend || 0), avgRoas: Number(p.avgRoas || 0),
-          currency: typeof p.currency === 'string' ? p.currency : 'USD', accountName: p.accountName || null,
-          scale: Array.isArray(p.scale) ? p.scale : [], watch: Array.isArray(p.watch) ? p.watch : [], pause: Array.isArray(p.pause) ? p.pause : [],
+          total: Number(m.total || 0), spend: Number(m.spend || 0), avgRoas: Number(m.avgRoas || 0),
+          currency: typeof m.currency === 'string' ? m.currency : (typeof p.currency === 'string' ? p.currency : 'USD'), accountName: m.accountName || p.accountName || null,
+          scale: Array.isArray(m.scale) ? m.scale : [], watch: Array.isArray(m.watch) ? m.watch : [], pause: Array.isArray(m.pause) ? m.pause : [],
           opportunities: Array.isArray(p.opportunities) ? p.opportunities : [],
-        },
+          ...(p.selected ? { selected: p.selected } : {}),
+        } as any,
       })
       continue
     }
