@@ -58,35 +58,29 @@
 
   /* big statement band under the hero */
   .bigstatement{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,126px) 0}
-  .bigstatement p{color:#fff;font-size:clamp(27px,4.1vw,54px);font-weight:600;letter-spacing:-.025em;line-height:1.15;max-width:24ch}
+  .bigstatement p{color:#fdf3ec;font-size:clamp(28px,4.5vw,60px);font-weight:600;letter-spacing:-.03em;line-height:1.1;max-width:20ch}
   .bigstatement p b{font-weight:600;color:#ffe4d8}
   .bs-item{display:flex;align-items:flex-start;gap:clamp(18px,3vw,34px);margin-top:clamp(64px,9vw,120px)}
   @media(max-width:600px){.bs-item{flex-direction:column;gap:14px}}
   .bs-no{font-family:var(--sans);font-size:clamp(24px,3vw,40px);font-weight:600;color:#fff;border:2px solid rgba(255,255,255,.55);border-radius:100px;padding:4px 20px;line-height:1.15;flex:0 0 auto}
   .bs-h{font-size:clamp(28px,4vw,52px);font-weight:600;color:#fff;letter-spacing:-.03em;line-height:1.08;max-width:20ch}
-  /* animated "learning" mockup (CSS-only, loops) */
+  /* animated "learning" mockup — SCROLL-SCRUBBED via --sp (0→1), set by JS as it passes the viewport */
   .learnviz{margin:clamp(46px,6vw,80px) auto 0;background:#12180f;border-radius:14px;overflow:hidden;max-width:880px;box-shadow:0 44px 100px -46px rgba(0,0,0,.6);transform:rotate(-.45deg)}
   .lv-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
   .lv-src{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:#cdd8c4;letter-spacing:.05em}
-  .lv-src .d{width:9px;height:9px;border-radius:50%;background:var(--lime);animation:lvblip 7s ease-in-out infinite}
-  @keyframes lvblip{0%,12%,82%,100%{box-shadow:0 0 0 0 rgba(217,242,122,.55)}22%{box-shadow:0 0 0 6px rgba(217,242,122,0)}}
-  .lv-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#0c120d;background:var(--lime);padding:5px 11px;border-radius:100px;font-weight:700;opacity:0;animation:lvlearn 7s ease-in-out infinite;white-space:nowrap}
-  @keyframes lvlearn{0%,16%{opacity:0;transform:translateY(-3px)}26%,72%{opacity:1;transform:none}80%,100%{opacity:0}}
+  .lv-src .d{width:9px;height:9px;border-radius:50%;background:var(--lime);animation:lvblip 2.4s ease-in-out infinite}
+  @keyframes lvblip{0%,100%{box-shadow:0 0 0 0 rgba(217,242,122,.55)}50%{box-shadow:0 0 0 6px rgba(217,242,122,0)}}
+  .lv-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#0c120d;background:var(--lime);padding:5px 11px;border-radius:100px;font-weight:700;opacity:0;transition:opacity .3s ease;white-space:nowrap}
   .lv-body{padding:20px 20px 6px}
   .lv-h{font-family:var(--mono);font-size:11px;color:#8fa088;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
   .lv-line{font-size:15px;color:#b7c2ad;padding:10px 12px;line-height:1.4;border-radius:7px}
   .lv-key{position:relative;overflow:hidden;color:#fff;font-weight:600;isolation:isolate}
-  .lv-key::before{content:"";position:absolute;inset:0;background:var(--lime);transform:scaleX(0);transform-origin:left;z-index:-1;animation:lvsweep 7s ease-in-out infinite}
-  .lv-key .kt{animation:lvtext 7s ease-in-out infinite}
-  @keyframes lvsweep{0%,8%{transform:scaleX(0)}18%{transform:scaleX(1)}72%{transform:scaleX(1)}80%{transform:scaleX(0)}100%{transform:scaleX(0)}}
-  @keyframes lvtext{0%,12%{color:#fff}20%,72%{color:#0c120d}80%,100%{color:#fff}}
+  .lv-key::before{content:"";position:absolute;inset:0;background:var(--lime);transform-origin:left;transform:scaleX(var(--sp,0));z-index:-1;transition:transform .1s linear}
+  .lv-key .kt{transition:color .18s ease}
   .lv-logos{display:flex;gap:12px;justify-content:center;padding:16px;border-top:1px solid rgba(255,255,255,.07);margin-top:12px}
-  .lv-logos .lg{width:36px;height:36px;border-radius:9px;background:#fff;display:grid;place-items:center;opacity:.4;animation:lvpop 7s ease-in-out infinite}
+  .lv-logos .lg{width:36px;height:36px;border-radius:9px;background:#fff;display:grid;place-items:center;opacity:.4;transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease}
   .lv-logos .lg svg{width:22px;height:22px}
-  .lv-logos .lg:nth-child(2){animation-delay:.45s}.lv-logos .lg:nth-child(3){animation-delay:.9s}
-  .lv-logos .lg:nth-child(4){animation-delay:1.35s}.lv-logos .lg:nth-child(5){animation-delay:1.8s}
-  @keyframes lvpop{0%,26%,100%{opacity:.4;transform:scale(1);box-shadow:none}6%{opacity:1;transform:scale(1.14);box-shadow:0 0 0 3px rgba(217,242,122,.6)}16%{opacity:.55;transform:scale(1)}}
-  @media(prefers-reduced-motion:reduce){.lv-key::before{transform:scaleX(1)}.lv-key .kt{color:#0c120d}.lv-tag{opacity:1}.lv-logos .lg{opacity:.8;animation:none}.lv-src .d,.learnviz{animation:none}}
+  @media(prefers-reduced-motion:reduce){.lv-key::before{transform:scaleX(1)}.lv-key .kt{color:#0c120d}.lv-tag{opacity:1}.lv-logos .lg{opacity:.85}.lv-src .d{animation:none}}
 
   /* type-led section openers */
   .opener{font-family:var(--serif);font-weight:400;letter-spacing:-.015em;line-height:1;font-size:clamp(40px,6.4vw,86px)}
@@ -232,7 +226,7 @@
   <!-- big statement band -->
   <section class="bigstatement">
     <div class="shell">
-      <p class="rv">Selfmade learns everything about your DTC brand: your store, products, customers, competitors, and ads. Then it uses that knowledge to create and run your marketing.</p>
+      <p class="rv">Selfmade learns all your products, customers, competitors and ads to create and run your marketing for you.</p>
       <div class="bs-item rv">
         <span class="bs-no">01</span>
         <h2 class="bs-h">Selfmade learns you &amp; your brand from everything you already do.</h2>
@@ -450,5 +444,25 @@
       es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } });
     },{threshold:.12});
     document.querySelectorAll('.rv').forEach(function(el){ io.observe(el); });
+
+    // scroll-scrub the learning mockup: as it crosses the viewport, drive --sp (0→1)
+    (function(){
+      var viz=document.querySelector('.learnviz'); if(!viz) return;
+      var key=viz.querySelector('.lv-key'), kt=viz.querySelector('.lv-key .kt'), tag=viz.querySelector('.lv-tag');
+      var logos=[].slice.call(viz.querySelectorAll('.lv-logos .lg'));
+      var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches, ticking=false;
+      function upd(){ ticking=false;
+        var r=viz.getBoundingClientRect(), vh=window.innerHeight||800;
+        var p=(vh*0.82 - r.top)/(vh*0.55); p=reduce?1:Math.max(0,Math.min(1,p));
+        if(key) key.style.setProperty('--sp', Math.max(0,Math.min(1,(p-0.08)/0.4)).toFixed(3));
+        if(kt) kt.style.color=(p>0.30)?'#0c120d':'#fff';
+        if(tag) tag.style.opacity=(p>0.48)?'1':'0';
+        for(var i=0;i<logos.length;i++){ var on=p>(0.14+i*0.13);
+          logos[i].style.opacity=on?'1':'0.4'; logos[i].style.transform=on?'scale(1.08)':'scale(1)';
+          logos[i].style.boxShadow=on?'0 0 0 3px rgba(217,242,122,.6)':'none'; }
+      }
+      function ons(){ if(!ticking){ ticking=true; requestAnimationFrame(upd); } }
+      window.addEventListener('scroll',ons,{passive:true}); window.addEventListener('resize',ons); upd();
+    })();
   </script>
 </body></html>
