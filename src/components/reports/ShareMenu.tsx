@@ -117,5 +117,5 @@ export default function ShareMenu({ payload, onClose, savedId }: {
 const taStyle: React.CSSProperties = { width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', resize: 'vertical', boxSizing: 'border-box', color: '#141d15' }
 const inStyle: React.CSSProperties = { width: '100%', padding: '9px 12px', borderRadius: 10, border: '1px solid rgba(0,0,0,0.12)', fontFamily: 'inherit', fontSize: 13, outline: 'none', boxSizing: 'border-box', color: '#141d15' }
 const lblStyle: React.CSSProperties = { display: 'block', fontSize: 11, fontWeight: 700, color: '#6b6a58', marginBottom: 5 }
-const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 100, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }
+const btnPrimary: React.CSSProperties = { padding: '8px 16px', borderRadius: 100, border: 'none', background: '#ef4a1e', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost: React.CSSProperties = { padding: '8px 14px', borderRadius: 100, border: '1px solid rgba(0,0,0,0.12)', background: '#fff', color: '#6b6a58', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }

@@ -68,7 +68,7 @@ function LocationPicker({selected, onChange}: {selected: any[], onChange: (v: an
       {selected.length > 0 && (
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
           {selected.map((loc:any) => (
-            <span key={loc.key} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#141d15',color:'#ff5a2c',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700}}>
+            <span key={loc.key} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#ef4a1e',color:'#fff',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700}}>
               {typeLabel(loc.type)} {loc.name}{loc.country_code ? `, ${loc.country_code}` : ''}
               <button onClick={()=>remove(loc.key)} style={{background:'none',border:'none',color:'#ff5a2c',cursor:'pointer',fontSize:12,padding:0,lineHeight:1}}>×</button>
             </span>
@@ -595,7 +595,7 @@ function M4Inner() {
             ))}
           </div>
           <div style={{display:'flex',gap:12}}>
-            <button onClick={()=>goTo('pixel')} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
+            <button onClick={()=>goTo('pixel')} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
             <button onClick={gradeNow} disabled={loading} style={{background:'none',border:'1.5px solid rgba(255,90,44,0.2)',color:'#141d15',padding:'13px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.6:1}}>{loading?'Analysing…':'Grade and Scale My Campaigns'}</button>
           </div>
         </div>
@@ -719,7 +719,7 @@ function M4Inner() {
               </div>
               <div style={{display:'flex',gap:8}}>
                 <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="Add domain or @handle" style={{...S.input,flex:1}}/>
-                <button onClick={addCompetitor} style={{background:'#141d15',color:'#ff5a2c',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
+                <button onClick={addCompetitor} style={{background:'#ef4a1e',color:'#fff',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
               </div>
             </div>
             <div style={{marginBottom:8}}><label style={S.label}>Meta Pixel</label></div>
@@ -830,7 +830,7 @@ function M4Inner() {
           <div style={S.body}>
             {interests.length===0?(
               <div style={{textAlign:'center',padding:32}}>
-                <button onClick={generateInterests} disabled={loading} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Mello is thinking…':'Generate Interest Suggestions'}</button>
+                <button onClick={generateInterests} disabled={loading} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Mello is thinking…':'Generate Interest Suggestions'}</button>
               </div>
             ):(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
@@ -947,7 +947,7 @@ function M4Inner() {
               <div style={{fontSize:32,marginBottom:12}}>Chart</div>
               <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No campaign data yet</div>
               <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Run campaigns for 7 days then grade.</div>
-              <button onClick={gradeNow} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
+              <button onClick={gradeNow} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
             </div>
           ):(
             <div style={{display:'flex',flexDirection:'column',gap:14}}>

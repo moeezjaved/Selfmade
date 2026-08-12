@@ -181,7 +181,7 @@ export default function SavedAdsPage() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>📚 Saved Ads</div>
             <button onClick={() => setShowCreate(o => !o)}
-              style={{ width: 28, height: 28, borderRadius: '50%', background: '#141d15', color: '#ff5a2c', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              style={{ width: 28, height: 28, borderRadius: '50%', background: '#ef4a1e', color: '#fff', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <Plus size={14} />
             </button>
           </div>
@@ -219,7 +219,7 @@ export default function SavedAdsPage() {
                 <span>👥 Share with team {canTeam ? '' : '(Pro)'}</span>
               </label>
               <button onClick={createBoard} disabled={creating || !newBoardName.trim()}
-                style={{ width: '100%', padding: '7px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: creating ? 0.7 : 1 }}>
+                style={{ width: '100%', padding: '7px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 7, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', opacity: creating ? 0.7 : 1 }}>
                 {creating ? 'Creating…' : 'Create Board'}
               </button>
             </div>
@@ -290,7 +290,7 @@ export default function SavedAdsPage() {
             <div style={{ fontSize: 18, fontWeight: 700, color: '#111', marginBottom: 8 }}>Create your first board</div>
             <div style={{ fontSize: 14 }}>Save and organise ads you love.</div>
             <button onClick={() => setShowCreate(true)}
-              style={{ marginTop: 20, padding: '10px 24px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ marginTop: 20, padding: '10px 24px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               + New Board
             </button>
           </div>
@@ -306,7 +306,7 @@ export default function SavedAdsPage() {
               <>
                 <div style={{ fontSize: 14 }}>Install the browser extension, then save any ad you find on<br />Instagram, the Facebook Ad Library or TikTok — it lands here.</div>
                 <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer"
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 20, padding: '10px 22px', background: '#141d15', color: '#ff5a2c', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 20, padding: '10px 22px', background: '#ef4a1e', color: '#fff', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
                   🧩 Get the Chrome extension
                 </a>
               </>
@@ -489,7 +489,7 @@ export default function SavedAdsPage() {
                         }
                         return isVid ? setCloneVid(saved) : setCloneImg(saved)
                       }}
-                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
+                        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: '9px 12px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}
                         onMouseEnter={e => (e.currentTarget.style.background = '#12290f')}
                         onMouseLeave={e => (e.currentTarget.style.background = '#141d15')}>
                         <Sparkles size={14} /> Remake{isVid ? ' video' : ''} with my product

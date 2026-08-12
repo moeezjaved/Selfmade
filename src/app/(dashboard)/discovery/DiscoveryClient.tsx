@@ -349,7 +349,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
         {leadIcon && <span style={{ display: 'inline-flex', color: selected.length ? '#5f9032' : '#7d8a7f' }}>{leadIcon}</span>}
         {label}
         {selected.length > 0 && (
-          <span style={{ background: '#141d15', color: '#ff5a2c', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+          <span style={{ background: '#ef4a1e', color: '#fff', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
             {selected.length}
           </span>
         )}
@@ -606,7 +606,7 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
               placeholder="Board name…"
               style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
             <button onClick={createAndSave} disabled={creating || !newName.trim()}
-              style={{ padding: '8px 14px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '8px 14px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               {creating ? '…' : 'Save'}
             </button>
           </div>
@@ -747,7 +747,7 @@ function ScriptsMenu({ adId }: { adId: string }) {
         onClick={() => router.push(`/discovery/${encodeURIComponent(adId)}?script=1`)}
         style={{
           background: '#ff5a2c',
-          color: '#141d15',
+          color: '#fff',
           border: 'none',
           padding: '7px 14px',
           borderRadius: 8,
@@ -1916,7 +1916,7 @@ export default function DiscoveryPage() {
               {isFollowed ? '✓ Following' : '♡ Follow'}
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
+              <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#ef4a1e', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
               <button onClick={() => { window.open(`/discovery/brand/${hoverBrand}`, '_blank', 'noopener'); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
             </div>
           </div>
@@ -2198,7 +2198,7 @@ export default function DiscoveryPage() {
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <a href="https://www.facebook.com/ads/library/api/" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#141d15', color: '#ff5a2c', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#ef4a1e', color: '#fff', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
                 🔑 Confirm Identity on Meta
               </a>
               <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${country === 'ALL' ? 'US' : country}${query ? `&q=${encodeURIComponent(query)}` : ''}&media_type=all`}

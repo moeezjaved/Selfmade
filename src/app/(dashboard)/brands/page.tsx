@@ -22,7 +22,7 @@ interface Brand {
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }
 const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', marginBottom: 8 }
-const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
+const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#ef4a1e', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
 const csv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
 // Pasted product image URLs are often referrer/hotlink-protected → a raw <img> renders broken.
 // Route through the weserv proxy (same as every other image surface). R2 objects pass through.

@@ -123,7 +123,7 @@ export default function BrainPage() {
                 <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 12 }}>Mello answers from everything the company knows — beliefs, facts, what it's learned, and your customer conversations.</div>
                 <div style={{ display: 'flex', gap: 8 }}>
                   <input value={ask} onChange={e => setAsk(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') doAsk() }} placeholder="e.g. What are customers complaining about?" style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 14, fontFamily: 'inherit' }} />
-                  <button onClick={doAsk} disabled={asking} style={{ background: '#141d15', color: '#ff5a2c', border: 'none', padding: '10px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 800, cursor: asking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: asking ? 0.6 : 1 }}>{asking ? '…' : 'Ask'}</button>
+                  <button onClick={doAsk} disabled={asking} style={{ background: '#ef4a1e', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 10, fontSize: 13.5, fontWeight: 800, cursor: asking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: asking ? 0.6 : 1 }}>{asking ? '…' : 'Ask'}</button>
                 </div>
                 {answer ? (
                   <div style={{ marginTop: 14, padding: '14px 16px', background: '#f9f5ec', border: '1px solid #e6efdc', borderRadius: 12 }}>
@@ -176,7 +176,7 @@ export default function BrainPage() {
                       <div style={{ fontSize: 12.5, color: '#8a6a64', marginTop: 2 }}>Clashes with: {c.existing_rule}</div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 9, flexWrap: 'wrap' }}>
                         <button onClick={() => resolveConflict(c.id, 'temporary')} style={{ background: '#fff', color: '#141d15', border: '1.5px solid #e2e8f0', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Temporary exception</button>
-                        <button onClick={() => resolveConflict(c.id, 'replace')} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Replace old rule</button>
+                        <button onClick={() => resolveConflict(c.id, 'replace')} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Replace old rule</button>
                         <button onClick={() => resolveConflict(c.id, 'keep')} style={{ background: '#fff', color: '#5a705a', border: '1.5px solid #e2e8f0', padding: '6px 13px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Keep old</button>
                       </div>
                     </div>
@@ -193,7 +193,7 @@ export default function BrainPage() {
                     {p.evidence?.basedOn && <div style={{ fontSize: 12.5, color: '#5a705a', marginTop: 4 }}>Why — {p.evidence.basedOn}</div>}
                     <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: 'ui-monospace,monospace' }}>{SOURCE_LABEL(p.source)}</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
-                      <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
+                      <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
                       <button onClick={() => proposal(p.id, 'dismiss')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
                     </div>
                   </div>
@@ -247,7 +247,7 @@ export default function BrainPage() {
                     <div key={p.id} style={{ padding: '10px 0', borderTop: '1px solid #e6efdc' }}>
                       <div style={{ fontSize: 14, color: '#141d15' }}>{p.rule}{p.department && pill(DEPT_LABEL[p.department] || p.department)}</div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                        <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
+                        <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
                         <button onClick={() => proposal(p.id, 'dismiss')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
                       </div>
                     </div>

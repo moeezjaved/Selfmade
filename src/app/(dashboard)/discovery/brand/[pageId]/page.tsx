@@ -340,7 +340,7 @@ export default function BrandPage() {
             </div>
             <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&view_all_page_id=${pageId}`}
               target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#141d15', color: '#ff5a2c', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#ef4a1e', color: '#fff', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
               <ExternalLink size={14} /> View on Meta Ads Library
             </a>
           </div>
@@ -448,7 +448,7 @@ export default function BrandPage() {
                 {libHasMore && (
                   <div style={{ textAlign: 'center', marginTop: 24 }}>
                     <button onClick={() => loadLib(libPage + 1, false)} disabled={libLoading}
-                      style={{ padding: '10px 28px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: libLoading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: libLoading ? 0.7 : 1 }}>
+                      style={{ padding: '10px 28px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: libLoading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: libLoading ? 0.7 : 1 }}>
                       {libLoading ? 'Loading…' : 'Load more'}
                     </button>
                   </div>

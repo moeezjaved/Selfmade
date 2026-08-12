@@ -332,7 +332,7 @@ function CampaignsInner() {
             ))}
           </div>
           <button onClick={loadCampaigns} style={{ background: '#f4f0e6', color: '#3a5a3a', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>↻ Refresh</button>
-          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
+          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
         </div>
       </div>
 
@@ -345,7 +345,7 @@ function CampaignsInner() {
         <div style={{ background: '#ffffff', border: '1px solid #e8f0e8', borderRadius: 16, padding: 48, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
           <div style={{ fontSize: 16, fontWeight: 700, color: '#141d15', marginBottom: 16 }}>No active or paused campaigns found</div>
-          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
+          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
         </div>
       ) : (
         <div style={{ background: '#fff', border: '1px solid #e8f0e8', borderRadius: 16, overflow: 'hidden', overflowX: 'auto' }}>
@@ -413,7 +413,7 @@ function CampaignsInner() {
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)} className="mello-manage"
                     style={{ background: 'linear-gradient(135deg, #141d15 0%, #24382a 100%)', color: '#ff5a2c', border: '1px solid rgba(255,90,44,.18)', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(17,24,17,.35)', transition: 'transform .12s, box-shadow .12s' }}>
-                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#ff5a2c', color: '#141d15', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
+                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#ff5a2c', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
@@ -645,7 +645,7 @@ function CampaignsInner() {
                         }
                       }}
                       style={{ display: 'none' }} />
-                    <label htmlFor="creative-upload" style={{ background: '#141d15', color: '#ff5a2c', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
+                    <label htmlFor="creative-upload" style={{ background: '#ef4a1e', color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
                       {uploadingCreative ? '⏳ Uploading...' : '📁 Choose File'}
                     </label>
                     {uploadingCreative && <div style={{ marginTop: 12, fontSize: 12, color: '#b8860b', fontWeight: 600 }}>⏳ Uploading to Meta...</div>}
@@ -692,7 +692,7 @@ function CampaignsInner() {
               <button onClick={() => { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false) }}
                 style={{ flex: 1, background: 'none', border: '1.5px solid rgba(0,0,0,0.12)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveEdit} disabled={saving}
-                style={{ flex: 2, background: '#ff5a2c', color: '#141d15', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+                style={{ flex: 2, background: '#ff5a2c', color: '#fff', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
