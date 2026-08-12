@@ -34,12 +34,40 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { adId } = await req.json()
+  const { adId, language } = await req.json()
   if (!adId) return NextResponse.json({ error: 'adId required' }, { status: 400 })
+  // Surfaced hooks/framework should read in the user's language (default English), NOT the source ad's
+  // language — the bug was a Hindi ad showing Hindi hooks. The Whisper transcript stays the literal ad.
+  const LANG: Record<string, string> = { en: 'English', ur: 'Urdu', hi: 'Hindi', ar: 'Arabic', es: 'Spanish', fr: 'French', de: 'German', pt: 'Portuguese' }
+  const langName = LANG[String(language || 'en')] || 'English'
 
-  // Cache hit → free, no reserve.
+  // Analyze framework + hooks + strategies in the target language (cheap gpt-4o-mini).
+  const analyze = async (text: string) => {
+    const an = await getOpenAI().chat.completions.create({
+      model: 'gpt-4o-mini',
+      response_format: { type: 'json_schema', json_schema: ANALYSIS_SCHEMA },
+      messages: [{ role: 'user', content: `Analyze this ad. Identify the copywriting FRAMEWORK (e.g. PAS, AIDA, BAB, Problem-Solution), the HOOKS (first lines / attention grabbers), and persuasion STRATEGIES. Write the framework name, hooks and strategies in ${langName} — the ad itself may be in another language, so translate/transcreate them into ${langName}. Return JSON.\n\n${text.slice(0, 6000) || '(no transcribable content)'}` }],
+    })
+    return JSON.parse(an.choices[0]?.message?.content || '{}')
+  }
+
+  // Cache hit → free. Re-run the cheap analysis in the requested language so cached hooks/framework
+  // aren't stuck in the source ad's language (Whisper transcript is reused, not re-run).
   const { data: existing } = await admin.from('ad_scripts').select('*').eq('ad_id', adId).maybeSingle()
-  if (existing?.transcript) return NextResponse.json({ script: existing, cached: true })
+  if (existing?.transcript) {
+    try {
+      const spoken = (existing.transcript as any[]).map((s: any) => s.text).join(' ')
+      const analysis = await analyze(spoken)
+      const updated = {
+        ...existing,
+        framework: analysis.framework || existing.framework || null,
+        hooks: Array.isArray(analysis.hooks) && analysis.hooks.length ? analysis.hooks : (existing.hooks || []),
+        strategies: Array.isArray(analysis.strategies) && analysis.strategies.length ? analysis.strategies : (existing.strategies || []),
+      }
+      await admin.from('ad_scripts').update({ framework: updated.framework, hooks: updated.hooks, strategies: updated.strategies }).eq('ad_id', adId)
+      return NextResponse.json({ script: updated, cached: true })
+    } catch { return NextResponse.json({ script: existing, cached: true }) }
+  }
 
   // Need the ad's video (+ its written copy — many UGC ads carry the real message in
   // on-screen text/caption, not speech, so we fold the body into the analysis).
@@ -77,13 +105,8 @@ export async function POST(req: NextRequest) {
     const copy = `${ad.title || ''} ${ad.body || ''}`.replace(/\{\{[^}]*\}\}/g, '').trim()
     const analyzeText = [spoken, copy && `[ad copy] ${copy}`].filter(Boolean).join('\n\n')
 
-    // Analyze framework + hooks + strategies (cheap).
-    const an = await getOpenAI().chat.completions.create({
-      model: 'gpt-4o-mini',
-      response_format: { type: 'json_schema', json_schema: ANALYSIS_SCHEMA },
-      messages: [{ role: 'user', content: `Analyze this ad. Identify the copywriting FRAMEWORK (e.g. PAS, AIDA, BAB, Problem-Solution), the HOOKS (first lines / attention grabbers), and persuasion STRATEGIES. Return JSON.\n\n${analyzeText.slice(0, 6000) || '(no transcribable content)'}` }],
-    })
-    const analysis = JSON.parse(an.choices[0]?.message?.content || '{}')
+    // Analyze framework + hooks + strategies (cheap), in the target language.
+    const analysis = await analyze(analyzeText)
 
     const row = {
       ad_id: adId, transcript,

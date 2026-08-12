@@ -1,12 +1,12 @@
 /**
  * POST /api/scripts/duplicate  { sourceAdId, brandId?, brief? }
- * reserve(5cr) → take a transcribed source ad's framework + beats and rewrite it for
- * the user's brand/product, SAME structure → store generated_scripts → commit.
- * Requires the source ad to be transcribed first (ad_scripts row).
+ * Take a transcribed source ad's framework + beats and rewrite it for the user's brand/product,
+ * SAME structure → store generated_scripts. FREE — parity with the Remake studio, which does the
+ * identical brand rewrite for free and only charges credits at video render. (Was 35cr, a bug: it
+ * charged for a text rewrite the Remake flow gives away.) Requires the source ad transcribed first.
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import OpenAI from 'openai'
 
 export const dynamic = 'force-dynamic'
@@ -35,15 +35,6 @@ export async function POST(req: NextRequest) {
   if (brandId) {
     const { data } = await admin.from('brands').select('*').eq('id', brandId).eq('user_id', user.id).maybeSingle()
     brand = data
-  }
-
-  let tx
-  try {
-    tx = await reserveCredits(admin, user.id, 'script_duplicate', sourceAdId)
-  } catch (e) {
-    if (e instanceof InsufficientCreditsError)
-      return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have }, { status: 402 })
-    throw e
   }
 
   try {
@@ -76,13 +67,10 @@ Return ONLY the new script text, ready to read on camera. Match the source's len
     const { data: row } = await admin.from('generated_scripts').insert({
       user_id: user.id, source_ad_id: sourceAdId, brand_id: brandId || null,
       framework: src.framework, script, brief: brand ? { brandId } : (brief || null),
-      credit_tx_id: tx.id,
     }).select().single()
 
-    await commitCredits(admin, tx.id, { model: 'gpt-4o-mini', actual_cost_usd: 0.003, reference_id: sourceAdId })
     return NextResponse.json({ generated: row })
   } catch (e: any) {
-    await refundCredits(admin, tx.id).catch(() => {})
     return NextResponse.json({ error: e?.message || 'duplication failed' }, { status: 500 })
   }
 }

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { COMPANY } from '@/lib/company'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * LegalShell — one premium chrome for every public legal / info page (privacy, terms, refund,
@@ -9,18 +10,29 @@ import { COMPANY } from '@/lib/company'
  */
 const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#ff5a2c'
 
-export default function LegalShell({ eyebrow = 'Legal', title, updated, intro, children }: {
+export default async function LegalShell({ eyebrow = 'Legal', title, updated, intro, children }: {
   eyebrow?: string; title: string; updated?: string; intro?: React.ReactNode; children: React.ReactNode
 }) {
+  // Auth-aware chrome: a logged-in user reaching these pages (e.g. via in-app "Support & feedback")
+  // should get in-app nav + a logo that returns to the app, not the logged-out marketing home.
+  let signedIn = false
+  try { const s = await createClient(); signedIn = !!(await s.auth.getUser()).data.user } catch { /* treat as logged out */ }
+  const home = signedIn ? '/brief' : '/'
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
       {/* ── Nav — mirrors the landing ── */}
       <nav style={{ position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.85)', backdropFilter: 'blur(14px)', borderBottom: '1px solid #f0f2ef' }}>
         <div style={{ maxWidth: 1200, margin: '0 auto', height: 66, padding: '0 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/" style={{ display: 'flex', alignItems: 'center' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
+          <Link href={home} style={{ display: 'flex', alignItems: 'center' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-            <Link href="/login" className="ls-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
-            <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Hire Mello →</Link>
+            {signedIn ? (
+              <Link href="/brief" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Dashboard →</Link>
+            ) : (
+              <>
+                <Link href="/login" className="ls-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
+                <Link href="/signup" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Hire Mello →</Link>
+              </>
+            )}
           </div>
         </div>
       </nav>

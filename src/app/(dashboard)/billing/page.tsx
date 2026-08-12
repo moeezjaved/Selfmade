@@ -140,6 +140,9 @@ export default function BillingPage() {
             <div>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,90,44,0.6)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Your subscription</div>
               <div style={{ fontSize: 34, fontWeight: 900, color: '#ff5a2c', lineHeight: 1 }}>Selfmade {PLANS[normalizePlan(profile?.plan_id)].label}</div>
+              <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)', marginTop: 8 }}>
+                Includes {PLANS[normalizePlan(profile?.plan_id)].seats} team seat{PLANS[normalizePlan(profile?.plan_id)].seats === 1 ? '' : 's'} · {(PLANS[normalizePlan(profile?.plan_id)].monthlyCredits ?? 0).toLocaleString()} credits / month
+              </div>
             </div>
             <span style={{ background: '#ff5a2c20', border: '1px solid #ff5a2c40', color: '#ff5a2c', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>
