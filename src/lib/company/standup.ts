@@ -80,7 +80,7 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
     const { data: comms } = await admin.from('channel_identities').select('provider, meta')
       .eq('user_id', userId).in('provider', ['slack', 'whatsapp']).eq('active', true)
     const hasFounderComms = (comms || []).some((c: any) => !c?.meta?.customer_channel)
-    if (!hasFounderComms) connectPrompts.push({ key: 'comms', emoji: '💬', label: 'Get briefs on Slack or WhatsApp' })
+    if (!hasFounderComms) connectPrompts.push({ key: 'comms', emoji: '💬', label: 'Get briefs on Slack' })
   } catch { /* best-effort */ }
 
   const pending = (tasks as any[]).filter(t => t.status === 'suggested')

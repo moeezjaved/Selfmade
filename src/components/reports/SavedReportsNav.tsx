@@ -82,18 +82,18 @@ export default function SavedReportsNav() {
     const canDelete = !r.ownerName   // not a shared-with-me report
     return (
       <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-        style={{ display: 'flex', alignItems: 'center', width: '100%', height: 32, borderRadius: 10, background: hover ? 'rgba(255,255,255,0.08)' : 'transparent', transition: 'background-color .075s ease-in-out' }}>
+        style={{ display: 'flex', alignItems: 'center', width: '100%', height: 32, borderRadius: 10, background: hover ? '#f5f8f2' : 'transparent', transition: 'background-color .075s ease-in-out' }}>
         <button onClick={() => router.push(`/reports?report=${r.id}`)} title={r.ownerName ? `${r.name} — shared by ${r.ownerName}` : r.name}
-          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, height: '100%', padding: '0 4px 0 10px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, height: '100%', padding: '0 4px 0 10px', border: 'none', background: 'transparent', color: '#141d15', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
           <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
           {badge && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#8b8a72', flexShrink: 0 }}>{badge}</span>}
         </button>
         {canDelete && hover && (
           <button onClick={() => del(r)} title="Delete report"
-            style={{ flexShrink: 0, width: 24, height: 24, marginRight: 5, borderRadius: 6, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, lineHeight: 1 }}
-            onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,120,110,0.25)'; e.currentTarget.style.color = '#ffd5d0' }}
-            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'rgba(255,255,255,0.5)' }}>✕</button>
+            style={{ flexShrink: 0, width: 24, height: 24, marginRight: 5, borderRadius: 6, border: 'none', background: 'transparent', color: '#9aa79a', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, lineHeight: 1 }}
+            onMouseEnter={e => { e.currentTarget.style.background = '#fdecea'; e.currentTarget.style.color = '#b91c1c' }}
+            onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#9aa79a' }}>✕</button>
         )}
       </div>
     )
@@ -101,8 +101,8 @@ export default function SavedReportsNav() {
 
   const Shortcut = ({ s }: { s: { emoji: string; label: string; href: string } }) => (
     <button onClick={() => router.push(s.href)} title={s.label}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color .075s ease-in-out' }}
-      onMouseEnter={e => e.currentTarget.style.background = 'rgba(255,255,255,0.08)'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+      style={{ display: 'flex', alignItems: 'center', gap: 4, width: '100%', height: 32, padding: '0 10px', borderRadius: 10, border: 'none', background: 'transparent', color: '#141d15', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', transition: 'background-color .075s ease-in-out' }}
+      onMouseEnter={e => e.currentTarget.style.background = '#f5f8f2'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
       <span style={{ fontSize: 13, flexShrink: 0 }}>{s.emoji}</span>
       <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.label}</span>
     </button>
@@ -166,8 +166,8 @@ function Folder({ title, defaultOpen, children }: { title: string; defaultOpen?:
     <div style={{ marginTop: 8 }}>
       <button onClick={() => setOpen(o => !o)}
         style={{ display: 'flex', alignItems: 'center', gap: 5, width: '100%', padding: '5px 8px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: 'inherit' }}>
-        <ChevronRight size={12} color="rgba(255,255,255,0.4)" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .12s' }} />
-        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{title}</span>
+        <ChevronRight size={12} color="#9aa79a" style={{ transform: open ? 'rotate(90deg)' : 'none', transition: 'transform .12s' }} />
+        <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: '#9aa79a' }}>{title}</span>
       </button>
       {open && <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>{children}</div>}
     </div>
