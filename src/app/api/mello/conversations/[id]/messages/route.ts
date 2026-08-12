@@ -91,7 +91,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             conversation_id: conversationId, role: 'assistant', content: g.reply,
           }).select('id').single()
           await admin.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
-          logMelloAnswer(admin, { userId, brandId, surface: surface || 'mello', question: message, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, ms: Date.now() - t0, createdMemory, confidence: 'high' })
+          logMelloAnswer(admin, { userId, brandId, surface: surface || 'mello', question: message, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, memoryIds: g.memoryIds, ms: Date.now() - t0, createdMemory, confidence: 'high' })
           if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
           send({ type: 'done' })
         } else {

@@ -16,6 +16,7 @@ export type MelloTrace = {
   createdMemory?: boolean     // did this turn extract a durable memory into the Company Brain?
   conflict?: boolean          // did a belief conflict get flagged?
   confidence?: 'high' | 'medium' | 'low'
+  memoryIds?: string[]        // exact memory rows the answer used (dna:<id> / mem:<id> / learn:<id>)
 }
 
 export function logMelloAnswer(admin: any, t: MelloTrace): void {
@@ -26,6 +27,7 @@ export function logMelloAnswer(admin: any, t: MelloTrace): void {
       user_id: rec.userId, brand_id: rec.brandId || null, surface: rec.surface,
       question: rec.question, intent: rec.intent, path: rec.path, sources: rec.sources, ms: rec.ms ?? null,
       created_memory: !!rec.createdMemory, conflict: !!rec.conflict, confidence: rec.confidence ?? null,
+      memory_ids: rec.memoryIds || [],
     }).then(() => {}, () => {})   // columns/table may not exist yet — never throw
   } catch { /* never throw */ }
 }

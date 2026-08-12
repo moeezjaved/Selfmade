@@ -20,7 +20,7 @@ const TEACH = /^(never|always|from now on|don'?t|do not|only|we (?:never|always|
 const SIGNAL = /\b((our|my) (audience|customers?|buyers?|brand|market|product|tone|voice|goal|niche|focus)|we (are|sell|target|focus on|prefer|value|care about))\b/i
 
 export type Grounded =
-  | { handled: true; reply: string; intent: MelloIntent; sources: string[] }
+  | { handled: true; reply: string; intent: MelloIntent; sources: string[]; memoryIds?: string[] }
   | { handled: false; intent: MelloIntent; brandId: string | null; watchLine: string }
 
 export async function answerGrounded(
@@ -112,7 +112,7 @@ export async function answerGrounded(
     try {
       const { brainAnswer } = await import('@/lib/brain')
       const ans = await brainAnswer(admin, userId, q, { brandId })
-      if (ans?.reply) return { handled: true, intent, sources: ans.sources?.length ? ans.sources : ['Company Brain'], reply: ans.sources?.length ? `${ans.reply}\n\n_Source · ${ans.sources.join(' · ')}_` : ans.reply }
+      if (ans?.reply) return { handled: true, intent, memoryIds: ans.memoryIds, sources: ans.sources?.length ? ans.sources : ['Company Brain'], reply: ans.sources?.length ? `${ans.reply}\n\n_Source · ${ans.sources.join(' · ')}_` : ans.reply }
     } catch { /* fall through */ }
   }
 

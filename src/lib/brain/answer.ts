@@ -22,7 +22,7 @@ function isCompanyQuestion(q: string): boolean {
 
 export async function brainAnswer(
   admin: any, userId: string, question: string, opts?: { brandId?: string | null },
-): Promise<{ reply: string; sources: string[] } | null> {
+): Promise<{ reply: string; sources: string[]; memoryIds: string[] } | null> {
   const q = String(question || '').trim().slice(0, 500)
   if (!q || !isCompanyQuestion(q)) return null
   const nowIso = new Date().toISOString()
@@ -37,8 +37,8 @@ export async function brainAnswer(
   let dna: any[] = [], mem: any[] = [], learns: any[] = [], signals: any[] = [], ctx: any[] = [], follows: any[] = [], identity: any = null
   try {
     const [dnaR, memR, lnR, sgR, cxR, flR, idR] = await Promise.all([
-      admin.from('company_dna').select('rule, department, priority, source, brand_id').eq('user_id', userId).eq('active', true).order('created_at', { ascending: false }).limit(80),
-      admin.from('mello_memory').select('content, category, confidence, department, brand_id').eq('user_id', userId).is('retired_at', null).order('confidence', { ascending: false }).limit(80),
+      admin.from('company_dna').select('id, rule, department, priority, source, brand_id').eq('user_id', userId).eq('active', true).order('created_at', { ascending: false }).limit(80),
+      admin.from('mello_memory').select('id, content, category, confidence, department, brand_id, status').eq('user_id', userId).is('retired_at', null).order('confidence', { ascending: false }).limit(80),
       admin.from('learnings').select('department, event, result, metric, created_at, brand_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
       admin.from('customer_signals').select('topic, sentiment, quote, brand_id').eq('user_id', userId).gte('created_at', since).order('created_at', { ascending: false }).limit(300),
       admin.from('brain_context').select('kind, body, brand_id').eq('user_id', userId).or(`expires_at.is.null,expires_at.gt.${nowIso}`).order('created_at', { ascending: false }).limit(40),
@@ -52,7 +52,9 @@ export async function brainAnswer(
     // un-tagged (null brand_id) facts were treated as account-wide — so every brand's answer described
     // another brand's products (Aura came back selling Hair ResQ's regrowth system + a soda). Scope them
     // STRICTLY to the active brand (like learnings/signals); with no brand active, All-brands still sees all.
-    mem = (memR?.data || []).filter(strictBrand).slice(0, 40)
+    // Only trusted facts (active/confirmed) inform an answer — a PROPOSED fact is unconfirmed and must
+    // not be stated as truth (#5). NULL status = legacy = trusted.
+    mem = (memR?.data || []).filter((m: any) => !m.status || m.status === 'active' || m.status === 'confirmed').filter(strictBrand).slice(0, 40)
     learns = (lnR?.data || []).filter(strictBrand).slice(0, 30)   // learnings belong to their brand (strict), like signals
     signals = (sgR?.data || []).filter(strictBrand).slice(0, 200)
     ctx = (cxR?.data || []).filter(inBrand).slice(0, 20)
@@ -110,7 +112,12 @@ ${context}`
     ])
     const reply = (resp?.choices?.[0]?.message?.content || '').trim()
     if (!reply) return null
-    return { reply, sources }
+    // #2 · which memory rows grounded this answer (beliefs + facts actually put in the prompt).
+    const memoryIds = [
+      ...dna.map((d: any) => d.id).filter(Boolean).map((id: string) => `dna:${id}`),
+      ...mem.slice(0, 20).map((m: any) => m.id).filter(Boolean).map((id: string) => `mem:${id}`),
+    ]
+    return { reply, sources, memoryIds }
   } catch { return null }
 }
 

@@ -21,6 +21,16 @@ type Atom =
 
 const CUSTOMER_SOURCES: BrainSource[] = ['inbox', 'whatsapp', 'email']
 
+// #3 · anti-hallucination guard for FACTS: every number the extractor put in a fact ("serum costs $34")
+// MUST appear in the source text, or we drop the fact — the model never gets to invent a price / percent
+// / metric. Beliefs & decisions are rephrasings of what the founder said, so this applies only to facts.
+export function factIsGrounded(text: string, raw: string): boolean {
+  const nums = String(text).match(/\d[\d,.]*\d|\d/g) || []
+  if (!nums.length) return true
+  const src = String(raw).replace(/,/g, '')
+  return nums.every((n) => src.includes(n.replace(/,/g, '')))
+}
+
 /** LLM extractor — returns typed atoms; the gatekeeper that keeps the Brain from becoming a landfill. */
 async function classify(raw: string, source: BrainSource): Promise<Atom[]> {
   try {
@@ -82,10 +92,14 @@ export async function brainIngest(admin: any, opts: {
           }
           stored++
         } else if (a.type === 'fact') {
+          if (!factIsGrounded(a.text, raw)) continue   // #3 · a number not in the source → dropped, not stored
+          // #5 · a fact the FOUNDER stated is trusted (active); one derived from a customer/observed source
+          // is a PROPOSED claim that awaits confirmation before it's reasoned over as truth.
+          const status = CUSTOMER_SOURCES.includes(opts.source) ? 'proposed' : 'active'
           await admin.from('mello_memory').insert({
             user_id: opts.userId, brand_id: opts.brandId || null, content: a.text.slice(0, 400),
             category: 'fact', confidence: a.confidence ?? 60, source: `brain:${opts.source}`,
-            department: a.department || null, source_kind: opts.source,
+            department: a.department || null, source_kind: opts.source, status,
           })
           stored++
         } else if (a.type === 'signal') {

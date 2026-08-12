@@ -84,24 +84,57 @@ export async function getPrefs(admin: any, userId: string): Promise<Record<strin
 }
 
 export async function setPref(admin: any, userId: string, key: string, value: any, inferred = false): Promise<void> {
+  // #4 · provenance + history: a preference now records WHO set it and keeps an append-only trail, so a
+  // changed preference doesn't silently erase the old one (setPref was overwrite-with-no-history).
+  const source = inferred ? 'inferred' : 'founder'
   try {
-    await admin.from('ceo_preferences').upsert({ user_id: userId, key, value, inferred, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
+    await admin.from('ceo_preferences').upsert({ user_id: userId, key, value, inferred, source, updated_at: new Date().toISOString() }, { onConflict: 'user_id,key' })
   } catch { /* best-effort */ }
+  try { await admin.from('ceo_preference_history').insert({ user_id: userId, key, value, source }) } catch { /* history is best-effort; table may not exist pre-mig-156 */ }
+}
+
+// ── #5 · fact confirmation (PROPOSED → CONFIRMED) ────────────────────────────
+/** Proposed facts awaiting the founder's yes (observed/customer-derived, not yet trusted as truth). */
+export async function proposedMemories(admin: any, userId: string, brandId?: string | null): Promise<any[]> {
+  try {
+    const { data } = await admin.from('mello_memory')
+      .select('id, content, category, confidence, source_kind, created_at, brand_id')
+      .eq('user_id', userId).eq('status', 'proposed').is('retired_at', null)
+      .order('created_at', { ascending: false }).limit(30)
+    let rows = (data || []) as any[]
+    if (brandId) rows = rows.filter((r) => !r.brand_id || r.brand_id === brandId)
+    return rows
+  } catch { return [] }
+}
+
+/** Founder confirms (→ trusted) or rejects (→ retired) a proposed fact. Owner-scoped. */
+export async function confirmMemory(admin: any, userId: string, id: string, action: 'confirm' | 'reject'): Promise<boolean> {
+  try {
+    const patch = action === 'confirm'
+      ? { status: 'confirmed' }
+      : { status: 'superseded', retired_at: new Date().toISOString() }
+    const { data } = await admin.from('mello_memory').update(patch).eq('id', id).eq('user_id', userId).select('id').maybeSingle()
+    return !!data
+  } catch { return false }
 }
 
 // ── recall() — the fixed-order context bundle a department reads before it acts ──
 export type Recall = {
-  dna: any[]; deptMemory: any[]; learnings: any[]; prefs: Record<string, any>; prompt: string
+  dna: any[]; deptMemory: any[]; learnings: any[]; prefs: Record<string, any>; prompt: string; ids: string[]
 }
+
+/** A memory is usable in live context only when it's trusted (active/confirmed) — a PROPOSED fact awaits
+ *  founder confirmation and must NOT be reasoned over as truth. NULL status = legacy row = active. */
+export const isTrustedStatus = (s?: string | null) => !s || s === 'active' || s === 'confirmed'
 
 export async function recall(admin: any, opts: { userId: string; department: Department | string; brandId?: string | null; limit?: number }): Promise<Recall> {
   const lim = opts.limit ?? 8
   const [dna, memRes, learnRes, prefs] = await Promise.all([
     getDna(admin, opts.userId, { brandId: opts.brandId ?? undefined, department: opts.department }),
-    admin.from('mello_memory').select('content, category, confidence, department, brand_id, expires_at')
+    admin.from('mello_memory').select('id, content, category, confidence, department, brand_id, expires_at, status')
       .eq('user_id', opts.userId).or(`department.eq.${opts.department},department.is.null`)
       .order('confidence', { ascending: false }).limit(lim * 3),
-    admin.from('learnings').select('event, result, metric, confidence, created_at, brand_id')
+    admin.from('learnings').select('id, event, result, metric, confidence, created_at, brand_id')
       .eq('user_id', opts.userId).eq('department', opts.department)
       .order('created_at', { ascending: false }).limit(lim * 3),
     getPrefs(admin, opts.userId),
@@ -111,7 +144,7 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   const now = Date.now()
   const notExpired = (r: any) => !r.expires_at || new Date(r.expires_at).getTime() > now
   const inBrand = (r: any) => opts.brandId === undefined || opts.brandId === null || !r.brand_id || r.brand_id === opts.brandId
-  const deptMemory = ((memRes?.data || []) as any[]).filter(notExpired).filter(inBrand).slice(0, lim)
+  const deptMemory = ((memRes?.data || []) as any[]).filter(notExpired).filter((m) => isTrustedStatus(m.status)).filter(inBrand).slice(0, lim)
   const learnings = ((learnRes?.data || []) as any[]).filter(inBrand).slice(0, lim)
 
   // Compact, prompt-ready rendering in the order of authority.
@@ -128,7 +161,14 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   })
   if (prefLines.length) lines.push(`Working with the founder:\n${prefLines.join('\n')}`)
 
-  return { dna, deptMemory, learnings, prefs, prompt: lines.join('\n\n') }
+  // #2 · ID-level provenance — exactly which memory rows this context came from, so an answer log can
+  // point back at them ("Mello used dna:… + mello_memory:…").
+  const ids = [
+    ...dna.map((d: any) => d.id).filter(Boolean).map((id: string) => `dna:${id}`),
+    ...deptMemory.map((m: any) => m.id).filter(Boolean).map((id: string) => `mem:${id}`),
+    ...learnings.map((l: any) => l.id).filter(Boolean).map((id: string) => `learn:${id}`),
+  ]
+  return { dna, deptMemory, learnings, prefs, prompt: lines.join('\n\n'), ids }
 }
 
 // v4 — write pipeline (ingest) + read side (answer). Kept in sibling files; re-exported here.
