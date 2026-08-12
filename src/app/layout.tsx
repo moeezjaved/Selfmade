@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: { default: 'Selfmade', template: '%s — Selfmade' },
   description: 'AI-powered Meta ads platform. Stop guessing. Start winning.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai'), icons: { icon: '/favicon.png', shortcut: '/favicon.png', apple: '/favicon.png' },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai'), icons: { icon: '/favicon.svg', shortcut: '/favicon.svg', apple: '/favicon.svg' },
   openGraph: {
     title: 'Selfmade — AI Meta Ads Platform',
     description: 'Stop guessing. Start winning. AI-powered Meta ads co-pilot.',
@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       .selfmade-loading {
         display: inline-block;
         width: 32px; height: 32px;
-        background: url('/favicon.png') center/contain no-repeat;
+        background: url('/favicon.svg') center/contain no-repeat;
         animation: spin 1s linear infinite;
         border-radius: 8px;
       }
