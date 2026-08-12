@@ -201,16 +201,14 @@
 
   .footer{padding:54px 0 46px;text-align:center;border-top:1px solid var(--line)}
   .foot-meta{font-size:11.5px;color:var(--fog);font-family:var(--mono);letter-spacing:.06em}
-  /* ── LEARNING → ACTION : the transformation (Hyper-style scrub, Selfmade context) ── */
-  .actsec{background:var(--forest);color:#eef2e6;padding:clamp(80px,10vw,120px) 0;position:relative;overflow:hidden}
-  .actsec::before{content:"";position:absolute;inset:0;pointer-events:none;opacity:.5;
-    background:radial-gradient(60% 60% at 72% 40%,rgba(217,242,122,.06),transparent 70%)}
-  .actsec .mono-eyebrow{color:var(--lime)}
-  .act-h{font-size:clamp(30px,5.2vw,60px);letter-spacing:-.035em;line-height:1.02;max-width:17ch;margin-top:14px;font-weight:700}
-  .act-h em{font-family:var(--serif);font-style:italic;color:var(--lime);font-weight:400}
-  .act-sub{margin-top:16px;max-width:52ch;color:#b9c2b0;font-size:clamp(14px,1.6vw,16.5px);line-height:1.55}
-  .actstage{position:relative;margin-top:clamp(40px,6vw,72px);display:grid;
-    grid-template-columns:minmax(200px,.86fr) 60px minmax(320px,1.3fr);align-items:center;min-height:520px}
+  /* ── LEARNING → ACTION : the transformation (Hyper-style scrub, Selfmade context) — orange band, dark stage ── */
+  .actsec{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,122px) 0;position:relative;overflow:hidden}
+  .actsec .bs-h em{font-family:var(--serif);font-style:italic;font-weight:400;color:#fff}
+  .act-sub{margin-top:clamp(22px,3vw,34px);max-width:56ch;color:#fdf3ec;font-size:clamp(14.5px,1.7vw,18px);line-height:1.5;font-weight:500}
+  .act-panel{position:relative;margin-top:clamp(40px,6vw,64px);background:#101a12;border:1px solid rgba(255,255,255,.09);
+    border-radius:16px;padding:clamp(22px,4vw,48px);box-shadow:0 46px 90px -46px rgba(0,0,0,.55)}
+  .actstage{position:relative;display:grid;
+    grid-template-columns:minmax(200px,.86fr) 60px minmax(320px,1.3fr);align-items:center;min-height:clamp(430px,50vw,520px)}
 
   /* left — raw learnings drifting */
   .act-in{position:relative;height:100%;min-height:480px}
@@ -371,10 +369,82 @@
     </div>
   </section>
 
+  <!-- LEARNING → ACTION — the transformation -->
+  <section class="actsec" id="action">
+    <div class="shell">
+      <div class="bs-item rv">
+        <span class="bs-no">02</span>
+        <h2 class="bs-h">Selfmade turns everything it learns <em>into action.</em></h2>
+      </div>
+      <p class="act-sub rv">Competitor moves, reviews, product facts, customer questions — it reads them all night, then makes the actual work: research, images, video, and live campaigns on Facebook.</p>
+    </div>
+    <div class="shell">
+      <div class="act-panel">
+      <div class="actstage">
+        <div class="act-in">
+          <div class="lbl">WHAT IT LEARNS</div>
+          <span class="chip c1" data-rot="-4"><i class="dot"></i>Competitor ad · <span class="mono">NovaMane</span></span>
+          <span class="chip c2" data-rot="3"><i class="dot"></i>Review · “safe for sensitive skin?”</span>
+          <span class="chip c3" data-rot="-2"><i class="dot"></i>Product · Vitamin-C serum · $34</span>
+          <span class="chip c4" data-rot="4"><i class="dot"></i>Trend · “glass skin” <span class="mono">+40%</span></span>
+          <span class="chip c5" data-rot="-3"><i class="dot"></i>Customer · “when does it ship?”</span>
+          <span class="chip c6" data-rot="2"><i class="dot"></i>Winner · UGC <span class="mono">2.4× studio</span></span>
+        </div>
+
+        <div class="act-seam"><span class="seam-mk">S<span>MELLO</span></span></div>
+
+        <div class="act-out">
+          <!-- research -->
+          <div class="act-card ac1">
+            <div class="ac-bar"><span>RESEARCH</span><span class="st">✦ DONE 02:11</span></div>
+            <div class="ac-body">
+              <div class="ac-kv"><span class="k">Competitor</span><b>NovaMane</b></div>
+              <div class="ac-kv"><span class="k">Winning angle</span><b>“Confidence, not chemicals”</b></div>
+              <div class="ac-kv"><span class="k">Ad age</span><b>248 days · live</b></div>
+            </div>
+          </div>
+          <!-- image -->
+          <div class="act-card ac2">
+            <div class="ac-bar"><span>IMAGE</span><span class="st">✦ GENERATED</span></div>
+            <div class="ac-shot"><div class="prod"></div><div class="swash"></div><span class="badge">1024×1024</span></div>
+            <div class="ac-cap">Product hero · on your brand, your angle</div>
+          </div>
+          <!-- video -->
+          <div class="act-card ac3">
+            <div class="ac-bar"><span>VIDEO</span><span class="st">✦ RENDERED</span></div>
+            <div class="ac-video"><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div></div>
+            <div class="ac-cap">UGC cut · captions burned in</div>
+          </div>
+          <!-- facebook ad -->
+          <div class="act-card ac4 fb">
+            <div class="fb-top">
+              <span class="fb-av">A</span>
+              <div class="fb-id"><b>Aura</b><span><span class="globe"></span>Sponsored</span></div>
+              <span class="fb-more">···</span>
+            </div>
+            <div class="fb-text">Glow that actually lasts — clean ingredients, zero compromises. ✨</div>
+            <div class="fb-img"><span class="kick">LIVE ON FACEBOOK</span><div class="prod"></div></div>
+            <div class="fb-link">
+              <div class="t"><span class="dom">aura.com</span><b>Shop the Vitamin-C Serum</b><s>Free shipping over $40</s></div>
+              <span class="fb-btn">Shop Now</span>
+            </div>
+            <div class="fb-eng">
+              <span class="rx"><i class="up">👍</i><i class="he">❤</i></span>
+              <b class="fbc" data-to="428">0</b>
+              <span>· <b class="fbc" data-to="37">0</b> comments · <b class="fbc" data-to="12">0</b> shares</span>
+            </div>
+            <div class="fb-live"><span class="d"></span> LIVE · ROAS <b class="fbc" data-to="3.2" data-dec="1">0</b>× · reach <b class="fbc" data-to="12480">0</b></div>
+          </div>
+        </div>
+      </div>
+      </div>
+    </div>
+  </section>
+
   <!-- 2 · BRAIN — one big real interface, asymmetric, bleeding off-canvas -->
   <section class="brainsec" id="brain">
     <div class="shell">
-      <div class="mono-eyebrow rv">02 — the brain</div>
+      <div class="mono-eyebrow rv">03 — the brain</div>
       <h2 class="opener rv d1">It learns your <em>brand.</em></h2>
       <p class="lede rv d1">Your store. Your products. Your customers. Your competitors. Your ads. Then it puts that knowledge to work.</p>
     </div>
@@ -440,80 +510,11 @@
     </div>
   </section>
 
-  <!-- LEARNING → ACTION — the transformation -->
-  <section class="actsec" id="action">
-    <div class="shell">
-      <div class="act-head rv">
-        <div class="mono-eyebrow">learning → action</div>
-        <h2 class="act-h">Selfmade turns everything it learns <em>into action.</em></h2>
-        <p class="act-sub">Competitor moves, reviews, product facts, customer questions — it reads them all night, then makes the actual work: research, images, video, and live campaigns on Facebook.</p>
-      </div>
-    </div>
-    <div class="shell">
-      <div class="actstage">
-        <div class="act-in">
-          <div class="lbl">WHAT IT LEARNS</div>
-          <span class="chip c1" data-rot="-4"><i class="dot"></i>Competitor ad · <span class="mono">NovaMane</span></span>
-          <span class="chip c2" data-rot="3"><i class="dot"></i>Review · “safe for sensitive skin?”</span>
-          <span class="chip c3" data-rot="-2"><i class="dot"></i>Product · Vitamin-C serum · $34</span>
-          <span class="chip c4" data-rot="4"><i class="dot"></i>Trend · “glass skin” <span class="mono">+40%</span></span>
-          <span class="chip c5" data-rot="-3"><i class="dot"></i>Customer · “when does it ship?”</span>
-          <span class="chip c6" data-rot="2"><i class="dot"></i>Winner · UGC <span class="mono">2.4× studio</span></span>
-        </div>
-
-        <div class="act-seam"><span class="seam-mk">S<span>MELLO</span></span></div>
-
-        <div class="act-out">
-          <!-- research -->
-          <div class="act-card ac1">
-            <div class="ac-bar"><span>RESEARCH</span><span class="st">✦ DONE 02:11</span></div>
-            <div class="ac-body">
-              <div class="ac-kv"><span class="k">Competitor</span><b>NovaMane</b></div>
-              <div class="ac-kv"><span class="k">Winning angle</span><b>“Confidence, not chemicals”</b></div>
-              <div class="ac-kv"><span class="k">Ad age</span><b>248 days · live</b></div>
-            </div>
-          </div>
-          <!-- image -->
-          <div class="act-card ac2">
-            <div class="ac-bar"><span>IMAGE</span><span class="st">✦ GENERATED</span></div>
-            <div class="ac-shot"><div class="prod"></div><div class="swash"></div><span class="badge">1024×1024</span></div>
-            <div class="ac-cap">Product hero · on your brand, your angle</div>
-          </div>
-          <!-- video -->
-          <div class="act-card ac3">
-            <div class="ac-bar"><span>VIDEO</span><span class="st">✦ RENDERED</span></div>
-            <div class="ac-video"><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div></div>
-            <div class="ac-cap">UGC cut · captions burned in</div>
-          </div>
-          <!-- facebook ad -->
-          <div class="act-card ac4 fb">
-            <div class="fb-top">
-              <span class="fb-av">A</span>
-              <div class="fb-id"><b>Aura</b><span><span class="globe"></span>Sponsored</span></div>
-              <span class="fb-more">···</span>
-            </div>
-            <div class="fb-text">Glow that actually lasts — clean ingredients, zero compromises. ✨</div>
-            <div class="fb-img"><span class="kick">LIVE ON FACEBOOK</span><div class="prod"></div></div>
-            <div class="fb-link">
-              <div class="t"><span class="dom">aura.com</span><b>Shop the Vitamin-C Serum</b><s>Free shipping over $40</s></div>
-              <span class="fb-btn">Shop Now</span>
-            </div>
-            <div class="fb-eng">
-              <span class="rx"><i class="up">👍</i><i class="he">❤</i></span>
-              <b class="fbc" data-to="428">0</b>
-              <span>· <b class="fbc" data-to="37">0</b> comments · <b class="fbc" data-to="12">0</b> shares</span>
-            </div>
-            <div class="fb-live"><span class="d"></span> LIVE · ROAS <b class="fbc" data-to="3.2" data-dec="1">0</b>× · reach <b class="fbc" data-to="12480">0</b></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
 
   <!-- 3 · WORK — artifacts through the pipeline -->
   <section class="worksec" id="work">
     <div class="shell">
-      <div class="mono-eyebrow rv">03 — the work</div>
+      <div class="mono-eyebrow rv">04 — the work</div>
       <h2 class="opener rv d1">Then it goes to <em>work.</em></h2>
       <div class="pipe">
         <div class="job">
