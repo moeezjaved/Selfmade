@@ -9,6 +9,7 @@ import { isAdsQuestion } from '@/lib/meta/answer'
 import { shouldRemember } from '@/lib/mello/remember'
 import { freshnessLabel, isTrustedStatus } from '@/lib/brain'
 import { factIsGrounded } from '@/lib/brain/ingest'
+import { detectTopicTrends, detectLaunchSpikes, detectTopPerformer } from '@/lib/brain/signals'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -125,6 +126,40 @@ console.log('\nMELLO ROUTING TESTS\n')
   ok('#5 legacy null is trusted', isTrustedStatus(null) === true)
   ok('#5 proposed is NOT trusted', isTrustedStatus('proposed') === false)
   ok('#5 superseded is NOT trusted', isTrustedStatus('superseded') === false)
+}
+
+// Proactive signals — the "company teaches Selfmade by operating" detectors (deterministic, no LLM).
+{
+  const now = Date.now(), d = (days: number) => new Date(now - days * 86400000).toISOString()
+  // Customer topic surge: 6 "shipping" this week vs 2 last week = 3x → fires; "sizing" 3 this week → below floor.
+  const sig = [
+    ...Array(6).fill(0).map(() => ({ topic: 'shipping', created_at: d(2) })),
+    ...Array(2).fill(0).map(() => ({ topic: 'shipping', created_at: d(9) })),
+    ...Array(3).fill(0).map(() => ({ topic: 'sizing', created_at: d(1) })),
+  ]
+  const trends = detectTopicTrends(sig, now)
+  ok('Signals: shipping surge detected (3x)', trends.some(t => t.topic === 'shipping' && t.ratio === 3))
+  ok('Signals: below-floor topic ignored', !trends.some(t => t.topic === 'sizing'))
+
+  // Competitor launch spike: 9 new in 72h vs 2 prior 72h → fires; a quiet rival (3 new) does not.
+  const ads = [
+    ...Array(9).fill(0).map(() => ({ page_id: 'p1', first_seen_at: d(1) })),
+    ...Array(2).fill(0).map(() => ({ page_id: 'p1', first_seen_at: d(4) })),
+    ...Array(3).fill(0).map(() => ({ page_id: 'p2', first_seen_at: d(1) })),
+  ]
+  const spikes = detectLaunchSpikes(ads, now)
+  ok('Signals: launch spike detected', spikes.some(s => s.pageId === 'p1' && s.current === 9))
+  ok('Signals: quiet competitor not flagged', !spikes.some(s => s.pageId === 'p2'))
+
+  // Standout campaign: winner at 5x, well above the ~2.6x account average → fires; even split → null.
+  const top = detectTopPerformer([
+    { name: 'UGC founder story', spend: 200, value: 1000 },  // 5.0x
+    { name: 'Product-only', spend: 800, value: 1600 },       // 2.0x  → weighted avg 2.6x
+  ])
+  ok('Signals: standout campaign detected', !!top && top.name === 'UGC founder story' && top.roas === 5)
+  ok('Signals: no false standout when even', detectTopPerformer([
+    { name: 'A', spend: 300, value: 600 }, { name: 'B', spend: 300, value: 600 },
+  ]) === null)
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)

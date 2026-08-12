@@ -62,6 +62,9 @@
     },
     "src/app/api/cron/creative-strategy/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/brain-signals/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -132,6 +135,10 @@
     {
       "path": "/api/cron/sales-followup",
       "schedule": "0 9 * * *"
+    },
+    {
+      "path": "/api/cron/brain-signals",
+      "schedule": "30 2 * * *"
     }
   ]
 }
