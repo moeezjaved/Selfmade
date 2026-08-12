@@ -64,22 +64,23 @@
   @media(max-width:600px){.bs-item{flex-direction:column;gap:14px}}
   .bs-no{font-family:var(--sans);font-size:clamp(24px,3vw,40px);font-weight:600;color:#fff;border:2px solid rgba(255,255,255,.55);border-radius:100px;padding:4px 20px;line-height:1.15;flex:0 0 auto}
   .bs-h{font-size:clamp(28px,4vw,52px);font-weight:600;color:#fff;letter-spacing:-.03em;line-height:1.08;max-width:20ch}
-  /* animated "learning" mockup — SCROLL-SCRUBBED via --sp (0→1), set by JS as it passes the viewport */
-  .learnviz{margin:clamp(46px,6vw,80px) auto 0;background:#12180f;border-radius:14px;overflow:hidden;max-width:880px;box-shadow:0 44px 100px -46px rgba(0,0,0,.6);transform:rotate(-.45deg)}
-  .lv-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 18px;border-bottom:1px solid rgba(255,255,255,.07)}
-  .lv-src{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:12px;color:#cdd8c4;letter-spacing:.05em}
-  .lv-src .d{width:9px;height:9px;border-radius:50%;background:var(--lime);animation:lvblip 2.4s ease-in-out infinite}
-  @keyframes lvblip{0%,100%{box-shadow:0 0 0 0 rgba(217,242,122,.55)}50%{box-shadow:0 0 0 6px rgba(217,242,122,0)}}
-  .lv-tag{font-family:var(--mono);font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:#0c120d;background:var(--lime);padding:5px 11px;border-radius:100px;font-weight:700;opacity:0;transition:opacity .3s ease;white-space:nowrap}
-  .lv-body{padding:20px 20px 6px}
-  .lv-h{font-family:var(--mono);font-size:11px;color:#8fa088;letter-spacing:.1em;text-transform:uppercase;margin-bottom:12px}
-  .lv-line{font-size:15px;color:#b7c2ad;padding:10px 12px;line-height:1.4;border-radius:7px}
+  /* animated "learning" mockup — big, responsive, SCROLL-SCRUBBED via --sp (0→1) set by JS */
+  .learnviz{margin:clamp(46px,6vw,84px) auto 0;background:#12180f;border-radius:16px;overflow:hidden;width:100%;max-width:1080px;box-shadow:0 54px 120px -46px rgba(0,0,0,.62);transform:rotate(-.4deg)}
+  .lv-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:clamp(14px,1.7vw,20px) clamp(16px,2.2vw,28px);border-bottom:1px solid rgba(255,255,255,.07)}
+  .lv-src{display:flex;align-items:center;gap:10px;font-family:var(--mono);font-size:clamp(12px,1.3vw,14px);color:#cdd8c4;letter-spacing:.05em;min-width:0}
+  .lv-src .d{width:10px;height:10px;border-radius:50%;background:var(--lime);flex:0 0 auto;animation:lvblip 2.4s ease-in-out infinite}
+  @keyframes lvblip{0%,100%{box-shadow:0 0 0 0 rgba(217,242,122,.55)}50%{box-shadow:0 0 0 7px rgba(217,242,122,0)}}
+  .lv-tag{font-family:var(--mono);font-size:clamp(10px,1.1vw,12px);letter-spacing:.12em;text-transform:uppercase;color:#0c120d;background:var(--lime);padding:6px 13px;border-radius:100px;font-weight:700;opacity:0;transition:opacity .3s ease;white-space:nowrap;flex:0 0 auto}
+  .lv-body{padding:clamp(20px,3vw,42px) clamp(18px,2.6vw,34px) clamp(8px,1.4vw,16px)}
+  .lv-h{font-family:var(--mono);font-size:clamp(11px,1.2vw,13px);color:#8fa088;letter-spacing:.1em;text-transform:uppercase;margin-bottom:clamp(12px,1.8vw,20px)}
+  .lv-line{font-size:clamp(15px,2vw,22px);color:#b7c2ad;padding:clamp(10px,1.5vw,16px) clamp(12px,1.6vw,18px);line-height:1.4;border-radius:8px}
   .lv-key{position:relative;overflow:hidden;color:#fff;font-weight:600;isolation:isolate}
   .lv-key::before{content:"";position:absolute;inset:0;background:var(--lime);transform-origin:left;transform:scaleX(var(--sp,0));z-index:-1;transition:transform .1s linear}
   .lv-key .kt{transition:color .18s ease}
-  .lv-logos{display:flex;gap:12px;justify-content:center;padding:16px;border-top:1px solid rgba(255,255,255,.07);margin-top:12px}
-  .lv-logos .lg{width:36px;height:36px;border-radius:9px;background:#fff;display:grid;place-items:center;opacity:.4;transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease}
-  .lv-logos .lg svg{width:22px;height:22px}
+  .lv-logos{display:flex;flex-wrap:wrap;gap:clamp(12px,1.6vw,18px);justify-content:center;padding:clamp(16px,2.2vw,28px);border-top:1px solid rgba(255,255,255,.07);margin-top:clamp(12px,1.6vw,20px)}
+  .lv-logos .lg{width:clamp(40px,4.6vw,52px);height:clamp(40px,4.6vw,52px);border-radius:11px;background:#fff;display:grid;place-items:center;opacity:.4;transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease}
+  .lv-logos .lg svg{width:60%;height:60%}
+  @media(max-width:640px){.learnviz{transform:none;border-radius:12px}}
   @media(prefers-reduced-motion:reduce){.lv-key::before{transform:scaleX(1)}.lv-key .kt{color:#0c120d}.lv-tag{opacity:1}.lv-logos .lg{opacity:.85}.lv-src .d{animation:none}}
 
   /* type-led section openers */
