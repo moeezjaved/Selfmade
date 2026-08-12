@@ -53,7 +53,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       .selfmade-loading {
         display: inline-block;
         width: 32px; height: 32px;
-        background: url('/favicon.svg') center/contain no-repeat;
+        background: url(/favicon.svg) center/contain no-repeat;
         animation: spin 1s linear infinite;
         border-radius: 8px;
       }
