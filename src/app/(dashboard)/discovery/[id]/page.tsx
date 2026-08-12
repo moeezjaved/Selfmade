@@ -153,7 +153,7 @@ export default function AdDetailPage() {
         <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={handleSave} disabled={saving}
             title={selectedBoard ? 'Save to the selected board' : 'Pick a board under “Save Details” first'}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#ff5a2c', color: '#141d15', border: 'none', fontWeight: 800, fontSize: 13, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 18px', borderRadius: 8, background: '#ff5a2c', color: '#fff', border: 'none', fontWeight: 800, fontSize: 13, cursor: saving ? 'default' : 'pointer', fontFamily: 'inherit', opacity: saving ? 0.6 : 1 }}>
             <Bookmark size={14} /> {saving ? 'Saving…' : 'Save'}
           </button>
           <button onClick={copyLink}
@@ -254,7 +254,7 @@ export default function AdDetailPage() {
               {boards.map(b => <option key={b.id} value={b.id}>{b.emoji ? `${b.emoji} ` : ''}{b.name}</option>)}
             </select>
             <button onClick={handleSave} disabled={saving || !selectedBoard}
-              style={{ width: '100%', padding: '10px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: (saving || !selectedBoard) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (saving || !selectedBoard) ? 0.6 : 1 }}>
+              style={{ width: '100%', padding: '10px', background: '#ff5a2c', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 800, fontSize: 13, cursor: (saving || !selectedBoard) ? 'default' : 'pointer', fontFamily: 'inherit', opacity: (saving || !selectedBoard) ? 0.6 : 1 }}>
               {saving ? 'Saving…' : 'Confirm'}
             </button>
           </div>

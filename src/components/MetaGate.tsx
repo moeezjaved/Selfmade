@@ -52,7 +52,7 @@ export default function MetaGate({ feature, children }: { feature: string; child
             </div>
           ))}
         </div>
-        <a href="/connect/meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#141d15', color: '#ff5a2c', borderRadius: 100, padding: '13px 30px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none' }}>
+        <a href="/connect/meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '13px 30px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none' }}>
           Connect Facebook →
         </a>
         <div style={{ fontSize: 12, color: '#9aa79a', marginTop: 12 }}>Two clicks, ~30 seconds. You can disconnect anytime.</div>

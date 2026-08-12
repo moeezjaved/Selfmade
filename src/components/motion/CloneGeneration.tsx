@@ -72,7 +72,7 @@ function TransformStage({ refImage, productImage }: { refImage: string; productI
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={productImage} alt="" style={{ width: 76, height: 76, objectFit: 'cover', borderRadius: 8, display: 'block' }} />
               <div className="sm-anim" style={{ position: 'absolute', inset: -3, borderRadius: 15, border: '2px solid #ff5a2c', animation: 'tf-ring 8.8s linear infinite', pointerEvents: 'none' }} />
-              <div style={{ position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', background: '#141d15', color: '#ff5a2c', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', padding: '2px 8px', borderRadius: 100, whiteSpace: 'nowrap' }}>YOURS</div>
+              <div style={{ position: 'absolute', top: -9, left: '50%', transform: 'translateX(-50%)', background: '#ef4a1e', color: '#fff', fontSize: 9, fontWeight: 800, letterSpacing: '.06em', padding: '2px 8px', borderRadius: 100, whiteSpace: 'nowrap' }}>YOURS</div>
             </div>
           </div>
         )}

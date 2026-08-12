@@ -348,7 +348,7 @@ export default function BrandsPage() {
             {showImport ? '× Cancel import' : '📥 Bulk import CSV'}
           </button>
           <button onClick={() => { setShowAdd(s => !s); setShowImport(false); setShowUrlLookup(false) }}
-            style={{ padding: '9px 18px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '9px 18px', background: '#ff5a2c', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             {showAdd ? '× Cancel' : '+ Add brand'}
           </button>
         </div>
@@ -377,7 +377,7 @@ export default function BrandsPage() {
               style={{ ...inputStyle, flex: 1 }}
             />
             <button onClick={lookupFromUrl} disabled={!urlInput.trim() || urlLookupLoading}
-              style={{ padding: '8px 16px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: urlLookupLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '8px 16px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: urlLookupLoading ? 'wait' : 'pointer', fontFamily: 'inherit' }}>
               {urlLookupLoading ? '⏳ Looking up…' : '🔍 Lookup'}
             </button>
           </div>
@@ -439,7 +439,7 @@ export default function BrandsPage() {
 
                   <div style={{ display: 'flex', gap: 8 }}>
                     <button onClick={confirmAddFromUrl}
-                      style={{ padding: '9px 18px', background: '#ff5a2c', color: '#141d15', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ padding: '9px 18px', background: '#ff5a2c', color: '#fff', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                       ✓ Add this brand
                     </button>
                     <button onClick={() => { setUrlLookupResult(null); setUrlInput(''); setEditableCats([]) }}
@@ -621,7 +621,7 @@ export default function BrandsPage() {
                           {(Date.now() - new Date(t.created_at).getTime()) < 86_400_000 && (
                             <span style={{
                               fontSize: 9, fontWeight: 800, padding: '1px 6px', borderRadius: 100,
-                              background: '#ff5a2c', color: '#141d15',
+                              background: '#ff5a2c', color: '#fff',
                               textTransform: 'uppercase', letterSpacing: 0.5,
                             }}>NEW</span>
                           )}

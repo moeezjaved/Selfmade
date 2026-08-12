@@ -149,7 +149,7 @@ function InsightsPage() {
           <div style={{fontSize:32,marginBottom:12}}>📊</div>
           <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No campaign data yet</div>
           <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Launch your first M4 campaign, let it run for a few days, then come back here.</div>
-          <a href='/m4' style={{background:'#ff5a2c',color:'#141d15',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,textDecoration:'none',display:'inline-block'}}>Launch M4 Campaign</a>
+          <a href='/m4' style={{background:'#ff5a2c',color:'#fff',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,textDecoration:'none',display:'inline-block'}}>Launch M4 Campaign</a>
         </div>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:16}}>
@@ -195,7 +195,7 @@ function InsightsPage() {
                             <span>{adset.status}</span>
                             {adset.top_preview_url && (
                               <a href={adset.top_preview_url} target="_blank" rel="noopener noreferrer"
-                                style={{fontSize:11,fontWeight:700,color:'#141d15',background:'#ff5a2c',padding:'2px 10px',borderRadius:100,textDecoration:'none'}}>
+                                style={{fontSize:11,fontWeight:700,color:'#fff',background:'#ff5a2c',padding:'2px 10px',borderRadius:100,textDecoration:'none'}}>
                                 👁 View Ad
                               </a>
                             )}
@@ -207,7 +207,7 @@ function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -322,7 +322,7 @@ function InsightsPage() {
             {/* Fixed Footer */}
             <div style={{padding:'14px 24px',borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',gap:10,flexShrink:0,background:'#ffffff',borderRadius:'0 0 20px 20px'}}>
               <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.15)',color:'#6b8f6b',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
-              <button onClick={executeScale} style={{flex:2,background:'#ff5a2c',color:'#141d15',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+              <button onClick={executeScale} style={{flex:2,background:'#ff5a2c',color:'#fff',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                 {isBudgetIncrease ? 'Increase Budget +'+scaleFactor+'%' : 'Scale '+scaleFactor+'x — Duplicate Now'}
               </button>
             </div>

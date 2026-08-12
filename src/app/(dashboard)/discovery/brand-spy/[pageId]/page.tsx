@@ -795,7 +795,7 @@ function PullBrand({ name, pageId, pulling, onPull, capMsg }: { name: string; pa
           <>
             <div style={{ fontSize: 14, color: '#374151', marginBottom: 22, lineHeight: 1.55 }}>We don’t have {name}’s ads in your catalog yet. Pull them now — we’ll crawl their full ad history, then apply thumbnails, posters and AI creative-DNA automatically, just like every ad in Discovery.</div>
             {capMsg && <div style={{ margin: '0 auto 16px', maxWidth: 440, background: '#fff7ed', border: '1px solid #fed7aa', color: '#9a3412', borderRadius: 10, padding: '10px 14px', fontSize: 13, fontWeight: 600 }}>⚡ {capMsg} <a href="/settings" style={{ color: '#141d15', textDecoration: 'underline' }}>Upgrade →</a></div>}
-            <button onClick={onPull} style={{ background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
+            <button onClick={onPull} style={{ background: '#ef4a1e', color: '#fff', fontWeight: 800, fontSize: 15, padding: '13px 26px', borderRadius: 12, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Pull {name}’s ads</button>
             <div style={{ marginTop: 14 }}>
               <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&view_all_page_id=${pageId}`} target="_blank" rel="noreferrer" style={{ fontSize: 12.5, color: '#9ca3af', textDecoration: 'none' }}>or view raw in Meta Ad Library ↗</a>
             </div>

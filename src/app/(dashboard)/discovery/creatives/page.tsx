@@ -172,7 +172,7 @@ export default function CreativesPage() {
       {hasMore && !loading && (
         <div style={{ textAlign: 'center', marginTop: 24 }}>
           <button onClick={() => load(page + 1, false)}
-            style={{ padding: '10px 24px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+            style={{ padding: '10px 24px', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
             Load more
           </button>
         </div>
@@ -207,7 +207,7 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
         )}
 
         {/* Ad count badge */}
-        <div style={{ position: 'absolute', top: 8, right: 8, background: '#141d15', color: '#ff5a2c', fontSize: 12, fontWeight: 800, padding: '4px 10px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 4 }}>
+        <div style={{ position: 'absolute', top: 8, right: 8, background: '#ef4a1e', color: '#fff', fontSize: 12, fontWeight: 800, padding: '4px 10px', borderRadius: 100, display: 'flex', alignItems: 'center', gap: 4 }}>
           ×{c.ad_count}
         </div>
 

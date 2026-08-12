@@ -111,7 +111,7 @@ export default function ReportFilters({ filters, onChange, currency = 'PKR' }: {
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                    <button onClick={add} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
+                    <button onClick={add} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#ef4a1e', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
                   </div>
                 </div>
               )}

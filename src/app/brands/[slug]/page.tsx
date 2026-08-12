@@ -168,7 +168,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
             moment {name} launches a new ad. Free to start.
           </p>
           <Link href={`/login?next=/discovery/brand-spy/${ref.pageId}`}
-            style={{ display: 'inline-block', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 15, padding: '13px 30px', borderRadius: 100, textDecoration: 'none' }}>
+            style={{ display: 'inline-block', background: '#ef4a1e', color: '#fff', fontWeight: 800, fontSize: 15, padding: '13px 30px', borderRadius: 100, textDecoration: 'none' }}>
             Unlock {name}'s ads — free →
           </Link>
         </div>

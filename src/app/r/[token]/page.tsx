@@ -51,7 +51,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
           <div style={{ fontSize: 40, marginBottom: 10 }}>🔗</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#141d15' }}>This shared report isn’t available</div>
           <div style={{ fontSize: 14, marginTop: 6 }}>The link may have expired or been removed.</div>
-          <a href="https://tryselfmade.ai" style={{ display: 'inline-block', marginTop: 18, background: '#141d15', color: '#ff5a2c', padding: '10px 20px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 14 }}>Go to Selfmade</a>
+          <a href="https://tryselfmade.ai" style={{ display: 'inline-block', marginTop: 18, background: '#ef4a1e', color: '#fff', padding: '10px 20px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 14 }}>Go to Selfmade</a>
         </div>
       </div>
     )
@@ -67,10 +67,10 @@ export default async function SharedReportPage({ params }: { params: { token: st
       {/* Top bar */}
       <div style={{ background: '#141d15', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://tryselfmade.ai" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ff5a2c', color: '#141d15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</span>
+          <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ff5a2c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</span>
           <span style={{ color: '#ff5a2c', fontWeight: 800, fontSize: 15 }}>Selfmade</span>
         </a>
-        <a href="https://tryselfmade.ai" style={{ color: '#141d15', background: '#ff5a2c', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>
+        <a href="https://tryselfmade.ai" style={{ color: '#fff', background: '#ff5a2c', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px 60px' }}>

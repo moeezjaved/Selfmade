@@ -241,7 +241,7 @@ function HooksTab({ hooks }: { hooks: BrandData['hooks'] }) {
         <div key={hook.type} style={{ background: '#f8fafc', borderRadius: 12, padding: 16, border: '1px solid #f1f5f9' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
             <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{hook.type}</div>
-            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: '#141d15', color: '#ff5a2c', borderRadius: 100 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', background: '#ef4a1e', color: '#fff', borderRadius: 100 }}>
               {hook.count} ads
             </span>
           </div>

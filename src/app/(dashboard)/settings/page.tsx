@@ -270,7 +270,7 @@ export default function SettingsPage() {
           <button
             onClick={saveProfile}
             disabled={saving || loading}
-            style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:saving||loading?'not-allowed':'pointer',alignSelf:'flex-start',opacity:saving||loading?0.6:1}}
+            style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:saving||loading?'not-allowed':'pointer',alignSelf:'flex-start',opacity:saving||loading?0.6:1}}
           >
             {saving ? 'Saving…' : saved ? '✓ Saved!' : 'Save Changes'}
           </button>
@@ -304,7 +304,7 @@ export default function SettingsPage() {
           <button
             onClick={changePassword}
             disabled={pwSaving || !newPw || !confirmPw}
-            style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:(pwSaving||!newPw||!confirmPw)?'not-allowed':'pointer',alignSelf:'flex-start',opacity:(pwSaving||!newPw||!confirmPw)?0.6:1}}
+            style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'10px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:(pwSaving||!newPw||!confirmPw)?'not-allowed':'pointer',alignSelf:'flex-start',opacity:(pwSaving||!newPw||!confirmPw)?0.6:1}}
           >
             {pwSaving ? 'Updating…' : 'Update Password'}
           </button>
@@ -418,7 +418,7 @@ export default function SettingsPage() {
               <div style={{fontSize:12.5,color:'#7a9a7a',marginTop:2}}>One-click save on Instagram, the Facebook Ad Library & TikTok. Sign in once with your Selfmade account.</div>
             </div>
             <a href={CHROME_STORE_URL} target="_blank" rel="noopener noreferrer"
-              style={{background:'#ff5a2c',color:'#141d15',padding:'9px 18px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
+              style={{background:'#ff5a2c',color:'#fff',padding:'9px 18px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
               Get the extension →
             </a>
           </div>
@@ -455,7 +455,7 @@ export default function SettingsPage() {
                   </button>
                 </>
               ) : metaConnected === false ? (
-                <a href="/connect-meta" style={{background:'#ff5a2c',color:'#141d15',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>Connect →</a>
+                <a href="/connect-meta" style={{background:'#ff5a2c',color:'#fff',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>Connect →</a>
               ) : null}
             </div>
           </div>
@@ -564,14 +564,14 @@ function ChannelsSection() {
           </div>
           {c ? (
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-              <button onClick={() => sendTest(provider)} disabled={testing === provider} style={{ padding: '7px 14px', borderRadius: 100, border: 'none', background: '#ff5a2c', color: '#141d15', fontSize: 13, fontWeight: 800, cursor: testing === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: testing === provider ? 0.6 : 1 }}>{testing === provider ? 'Sending…' : 'Send test →'}</button>
+              <button onClick={() => sendTest(provider)} disabled={testing === provider} style={{ padding: '7px 14px', borderRadius: 100, border: 'none', background: '#ff5a2c', color: '#fff', fontSize: 13, fontWeight: 800, cursor: testing === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: testing === provider ? 0.6 : 1 }}>{testing === provider ? 'Sending…' : 'Send test →'}</button>
               <button onClick={() => disconnect(c.id)} style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #e2e8f0', background: '#fff', color: '#b91c1c', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Disconnect</button>
             </div>
           ) : provider === 'slack' ? (
             // One-click OAuth — no code to copy.
-            <a href="/api/channels/slack/start" style={{ background: '#ff5a2c', color: '#141d15', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Add to Slack →</a>
+            <a href="/api/channels/slack/start" style={{ background: '#ff5a2c', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Add to Slack →</a>
           ) : (
-            <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#ff5a2c', color: '#141d15', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Opening…' : 'Connect →'}</button>
+            <button onClick={() => connect(provider)} disabled={busy === provider} style={{ background: '#ff5a2c', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>{busy === provider ? 'Opening…' : 'Connect →'}</button>
           )}
         </div>
         {code?.provider === provider && (
@@ -668,7 +668,7 @@ function CustomerChannelsSection() {
           </div>
         ) : (
           <button onClick={() => connect(provider)} disabled={busy === provider}
-            style={{ background: '#ff5a2c', color: '#141d15', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
+            style={{ background: '#ff5a2c', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, border: 'none', cursor: busy === provider ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: busy === provider ? 0.6 : 1 }}>
             {busy === provider ? 'Opening…' : 'Connect →'}
           </button>
         )}

@@ -207,7 +207,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
                 {(s.preview || s.thumb)
                   ? <img src={s.preview || s.thumb || ''} alt="" onClick={() => s.preview && setZoom(s.preview)} title={s.preview ? 'Click to enlarge' : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: s.preview ? 'zoom-in' : 'default' }} />
                   : <span style={{ fontSize: 20, color: '#b4bdad' }}>▦</span>}
-                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#141d15', background: '#ff5a2c', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
+                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#fff', background: '#ff5a2c', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
                 {busy[s.index] && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3a7d2c', fontWeight: 700 }}>…</div>}
               </div>
               {board.editable && (

@@ -29,7 +29,7 @@ export default function Image() {
         </div>
 
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'sans-serif' }}>
-          <div style={{ display: 'flex', background: '#141d15', color: '#ff5a2c', fontSize: 24, fontWeight: 800, padding: '14px 30px', borderRadius: 100 }}>tryselfmade.ai</div>
+          <div style={{ display: 'flex', background: '#ef4a1e', color: '#fff', fontSize: 24, fontWeight: 800, padding: '14px 30px', borderRadius: 100 }}>tryselfmade.ai</div>
           <div style={{ display: 'flex', fontSize: 20, fontWeight: 600, color: '#8a927f' }}>$49/mo · starts tonight</div>
         </div>
       </div>

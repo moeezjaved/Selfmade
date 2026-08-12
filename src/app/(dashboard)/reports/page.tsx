@@ -465,7 +465,7 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
             </span>
             {c.preview_url ? (
               <a href={c.preview_url} target="_blank" rel="noopener noreferrer"
-                style={{ fontSize: 11, fontWeight: 700, color: '#141d15', background: '#ff5a2c', padding: '4px 12px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
+                style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#ff5a2c', padding: '4px 12px', borderRadius: 100, textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 4 }}>
                 👁 View Ad
               </a>
             ) : null}
@@ -550,7 +550,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                   </div>
                   {c.preview_url && (
                     <a href={c.preview_url} target="_blank" rel="noopener noreferrer" onClick={(e: any) => e.stopPropagation()}
-                      style={{ background: '#ff5a2c', color: '#141d15', padding: '4px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>👁</a>
+                      style={{ background: '#ff5a2c', color: '#fff', padding: '4px 8px', borderRadius: 7, fontSize: 11, fontWeight: 700, textDecoration: 'none' }}>👁</a>
                   )}
                   <span style={{ fontSize: 10, color: '#bbb' }}>{expanded[c.creative_id] ? '▲' : '▼'}</span>
                 </div>

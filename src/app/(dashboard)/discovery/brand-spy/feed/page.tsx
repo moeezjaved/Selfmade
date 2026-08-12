@@ -68,7 +68,7 @@ export default function BrandSpyFeed() {
         <div style={{ border: '1px dashed #d6ddd4', borderRadius: 12, padding: '28px 20px', textAlign: 'center' }}>
           <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 4 }}>You’re not watching any competitors yet.</div>
           <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 14 }}>Follow a brand and their newest ads land here — nobody else’s.</div>
-          <Link href="/discovery/brand-spy" style={{ background: '#141d15', color: '#ff5a2c', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>+ Find a competitor to spy</Link>
+          <Link href="/discovery/brand-spy" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>+ Find a competitor to spy</Link>
         </div>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 14 }}>
