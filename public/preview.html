@@ -60,6 +60,10 @@
   .bigstatement{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,126px) 0}
   .bigstatement p{font-size:clamp(27px,4.1vw,54px);font-weight:600;letter-spacing:-.025em;line-height:1.15;max-width:22ch}
   .bigstatement p b{font-weight:600;color:#ffe4d8}
+  .bs-item{display:flex;align-items:flex-start;gap:clamp(18px,3vw,34px);margin-top:clamp(64px,9vw,120px)}
+  @media(max-width:600px){.bs-item{flex-direction:column;gap:14px}}
+  .bs-no{font-family:var(--sans);font-size:clamp(24px,3vw,40px);font-weight:600;color:#fff;border:2px solid rgba(255,255,255,.55);border-radius:100px;padding:4px 20px;line-height:1.15;flex:0 0 auto}
+  .bs-h{font-size:clamp(28px,4vw,52px);font-weight:600;color:#fff;letter-spacing:-.03em;line-height:1.08;max-width:20ch}
 
   /* type-led section openers */
   .opener{font-family:var(--serif);font-weight:400;letter-spacing:-.015em;line-height:1;font-size:clamp(40px,6.4vw,86px)}
@@ -204,7 +208,13 @@
 
   <!-- big statement band -->
   <section class="bigstatement">
-    <div class="shell"><p class="rv">Selfmade learns everything about your DTC brand — your store, products, customers, competitors, and ads — then uses that knowledge to create and run your marketing.</p></div>
+    <div class="shell">
+      <p class="rv">Selfmade learns everything about your DTC brand — your store, products, customers, competitors, and ads — then uses that knowledge to create and run your marketing.</p>
+      <div class="bs-item rv">
+        <span class="bs-no">01</span>
+        <h2 class="bs-h">Selfmade learns your whole brand from everything you already run.</h2>
+      </div>
+    </div>
   </section>
 
   <!-- 2 · BRAIN — one big real interface, asymmetric, bleeding off-canvas -->
