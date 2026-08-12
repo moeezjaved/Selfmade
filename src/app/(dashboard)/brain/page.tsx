@@ -42,6 +42,7 @@ export default function BrainPage() {
   const [answer, setAnswer] = useState<{ reply: string; sources: string[] } | null>(null)
   const [tl, setTl] = useState<{ timeline: any[]; patterns: any[]; hasHistory: boolean } | null>(null)
   const [conflicts, setConflicts] = useState<any[]>([])
+  const [proposedFacts, setProposedFacts] = useState<any[]>([])   // observed facts awaiting the founder's yes (#5)
   const [why, setWhy] = useState<Record<string, boolean>>({})          // belief id → "Why?" open
   const [briefs, setBriefs] = useState<Record<string, { brief: string; loading?: boolean }>>({})  // dept → first-day brief
   const [loading, setLoading] = useState(true)
@@ -53,7 +54,8 @@ export default function BrainPage() {
   const loadTimeline = () => fetch(`/api/brain/timeline${brandQS()}`).then(r => r.json()).then(j => { if (!j.error) setTl(j) }).catch(() => {})
   const loadConflicts = () => fetch('/api/brain/conflict').then(r => r.json()).then(j => { if (j.conflicts) setConflicts(j.conflicts) }).catch(() => {})
   const loadCulture = () => fetch(`/api/brain/culture${brandQS()}`).then(r => r.json()).then(j => { if (j.culture) setCulture(j.culture) }).catch(() => {})
-  const loadAll = () => { load(); loadTimeline(); loadConflicts(); loadCulture() }
+  const loadProposedFacts = () => fetch(`/api/brain/memory/confirm${brandQS()}`).then(r => r.json()).then(j => { if (j.proposed) setProposedFacts(j.proposed) }).catch(() => {})
+  const loadAll = () => { load(); loadTimeline(); loadConflicts(); loadCulture(); loadProposedFacts() }
   useEffect(() => { loadAll() }, [])
   // Re-pull when the project switcher changes brand — the Brain is per-brand, so it must never keep
   // showing the previous brand's identity/beliefs/culture (the "wrong brand in Brain" bug).
@@ -62,6 +64,12 @@ export default function BrainPage() {
     await fetch('/api/brain/conflict', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) }).catch(() => {})
     toast.success(action === 'replace' ? 'Replaced the old rule' : action === 'temporary' ? 'Added as a temporary exception' : 'Kept the old rule')
     loadConflicts(); load()
+  }
+  // #5 · confirm/reject an observed fact — optimistic removal so the row disappears instantly.
+  const confirmFact = async (id: string, action: 'confirm' | 'reject') => {
+    setProposedFacts(fs => fs.filter(f => f.id !== id))
+    await fetch('/api/brain/memory/confirm', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, action }) }).catch(() => {})
+    toast.success(action === 'confirm' ? 'Confirmed — I’ll treat it as true from now on' : 'Rejected — forgotten')
   }
   const loadBrief = async (dept: string) => {
     if (briefs[dept]?.loading) return
@@ -109,7 +117,7 @@ export default function BrainPage() {
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
         {TABS.map(t => (
           <button key={t} onClick={() => setTab(t)} style={{ fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: tab === t ? '#ef4a1e' : '#eef3ea', color: tab === t ? '#fff' : '#5a705a' }}>
-            {t}{t === 'Review' && ((ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)) ? pill(`${(ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)}`) : null}
+            {t}{t === 'Review' && ((ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0) + proposedFacts.length) ? pill(`${(ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0) + proposedFacts.length}`) : null}
           </button>
         ))}
       </div>
@@ -184,6 +192,23 @@ export default function BrainPage() {
                 </div>
               )}
 
+              {proposedFacts.length > 0 && (
+                <div style={card}>
+                  <div style={{ fontSize: 15, fontWeight: 700, color: '#141d15', marginBottom: 3 }}>Facts I picked up — true?</div>
+                  <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 6 }}>Things I observed (mostly from customer conversations). I won&rsquo;t treat one as true until you confirm it.</div>
+                  {proposedFacts.map((f: any) => (
+                    <div key={f.id} style={{ padding: '11px 0', borderTop: '1px solid #f1f5f9' }}>
+                      <div style={{ fontSize: 14, color: '#141d15' }}>{f.content}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: 'ui-monospace,monospace' }}>observed · {f.source_kind || 'conversation'}{f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</div>
+                      <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
+                        <button onClick={() => confirmFact(f.id, 'confirm')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Yes, that’s true</button>
+                        <button onClick={() => confirmFact(f.id, 'reject')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>No, forget it</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div style={card}>
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#141d15', marginBottom: 3 }}>Suggested rules</div>
                 <div style={{ fontSize: 12.5, color: '#7a9a7a', marginBottom: 6 }}>Things Mello learned from your work and conversations. Approve to make them company rules.</div>
@@ -197,7 +222,7 @@ export default function BrainPage() {
                       <button onClick={() => proposal(p.id, 'dismiss')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
                     </div>
                   </div>
-                )) : (conflicts.length ? null : <p style={{ color: '#9ca3af', fontSize: 13 }}>Nothing to review. As Mello learns from your work and conversations, suggested rules land here.</p>)}
+                )) : ((conflicts.length || proposedFacts.length) ? null : <p style={{ color: '#9ca3af', fontSize: 13 }}>Nothing to review. As Mello learns from your work and conversations, suggested rules land here.</p>)}
               </div>
             </>
           )}
