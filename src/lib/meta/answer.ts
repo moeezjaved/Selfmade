@@ -140,8 +140,13 @@ export async function answerAdsQuestion(admin: any, userId: string, message: str
   let scopedAccountId: string | undefined = undefined
   try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId))?.account_id || undefined } catch { /* fall back to primary */ }
   try { a = await auditAccount(admin, userId, scopedAccountId, 'last_30d') } catch { /* safe reply below */ }
+  // No-guess guard: if there's no account or no data, say so plainly — never fabricate a number.
   if (!a) return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }
   if (!a.total) return { reply: `I checked ${a.accountName || 'your account'} — no active campaigns with spend in the last 30 days, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
+
+  // Provenance — every company number Mello quotes must be traceable to its source, period, and that
+  // it's the live audit (the SAME auditAccount the Morning Brief reads, so chat and brief agree).
+  const provenance = `\n\n_Meta Ads · ${a.accountName || 'your account'} · last 30 days · live audit_`
 
   // Phase 2 first (reasoned), hard-capped so it can never hang; Phase 1 (deterministic) is the fallback.
   try {
@@ -149,8 +154,8 @@ export async function answerAdsQuestion(admin: any, userId: string, message: str
       reasonedAnswer(admin, userId, a),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 22000)),
     ])
-    if (reasoned) return { reply: reasoned }
+    if (reasoned) return { reply: reasoned + provenance }
   } catch { /* fall through to deterministic */ }
 
-  return { reply: deterministicAnswer(a) }
+  return { reply: deterministicAnswer(a) + provenance }
 }

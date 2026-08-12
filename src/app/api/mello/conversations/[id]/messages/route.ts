@@ -1,6 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { runAgent, generateTitle, type HistoryMsg } from '@/lib/mello/agent'
+import { answerGrounded } from '@/lib/mello/grounded'
+import { logMelloAnswer } from '@/lib/mello/observe'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -16,6 +18,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   if (!message) return new Response('Empty message', { status: 400 })
   const surface: string | undefined = typeof body?.surface === 'string' ? body.surface : undefined
   const context: string | undefined = typeof body?.context === 'string' ? body.context.slice(0, 2000) : undefined
+  const brandId: string | null = typeof body?.brandId === 'string' ? body.brandId : (typeof body?.brand === 'string' ? body.brand : null)
 
   const admin = createAdminClient()
   const { data: conv } = await admin
@@ -60,29 +63,26 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           send({ type: 'title_update', title })
         }
 
-        // PRODUCT HOW-TO — "how do I add a competitor / connect Meta / upgrade" gets real in-app steps,
-        // NOT the competitor-flavored agent. Same guard the /brief chat uses (askMello step 3.5). Runs
-        // first so the watched-competitor context is never dragged into a plain how-to question.
-        let guide: string | null = null
-        try { const { productHowTo } = await import('@/lib/mello/ask'); guide = productHowTo(message) } catch { /* ignore */ }
+        // ONE BACKEND — the SAME grounded pipeline /brief uses: intent router → source-of-truth answer
+        // (product-help / Meta audit / competitor / Company Brain). Only escalates to the agent when
+        // nothing authoritative applies, and then with intent + brand so competitor context is scoped
+        // and never leaks into an unrelated question.
+        const t0 = Date.now()
+        const g = await answerGrounded(admin, userId, message, { brandId })
 
-        // GROUNDED ROUTER (Phase 1) — an ad-performance question is answered straight from the audit
-        // engine and streamed as a normal reply, bypassing the tool-loop that hangs. This is the fix
-        // for "Mello isn't answering": the money question is deterministic and instant.
-        let adsAns: { reply: string } | null = guide ? { reply: guide } : null
-        if (!adsAns) { try { const { answerAdsQuestion } = await import('@/lib/meta/answer'); adsAns = await answerAdsQuestion(admin, userId, message) } catch (e: any) { console.error('[mello] ads-router', e?.message) } }
-
-        if (adsAns) {
-          send({ type: 'text_delta', delta: adsAns.reply })
-          send({ type: 'text_done', content: adsAns.reply })
+        if (g.handled) {
+          send({ type: 'text_delta', delta: g.reply })
+          send({ type: 'text_done', content: g.reply })
           const { data: saved } = await admin.from('agent_messages').insert({
-            conversation_id: conversationId, role: 'assistant', content: adsAns.reply,
+            conversation_id: conversationId, role: 'assistant', content: g.reply,
           }).select('id').single()
           await admin.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
+          logMelloAnswer(admin, { userId, brandId, surface: surface || 'mello', question: message, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, ms: Date.now() - t0 })
           if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
           send({ type: 'done' })
         } else {
-          const result = await runAgent({ userId, history, userMessage: message, send, surface, context })
+          const result = await runAgent({ userId, history, userMessage: message, send, surface, context, intent: g.intent, brandId: g.brandId })
+          logMelloAnswer(admin, { userId, brandId: g.brandId, surface: surface || 'mello', question: message, intent: g.intent, path: 'agent', ms: Date.now() - t0 })
 
           const { data: saved } = await admin.from('agent_messages').insert({
             conversation_id: conversationId,

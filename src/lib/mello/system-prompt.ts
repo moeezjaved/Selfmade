@@ -6,17 +6,19 @@
 import { listAdAccounts } from './meta-data'
 import { getMemories, recallMemories, renderMemories, type Memory } from './memory'
 import { createAdminClient } from '@/lib/supabase/server'
+import { intentNeedsCompetitorContext, type MelloIntent } from './intent'
 
 /** The user's live business state — their brands + who they watch — so Mello reasons over the whole
- *  picture every turn (the "decision engine on all our data" layer), not just what a tool fetches.
- *  Fail-soft: any error → a neutral note, never blocks the turn. */
-async function buildBusinessBlock(userId: string): Promise<string> {
+ *  picture, not just what a tool fetches. Scoped to the ACTIVE brand when we know it (so Aura never sees
+ *  Mars Men's rivals). Fail-soft: any error → a neutral note, never blocks the turn. */
+async function buildBusinessBlock(userId: string, brandId?: string | null): Promise<string> {
   try {
     const admin = createAdminClient()
-    const [{ data: brands }, { data: follows }] = await Promise.all([
-      admin.from('brands').select('id, name, website, industry, tone, usps, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(10),
-      admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).limit(60),
-    ])
+    let bq = admin.from('brands').select('id, name, website, industry, tone, usps, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(10)
+    if (brandId) bq = bq.eq('id', brandId)
+    let fq = admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).limit(60)
+    if (brandId) fq = fq.eq('brand_id', brandId)   // only THIS brand's rivals
+    const [{ data: brands }, { data: follows }] = await Promise.all([bq, fq])
     const bl = (brands || []) as any[]
     const fl = (follows || []) as any[]
     if (!bl.length && !fl.length) return '  (no brands set up yet — the user is brand-new; help them add their brand + a competitor to watch)'
@@ -34,8 +36,12 @@ async function buildBusinessBlock(userId: string): Promise<string> {
   } catch { return '  (business context unavailable this turn)' }
 }
 
-export async function buildSystemPrompt(userId: string, query?: string, surface?: string): Promise<string> {
+export async function buildSystemPrompt(userId: string, query?: string, surface?: string, opts?: { intent?: string; brandId?: string | null }): Promise<string> {
   const inStudio = surface === 'studio'
+  // Only inject the watched-competitor / business block for intents that actually need it. A product-help
+  // or pure-metric question must NEVER carry competitor context (that leak is what made "how do I connect
+  // Meta" answer about a rival). Undefined intent (studio, legacy callers) defaults to including it.
+  const wantsBusiness = opts?.intent === undefined || intentNeedsCompetitorContext(opts.intent as MelloIntent)
   let accountsBlock = '  (no ad accounts connected yet — tell the user to connect Meta in Settings before pulling performance)'
   try {
     const accounts = await listAdAccounts(userId)
@@ -55,7 +61,7 @@ export async function buildSystemPrompt(userId: string, query?: string, surface?
   const merged: Memory[] = []
   for (const m of [...relevant, ...recent]) { if (seen.has(m.content)) continue; seen.add(m.content); merged.push(m) }
   const memoryBlock = renderMemories(merged.slice(0, 48))
-  const businessBlock = await buildBusinessBlock(userId)
+  const businessBlock = wantsBusiness ? await buildBusinessBlock(userId, opts?.brandId) : '  (not relevant to this question)'
   const today = new Date().toISOString().slice(0, 10)
 
   return `You are Mello, an AI marketing analyst embedded in Selfmade. You help marketing teams diagnose ad performance, find patterns, generate creative, and get inspiration from top-performing ads. You are trained on insights from billions in ad spend across Selfmade's ad-intelligence library.

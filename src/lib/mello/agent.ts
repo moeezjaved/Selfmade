@@ -71,9 +71,11 @@ export async function runAgent(opts: {
   send: Emit
   surface?: string        // e.g. 'studio' — unlocks the canvas-generation tool
   context?: string        // live surface state (e.g. the studio canvas: loaded source ad, brand)
+  intent?: string         // routed intent — gates whether competitor context is injected
+  brandId?: string | null // active brand — scopes the business/competitor context
 }): Promise<AgentResult> {
-  const { userId, history, userMessage, send, surface, context } = opts
-  const system = await buildSystemPrompt(userId, userMessage, surface)
+  const { userId, history, userMessage, send, surface, context, intent, brandId } = opts
+  const system = await buildSystemPrompt(userId, userMessage, surface, { intent, brandId })
   // create_ad drives the studio canvas — only expose it there, so Mello never claims to
   // generate on a surface that can't render it.
   const activeTools = surface === 'studio' ? TOOLS : TOOLS.filter(t => t.function.name !== 'create_ad')
@@ -247,9 +249,9 @@ export async function generateTitle(userMessage: string): Promise<string> {
 }
 
 /** Non-streaming run for automations — collects the full text. */
-export async function runAgentToText(userId: string, prompt: string): Promise<AgentResult> {
+export async function runAgentToText(userId: string, prompt: string, opts?: { intent?: string; brandId?: string | null }): Promise<AgentResult> {
   const noop: Emit = () => {}
-  return runAgent({ userId, history: [], userMessage: prompt, send: noop })
+  return runAgent({ userId, history: [], userMessage: prompt, send: noop, intent: opts?.intent, brandId: opts?.brandId })
 }
 
 function hashStr(s: string): number {
