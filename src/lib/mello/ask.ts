@@ -24,7 +24,7 @@ export async function askMello(admin: any, userId: string, message: string, opts
   // 1-4.5 · the shared grounded pipeline (source of truth per intent).
   const g = await answerGrounded(admin, userId, q, { item, brandId: opts?.brandId })
   if (g.handled) {
-    logMelloAnswer(admin, { userId, brandId: opts?.brandId, surface, question: q, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, ms: Date.now() - t0 })
+    logMelloAnswer(admin, { userId, brandId: opts?.brandId, surface, question: q, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, memoryIds: g.memoryIds, ms: Date.now() - t0 })
     return { reply: g.reply }
   }
 

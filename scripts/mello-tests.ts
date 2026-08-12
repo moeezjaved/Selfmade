@@ -7,7 +7,8 @@
 import { classifyIntent, productHowTo, isProductHelp, intentNeedsCompetitorContext } from '@/lib/mello/intent'
 import { isAdsQuestion } from '@/lib/meta/answer'
 import { shouldRemember } from '@/lib/mello/remember'
-import { freshnessLabel } from '@/lib/brain'
+import { freshnessLabel, isTrustedStatus } from '@/lib/brain'
+import { factIsGrounded } from '@/lib/brain/ingest'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -108,6 +109,22 @@ console.log('\nMELLO ROUTING TESTS\n')
   ok('Temporal: 2 days = CURRENT', freshnessLabel(iso(2)) === 'CURRENT')
   ok('Temporal: 20 days = RECENT', freshnessLabel(iso(20)) === 'RECENT')
   ok('Temporal: 200 days = HISTORICAL', freshnessLabel(iso(200)) === 'HISTORICAL')
+}
+
+// #3 — a fact's numbers must be grounded in the source (no invented prices/metrics).
+{
+  ok('#3 grounded number kept', factIsGrounded('serum costs $34', 'the serum is $34 right now') === true)
+  ok('#3 invented number dropped', factIsGrounded('serum costs $34', 'the serum is premium') === false)
+  ok('#3 no-number fact kept', factIsGrounded('we use premium positioning', 'we go premium') === true)
+}
+
+// #5 — trust status: proposed facts are NOT reasoned over as truth until confirmed.
+{
+  ok('#5 active is trusted', isTrustedStatus('active') === true)
+  ok('#5 confirmed is trusted', isTrustedStatus('confirmed') === true)
+  ok('#5 legacy null is trusted', isTrustedStatus(null) === true)
+  ok('#5 proposed is NOT trusted', isTrustedStatus('proposed') === false)
+  ok('#5 superseded is NOT trusted', isTrustedStatus('superseded') === false)
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
