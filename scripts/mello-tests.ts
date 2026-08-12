@@ -6,6 +6,8 @@
  */
 import { classifyIntent, productHowTo, isProductHelp, intentNeedsCompetitorContext } from '@/lib/mello/intent'
 import { isAdsQuestion } from '@/lib/meta/answer'
+import { shouldRemember } from '@/lib/mello/remember'
+import { freshnessLabel } from '@/lib/brain'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -81,6 +83,31 @@ console.log('\nMELLO ROUTING TESTS\n')
 // Guard — a brief-item reaction ("why this?") is never mis-routed to product-help.
 {
   ok('Guard: item reaction = general (not product_help)', classifyIntent('why this?', { hasItem: true }) !== 'product_help')
+}
+
+// T13 — durable knowledge becomes memory (the compounding loop).
+{
+  ok('T13 belief remembered', shouldRemember("We don't discount this product") === true)
+  ok('T13 decision remembered', shouldRemember("We decided to target premium skincare buyers") === true)
+  ok('T13 learning remembered', shouldRemember('We learned UGC creatives outperform studio shots') === true)
+  ok('T13 plan remembered', shouldRemember("We're launching the serum in September") === true)
+}
+
+// T14 — transient / lookup messages NEVER become memory.
+{
+  ok('T14 how-to not remembered', shouldRemember('How do I connect Meta?') === false)
+  ok('T14 metric lookup not remembered', shouldRemember('what is my ROAS this week?') === false)
+  ok('T14 request not remembered', shouldRemember('create a headline for my serum') === false)
+  ok('T14 chit-chat not remembered', shouldRemember('thanks, that helps') === false)
+  ok('T14 competitor lookup not remembered', shouldRemember('show me competitor ads') === false)
+}
+
+// Temporal — freshness buckets rank current over historical.
+{
+  const iso = (days: number) => new Date(Date.now() - days * 86400000).toISOString()
+  ok('Temporal: 2 days = CURRENT', freshnessLabel(iso(2)) === 'CURRENT')
+  ok('Temporal: 20 days = RECENT', freshnessLabel(iso(20)) === 'RECENT')
+  ok('Temporal: 200 days = HISTORICAL', freshnessLabel(iso(200)) === 'HISTORICAL')
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)

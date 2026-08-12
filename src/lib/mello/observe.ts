@@ -10,18 +10,22 @@ export type MelloTrace = {
   surface: string            // brief | mello | slack | whatsapp | studio
   question: string
   intent: string
-  path: string               // grounded:<intent> | agent
-  sources?: string[]
+  path: string               // grounded:<intent> | agent | item_reflect
+  sources?: string[]         // what the answer used (live services + memory layers), e.g. ['Meta Ads audit']
   ms?: number
+  createdMemory?: boolean     // did this turn extract a durable memory into the Company Brain?
+  conflict?: boolean          // did a belief conflict get flagged?
+  confidence?: 'high' | 'medium' | 'low'
 }
 
 export function logMelloAnswer(admin: any, t: MelloTrace): void {
   const rec = { ...t, question: String(t.question || '').slice(0, 300), sources: t.sources || [] }
-  try { console.log('[mello]', JSON.stringify({ intent: rec.intent, path: rec.path, surface: rec.surface, sources: rec.sources, ms: rec.ms })) } catch { /* ignore */ }
+  try { console.log('[mello]', JSON.stringify({ intent: rec.intent, path: rec.path, surface: rec.surface, sources: rec.sources, ms: rec.ms, createdMemory: !!rec.createdMemory })) } catch { /* ignore */ }
   try {
     admin.from('mello_answer_log').insert({
       user_id: rec.userId, brand_id: rec.brandId || null, surface: rec.surface,
       question: rec.question, intent: rec.intent, path: rec.path, sources: rec.sources, ms: rec.ms ?? null,
-    }).then(() => {}, () => {})   // table may not exist yet — never throw
+      created_memory: !!rec.createdMemory, conflict: !!rec.conflict, confidence: rec.confidence ?? null,
+    }).then(() => {}, () => {})   // columns/table may not exist yet — never throw
   } catch { /* never throw */ }
 }
