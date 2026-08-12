@@ -129,12 +129,9 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     })(), []),
     soft<any[]>(admin.from('followed_brands').select('page_id, brand_name, spied, brand_id')
       .eq('user_id', userId).limit(200).then((r: any) => r.data || []), []),
-    soft<number>((async () => {
-      // Brand view: only ads from THIS brand's watched competitors read in 24h (not the whole system).
-      if (scopePages) { const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).gte('created_at', H24).in('page_id', scopePages); return count || 0 }
-      const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'estimated', head: true }).gte('created_at', H24)
-      return count || 0
-    })(), 0),
+    // "Ads read overnight" — the SAME shared query Mello's chat uses, so the brief number and Mello's
+    // answer to "how many competitor ads did we analyze?" can never disagree (Phase 10, data-layer parity).
+    soft<number>((async () => { const { countAdsScanned24h } = await import('@/lib/company/metrics'); return countAdsScanned24h(admin, scopePages) })(), 0),
     soft<any[]>((async () => {
       let q = admin.from('daily_observations').select('id, observation, action, confidence, created_at')
         .eq('user_id', userId).gte('created_at', H48).order('created_at', { ascending: false }).limit(3)

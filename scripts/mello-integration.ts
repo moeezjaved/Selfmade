@@ -13,14 +13,17 @@ const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; c
 function makeAdmin(seed: Record<string, any[]>) {
   const from = (table: string) => {
     let rows = (seed[table] || []).slice()
+    let countMode = false
     const b: any = {
-      select: () => b,
+      select: (_cols?: any, opts?: any) => { if (opts && opts.count) countMode = true; return b },
       eq: (col: string, val: any) => { rows = rows.filter((r) => r[col] === val); return b },
-      order: () => b, limit: () => b, gte: () => b, in: () => b, not: () => b,
+      in: (col: string, vals: any[]) => { rows = rows.filter((r) => vals.includes(r[col])); return b },
+      order: () => b, limit: () => b, gte: () => b, not: () => b, or: () => b,
       insert: () => ({ then: (res: any) => res({ data: null, error: null }), select: () => ({ single: () => Promise.resolve({ data: { id: 'x' } }) }) }),
       single: () => Promise.resolve({ data: rows[0] || null, error: null }),
       maybeSingle: () => Promise.resolve({ data: rows[0] || null, error: null }),
-      then: (res: any) => res({ data: rows, error: null }),   // awaiting the builder resolves to {data}
+      // awaiting the builder resolves to {count} in count-mode, else {data}
+      then: (res: any) => res(countMode ? { count: rows.length, error: null } : { data: rows, error: null }),
     }
     return b
   }
@@ -28,10 +31,17 @@ function makeAdmin(seed: Record<string, any[]>) {
 }
 
 const USER = 'u1', BRAND = 'b1'
-const withFollows = makeAdmin({ followed_brands: [
-  { user_id: USER, brand_id: BRAND, brand_name: 'Sterone', spied: true },
-  { user_id: USER, brand_id: BRAND, brand_name: 'NovaMane', spied: true },
-] })
+const withFollows = makeAdmin({
+  followed_brands: [
+    { user_id: USER, brand_id: BRAND, brand_name: 'Sterone', spied: true, page_id: 'p1' },
+    { user_id: USER, brand_id: BRAND, brand_name: 'NovaMane', spied: true, page_id: 'p2' },
+  ],
+  // 3 competitor ads crawled (page_id in {p1,p2}) — the "ads read overnight" number.
+  discovery_ads_index: [
+    { ad_id: 'a1', page_id: 'p1' }, { ad_id: 'a2', page_id: 'p2' }, { ad_id: 'a3', page_id: 'p1' },
+    { ad_id: 'a4', page_id: 'zz' }, // a different brand's page — must be excluded by scope
+  ],
+})
 const noFollows = makeAdmin({ followed_brands: [] })
 
 console.log('\nMELLO INTEGRATION TESTS\n')
@@ -67,6 +77,15 @@ async function main() {
     ok('I4 escalates (handled=false)', r.handled === false)
     ok('I4 carries scoped competitor context', !r.handled && /Sterone/.test(r.watchLine) && /NovaMane/.test(r.watchLine), !r.handled ? r.watchLine.slice(0, 80) : '')
     ok('I4 brand preserved', !r.handled && r.brandId === BRAND)
+  }
+
+  // I5 — brief↔chat stat parity: "how many competitor ads did we analyze" reads the SAME scoped count
+  //      the brief renders (3 ads on p1/p2, the p-zz ad excluded by brand scope).
+  {
+    const r: any = await answerGrounded(withFollows, USER, 'how many competitor ads did we analyze overnight?', { brandId: BRAND })
+    ok('I5 handled', r.handled === true)
+    ok('I5 uses the shared ads-read count (3)', r.handled && /\b3\b/.test(r.reply), r.handled ? r.reply.slice(0, 80) : '')
+    ok('I5 sourced from ads-read-overnight', r.handled && r.sources.includes('Ads read overnight'))
   }
 
   console.log(`\n${pass} passed, ${fail} failed\n`)

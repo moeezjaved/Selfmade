@@ -58,10 +58,21 @@ export async function getDna(admin: any, userId: string, opts?: { brandId?: stri
   if (!opts?.includeProposed) q = q.eq('active', true)
   const { data } = await q.order('priority', { ascending: true }).order('created_at', { ascending: false })
   let rows = (data || []) as any[]
+  // Temporal: an EXPIRED rule (v4 expires_at, e.g. a "temporary exception") is no longer current truth —
+  // drop it from the live context so it can't compete with the standing belief.
+  const now = Date.now()
+  rows = rows.filter(d => !d.expires_at || new Date(d.expires_at).getTime() > now)
   // A department's context sees its own beliefs + company-wide ones (department is null).
   if (opts?.department) rows = rows.filter(d => !d.department || d.department === opts.department)
   if (opts?.brandId !== undefined) rows = rows.filter(d => !d.brand_id || d.brand_id === opts.brandId)
   return rows
+}
+
+/** Temporal bucket for a timestamp — so the model ranks yesterday's result over one from six months ago. */
+export function freshnessLabel(dateStr?: string | null): 'CURRENT' | 'RECENT' | 'HISTORICAL' {
+  if (!dateStr) return 'HISTORICAL'
+  const days = (Date.now() - new Date(dateStr).getTime()) / 86400000
+  return days <= 7 ? 'CURRENT' : days <= 30 ? 'RECENT' : 'HISTORICAL'
 }
 
 // ── L5 · CEO preferences ─────────────────────────────────────────────────────
@@ -87,7 +98,7 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   const lim = opts.limit ?? 8
   const [dna, memRes, learnRes, prefs] = await Promise.all([
     getDna(admin, opts.userId, { brandId: opts.brandId ?? undefined, department: opts.department }),
-    admin.from('mello_memory').select('content, category, confidence, department, brand_id')
+    admin.from('mello_memory').select('content, category, confidence, department, brand_id, expires_at')
       .eq('user_id', opts.userId).or(`department.eq.${opts.department},department.is.null`)
       .order('confidence', { ascending: false }).limit(lim * 3),
     admin.from('learnings').select('event, result, metric, confidence, created_at, brand_id')
@@ -97,15 +108,17 @@ export async function recall(admin: any, opts: { userId: string; department: Dep
   ])
   // Scope to the active brand: this brand's rows + account-wide (null) rows. Over-fetched (lim×3) so the
   // brand filter still leaves enough. (brand_id absent pre-mig-152 → all rows treated as account-wide.)
+  const now = Date.now()
+  const notExpired = (r: any) => !r.expires_at || new Date(r.expires_at).getTime() > now
   const inBrand = (r: any) => opts.brandId === undefined || opts.brandId === null || !r.brand_id || r.brand_id === opts.brandId
-  const deptMemory = ((memRes?.data || []) as any[]).filter(inBrand).slice(0, lim)
+  const deptMemory = ((memRes?.data || []) as any[]).filter(notExpired).filter(inBrand).slice(0, lim)
   const learnings = ((learnRes?.data || []) as any[]).filter(inBrand).slice(0, lim)
 
   // Compact, prompt-ready rendering in the order of authority.
   const lines: string[] = []
   if (dna.length) lines.push(`Company beliefs (never break):\n${dna.map(d => `• ${d.rule}`).join('\n')}`)
   if (deptMemory.length) lines.push(`What ${opts.department} knows:\n${deptMemory.map(m => `• ${m.content}`).join('\n')}`)
-  if (learnings.length) lines.push(`What ${opts.department} has learned:\n${learnings.map(l => `• ${l.event}${l.result ? ` → ${l.result}` : ''}`).join('\n')}`)
+  if (learnings.length) lines.push(`What ${opts.department} has learned (newest first — prefer CURRENT over HISTORICAL):\n${learnings.map(l => `• [${freshnessLabel(l.created_at)}] ${l.event}${l.result ? ` → ${l.result}` : ''}`).join('\n')}`)
   const prefLines = Object.entries(prefs).map(([k, v]) => {
     if (k === 'culture' && v && typeof v === 'object') {
       const c: any = v

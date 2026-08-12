@@ -48,10 +48,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 
   // Chat is a memory source, not a dead end: extract durable facts/beliefs from the founder's message
   // into the Company Brain (same brainIngest extractor Slack/WhatsApp use — conflict-checked, no new
-  // memory system). Fire-and-forget so it never blocks the stream; skip trivial one-liners.
-  if (message.length >= 12) {
-    try { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: user.id, brandId, source: 'founder', raw: message }) } catch { /* best-effort */ }
-  }
+  // memory system). Fire-and-forget so it never blocks the stream. shouldRemember() is the SELECTIVE
+  // gate — only statements that assert durable knowledge pass, so "how do I connect Meta?" / metric
+  // lookups / chit-chat never become memory and never burn an extraction call.
+  let createdMemory = false
+  try {
+    const { shouldRemember } = await import('@/lib/mello/remember')
+    if (shouldRemember(message)) {
+      createdMemory = true
+      const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: user.id, brandId, source: 'founder', raw: message })
+    }
+  } catch { /* best-effort */ }
 
   const encoder = new TextEncoder()
   const userId = user.id
@@ -84,12 +91,12 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
             conversation_id: conversationId, role: 'assistant', content: g.reply,
           }).select('id').single()
           await admin.from('agent_conversations').update({ updated_at: new Date().toISOString() }).eq('id', conversationId)
-          logMelloAnswer(admin, { userId, brandId, surface: surface || 'mello', question: message, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, ms: Date.now() - t0 })
+          logMelloAnswer(admin, { userId, brandId, surface: surface || 'mello', question: message, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, ms: Date.now() - t0, createdMemory, confidence: 'high' })
           if (saved?.id) send({ type: 'feedback_prompt', message_id: saved.id })
           send({ type: 'done' })
         } else {
           const result = await runAgent({ userId, history, userMessage: message, send, surface, context, intent: g.intent, brandId: g.brandId })
-          logMelloAnswer(admin, { userId, brandId: g.brandId, surface: surface || 'mello', question: message, intent: g.intent, path: 'agent', ms: Date.now() - t0 })
+          logMelloAnswer(admin, { userId, brandId: g.brandId, surface: surface || 'mello', question: message, intent: g.intent, path: 'agent', ms: Date.now() - t0, createdMemory, confidence: 'medium' })
 
           const { data: saved } = await admin.from('agent_messages').insert({
             conversation_id: conversationId,

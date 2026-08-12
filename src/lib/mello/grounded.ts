@@ -64,6 +64,19 @@ export async function answerGrounded(
     if (names.length) watchLine = `The founder is watching these competitors (their ads are in your crawled library — pull specifics with search_ad_library / get_competitor_ads): ${names.join(', ')}.\n\n`
   } catch { /* ignore */ }
 
+  // 3a · company STAT ("how many competitor ads did we analyze / read overnight?") → the SAME shared
+  // count the brief renders, so chat and brief never disagree (Phase 10, data-layer parity).
+  const STATS = /\b(how many|number of)\b[^?]*\bads?\b[^?]*\b(analy[sz]|read|scan|crawl|overnight|index)/i
+  if (STATS.test(q) || /\bads read overnight\b/i.test(q)) {
+    try {
+      const { getAdsScanned24h } = await import('@/lib/company/metrics')
+      const n = await getAdsScanned24h(admin, userId, brandId)
+      return { handled: true, intent: 'competitor', sources: ['Ads read overnight'], reply: n > 0
+        ? `I read ${n.toLocaleString()} competitor ad${n === 1 ? '' : 's'} in the last 24 hours${names.length ? ` across the ${names.length} brand${names.length === 1 ? '' : 's'} you watch` : ''} — the same number on your brief.`
+        : `No new competitor ads came through in the last 24 hours. The moment one launches, I'll flag it on your brief.` }
+    } catch { /* fall through */ }
+  }
+
   // 3 · competitor identity / list — instant, straight from data
   if (intent === 'competitor') {
     const asksList = /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90

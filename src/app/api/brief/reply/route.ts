@@ -28,6 +28,20 @@ export async function POST(req: NextRequest) {
 
   // Mello's one brain (shared with Slack + WhatsApp). brandId comes from the brief's active-project
   // switcher so the answer scopes to the RIGHT brand (the server cookie is unreliable).
-  const out = await askMello(createAdminClient(), user.id, q, { item, email: user.email, brandId: brandId ? String(brandId) : null })
+  const admin = createAdminClient()
+  const bId = brandId ? String(brandId) : null
+
+  // Chat → Company Brain loop: the brief chat is a memory source too. A durable statement the founder
+  // types here ("we don't discount this product") is extracted into the Brain, conflict-checked. Gated by
+  // shouldRemember + skipped when reacting to a brief item ("why this?"), fire-and-forget. Same extractor
+  // as /mello, Slack, WhatsApp — no second memory system.
+  if (!item) {
+    try {
+      const { shouldRemember } = await import('@/lib/mello/remember')
+      if (shouldRemember(q)) { const { brainIngest } = await import('@/lib/brain'); void brainIngest(admin, { userId: user.id, brandId: bId, source: 'founder', raw: q }) }
+    } catch { /* best-effort */ }
+  }
+
+  const out = await askMello(admin, user.id, q, { item, email: user.email, brandId: bId, surface: 'brief' })
   return NextResponse.json(out)
 }
