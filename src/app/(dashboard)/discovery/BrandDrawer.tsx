@@ -535,8 +535,8 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
                   padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 600,
-                  background: timeDays === f.days ? '#141d15' : 'transparent',
-                  color: timeDays === f.days ? '#ff5a2c' : '#6b7280',
+                  background: timeDays === f.days ? '#ef4a1e' : 'transparent',
+                  color: timeDays === f.days ? '#fff' : '#6b7280',
                   border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 }}>
                 {f.label}

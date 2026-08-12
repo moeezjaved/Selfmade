@@ -273,7 +273,7 @@ function InsightsPage() {
               {/* First time vs already scaled */}
               {scaleModal && (scaleModal.adset.name.includes('Scale') || scaleModal.adset.name.includes('Duplic')) ? (
                 <div style={{display:'flex',gap:8,marginBottom:16}}>
-                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#141d15':'#e2e8f0'),background:!isBudgetIncrease?'#141d15':'#f8fafc',color:!isBudgetIncrease?'#ff5a2c':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+                  <button onClick={()=>{setIsBudgetIncrease(false);setScaleFactor('2')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(!isBudgetIncrease?'#141d15':'#e2e8f0'),background:!isBudgetIncrease?'#ef4a1e':'#f8fafc',color:!isBudgetIncrease?'#fff':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
                     Duplicate Again
                   </button>
                   <button onClick={()=>{setIsBudgetIncrease(true);setScaleFactor('10')}} style={{flex:1,padding:'8px 0',borderRadius:10,border:'2px solid '+(isBudgetIncrease?'#b45309':'#e2e8f0'),background:isBudgetIncrease?'#fef3c7':'#f8fafc',color:isBudgetIncrease?'#92400e':'#6b7280',fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>

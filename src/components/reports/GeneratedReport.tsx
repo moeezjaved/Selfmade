@@ -917,7 +917,7 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
         <div style={{ flex: 1 }} />
         <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.1)', borderRadius: 10, padding: 3 }}>
           {(['daily', 'weekly', 'monthly'] as const).map(inc => (
-            <button key={inc} onClick={() => setIncrement(inc)} style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize', color: increment === inc ? '#ff5a2c' : '#7c8577', background: increment === inc ? '#0e1b12' : 'transparent' }}>{inc}</button>
+            <button key={inc} onClick={() => setIncrement(inc)} style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize', color: increment === inc ? '#fff' : '#7c8577', background: increment === inc ? '#ef4a1e' : 'transparent' }}>{inc}</button>
           ))}
         </div>
       </div>

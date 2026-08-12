@@ -510,7 +510,7 @@ export default function IndexerAdminPage() {
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {COUNTRIES.map(c => (
                     <button key={c} onClick={() => setNewCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
-                      style={{ padding: '4px 10px', background: newCountries.includes(c) ? '#141d15' : '#f1f5f9', color: newCountries.includes(c) ? '#ff5a2c' : '#374151', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ padding: '4px 10px', background: newCountries.includes(c) ? '#ef4a1e' : '#f1f5f9', color: newCountries.includes(c) ? '#fff' : '#374151', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                       {c}
                     </button>
                   ))}

@@ -326,7 +326,7 @@ function CampaignsInner() {
           <div style={{ display: 'flex', background: '#f4f0e6', borderRadius: 10, padding: 3, gap: 2 }}>
             {DATE_RANGES.map(dr => (
               <button key={dr.value} onClick={() => setDateRange(dr.value)}
-                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: dateRange === dr.value ? '#141d15' : 'transparent', color: dateRange === dr.value ? '#ff5a2c' : '#4a6a4a', transition: 'all .15s' }}>
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: dateRange === dr.value ? '#ef4a1e' : 'transparent', color: dateRange === dr.value ? '#fff' : '#4a6a4a', transition: 'all .15s' }}>
                 {dr.label}
               </button>
             ))}
@@ -412,8 +412,8 @@ function CampaignsInner() {
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)} className="mello-manage"
-                    style={{ background: 'linear-gradient(135deg, #141d15 0%, #24382a 100%)', color: '#ff5a2c', border: '1px solid rgba(255,90,44,.18)', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(17,24,17,.35)', transition: 'transform .12s, box-shadow .12s' }}>
-                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#ff5a2c', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
+                    style={{ background: '#ef4a1e', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(239,74,30,.35)', transition: 'transform .12s, box-shadow .12s' }}>
+                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
@@ -746,8 +746,8 @@ function CampaignsInner() {
                     maxWidth: '88%',
                     padding: '9px 13px',
                     borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: msg.role === 'user' ? '#141d15' : '#f4f0e6',
-                    color: msg.role === 'user' ? '#ff5a2c' : '#141d15',
+                    background: msg.role === 'user' ? '#ef4a1e' : '#f4f0e6',
+                    color: msg.role === 'user' ? '#fff' : '#141d15',
                     fontSize: 13,
                     lineHeight: 1.5,
                     whiteSpace: 'pre-wrap',
