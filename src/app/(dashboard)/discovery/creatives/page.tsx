@@ -120,8 +120,8 @@ export default function CreativesPage() {
             <button key={o.value} onClick={() => setType(o.value as any)}
               style={{
                 padding: '5px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700,
-                background: type === o.value ? '#141d15' : 'transparent',
-                color: type === o.value ? '#ff5a2c' : '#6b7280',
+                background: type === o.value ? '#ef4a1e' : 'transparent',
+                color: type === o.value ? '#fff' : '#6b7280',
                 border: 'none', cursor: 'pointer', fontFamily: 'inherit',
               }}>
               {o.label}

@@ -771,7 +771,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
       </button>
       {spied && (
         <button onClick={toggleEmail} disabled={busy} title="Get emailed when this brand launches new ads (2 credits per email)"
-          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', border: '1px solid', borderColor: emailOn ? '#141d15' : '#d1d5db', background: emailOn ? '#141d15' : '#fff', color: emailOn ? '#ff5a2c' : '#374151' }}>
+          style={{ display: 'inline-flex', alignItems: 'center', gap: 7, fontSize: 12.5, fontWeight: 700, padding: '6px 13px', borderRadius: 100, cursor: busy ? 'default' : 'pointer', border: '1px solid', borderColor: emailOn ? '#141d15' : '#d1d5db', background: emailOn ? '#ef4a1e' : '#fff', color: emailOn ? '#fff' : '#374151' }}>
           🔔 {emailOn ? 'Email alerts on' : 'Email me new ads'} <span style={{ opacity: 0.7, fontWeight: 600 }}>· 2 cr</span>
         </button>
       )}

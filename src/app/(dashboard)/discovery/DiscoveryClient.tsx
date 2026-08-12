@@ -1017,8 +1017,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           onClick={goStudio}
           style={{
             pointerEvents: 'auto',
-            background: '#ff5a2c',
-            color: '#14281a',
+            background: '#ef4a1e',
+            color: '#fff',
             border: 'none',
             padding: '8px 14px',
             borderRadius: 10,
@@ -1032,8 +1032,8 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             gap: 7,
             boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
           }}
-          onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#ff5a2c')}
+          onMouseEnter={e => (e.currentTarget.style.background = '#d63f16')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#ef4a1e')}
         >
           <Copy size={14} strokeWidth={2.4} /> Remake
         </button>
@@ -1047,9 +1047,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         <div className="hover-overlay" style={{ position: 'absolute', bottom: 44, left: 12, opacity: 0, transition: 'opacity .18s', pointerEvents: 'none', zIndex: 8 }}>
           <button
             onClick={goStudio}
-            style={{ pointerEvents: 'auto', background: '#ff5a2c', color: '#14281a', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
-            onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#ff5a2c')}
+            style={{ pointerEvents: 'auto', background: '#ef4a1e', color: '#fff', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
+            onMouseEnter={e => (e.currentTarget.style.background = '#d63f16')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#ef4a1e')}
           >
             <Film size={14} strokeWidth={2.4} /> Remake
           </button>
@@ -1946,8 +1946,8 @@ export default function DiscoveryPage() {
               <a key={tab.href} href={tab.href}
                 style={{
                   padding: '6px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: tab.href === '/discovery' ? '#141d15' : 'transparent',
-                  color: tab.href === '/discovery' ? '#ff5a2c' : '#5b6a55',
+                  background: tab.href === '/discovery' ? '#ef4a1e' : 'transparent',
+                  color: tab.href === '/discovery' ? '#fff' : '#5b6a55',
                   textDecoration: 'none',
                   boxShadow: tab.href === '/discovery' ? '0 2px 6px rgba(20,29,21,0.25)' : 'none',
                 }}>
@@ -2097,7 +2097,7 @@ export default function DiscoveryPage() {
             <button key={p.label} onClick={() => { p.apply(); setActiveChip(p.label) }}
               onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
               onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
-              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#141d15' : '#fff', color: on ? '#ff5a2c' : '#333d35', border: on ? '1px solid #141d15' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#ef4a1e' : '#fff', color: on ? '#fff' : '#333d35', border: on ? '1px solid #141d15' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               {p.label}
               {p.tip && chipTip?.label === p.label && (
                 <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
@@ -2127,8 +2127,8 @@ export default function DiscoveryPage() {
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
                   padding: '5px 11px', borderRadius: 8, fontSize: 11.5, fontWeight: 700,
-                  background: timeDays === f.days ? '#141d15' : 'transparent',
-                  color: timeDays === f.days ? '#ff5a2c' : '#6f6d5a',
+                  background: timeDays === f.days ? '#ef4a1e' : 'transparent',
+                  color: timeDays === f.days ? '#fff' : '#6f6d5a',
                   border: 'none',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>

@@ -108,7 +108,7 @@ export default function BrainPage() {
 
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 20 }}>
         {TABS.map(t => (
-          <button key={t} onClick={() => setTab(t)} style={{ fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: tab === t ? '#141d15' : '#eef3ea', color: tab === t ? '#ff5a2c' : '#5a705a' }}>
+          <button key={t} onClick={() => setTab(t)} style={{ fontSize: 13, fontWeight: 700, padding: '7px 14px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', background: tab === t ? '#ef4a1e' : '#eef3ea', color: tab === t ? '#fff' : '#5a705a' }}>
             {t}{t === 'Review' && ((ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)) ? pill(`${(ov?.counts?.conflicts || 0) + (ov?.counts?.candidates || 0)}`) : null}
           </button>
         ))}
@@ -230,7 +230,7 @@ export default function BrainPage() {
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     {row.opts.map(([val, label]) => (
                       <button key={val} onClick={() => saveCulture({ ...culture, [row.k]: val })}
-                        style={{ fontSize: 12.5, padding: '5px 12px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, background: culture[row.k] === val ? '#141d15' : '#eef3ea', color: culture[row.k] === val ? '#ff5a2c' : '#5a705a' }}>{label}</button>
+                        style={{ fontSize: 12.5, padding: '5px 12px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 600, background: culture[row.k] === val ? '#ef4a1e' : '#eef3ea', color: culture[row.k] === val ? '#fff' : '#5a705a' }}>{label}</button>
                     ))}
                   </div>
                 </div>
@@ -339,7 +339,7 @@ export default function BrainPage() {
                   <option value="">Whole company</option>
                   {Object.entries(DEPT_LABEL).map(([k, v]) => <option key={k} value={k}>{v} only</option>)}
                 </select>
-                <button onClick={teach} disabled={!rule.trim() || busy} style={{ background: rule.trim() && !busy ? '#141d15' : '#e2e8f0', color: rule.trim() && !busy ? '#ff5a2c' : '#9ca3af', border: 'none', padding: '9px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: rule.trim() && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>{busy ? 'Teaching…' : 'Teach it'}</button>
+                <button onClick={teach} disabled={!rule.trim() || busy} style={{ background: rule.trim() && !busy ? '#ef4a1e' : '#e2e8f0', color: rule.trim() && !busy ? '#fff' : '#9ca3af', border: 'none', padding: '9px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: rule.trim() && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>{busy ? 'Teaching…' : 'Teach it'}</button>
               </div>
             </div>
           )}

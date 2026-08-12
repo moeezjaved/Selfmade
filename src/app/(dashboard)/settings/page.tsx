@@ -336,7 +336,7 @@ export default function SettingsPage() {
               <option value="">{competitors.length ? 'Reference: my product (default)' : 'No competitors in Brand Spy yet'}</option>
               {competitors.map(c=> <option key={c.pageId} value={c.pageId}>Follow: {c.name}</option>)}
             </select>
-            <button onClick={enrollAutopilot} disabled={!apBrand||apBusy} style={{padding:'9px 18px',borderRadius:100,border:'none',background: apBrand&&!apBusy ? '#141d15':'#e2e8f0',color: apBrand&&!apBusy ? '#ff5a2c':'#9ca3af',fontSize:13,fontWeight:800,cursor: apBrand&&!apBusy ?'pointer':'default',fontFamily:'inherit',whiteSpace:'nowrap'}}>{apBusy?'Turning on…':'Turn on daily ads'}</button>
+            <button onClick={enrollAutopilot} disabled={!apBrand||apBusy} style={{padding:'9px 18px',borderRadius:100,border:'none',background: apBrand&&!apBusy ? '#ef4a1e':'#e2e8f0',color: apBrand&&!apBusy ? '#fff':'#9ca3af',fontSize:13,fontWeight:800,cursor: apBrand&&!apBusy ?'pointer':'default',fontFamily:'inherit',whiteSpace:'nowrap'}}>{apBusy?'Turning on…':'Turn on daily ads'}</button>
           </div>
           <div style={{fontSize:12,color:'#7a9a7a',padding:'0 4px 10px',marginTop:-6}}>Pick a competitor to have each morning’s ad modelled on <b>their newest ad</b> — remade for your product. Leave it on “my product” to generate from your own brand.</div>
           {autopilots.length === 0 ? (
