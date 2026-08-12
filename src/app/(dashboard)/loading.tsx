@@ -10,11 +10,8 @@ export default function DashboardLoading() {
       minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       gap: 14, background: '#f6f8f5',
     }}>
-      <div style={{ width: 46, height: 46, borderRadius: 13, background: '#141d15', display: 'grid', placeItems: 'center', boxShadow: '0 10px 30px -12px rgba(20,29,21,.35)', animation: 'sm-breathe 1.6s ease-in-out infinite' }}>
-        <div className="selfmade-loading" style={{ width: 24, height: 24 }} />
-      </div>
+      <div className="selfmade-loading" style={{ width: 52, height: 52, borderRadius: 14, boxShadow: '0 12px 30px -12px rgba(239,74,30,.45)' }} />
       <div style={{ fontSize: 13, color: '#9aa79a', fontWeight: 650, fontFamily: "'Inter',-apple-system,sans-serif" }}>One moment…</div>
-      <style>{`@keyframes sm-breathe{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(.94);opacity:.82}}`}</style>
     </div>
   )
 }
