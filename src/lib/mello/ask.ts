@@ -19,7 +19,7 @@ const SIGNAL = /\b((our|my) (audience|customers?|buyers?|brand|market|product|to
 // Product how-to — real, first-person answers so Mello can actually GUIDE the founder ("how do I connect
 // Meta / WhatsApp / add a competitor / upgrade") instead of improvising fluff. Matched before the ads
 // router; only fires when the founder is clearly asking HOW to do something in the app.
-function productHowTo(q: string): string | null {
+export function productHowTo(q: string): string | null {
   const t = q.toLowerCase()
   const asksHow = /\b(how|where|can i|help me|guide|steps?|set ?up|connect|link|add|enable|turn on|upgrade)\b/.test(t) || t.includes('?')
   if (!asksHow) return null

@@ -223,14 +223,19 @@ function LandingPages({ d }: { d: Spy }) {
   const [sel, setSel] = useState(d.landingPages[0] || null)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
   const [copied, setCopied] = useState(false)
+  const [failed, setFailed] = useState(false)
   if (d.landingPages.length === 0) {
     return <div style={{ ...card, textAlign: 'center', padding: 40, color: '#9ca3af' }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: '#374151', marginBottom: 6 }}>No destination URLs captured yet</div>
       These fill in as the crawler captures each ad’s link. Re-spy or wait for the next crawl pass.
     </div>
   }
-  const shotW = device === 'desktop' ? 1280 : 390
-  const shot = sel ? `https://s.wordpress.com/mshots/v1/${encodeURIComponent(sel.fullUrl)}?w=${shotW}` : ''
+  // thum.io renders the screenshot on demand (no stale WordPress "Generating Preview…" placeholder that
+  // mShots returns while it queues a job) AND honours a real mobile viewport — so Mobile actually shows
+  // the mobile layout instead of a scaled-down desktop shot.
+  const vp = device === 'desktop' ? { w: 1280, view: '1280x800' } : { w: 390, view: '390x844' }
+  const shot = sel ? `https://image.thum.io/get/width/${vp.w}/viewport/${vp.view}/${sel.fullUrl}` : ''
+  useEffect(() => { setFailed(false) }, [shot])
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '380px 1fr', gap: 12 }}>
       <div style={{ ...card, padding: 8, maxHeight: 620, overflowY: 'auto' }}>
@@ -254,7 +259,9 @@ function LandingPages({ d }: { d: Spy }) {
           <a href={sel?.fullUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', textDecoration: 'none' }}>Open ↗</a>
         </div>
         <div style={{ display: 'flex', justifyContent: 'center', background: '#f8f9fa', borderRadius: 10, padding: 12, minHeight: 460 }}>
-          {shot && <img key={shot} src={shot} alt="landing page preview" style={{ width: device === 'desktop' ? '100%' : 360, borderRadius: 8, border: '1px solid #e6e6e6', alignSelf: 'flex-start' }} />}
+          {shot && !failed
+            ? <img key={shot} src={shot} onError={() => setFailed(true)} alt="landing page preview" style={{ width: device === 'desktop' ? '100%' : 360, borderRadius: 8, border: '1px solid #e6e6e6', alignSelf: 'flex-start' }} />
+            : <div style={{ color: '#9ca3af', fontSize: 13, alignSelf: 'center', textAlign: 'center' }}>Preview unavailable — <a href={sel?.fullUrl} target="_blank" rel="noreferrer" style={{ color: '#2075ff', fontWeight: 700 }}>open the page ↗</a></div>}
         </div>
         <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8, textAlign: 'center' }}>Live preview rendered on demand — may take a few seconds the first time.</div>
       </div>

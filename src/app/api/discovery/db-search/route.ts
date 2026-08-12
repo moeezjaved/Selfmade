@@ -121,8 +121,11 @@ export async function GET(request: NextRequest) {
     const country = searchParams.get('country') || 'ALL'
     const sort = searchParams.get('sort') || 'recent'
     const days = parseInt(searchParams.get('days') || '0')
-    // "launched in the last N days" = days_running <= N. The semantic gap-fill below already filters on
-    // days_running, so both paths agree on what the window means.
+    // "7d/30d/…" = SEEN/ACTIVE in the last N days = last_seen >= now - N days (recency), NOT days_running
+    // (an ad's total lifespan). days_running<=N wrongly passes a short-lived OLD ad (e.g. launched May 28,
+    // ran 5 days → days_running=5 ≤ 7), which is exactly why stale ads leaked into "7d". last_seen is bumped
+    // on every crawl and is served by the (has_creative, last_seen desc, ad_id) composite (mig 147).
+    const sinceDate = days > 0 ? new Date(Date.now() - days * 86400000).toISOString() : null
     const page = parseInt(searchParams.get('page') || '0')
 
     // Free-plan discovery cap (spec §4.2): Free sees ~3 pages/query. Only look up the plan past the
@@ -424,8 +427,8 @@ export async function GET(request: NextRequest) {
     // (last_seen is bumped on every crawl), so old-but-active ads leaked into "7d". The feed is already
     // has_creative-only, so days_running<=N still has creative — and the (has_creative, days_running,
     // ad_id) composite (mig 130) serves BOTH this predicate and the days_running sort as a range scan.
-    if (days > 0) {
-      baseQuery = baseQuery.lte('days_running', days)
+    if (days > 0 && sinceDate) {
+      baseQuery = baseQuery.gte('last_seen', sinceDate)
     }
     // GetHookd-parity filters (performance tier, niche, brand volume, run-time,
     // CTA, creative reuse, hide-brands) — rollup-backed, all additive.
@@ -435,7 +438,7 @@ export async function GET(request: NextRequest) {
     // A time window (days>0) orders by days_running ASC so the (has_creative, days_running, ad_id)
     // composite (mig 130) serves BOTH the .lte('days_running', N) predicate AND the sort — index-only
     // scan, no timeout. (is_active is filtered on the small result set.)
-    if (days > 0) baseQuery = baseQuery.order('days_running', { ascending: true, nullsFirst: false }).order('ad_id', { ascending: true })
+    if (days > 0) baseQuery = baseQuery.order('last_seen', { ascending: false, nullsFirst: false }).order('ad_id', { ascending: true })
     else if (sort === 'longest') baseQuery = baseQuery.order('days_running', { ascending: false })
     else if (sort === 'oldest') baseQuery = baseQuery.order('start_date', { ascending: true })
     else if (sort === 'recent') baseQuery = baseQuery.order('last_seen', { ascending: false })
