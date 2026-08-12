@@ -56,6 +56,11 @@
   .hero .cta-row{display:flex;gap:12px;margin-top:34px;flex-wrap:wrap}
   .hero .tc{position:absolute;right:0;bottom:6px;z-index:4;font-family:var(--mono);font-size:11px;color:rgba(255,255,255,.55);letter-spacing:.08em}
 
+  /* big statement band under the hero */
+  .bigstatement{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,126px) 0}
+  .bigstatement p{font-size:clamp(27px,4.1vw,54px);font-weight:600;letter-spacing:-.025em;line-height:1.15;max-width:22ch}
+  .bigstatement p b{font-weight:600;color:#ffe4d8}
+
   /* type-led section openers */
   .opener{font-family:var(--serif);font-weight:400;letter-spacing:-.015em;line-height:1;font-size:clamp(40px,6.4vw,86px)}
   .opener em{font-style:italic;color:var(--rust)}
@@ -196,6 +201,11 @@
       <div class="tc">◉ 00:00:01</div>
     </div>
   </header>
+
+  <!-- big statement band -->
+  <section class="bigstatement">
+    <div class="shell"><p class="rv">Selfmade learns everything about your DTC brand — your store, products, customers, competitors, and ads — then uses that knowledge to create and run your marketing.</p></div>
+  </section>
 
   <!-- 2 · BRAIN — one big real interface, asymmetric, bleeding off-canvas -->
   <section class="brainsec" id="brain">
