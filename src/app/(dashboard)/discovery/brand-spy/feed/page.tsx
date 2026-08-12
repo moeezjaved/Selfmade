@@ -37,7 +37,10 @@ export default function BrandSpyFeed() {
       const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
       if (!pageIds.length) { setAds([]); setNoFollows(true); return }
       const perBrand = await Promise.all(pageIds.slice(0, 15).map(pid =>
-        fetch(`/api/discovery/db-search?pageId=${encodeURIComponent(pid)}&sort=recent&limit=6&country=ALL`).then(r => r.json()).catch(() => ({}))
+        // Must pass q + mode=brand — db-search only applies the page_id filter inside its `if (q)` brand
+        // branch. Without them the query fell through to a GLOBAL "recent" feed, so every followed brand
+        // returned the same non-competitor ads (the stale-feed bug). Numeric pageId as q resolves to the page.
+        fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then(r => r.json()).catch(() => ({}))
       ))
       const seen = new Set<string>()
       const merged = perBrand.flatMap((j: any) => (j.ads || j.results || []) as Ad[])

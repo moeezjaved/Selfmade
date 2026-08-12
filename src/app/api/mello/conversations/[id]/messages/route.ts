@@ -60,11 +60,17 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
           send({ type: 'title_update', title })
         }
 
+        // PRODUCT HOW-TO — "how do I add a competitor / connect Meta / upgrade" gets real in-app steps,
+        // NOT the competitor-flavored agent. Same guard the /brief chat uses (askMello step 3.5). Runs
+        // first so the watched-competitor context is never dragged into a plain how-to question.
+        let guide: string | null = null
+        try { const { productHowTo } = await import('@/lib/mello/ask'); guide = productHowTo(message) } catch { /* ignore */ }
+
         // GROUNDED ROUTER (Phase 1) — an ad-performance question is answered straight from the audit
         // engine and streamed as a normal reply, bypassing the tool-loop that hangs. This is the fix
         // for "Mello isn't answering": the money question is deterministic and instant.
-        let adsAns: { reply: string } | null = null
-        try { const { answerAdsQuestion } = await import('@/lib/meta/answer'); adsAns = await answerAdsQuestion(admin, userId, message) } catch (e: any) { console.error('[mello] ads-router', e?.message) }
+        let adsAns: { reply: string } | null = guide ? { reply: guide } : null
+        if (!adsAns) { try { const { answerAdsQuestion } = await import('@/lib/meta/answer'); adsAns = await answerAdsQuestion(admin, userId, message) } catch (e: any) { console.error('[mello] ads-router', e?.message) } }
 
         if (adsAns) {
           send({ type: 'text_delta', delta: adsAns.reply })
