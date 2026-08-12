@@ -128,7 +128,7 @@ export default function CreatorsPage() {
         {/* Stage tabs */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
           {STAGES.map(s => (
-            <button key={s.key} onClick={() => { setStage(s.key); setSel(new Set()) }} style={{ border: `1px solid ${stage === s.key ? FOREST : LINE}`, background: stage === s.key ? FOREST : '#fff', color: stage === s.key ? LIME : INK, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }}>
+            <button key={s.key} onClick={() => { setStage(s.key); setSel(new Set()) }} style={{ border: `1px solid ${stage === s.key ? '#ef4a1e' : LINE}`, background: stage === s.key ? '#ef4a1e' : '#fff', color: stage === s.key ? '#fff' : INK, borderRadius: 100, padding: '6px 12px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }}>
               {s.label} {counts[s.key] ? <b style={{ color: stage === s.key ? LIME : SUB }}>{counts[s.key]}</b> : ''}
             </button>
           ))}

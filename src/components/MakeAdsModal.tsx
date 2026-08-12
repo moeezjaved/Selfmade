@@ -67,7 +67,7 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
             {/* format */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
               {([['image', ImageIcon, 'Images'], ['video', Video, 'Videos']] as const).map(([m, Icon, label]) => (
-                <button key={m} onClick={() => setMedia(m)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, border: `1.5px solid ${media === m ? FOREST : LINE}`, background: media === m ? FOREST : '#fff', color: media === m ? LIME : INK, borderRadius: 12, padding: '10px 0', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <button key={m} onClick={() => setMedia(m)} style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7, border: `1.5px solid ${media === m ? '#ef4a1e' : LINE}`, background: media === m ? '#ef4a1e' : '#fff', color: media === m ? '#fff' : INK, borderRadius: 12, padding: '10px 0', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }}>
                   <Icon size={15} /> {label}
                 </button>
               ))}

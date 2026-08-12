@@ -233,7 +233,7 @@ export default function SettingsPage() {
             const on = tab === n.key
             return (
               <button key={n.key} onClick={() => setTab(n.key as typeof tab)}
-                style={{display:'flex',alignItems:'center',gap:11,padding:'11px 14px',borderRadius:12,border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:13.5,fontWeight:750,textAlign:'left',background:on?FOREST:'transparent',color:on?LIME:INK,transition:'background .15s,color .15s'}}>
+                style={{display:'flex',alignItems:'center',gap:11,padding:'11px 14px',borderRadius:12,border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:13.5,fontWeight:750,textAlign:'left',background:on?'#ef4a1e':'transparent',color:on?'#fff':INK,transition:'background .15s,color .15s'}}>
                 <span style={{display:'flex',opacity:on?1:0.65}}>{n.icon}</span>{n.label}
               </button>
             )

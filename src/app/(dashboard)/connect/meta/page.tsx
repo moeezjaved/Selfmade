@@ -158,8 +158,8 @@ export default function ConnectMetaByo() {
               below stays intact so it can be re-exposed instantly if OAuth ever fails for an agency. */}
           {!META_LIVE && (<>
           <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-            {bizId && <button onClick={() => { setTab('partner'); setErr(null) }} style={{ ...btnS, background: tab === 'partner' ? FOREST : '#eef2ec', color: tab === 'partner' ? LIME : '#3c463c' }}>Share with Selfmade · easiest</button>}
-            <button onClick={() => { setTab('token'); setErr(null) }} style={{ ...btnS, background: tab === 'token' ? FOREST : '#eef2ec', color: tab === 'token' ? LIME : '#3c463c' }}>Use your own token</button>
+            {bizId && <button onClick={() => { setTab('partner'); setErr(null) }} style={{ ...btnS, background: tab === 'partner' ? '#ef4a1e' : '#eef2ec', color: tab === 'partner' ? '#fff' : '#3c463c' }}>Share with Selfmade · easiest</button>}
+            <button onClick={() => { setTab('token'); setErr(null) }} style={{ ...btnS, background: tab === 'token' ? '#ef4a1e' : '#eef2ec', color: tab === 'token' ? '#fff' : '#3c463c' }}>Use your own token</button>
           </div>
 
           {tab === 'partner' && bizId ? (

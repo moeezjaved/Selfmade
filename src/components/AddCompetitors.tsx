@@ -250,7 +250,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
               placeholder="Paste the facebook.com/ads/library/… link"
               style={{ flex: 1, border: `1.5px solid ${linkId ? GREEN : LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 13, fontFamily: 'inherit', color: INK, outline: 'none', boxSizing: 'border-box' }} />
             <button onClick={addFromLink} disabled={!linkId}
-              style={{ background: linkId ? FOREST : '#dfe4de', color: linkId ? LIME : '#9aa79a', border: 'none', borderRadius: 100, padding: '0 18px', fontSize: 13, fontWeight: 800, cursor: linkId ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Add</button>
+              style={{ background: linkId ? '#ef4a1e' : '#dfe4de', color: linkId ? '#fff' : '#9aa79a', border: 'none', borderRadius: 100, padding: '0 18px', fontSize: 13, fontWeight: 800, cursor: linkId ? 'pointer' : 'default', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Add</button>
           </div>
           {link.trim() && !linkId && <div style={{ fontSize: 11.5, color: '#a3552b', marginTop: 6 }}>That doesn’t look like a Meta Ad Library link — it should contain <code style={{ background: '#eef2ec', padding: '1px 4px', borderRadius: 4 }}>view_all_page_id=…</code></div>}
           {howOpen && (
@@ -294,7 +294,7 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginTop: 16 }}>
           <button onClick={confirm} disabled={!picks.length || busy}
-            style={{ background: picks.length && !busy ? FOREST : '#dfe4de', color: picks.length && !busy ? LIME : '#9aa79a', border: 'none', borderRadius: 100, padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: picks.length && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+            style={{ background: picks.length && !busy ? '#ef4a1e' : '#dfe4de', color: picks.length && !busy ? '#fff' : '#9aa79a', border: 'none', borderRadius: 100, padding: '12px 22px', fontSize: 14, fontWeight: 800, cursor: picks.length && !busy ? 'pointer' : 'default', fontFamily: 'inherit' }}>
             {busy ? `Setting up… ${done}/${picks.length}` : picks.length ? `Watch ${picks.length} for me${totalCost > 0 ? ` · ${totalCost} cr` : ' · free'} →` : 'Pick at least one'}
           </button>
           {picks.length > 0 && !busy && totalCost > 0 && (

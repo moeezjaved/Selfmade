@@ -386,7 +386,7 @@ function StudioInner() {
         <div style={{ padding: 12, borderTop: `1px solid ${LINE}` }}>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, background: '#f6f8f5', border: `1px solid ${LINE}`, borderRadius: 14, padding: '8px 10px' }}>
             <textarea value={draft} onChange={e => setDraft(e.target.value)} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} rows={1} placeholder="Ask Mello…" style={{ flex: 1, resize: 'none', border: 'none', background: 'transparent', outline: 'none', fontSize: 13.5, color: INK, fontFamily: 'inherit', maxHeight: 120 }} />
-            <button onClick={send} disabled={!draft.trim() || chat.streaming} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: draft.trim() ? FOREST : '#dfe4de', color: draft.trim() ? LIME : '#9aa79a', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}><ArrowUp size={16} /></button>
+            <button onClick={send} disabled={!draft.trim() || chat.streaming} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: draft.trim() ? '#ef4a1e' : '#dfe4de', color: draft.trim() ? '#fff' : '#9aa79a', cursor: 'pointer', display: 'grid', placeItems: 'center', flexShrink: 0 }}><ArrowUp size={16} /></button>
           </div>
         </div>
       </div>

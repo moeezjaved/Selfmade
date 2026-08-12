@@ -182,7 +182,7 @@ export default function InboxPage() {
 
   const Tab = ({ id, label, count }: { id: 'inbox' | 'outbound' | 'insights'; label: string; count: number }) => (
     <button onClick={() => setTab(id)} style={{ border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'inherit', fontSize: 14, fontWeight: 800, padding: '4px 2px', color: tab === id ? INK : '#9aa79a', borderBottom: `2px solid ${tab === id ? FOREST : 'transparent'}` }}>
-      {label}{count > 0 && <span style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, background: tab === id ? FOREST : '#eef2ec', color: tab === id ? LIME : SUB, borderRadius: 100, padding: '1px 7px' }}>{count}</span>}
+      {label}{count > 0 && <span style={{ marginLeft: 6, fontSize: 11.5, fontWeight: 800, background: tab === id ? '#ef4a1e' : '#eef2ec', color: tab === id ? '#fff' : SUB, borderRadius: 100, padding: '1px 7px' }}>{count}</span>}
     </button>
   )
 
