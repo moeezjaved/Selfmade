@@ -22,7 +22,7 @@ function readCookie(name: string): string {
 type Brand = { pageId: string; name: string; adCount: number; active: number | null; inactive: number | null; video: number | null; image: number | null; carousel: number | null; crawled?: boolean }
 
 function tab(active: boolean): React.CSSProperties {
-  return { padding: '7px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', color: active ? '#111' : '#6b7280', background: active ? 'rgba(223,254,149,0.5)' : '#f3f4f6', border: 'none', cursor: 'pointer' }
+  return { padding: '7px 16px', borderRadius: 8, fontSize: 14, fontWeight: 700, textDecoration: 'none', color: active ? '#111' : '#6b7280', background: active ? 'rgba(255,90,44,0.5)' : '#f3f4f6', border: 'none', cursor: 'pointer' }
 }
 
 export default function BrandSpyList() {
@@ -255,7 +255,7 @@ export default function BrandSpyList() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
               <button onClick={() => setConfirmSpy(null)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#374151', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-              <button onClick={doSpy} style={{ background: '#1a3a1a', color: '#dffe95', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
+              <button onClick={doSpy} style={{ background: '#141d15', color: '#ff5a2c', border: 'none', padding: '9px 22px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Spy this brand</button>
             </div>
           </div>
         </div>

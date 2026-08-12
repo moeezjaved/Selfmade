@@ -92,10 +92,10 @@ export function CreditCounter({ compact = false }: { compact?: boolean }) {
          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer', fontFamily: 'inherit',
          padding: compact ? '4px 10px' : '6px 12px', borderRadius: 999,
          background: low ? '#fef2f2' : '#fff',
-         border: `1px solid ${low ? '#fecaca' : '#e7ece7'}`,
-         color: low ? '#b91c1c' : '#17251c', fontSize: 12, fontWeight: 700,
+         border: `1px solid ${low ? '#fecaca' : '#efece2'}`,
+         color: low ? '#b91c1c' : '#141d15', fontSize: 12, fontWeight: 700,
        }}>
-      <span style={{ fontSize: 13, color: low ? '#b91c1c' : '#3f8f4f' }}>◆</span>
+      <span style={{ fontSize: 13, color: low ? '#b91c1c' : '#ef4a1e' }}>◆</span>
       {/* Only show '…' when we genuinely have no number yet; once a cached/last balance exists, keep
           showing it through refetches so it never flashes back to '…' on refresh / page change. */}
       <span>{loading && !balance ? '…' : balance.toLocaleString()}</span>

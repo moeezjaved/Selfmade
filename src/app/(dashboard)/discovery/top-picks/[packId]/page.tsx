@@ -8,8 +8,8 @@ import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, LayoutTemplate, Sparkles, Lock, Copy, X, Check } from 'lucide-react'
 
-const LIME = '#dffe95'
-const DARK = '#1a3a1a'
+const LIME = '#ff5a2c'
+const DARK = '#141d15'
 const dollars = (cents: number) => (cents / 100)
 
 interface Ad {

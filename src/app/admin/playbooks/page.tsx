@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', LIME = '#ff5a2c', FOREST = '#141d15'
 const NICHES = ['Beauty', 'Fashion', 'Health & Wellness', 'Supplements', 'Home & Garden', 'Food & Beverage', 'Pets', 'Tech & Gadgets', 'Finance', 'Education']
 const HOOKS = ['Pain Point', 'Testimonial', 'Social Proof', 'Before & After', 'Question', 'Story', 'Announcement', 'Educational', 'Urgency', 'Discount', 'Unboxing', 'Us vs Them']
 const FORMATS = ['UGC', 'Studio / Produced', 'Graphic / Text', 'Mixed']

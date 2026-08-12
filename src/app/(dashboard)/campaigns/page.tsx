@@ -317,35 +317,35 @@ function CampaignsInner() {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <div style={{ fontSize: 22, fontWeight: 900, color: '#1a3a1a' }}>Campaigns</div>
+          <div style={{ fontSize: 22, fontWeight: 900, color: '#141d15' }}>Campaigns</div>
           <div style={{ fontSize: 13, color: '#7a9a7a', marginTop: 2 }}>Manage your Meta campaigns, ad sets and ads</div>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {/* flexWrap so Refresh + Launch New wrap to a new line on mobile instead of cropping off-screen. */}
           {/* Date range selector */}
-          <div style={{ display: 'flex', background: '#f0f7ee', borderRadius: 10, padding: 3, gap: 2 }}>
+          <div style={{ display: 'flex', background: '#f4f0e6', borderRadius: 10, padding: 3, gap: 2 }}>
             {DATE_RANGES.map(dr => (
               <button key={dr.value} onClick={() => setDateRange(dr.value)}
-                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: dateRange === dr.value ? '#1a3a1a' : 'transparent', color: dateRange === dr.value ? '#dffe95' : '#4a6a4a', transition: 'all .15s' }}>
+                style={{ padding: '6px 12px', borderRadius: 8, border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', background: dateRange === dr.value ? '#141d15' : 'transparent', color: dateRange === dr.value ? '#ff5a2c' : '#4a6a4a', transition: 'all .15s' }}>
                 {dr.label}
               </button>
             ))}
           </div>
-          <button onClick={loadCampaigns} style={{ background: '#f0f7ee', color: '#3a5a3a', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>↻ Refresh</button>
-          <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
+          <button onClick={loadCampaigns} style={{ background: '#f4f0e6', color: '#3a5a3a', border: 'none', padding: '8px 16px', borderRadius: 10, fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>↻ Refresh</button>
+          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '8px 18px', borderRadius: 10, fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch New</button>
         </div>
       </div>
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
           <img src='/favicon.png' style={{ width: 44, height: 44, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 16px', display: 'block' }} />
-          <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Loading campaigns...</div>
+          <div style={{ color: '#141d15', fontWeight: 700 }}>Loading campaigns...</div>
         </div>
       ) : campaigns.length === 0 ? (
         <div style={{ background: '#ffffff', border: '1px solid #e8f0e8', borderRadius: 16, padding: 48, textAlign: 'center' }}>
           <div style={{ fontSize: 32, marginBottom: 12 }}>📊</div>
-          <div style={{ fontSize: 16, fontWeight: 700, color: '#1a3a1a', marginBottom: 16 }}>No active or paused campaigns found</div>
-          <button onClick={() => window.location.href = '/m4'} style={{ background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#141d15', marginBottom: 16 }}>No active or paused campaigns found</div>
+          <button onClick={() => window.location.href = '/m4'} style={{ background: '#ff5a2c', color: '#141d15', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>🚀 Launch First Campaign</button>
         </div>
       ) : (
         <div style={{ background: '#fff', border: '1px solid #e8f0e8', borderRadius: 16, overflow: 'hidden', overflowX: 'auto' }}>
@@ -378,8 +378,8 @@ function CampaignsInner() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingLeft: 8, overflow: 'hidden' }}>
                   <span style={{ fontSize: 11, color: '#9e9e9e', transition: 'transform .15s', display: 'inline-block', transform: expandedCamp[camp.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                   <div style={{ overflow: 'hidden' }}>
-                    <div title={camp.name} style={{ fontSize: 13, fontWeight: 800, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{camp.name}</div>
-                    <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 1 }}>{camp.objective?.replace('OUTCOME_', '') || ''}</div>
+                    <div title={camp.name} style={{ fontSize: 13, fontWeight: 800, color: '#141d15', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{camp.name}</div>
+                    <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 1 }}>{camp.objective?.replace('OUTCOME_', '') || ''}</div>
                   </div>
                 </div>
                 {/* Delivery */}
@@ -390,30 +390,30 @@ function CampaignsInner() {
                   {camp.conversions > 0 && <div style={{ fontSize: 10, color: '#7a9a7a', fontWeight: 500 }}>purchases</div>}
                 </div>
                 {/* Cost/Result */}
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{fmtCPA(camp.cpa, currency)}</div>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#141d15' }}>{fmtCPA(camp.cpa, currency)}</div>
                 {/* Budget */}
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>{camp.daily_budget ? fmt(Math.round(camp.daily_budget / 100), currency) : '—'}</div>
-                  <div style={{ fontSize: 10, color: '#8aaa8a' }}>daily</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: '#141d15' }}>{camp.daily_budget ? fmt(Math.round(camp.daily_budget / 100), currency) : '—'}</div>
+                  <div style={{ fontSize: 10, color: '#8b8a72' }}>daily</div>
                 </div>
                 {/* Spent + ROAS — the return on that spend, right where it belongs. Green ≥ break-even. */}
-                <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: '#141d15' }}>
                   {camp.spend > 0 ? fmt(camp.spend, currency) : '—'}
                   {camp.spend > 0 && camp.roas > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: camp.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{camp.roas.toFixed(2)}x ROAS</div>}
                 </div>
                 {/* Impressions */}
-                <div style={{ fontSize: 13, color: camp.impressions > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                <div style={{ fontSize: 13, color: camp.impressions > 0 ? '#141d15' : '#9e9e9e' }}>
                   {camp.impressions > 0 ? camp.impressions.toLocaleString() : '—'}
                 </div>
                 {/* Reach */}
-                <div style={{ fontSize: 13, color: camp.reach > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                <div style={{ fontSize: 13, color: camp.reach > 0 ? '#141d15' : '#9e9e9e' }}>
                   {camp.reach > 0 ? camp.reach.toLocaleString() : '—'}
                 </div>
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)} className="mello-manage"
-                    style={{ background: 'linear-gradient(135deg, #17251c 0%, #24382a 100%)', color: '#dffe95', border: '1px solid rgba(223,254,149,.18)', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(17,24,17,.35)', transition: 'transform .12s, box-shadow .12s' }}>
-                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#dffe95', color: '#17251c', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
+                    style={{ background: 'linear-gradient(135deg, #141d15 0%, #24382a 100%)', color: '#ff5a2c', border: '1px solid rgba(255,90,44,.18)', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(17,24,17,.35)', transition: 'transform .12s, box-shadow .12s' }}>
+                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: '#ff5a2c', color: '#141d15', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
@@ -436,7 +436,7 @@ function CampaignsInner() {
                       <span style={{ fontSize: 10, color: '#b0b0b0', transition: 'transform .15s', display: 'inline-block', transform: expandedAdset[adset.id] ? 'rotate(90deg)' : 'rotate(0deg)' }}>▶</span>
                       <div style={{ overflow: 'hidden' }}>
                         <div title={adset.name} style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{adset.name}</div>
-                        <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1 }}>Age {adset.age_min}–{adset.age_max} · {adset.genders?.length === 1 ? (adset.genders[0] === 1 ? 'Male' : 'Female') : 'All'} · {adset.ads?.length || 0} ads</div>
+                        <div style={{ fontSize: 10, color: '#8b8a72', marginTop: 1 }}>Age {adset.age_min}–{adset.age_max} · {adset.genders?.length === 1 ? (adset.genders[0] === 1 ? 'Male' : 'Female') : 'All'} · {adset.ads?.length || 0} ads</div>
                       </div>
                     </div>
                     {/* Delivery */}
@@ -446,23 +446,23 @@ function CampaignsInner() {
                       {adset.conversions > 0 ? adset.conversions : '—'}
                     </div>
                     {/* CPA */}
-                    <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{fmtCPA(adset.cpa, currency)}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: '#141d15' }}>{fmtCPA(adset.cpa, currency)}</div>
                     {/* Budget */}
                     <div style={{ fontSize: 12, color: '#616161' }}>{adset.daily_budget ? fmt(Math.round(adset.daily_budget / 100), currency) : '—'}</div>
                     {/* Spent + ROAS */}
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1a3a1a' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#141d15' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
                       {adset.spend > 0 && adset.roas > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: adset.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{adset.roas.toFixed(2)}x</div>}
                     </div>
                     {/* Impressions */}
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.impressions > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.impressions > 0 ? '#141d15' : '#9e9e9e' }}>
                         {adset.impressions > 0 ? adset.impressions.toLocaleString() : '—'}
                       </div>
                     </div>
                     {/* Reach */}
                     <div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.reach > 0 ? '#1a3a1a' : '#9e9e9e' }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: adset.reach > 0 ? '#141d15' : '#9e9e9e' }}>
                         {adset.reach > 0 ? adset.reach.toLocaleString() : '—'}
                       </div>
                     </div>
@@ -493,7 +493,7 @@ function CampaignsInner() {
                         </div>
                         <div style={{ overflow: 'hidden' }}>
                           <div title={ad.name} style={{ fontSize: 12, fontWeight: 700, color: '#2a4a2a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.name}</div>
-                          {ad.primary_text && <div style={{ fontSize: 10, color: '#8aaa8a', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{ad.primary_text}</div>}
+                          {ad.primary_text && <div style={{ fontSize: 10, color: '#8b8a72', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 280 }}>{ad.primary_text}</div>}
                         </div>
                       </div>
                       {/* Delivery */}
@@ -514,12 +514,12 @@ function CampaignsInner() {
                       <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                         {ad.preview_url && (
                           <a href={ad.preview_url} target="_blank" rel="noopener noreferrer"
-                            style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center' }} title="View Ad">
+                            style={{ background: '#f4f0e6', color: '#141d15', border: 'none', padding: '5px 8px', borderRadius: 8, fontSize: 11, fontWeight: 700, textDecoration: 'none', display: 'flex', alignItems: 'center' }} title="View Ad">
                             👁
                           </a>
                         )}
                         <button onClick={() => openAdEdit(ad)}
-                          style={{ background: '#f0f7ee', color: '#1a3a1a', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Ad">
+                          style={{ background: '#f4f0e6', color: '#141d15', border: 'none', padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }} title="Edit Ad">
                           ✏️
                         </button>
                       </div>
@@ -535,9 +535,9 @@ function CampaignsInner() {
       {/* Edit modals — preserved exactly */}
       {editModal && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: 16 }}>
-          <div style={{ background: '#ffffff', border: '1px solid rgba(223,254,149,0.2)', borderRadius: 20, width: '100%', maxWidth: 500 }}>
+          <div style={{ background: '#ffffff', border: '1px solid rgba(255,90,44,0.2)', borderRadius: 20, width: '100%', maxWidth: 500 }}>
             <div style={{ padding: '20px 24px 0' }}>
-              <div style={{ fontSize: 17, fontWeight: 900, color: '#1a3a1a', marginBottom: 4 }}>
+              <div style={{ fontSize: 17, fontWeight: 900, color: '#141d15', marginBottom: 4 }}>
                 {editModal.action === 'update_budget' ? '💰 Edit Budget' : editModal.action === 'update_adset' ? '👥 Edit Audience' : '✏️ Edit Ad'}
               </div>
               <div style={{ fontSize: 12, color: '#7a9a7a', marginBottom: 16 }}>{editModal.name}</div>
@@ -545,7 +545,7 @@ function CampaignsInner() {
                 <div style={{ display: 'flex', gap: 4, borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                   {[{ key: 'text', label: '📝 Copy' }, { key: 'url', label: '🔗 URL' }, { key: 'creative', label: '🎨 Creative' }].map(t => (
                     <button key={t.key} onClick={() => setActiveTab(t.key)}
-                      style={{ padding: '8px 16px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: activeTab === t.key ? '#1a3a1a' : '#8aaa8a', borderBottom: `2px solid ${activeTab === t.key ? '#1a3a1a' : 'transparent'}`, marginBottom: -1 }}>
+                      style={{ padding: '8px 16px', background: 'none', border: 'none', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, cursor: 'pointer', color: activeTab === t.key ? '#141d15' : '#8b8a72', borderBottom: `2px solid ${activeTab === t.key ? '#141d15' : 'transparent'}`, marginBottom: -1 }}>
                       {t.label}
                     </button>
                   ))}
@@ -559,8 +559,8 @@ function CampaignsInner() {
                   <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 8 }}>Daily Budget ({currency})</label>
                   <input type="number" value={editModal.budget}
                     onChange={e => setEditModal((p: any) => ({ ...p, budget: parseFloat(e.target.value) }))}
-                    style={{ width: '100%', background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '12px 14px', color: '#1a3a1a', fontSize: 18, fontWeight: 800, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
-                  <div style={{ fontSize: 11, color: '#8aaa8a', marginTop: 8 }}>⚠️ Changing by more than 20% resets Meta learning phase</div>
+                    style={{ width: '100%', background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '12px 14px', color: '#141d15', fontSize: 18, fontWeight: 800, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                  <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 8 }}>⚠️ Changing by more than 20% resets Meta learning phase</div>
                 </div>
               )}
 
@@ -569,12 +569,12 @@ function CampaignsInner() {
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Primary Text</label>
                     <textarea value={editModal.primary_text} onChange={e => setEditModal((p: any) => ({ ...p, primary_text: e.target.value }))} rows={5}
-                      style={{ width: '100%', background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#1a3a1a', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#141d15', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'vertical', boxSizing: 'border-box' }} />
                   </div>
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Headline</label>
                     <input type="text" value={editModal.headline} onChange={e => setEditModal((p: any) => ({ ...p, headline: e.target.value }))}
-                      style={{ width: '100%', background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#1a3a1a', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#141d15', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
                 </div>
               )}
@@ -584,9 +584,9 @@ function CampaignsInner() {
                   <div>
                     <label style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: '.06em', display: 'block', marginBottom: 6 }}>Destination URL</label>
                     <input type="text" value={editModal.link_url} onChange={e => setEditModal((p: any) => ({ ...p, link_url: e.target.value }))}
-                      style={{ width: '100%', background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#1a3a1a', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 10, padding: '10px 14px', color: '#141d15', fontSize: 13, fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
                   </div>
-                  <div style={{ fontSize: 11, color: '#8aaa8a', background: '#f8fcf6', padding: 12, borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: '#8b8a72', background: '#f9f5ec', padding: 12, borderRadius: 8 }}>
                     💡 Make sure the URL matches your ad offer. Mismatched URLs hurt conversions.
                   </div>
                 </div>
@@ -594,9 +594,9 @@ function CampaignsInner() {
 
               {editModal.action === 'update_ad' && activeTab === 'creative' && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div style={{ background: '#f8fcf6', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
+                  <div style={{ background: '#f9f5ec', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 12, padding: 20, textAlign: 'center' }}>
                     <div style={{ fontSize: 32, marginBottom: 8 }}>🎨</div>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: '#1a3a1a', marginBottom: 4 }}>Upload New Creative</div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: '#141d15', marginBottom: 4 }}>Upload New Creative</div>
                     <div style={{ fontSize: 12, color: '#7a9a7a', marginBottom: 16 }}>Replace the image or video for this ad</div>
                     <input type="file" accept="image/*,video/*" id="creative-upload"
                       onChange={async e => {
@@ -645,14 +645,14 @@ function CampaignsInner() {
                         }
                       }}
                       style={{ display: 'none' }} />
-                    <label htmlFor="creative-upload" style={{ background: '#1a3a1a', color: '#dffe95', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
+                    <label htmlFor="creative-upload" style={{ background: '#141d15', color: '#ff5a2c', padding: '10px 20px', borderRadius: 100, fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-block' }}>
                       {uploadingCreative ? '⏳ Uploading...' : '📁 Choose File'}
                     </label>
                     {uploadingCreative && <div style={{ marginTop: 12, fontSize: 12, color: '#b8860b', fontWeight: 600 }}>⏳ Uploading to Meta...</div>}
                     {uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#2d7a2d', fontWeight: 700 }}>✅ Uploaded to Meta — ready to save</div>}
-                    {editModal.new_creative_name && !uploadingCreative && !uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#8aaa8a' }}>{editModal.new_creative_name}</div>}
+                    {editModal.new_creative_name && !uploadingCreative && !uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#8b8a72' }}>{editModal.new_creative_name}</div>}
                   </div>
-                  <div style={{ fontSize: 11, color: '#8aaa8a' }}>⚠️ Changing creative resets learning phase and social proof</div>
+                  <div style={{ fontSize: 11, color: '#8b8a72' }}>⚠️ Changing creative resets learning phase and social proof</div>
                 </div>
               )}
 
@@ -663,11 +663,11 @@ function CampaignsInner() {
                     <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                       <input type="number" value={editModal.age_min} min={18} max={65}
                         onChange={e => setEditModal((p: any) => ({ ...p, age_min: parseInt(e.target.value) }))}
-                        style={{ width: 80, background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', color: '#1a3a1a', fontSize: 14, fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
+                        style={{ width: 80, background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', color: '#141d15', fontSize: 14, fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
                       <span style={{ color: '#7a9a7a' }}>to</span>
                       <input type="number" value={editModal.age_max} min={18} max={65}
                         onChange={e => setEditModal((p: any) => ({ ...p, age_max: parseInt(e.target.value) }))}
-                        style={{ width: 80, background: '#f8fcf6', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', color: '#1a3a1a', fontSize: 14, fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
+                        style={{ width: 80, background: '#f9f5ec', border: '1px solid rgba(0,0,0,0.1)', borderRadius: 8, padding: '8px 12px', color: '#141d15', fontSize: 14, fontFamily: 'inherit', outline: 'none', textAlign: 'center' }} />
                     </div>
                   </div>
                   <div>
@@ -675,13 +675,13 @@ function CampaignsInner() {
                     <div style={{ display: 'flex', gap: 8 }}>
                       {[{ label: 'All', value: [] }, { label: '👨 Male', value: [1] }, { label: '👩 Female', value: [2] }].map(g => (
                         <button key={g.label} onClick={() => setEditModal((p: any) => ({ ...p, genders: g.value }))}
-                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `2px solid ${JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#1a3a1a' : 'rgba(0,0,0,0.1)'}`, background: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#f0f7ee' : 'transparent', color: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#1a3a1a' : '#6b8f6b', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
+                          style={{ flex: 1, padding: '8px 0', borderRadius: 10, border: `2px solid ${JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#141d15' : 'rgba(0,0,0,0.1)'}`, background: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#f4f0e6' : 'transparent', color: JSON.stringify(editModal.genders) === JSON.stringify(g.value) ? '#141d15' : '#6b8f6b', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
                           {g.label}
                         </button>
                       ))}
                     </div>
                   </div>
-                  <div style={{ fontSize: 11, color: '#8aaa8a', background: '#f8fcf6', padding: 12, borderRadius: 8 }}>
+                  <div style={{ fontSize: 11, color: '#8b8a72', background: '#f9f5ec', padding: 12, borderRadius: 8 }}>
                     ⚠️ Changing audience resets Meta learning phase
                   </div>
                 </div>
@@ -692,7 +692,7 @@ function CampaignsInner() {
               <button onClick={() => { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false) }}
                 style={{ flex: 1, background: 'none', border: '1.5px solid rgba(0,0,0,0.12)', color: '#6b8f6b', padding: '11px 0', borderRadius: 100, fontSize: 14, fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
               <button onClick={saveEdit} disabled={saving}
-                style={{ flex: 2, background: '#dffe95', color: '#1a3a1a', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+                style={{ flex: 2, background: '#ff5a2c', color: '#141d15', border: 'none', padding: '11px 0', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
                 {saving ? 'Saving...' : 'Save Changes'}
               </button>
             </div>
@@ -709,32 +709,32 @@ function CampaignsInner() {
           {/* Drawer panel */}
           <div style={{ width: 400, background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 32px rgba(0,0,0,0.18)', pointerEvents: 'auto' }}>
             {/* Header */}
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', background: '#1a3a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', background: '#141d15', display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#dffe95' }}>✨ Campaign Assistant</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: '#ff5a2c' }}>✨ Campaign Assistant</div>
                 <div style={{ fontSize: 11, color: '#7a9a7a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCampaign.name}</div>
               </div>
               <button onClick={() => setChatCampaign(null)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#dffe95', width: 28, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#ff5a2c', width: 28, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
             </div>
 
             {/* Campaign quick stats */}
             <div style={{ padding: '10px 18px', background: '#f8fbf7', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 16 }}>
               <div style={{ fontSize: 11 }}>
-                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Status</div>
+                <div style={{ color: '#8b8a72', marginBottom: 1 }}>Status</div>
                 <div style={{ fontWeight: 700, color: chatCampaign.status === 'ACTIVE' ? '#2e7d32' : '#757575' }}>{chatCampaign.status}</div>
               </div>
               <div style={{ fontSize: 11 }}>
-                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Budget/Day</div>
-                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.daily_budget ? fmt(Math.round(chatCampaign.daily_budget / 100), currency) : '—'}</div>
+                <div style={{ color: '#8b8a72', marginBottom: 1 }}>Budget/Day</div>
+                <div style={{ fontWeight: 700, color: '#141d15' }}>{chatCampaign.daily_budget ? fmt(Math.round(chatCampaign.daily_budget / 100), currency) : '—'}</div>
               </div>
               <div style={{ fontSize: 11 }}>
-                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Spent</div>
-                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.spend > 0 ? fmt(chatCampaign.spend, currency) : '—'}</div>
+                <div style={{ color: '#8b8a72', marginBottom: 1 }}>Spent</div>
+                <div style={{ fontWeight: 700, color: '#141d15' }}>{chatCampaign.spend > 0 ? fmt(chatCampaign.spend, currency) : '—'}</div>
               </div>
               <div style={{ fontSize: 11 }}>
-                <div style={{ color: '#8aaa8a', marginBottom: 1 }}>Results</div>
-                <div style={{ fontWeight: 700, color: '#1a3a1a' }}>{chatCampaign.conversions > 0 ? chatCampaign.conversions : '—'}</div>
+                <div style={{ color: '#8b8a72', marginBottom: 1 }}>Results</div>
+                <div style={{ fontWeight: 700, color: '#141d15' }}>{chatCampaign.conversions > 0 ? chatCampaign.conversions : '—'}</div>
               </div>
             </div>
 
@@ -746,8 +746,8 @@ function CampaignsInner() {
                     maxWidth: '88%',
                     padding: '9px 13px',
                     borderRadius: msg.role === 'user' ? '16px 16px 4px 16px' : '16px 16px 16px 4px',
-                    background: msg.role === 'user' ? '#1a3a1a' : '#f0f7ee',
-                    color: msg.role === 'user' ? '#dffe95' : '#1a3a1a',
+                    background: msg.role === 'user' ? '#141d15' : '#f4f0e6',
+                    color: msg.role === 'user' ? '#ff5a2c' : '#141d15',
                     fontSize: 13,
                     lineHeight: 1.5,
                     whiteSpace: 'pre-wrap',
@@ -758,7 +758,7 @@ function CampaignsInner() {
               ))}
               {chatBusy && (
                 <div style={{ display: 'flex', justifyContent: 'flex-start' }}>
-                  <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: '#f0f7ee', fontSize: 13, color: '#7a9a7a' }}>
+                  <div style={{ padding: '9px 13px', borderRadius: '16px 16px 16px 4px', background: '#f4f0e6', fontSize: 13, color: '#7a9a7a' }}>
                     <span style={{ animation: 'pulse 1.2s ease-in-out infinite' }}>Thinking…</span>
                   </div>
                 </div>
@@ -768,13 +768,13 @@ function CampaignsInner() {
 
             {/* Creative upload indicator */}
             {(chatCreativeHash || chatUploadingCreative || chatCreativeName) && (
-              <div style={{ padding: '8px 16px', background: '#f0f7ee', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ padding: '8px 16px', background: '#f4f0e6', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 18 }}>{chatIsVideo ? '🎬' : '🖼️'}</div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: chatCreativeHash ? '#2e7d32' : '#b8860b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {chatUploadingCreative ? '⏳ Uploading to Meta…' : chatCreativeHash ? '✅ Creative ready' : chatCreativeName}
                   </div>
-                  {chatCreativeName && <div style={{ fontSize: 10, color: '#8aaa8a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCreativeName}</div>}
+                  {chatCreativeName && <div style={{ fontSize: 10, color: '#8b8a72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCreativeName}</div>}
                 </div>
                 {!chatUploadingCreative && (
                   <button onClick={() => { setChatCreativeHash(null); setChatCreativeName(null) }}
@@ -791,7 +791,7 @@ function CampaignsInner() {
                   onChange={e => { const f = e.target.files?.[0]; if (f) { uploadChatCreative(f); e.target.value = '' } }}
                   style={{ display: 'none' }} />
                 <button onClick={() => chatFileRef.current?.click()} disabled={chatUploadingCreative}
-                  style={{ background: '#f0f7ee', border: 'none', color: '#1a3a1a', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title="Upload creative">
+                  style={{ background: '#f4f0e6', border: 'none', color: '#141d15', width: 36, height: 36, borderRadius: 10, cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }} title="Upload creative">
                   📎
                 </button>
                 {/* Text input */}
@@ -801,11 +801,11 @@ function CampaignsInner() {
                   onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChat() } }}
                   placeholder='e.g. "Add this creative to a new ad set" or "Increase budget to 8000"'
                   rows={2}
-                  style={{ flex: 1, background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 10, padding: '8px 12px', color: '#1a3a1a', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5 }}
+                  style={{ flex: 1, background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 10, padding: '8px 12px', color: '#141d15', fontSize: 13, fontFamily: 'inherit', outline: 'none', resize: 'none', lineHeight: 1.5 }}
                 />
                 {/* Send */}
                 <button onClick={sendChat} disabled={chatBusy || !chatInput.trim()}
-                  style={{ background: chatBusy || !chatInput.trim() ? '#e8f0e8' : '#dffe95', color: '#1a3a1a', border: 'none', width: 36, height: 36, borderRadius: 10, cursor: chatBusy || !chatInput.trim() ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
+                  style={{ background: chatBusy || !chatInput.trim() ? '#e8f0e8' : '#ff5a2c', color: '#141d15', border: 'none', width: 36, height: 36, borderRadius: 10, cursor: chatBusy || !chatInput.trim() ? 'default' : 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .15s' }}>
                   ↑
                 </button>
               </div>

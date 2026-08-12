@@ -8,7 +8,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import type { Metadata } from 'next'
 
 export const revalidate = 3600
-const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const LIME = '#ff5a2c', INK = '#0e1b12', GREEN = '#16a34a'
 const MIN = 6
 const toSlug = (s: string) => s.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
 const HOOKS = ['Question', 'Before & After', 'Testimonial', 'Story', 'Announcement', 'Educational', 'Urgency', 'Discount', 'Unboxing', 'Us vs Them', 'Social Proof', 'Pain Point']

@@ -46,12 +46,12 @@ export default async function SharedReportPage({ params }: { params: { token: st
 
   if (!snap) {
     return (
-      <div style={{ minHeight: '100vh', background: '#eef5eb', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: '#f3eee3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
         <div style={{ textAlign: 'center', color: '#3a5a3a' }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>🔗</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: '#1a3a1a' }}>This shared report isn’t available</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: '#141d15' }}>This shared report isn’t available</div>
           <div style={{ fontSize: 14, marginTop: 6 }}>The link may have expired or been removed.</div>
-          <a href="https://tryselfmade.ai" style={{ display: 'inline-block', marginTop: 18, background: '#1a3a1a', color: '#dffe95', padding: '10px 20px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 14 }}>Go to Selfmade</a>
+          <a href="https://tryselfmade.ai" style={{ display: 'inline-block', marginTop: 18, background: '#141d15', color: '#ff5a2c', padding: '10px 20px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 14 }}>Go to Selfmade</a>
         </div>
       </div>
     )
@@ -63,27 +63,27 @@ export default async function SharedReportPage({ params }: { params: { token: st
   const currency = snap.currency || 'USD'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#eef5eb', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f3eee3', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
       {/* Top bar */}
-      <div style={{ background: '#1a3a1a', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      <div style={{ background: '#141d15', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://tryselfmade.ai" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <span style={{ width: 26, height: 26, borderRadius: 8, background: '#dffe95', color: '#1a3a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</span>
-          <span style={{ color: '#dffe95', fontWeight: 800, fontSize: 15 }}>Selfmade</span>
+          <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ff5a2c', color: '#141d15', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</span>
+          <span style={{ color: '#ff5a2c', fontWeight: 800, fontSize: 15 }}>Selfmade</span>
         </a>
-        <a href="https://tryselfmade.ai" style={{ color: '#1a3a1a', background: '#dffe95', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>
+        <a href="https://tryselfmade.ai" style={{ color: '#141d15', background: '#ff5a2c', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>
       </div>
 
       <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 20px 60px' }}>
         {/* Header */}
         <div style={{ marginBottom: 6, fontSize: 12, color: '#7a9a7a', fontWeight: 600 }}>Shared by {snap.sharedBy}</div>
-        <div style={{ fontSize: 26, fontWeight: 900, color: '#1a3a1a', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ fontSize: 26, fontWeight: 900, color: '#141d15', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span>{snap.emoji || '📊'}</span>{snap.name}
         </div>
         {snap.description && <div style={{ fontSize: 14, color: '#7a9a7a', marginTop: 4 }}>{snap.description}</div>}
 
         {snap.note && (
           <div style={{ marginTop: 16, background: '#fff', border: '1px solid #d8e6d4', borderRadius: 12, padding: '14px 18px', color: '#2a3a2a', fontSize: 14.5, lineHeight: 1.6 }}>
-            <span style={{ fontSize: 11, fontWeight: 800, color: '#5a7a5a', textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 4 }}>Note</span>
+            <span style={{ fontSize: 11, fontWeight: 800, color: '#6b6a58', textTransform: 'uppercase', letterSpacing: '.05em', display: 'block', marginBottom: 4 }}>Note</span>
             “{snap.note}”
           </div>
         )}
@@ -107,12 +107,12 @@ export default async function SharedReportPage({ params }: { params: { token: st
                     <td style={{ padding: '11px 14px', textAlign: 'left' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                         <span style={{ fontSize: 11, color: '#b5c5b5', width: 16 }}>{i + 1}</span>
-                        <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f0f7ee', border: '1px solid rgba(0,0,0,0.06)' }}>
+                        <div style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#f4f0e6', border: '1px solid rgba(0,0,0,0.06)' }}>
                           {r.thumbnail
                             ? <img src={cdn(r.thumbnail, 96)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                             : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>{r.format === 'video' ? '🎬' : r.format === 'carousel' ? '🎠' : '🖼️'}</div>}
                         </div>
-                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#1a3a1a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</div>
+                        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#141d15', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 220 }}>{r.name}</div>
                       </div>
                     </td>
                     {metrics.map(m => (
@@ -124,7 +124,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
                 ))}
               </tbody>
               <tfoot>
-                <tr style={{ background: '#1a3a1a', color: '#dffe95' }}>
+                <tr style={{ background: '#141d15', color: '#ff5a2c' }}>
                   <td style={{ padding: '11px 14px', textAlign: 'left', fontWeight: 900 }}>Net results</td>
                   {metrics.map(m => (
                     <td key={m} style={{ padding: '11px 14px', textAlign: 'right', fontWeight: 900, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }}>{fmt(net[m] || 0, m, currency)}</td>

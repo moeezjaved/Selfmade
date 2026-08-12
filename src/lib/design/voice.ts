@@ -15,16 +15,16 @@ import type { CSSProperties } from 'react'
 /** Tokens — the brief's palette, promoted to the shared source of truth. */
 export const T = {
   ink: '#161c17',      // primary text
-  muted: '#68756b',    // secondary
+  muted: '#6f6d5a',    // secondary
   faint: '#9aa79a',    // tertiary / timestamps
   paper: '#faf9f5',    // warm surface
   shell: '#f6f8f5',    // app background
   card: '#ffffff',
   hair: '#ecebe3',     // hairline inside a surface
   line: '#e3e2da',     // border between surfaces
-  forest: '#17251c',   // ink-dark brand
-  lime: '#dffe95',     // action / highlight
-  green: '#3f8f4f',    // links / affordance
+  forest: '#141d15',   // ink-dark brand
+  lime: '#ff5a2c',     // action / highlight
+  green: '#ef4a1e',    // links / affordance
   greenBg: '#eef6e4',
   greenLine: '#d3e6b8',
 } as const

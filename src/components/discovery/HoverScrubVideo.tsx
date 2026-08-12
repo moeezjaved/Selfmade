@@ -89,7 +89,7 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
       {/* Play button (lime) — shown when not playing */}
       {!playing && (
         <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9, pointerEvents: 'none' }}>
-          <button onClick={play} aria-label="Play" style={{ pointerEvents: 'auto', width: 48, height: 48, borderRadius: '50%', background: '#dffe95', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,.35)', padding: 0, transition: 'transform .12s' }}
+          <button onClick={play} aria-label="Play" style={{ pointerEvents: 'auto', width: 48, height: 48, borderRadius: '50%', background: '#ff5a2c', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', boxShadow: '0 6px 20px rgba(0,0,0,.35)', padding: 0, transition: 'transform .12s' }}
             onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.08)'} onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}>
             <span style={{ fontSize: 17, marginLeft: 3, color: '#0e1b12' }}>▶</span>
           </button>
@@ -99,12 +99,12 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
       {/* Progress + loading ring while playing */}
       {playing && (
         <div style={{ position: 'absolute', bottom: 10, right: 10, width: 40, height: 40, zIndex: 9 }}>
-          <button onClick={pause} aria-label="Pause" style={{ position: 'absolute', inset: 0, width: 40, height: 40, borderRadius: '50%', background: 'rgba(14,27,18,.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#dffe95', fontSize: 13, backdropFilter: 'blur(4px)' }}>
+          <button onClick={pause} aria-label="Pause" style={{ position: 'absolute', inset: 0, width: 40, height: 40, borderRadius: '50%', background: 'rgba(14,27,18,.6)', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#ff5a2c', fontSize: 13, backdropFilter: 'blur(4px)' }}>
             {loading ? '' : '⏸'}
           </button>
           <svg width="40" height="40" viewBox="0 0 40 40" style={{ position: 'absolute', inset: 0, transform: 'rotate(-90deg)', pointerEvents: 'none' }}>
             <circle cx="20" cy="20" r="15" fill="none" stroke="rgba(255,255,255,.18)" strokeWidth="3" />
-            <circle cx="20" cy="20" r="15" fill="none" stroke="#dffe95" strokeWidth="3" strokeLinecap="round"
+            <circle cx="20" cy="20" r="15" fill="none" stroke="#ff5a2c" strokeWidth="3" strokeLinecap="round"
               strokeDasharray={C} strokeDashoffset={loading ? C * 0.75 : off}
               style={loading ? { animation: 'hsv-spin 0.8s linear infinite', transformOrigin: '20px 20px' } : { transition: 'stroke-dashoffset .2s linear' }} />
           </svg>

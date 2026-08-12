@@ -32,7 +32,7 @@ import { openCredits } from '@/components/credits/CreditModal'
 import { Markdown } from '@/components/mello/Markdown'
 const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ssr: false })
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
 
 type Item = { id?: string; kind: string; importance: number; title: string; body?: string; why?: string; cta_label?: string; cta_href?: string; thumbs?: string[]; media?: { image: string | null; videoUrl: string | null; adId?: string }[]; forBrand?: string; at?: string }
 type Brief = {
@@ -686,7 +686,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
               onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); say(draft) } }}
               placeholder={busy ? 'Mello is thinking…' : 'Ask Mello anything…'}
               style={{ flex: 1, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 26, padding: '15px 22px', fontSize: 14.5, color: INK, outline: 'none', fontFamily: 'inherit', boxShadow: '0 2px 6px rgba(16,24,15,.05), 0 18px 50px -16px rgba(16,24,15,.22)', resize: 'none', maxHeight: 132, lineHeight: 1.5 }} />
-            <button type="submit" disabled={busy || !draft.trim()} aria-label="Send" style={{ width: 50, height: 50, borderRadius: '50%', border: 'none', background: draft.trim() && !busy ? FOREST : '#c7cec5', color: LIME, display: 'grid', placeItems: 'center', cursor: draft.trim() && !busy ? 'pointer' : 'default', flexShrink: 0, boxShadow: draft.trim() && !busy ? '0 10px 26px -10px rgba(23,37,28,.5)' : 'none', transition: 'background .15s, box-shadow .15s' }}>
+            <button type="submit" disabled={busy || !draft.trim()} aria-label="Send" style={{ width: 50, height: 50, borderRadius: '50%', border: 'none', background: draft.trim() && !busy ? FOREST : '#c7cec5', color: LIME, display: 'grid', placeItems: 'center', cursor: draft.trim() && !busy ? 'pointer' : 'default', flexShrink: 0, boxShadow: draft.trim() && !busy ? '0 10px 26px -10px rgba(20,29,21,.5)' : 'none', transition: 'background .15s, box-shadow .15s' }}>
               <ArrowUp size={19} />
             </button>
           </form>

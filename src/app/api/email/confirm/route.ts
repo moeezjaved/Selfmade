@@ -10,12 +10,12 @@ export const dynamic = 'force-dynamic'
 
 function page(title: string, body: string) {
   return `<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title}</title></head>
-  <body style="margin:0;background:#eef5eb;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;">
+  <body style="margin:0;background:#f3eee3;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;">
     <div style="max-width:440px;background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:32px;text-align:center;">
-      <div style="color:#dffe95;background:#1a3a1a;display:inline-block;padding:8px 16px;border-radius:10px;font-weight:800;margin-bottom:18px;">Selfmade</div>
+      <div style="color:#ff5a2c;background:#141d15;display:inline-block;padding:8px 16px;border-radius:10px;font-weight:800;margin-bottom:18px;">Selfmade</div>
       <h1 style="color:#111;font-size:22px;margin:0 0 10px;">${title}</h1>
       <p style="color:#374151;font-size:15px;line-height:1.6;margin:0 0 22px;">${body}</p>
-      <a href="${(process.env.APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')}/discovery" style="display:inline-block;background:#1a3a1a;color:#dffe95;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">Go to Selfmade</a>
+      <a href="${(process.env.APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')}/discovery" style="display:inline-block;background:#141d15;color:#ff5a2c;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:10px;">Go to Selfmade</a>
     </div>
   </body></html>`
 }

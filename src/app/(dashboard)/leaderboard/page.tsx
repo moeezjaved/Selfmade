@@ -123,7 +123,7 @@ function LeaderboardPage() {
             <span style={{ fontSize: 11, fontWeight: 700, color: G9 }}>{currency}</span>
           </label>
           <button onClick={analyzeShifts} disabled={aiLoading || !data?.shifts}
-            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 34, padding: '0 13px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontSize: 13, fontWeight: 800, cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.shifts ? 0.6 : 1 }}>
+            style={{ display: 'flex', alignItems: 'center', gap: 5, height: 34, padding: '0 13px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#ff5a2c', fontSize: 13, fontWeight: 800, cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.shifts ? 0.6 : 1 }}>
             ✨ {aiLoading ? 'Reading…' : 'Analyze shifts'}
           </button>
         </div>

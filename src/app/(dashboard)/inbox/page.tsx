@@ -13,7 +13,7 @@ import toast from 'react-hot-toast'
 import { ChannelLogo } from '@/components/brand/logos'
 import { prettyInbound } from '@/lib/customer/pretty'
 
-const INK = '#17251c', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#1a3a1a', LIME = '#dffe95', MUTED = '#6b6b6b'
+const INK = '#141d15', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#141d15', LIME = '#ff5a2c', MUTED = '#6b6b6b'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
 
 type Msg = { id: string; body: string; intent?: string; priority?: string; suggested_reply?: string; status: string }
@@ -298,7 +298,7 @@ export default function InboxPage() {
         <div style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input value={simText} onChange={e => setSimText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') simulate() }}
             placeholder="Try a customer message — e.g. “my order hasn't arrived” or “can I get a refund?”"
-            style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f8fcf6', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
+            style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f9f5ec', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
           <button onClick={simulate} disabled={simBusy || !simText.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: simBusy || !simText.trim() ? 'default' : 'pointer', opacity: simBusy || !simText.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
             {simBusy ? 'Triaging…' : 'Simulate a message'}
           </button>
@@ -308,12 +308,12 @@ export default function InboxPage() {
         : threads.length === 0 ? (
           <div style={{ ...card, padding: '32px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 15, fontWeight: 750, color: INK, marginBottom: 6 }}>Nothing waiting on you 🌱</div>
-            <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 440, margin: '0 auto' }}>Connect Instagram or WhatsApp in <Link href="/settings" style={{ color: '#3f8f4f', fontWeight: 700, textDecoration: 'none' }}>Settings</Link> and every customer message lands here — triaged, prioritized, reply ready. Or try the box above.</div>
+            <div style={{ fontSize: 13, color: SUB, lineHeight: 1.6, maxWidth: 440, margin: '0 auto' }}>Connect Instagram or WhatsApp in <Link href="/settings" style={{ color: '#ef4a1e', fontWeight: 700, textDecoration: 'none' }}>Settings</Link> and every customer message lands here — triaged, prioritized, reply ready. Or try the box above.</div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {shownThreads.length === 0 && (
-              <div style={{ ...card, padding: '20px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>No <b style={{ color: INK }}>{intentFilter}</b> messages right now. <button onClick={() => setIntentFilter(null)} style={{ background: 'none', border: 'none', color: '#3f8f4f', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Show all</button></div>
+              <div style={{ ...card, padding: '20px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>No <b style={{ color: INK }}>{intentFilter}</b> messages right now. <button onClick={() => setIntentFilter(null)} style={{ background: 'none', border: 'none', color: '#ef4a1e', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Show all</button></div>
             )}
             {shownThreads.map(t => {
               const pri = PRI[t.priority] || PRI.low; const msg = t.latest; if (!msg) return null
@@ -329,7 +329,7 @@ export default function InboxPage() {
                   </div>
                   <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, background: '#f6f8f4', borderRadius: 10, padding: '10px 12px' }}>{prettyInbound(msg.body)}</div>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello&rsquo;s suggested reply</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#ef4a1e', marginBottom: 6 }}>Mello&rsquo;s suggested reply</div>
                     <DraftBox value={drafts[msg.id] ?? msg.suggested_reply ?? ''} onChange={v => setDrafts(d => ({ ...d, [msg.id]: v }))} />
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -348,7 +348,7 @@ export default function InboxPage() {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {OUT_TYPES.map(o => (
               <button key={o.type} onClick={() => simulateOutbound(o.type)} disabled={outBusy === o.type}
-                style={{ background: '#f8fcf6', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '8px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: outBusy === o.type ? 'default' : 'pointer', opacity: outBusy === o.type ? 0.6 : 1 }}>
+                style={{ background: '#f9f5ec', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '8px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: outBusy === o.type ? 'default' : 'pointer', opacity: outBusy === o.type ? 0.6 : 1 }}>
                 {outBusy === o.type ? 'Drafting…' : `${o.emoji} ${o.label}`}
               </button>
             ))}
@@ -373,7 +373,7 @@ export default function InboxPage() {
                     <span style={{ fontSize: 11.5, color: '#a7b0a5', fontWeight: 600, marginLeft: 'auto', textTransform: 'capitalize' }}>{o.thread?.channel || 'outbound'}</span>
                   </div>
                   <div>
-                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#3f8f4f', marginBottom: 6 }}>Mello wants to send</div>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#ef4a1e', marginBottom: 6 }}>Mello wants to send</div>
                     <DraftBox value={drafts[o.id] ?? o.body ?? ''} onChange={v => setDrafts(d => ({ ...d, [o.id]: v }))} />
                   </div>
                   <ActionRow messageId={o.id} fallback={o.body || ''} from="outbound" />
@@ -395,7 +395,7 @@ function InsightsPanel({ data, loading, onRefresh, onOpenInbox }: { data: Insigh
     low: { bg: '#eef2ec', fg: '#6b8f6b', label: 'NICE TO HAVE' },
   }
   if (loading && !data) return <div style={{ fontSize: 14, color: SUB, padding: 20 }}>Reading your conversations…</div>
-  if (!data) return <div style={{ ...card, padding: '32px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>Couldn’t build the report right now. <button onClick={onRefresh} style={{ background: 'none', border: 'none', color: '#3f8f4f', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Try again</button></div>
+  if (!data) return <div style={{ ...card, padding: '32px 24px', textAlign: 'center', fontSize: 13.5, color: SUB }}>Couldn’t build the report right now. <button onClick={onRefresh} style={{ background: 'none', border: 'none', color: '#ef4a1e', fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', fontSize: 13.5 }}>Try again</button></div>
   const arrow = (d: number) => d > 0 ? <span style={{ color: '#c0392b', fontWeight: 800 }}>↑{d}</span> : d < 0 ? <span style={{ color: '#3b6d11', fontWeight: 800 }}>↓{Math.abs(d)}</span> : <span style={{ color: '#a7b0a5' }}>—</span>
 
   return (
@@ -406,7 +406,7 @@ function InsightsPanel({ data, loading, onRefresh, onOpenInbox }: { data: Insigh
           <div style={{ fontSize: 15, fontWeight: 750, color: INK, lineHeight: 1.5 }}>{data.summary}</div>
           <div style={{ fontSize: 11.5, color: '#a7b0a5', marginTop: 4 }}>Last {data.days} days · {data.reasoned ? 'themes read by Mello' : 'grouped by type'}</div>
         </div>
-        <button onClick={onRefresh} disabled={loading} style={{ background: '#f8fcf6', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>{loading ? 'Refreshing…' : '↻ Refresh'}</button>
+        <button onClick={onRefresh} disabled={loading} style={{ background: '#f9f5ec', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', fontSize: 12.5, fontWeight: 750, fontFamily: 'inherit', cursor: loading ? 'default' : 'pointer', opacity: loading ? 0.6 : 1 }}>{loading ? 'Refreshing…' : '↻ Refresh'}</button>
       </div>
 
       {data.totalMessages === 0 ? (
@@ -443,10 +443,10 @@ function InsightsPanel({ data, loading, onRefresh, onOpenInbox }: { data: Insigh
                 </div>
                 {t.example && <div style={{ fontSize: 12.5, color: MUTED, fontStyle: 'italic', background: '#f6f8f4', borderRadius: 10, padding: '8px 12px', lineHeight: 1.5 }}>“{prettyInbound(t.example)}”</div>}
                 <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <span style={{ fontSize: 13.5, color: '#3f8f4f', fontWeight: 800, flexShrink: 0 }}>→</span>
+                  <span style={{ fontSize: 13.5, color: '#ef4a1e', fontWeight: 800, flexShrink: 0 }}>→</span>
                   <span style={{ fontSize: 13.5, color: INK, fontWeight: 650, lineHeight: 1.5 }}>{t.recommendation}</span>
                 </div>
-                <button onClick={() => onOpenInbox()} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, marginTop: 2, color: '#3f8f4f', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Reply in Inbox →</button>
+                <button onClick={() => onOpenInbox()} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', padding: 0, marginTop: 2, color: '#ef4a1e', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Reply in Inbox →</button>
               </div>
             )
           })}

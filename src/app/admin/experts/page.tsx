@@ -5,7 +5,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 
-const DARK = '#1a3a1a', LIME = '#dffe95'
+const DARK = '#141d15', LIME = '#ff5a2c'
 const dollars = (c: number) => (c / 100).toFixed(2)
 
 interface Pack {

@@ -71,7 +71,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
         <div style={{ display: 'grid', gridTemplateColumns: `repeat(${statCells.length}, 1fr)`, gap: 1, background: '#e6ece2', border: '1px solid #e6ece2', borderRadius: 12, overflow: 'hidden', marginBottom: 8 }}>
           {statCells.map((s) => (
             <div key={s.label} style={{ background: '#fbfcf9', padding: '14px 12px', textAlign: 'center' }}>
-              <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#17251c', lineHeight: 1 }}>{s.value}</div>
+              <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#141d15', lineHeight: 1 }}>{s.value}</div>
               <div style={{ fontSize: 10.5, color: '#7a8872', textTransform: 'uppercase', letterSpacing: '0.05em', marginTop: 5 }}>{s.label}</div>
             </div>
           ))}
@@ -191,7 +191,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
                     <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
                       {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ')}
                     </div>
-                    <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#c9f24d', color: '#17251c', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>
+                    <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#c9f24d', color: '#141d15', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>
                       ✨ Make my version →
                     </Link>
                   </div>

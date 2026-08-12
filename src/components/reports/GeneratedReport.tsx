@@ -204,15 +204,15 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
      <div style={{ maxWidth: 1120, margin: '0 auto' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 16, marginBottom: 22, flexWrap: 'wrap' }}>
-        <button onClick={onBack} title="Back" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(26,58,26,.14)', background: '#fff', color: '#1a3a1a', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+        <button onClick={onBack} title="Back" style={{ width: 40, height: 40, borderRadius: 12, border: '1px solid rgba(20,29,21,.14)', background: '#fff', color: '#141d15', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
           <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 5l-7 7 7 7" /></svg>
         </button>
-        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#dffe95,#b6e86a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>{tpl.emoji}</div>
+        <div style={{ width: 40, height: 40, borderRadius: 12, background: 'linear-gradient(135deg,#ff5a2c,#b6e86a)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 20 }}>{tpl.emoji}</div>
         <div style={{ flex: 1, minWidth: 200, paddingTop: 1 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
             <input value={name} onChange={e => setName(e.target.value)}
               style={{ fontSize: 23, fontWeight: 800, color: '#0e1b12', letterSpacing: '-.02em', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', padding: 0, minWidth: 0, width: Math.max(8, name.length + 1) + 'ch', maxWidth: '100%' }} />
-            {savedId && <span style={{ fontSize: 11.5, fontWeight: 600, color: '#7c8577', background: '#fff', border: '1px solid rgba(26,58,26,.12)', padding: '3px 9px', borderRadius: 999 }}>Saved</span>}
+            {savedId && <span style={{ fontSize: 11.5, fontWeight: 600, color: '#7c8577', background: '#fff', border: '1px solid rgba(20,29,21,.12)', padding: '3px 9px', borderRadius: 999 }}>Saved</span>}
           </div>
           <div style={{ fontSize: 13.5, fontWeight: 500, color: '#6f7a68', marginTop: 3 }}>{tpl.description}</div>
         </div>
@@ -223,11 +223,11 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             {agoLabel(syncedAt)}
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c8577" strokeWidth="2" style={loading ? { animation: 'spin 1s linear infinite' } : undefined}><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5" strokeLinecap="round" strokeLinejoin="round" /></svg>
           </button>
-          <button onClick={() => runAI('analyze')} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#dffe95', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(223,254,149,.9)' }}>
+          <button onClick={() => runAI('analyze')} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#ff5a2c', color: '#0e1b12', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 16px', borderRadius: 11, cursor: 'pointer', boxShadow: '0 5px 14px -6px rgba(255,90,44,.9)' }}>
             <svg width="15" height="15" viewBox="0 0 20 20" fill="#0e1b12"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /><circle cx="16" cy="15" r="1.5" /></svg>
             Analyze
           </button>
-          {onSave && <button onClick={openSave} disabled={saving} style={{ background: saved ? '#2f8f2f' : '#fff', color: saved ? '#fff' : '#1a3a1a', border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 11, cursor: 'pointer' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
+          {onSave && <button onClick={openSave} disabled={saving} style={{ background: saved ? '#2f8f2f' : '#fff', color: saved ? '#fff' : '#141d15', border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, padding: '10px 16px', borderRadius: 11, cursor: 'pointer' }}>{saving ? 'Saving…' : saved ? 'Saved ✓' : savedId ? 'Update' : 'Save'}</button>}
           <div style={{ position: 'relative' }}>
             <button onClick={() => setShareOpen(o => !o)} disabled={!rows.length} style={{ background: '#0e1b12', color: '#f4f7ef', border: 'none', fontFamily: FONT, fontSize: 13.5, fontWeight: 700, padding: '10px 18px', borderRadius: 11, cursor: rows.length ? 'pointer' : 'not-allowed', opacity: rows.length ? 1 : 0.5 }}>Share report</button>
             {shareOpen && rows.length > 0 && (<><div onClick={() => setShareOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 39 }} /><ShareMenu payload={sharePayload} savedId={savedId} onClose={() => setShareOpen(false)} /></>)}
@@ -264,7 +264,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
           <Chevron />
         </label>
         <label style={pill}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1a3a1a" strokeWidth="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" /></svg>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#141d15" strokeWidth="1.8"><rect x="3" y="4" width="18" height="17" rx="2.5" /><path d="M3 9h18M8 2v4M16 2v4" strokeLinecap="round" /></svg>
           {DR_LABEL[dateRange] || dateRange}
           <select value={dateRange} onChange={e => setDateRange(e.target.value)} style={pillSelect}>
             {DATE_RANGES.map(d => <option key={d.key} value={d.key}>{d.label}</option>)}
@@ -288,7 +288,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             { key: 'analyze', label: 'Analyze this report', icon: '✨' },
           ].map(c => (
             <button key={c.key} onClick={() => runAI(c.key)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 15px', borderRadius: 999, border: '1px solid rgba(26,58,26,.12)', background: c.key === 'analyze' ? 'linear-gradient(135deg,#faf5ff,#f3e8ff)' : '#fff', color: '#3a4636', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '9px 15px', borderRadius: 999, border: '1px solid rgba(20,29,21,.12)', background: c.key === 'analyze' ? 'linear-gradient(135deg,#faf5ff,#f3e8ff)' : '#fff', color: '#3a4636', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
               onMouseEnter={e => e.currentTarget.style.background = c.key === 'analyze' ? '#f3e8ff' : '#f4f6f0'}
               onMouseLeave={e => e.currentTarget.style.background = c.key === 'analyze' ? 'linear-gradient(135deg,#faf5ff,#f3e8ff)' : '#fff'}>
               <span style={{ fontSize: 13 }}>{c.icon}</span>{c.label}
@@ -309,14 +309,14 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
           <img src='/favicon.png' alt='' style={{ width: 42, height: 42, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 14px', display: 'block' }} />
-          <div style={{ color: '#1a3a1a', fontWeight: 700 }}>Building your report…</div>
+          <div style={{ color: '#141d15', fontWeight: 700 }}>Building your report…</div>
         </div>
       ) : error && !rows.length ? (
         <div style={{ background: 'rgba(248,113,113,0.08)', border: '1px solid rgba(248,113,113,0.25)', borderRadius: 16, padding: 24, color: '#c0392b' }}>{error}</div>
       ) : !rows.length ? (
-        <div style={{ textAlign: 'center', padding: 60, color: '#8aaa8a' }}>
+        <div style={{ textAlign: 'center', padding: 60, color: '#8b8a72' }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>{tpl.emoji}</div>
-          <div style={{ fontWeight: 700, color: '#1a3a1a' }}>No matching ads in this period</div>
+          <div style={{ fontWeight: 700, color: '#141d15' }}>No matching ads in this period</div>
           <div style={{ fontSize: 13, marginTop: 4 }}>{tpl.onlyFormat === 'video' ? 'This report needs active video ads with spend.' : tpl.onlyFormat === 'image' ? 'This report needs active image ads with spend.' : 'Try a wider date range.'}</div>
         </div>
       ) : (
@@ -352,16 +352,16 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
                 {/* Save the current metric/tag columns as a reusable preset (Motion's floating ＋ Save). */}
                 <button onClick={async () => { const n = await promptText({ title: 'Save these columns as a preset', placeholder: 'Preset name' }); if (n) savePreset(n, metrics, tagCols) }}
                   title="Save these columns as a preset"
-                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#dffe95', border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#0e1b12', cursor: 'pointer', fontFamily: FONT }}
-                  onMouseEnter={e => e.currentTarget.style.background = '#eaffb0'} onMouseLeave={e => e.currentTarget.style.background = '#dffe95'}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#ff5a2c', border: 'none', borderRadius: 999, padding: '6px 12px', fontSize: 12, fontWeight: 800, color: '#0e1b12', cursor: 'pointer', fontFamily: FONT }}
+                  onMouseEnter={e => e.currentTarget.style.background = '#eaffb0'} onMouseLeave={e => e.currentTarget.style.background = '#ff5a2c'}>
                   ＋ Save
                 </button>
                 <div style={{ flex: 1 }} />
                 {/* view toggle: cards / bar / line / sprint (time-series). The table always shows below. */}
-                <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
+                <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.1)', borderRadius: 10, padding: 3 }}>
                   {([['card', 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z'], ['bar', 'M4 20V10M10 20V4M16 20v-7M22 20H2'], ['line', 'M3 17l6-6 4 4 8-8'], ['sprint', 'M3 12h4l3 8 4-16 3 8h4']] as const).map(([v, d]) => (
                     <button key={v} onClick={() => setView(v)} title={v === 'card' ? 'Cards' : v === 'bar' ? 'Bar chart' : v === 'line' ? 'Line chart' : 'Sprint (over time)'} style={{ width: 30, height: 28, borderRadius: 7, border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', background: view === v ? '#0e1b12' : 'transparent' }}>
-                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#dffe95' : '#7c8577'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
+                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={view === v ? '#ff5a2c' : '#7c8577'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d={d} /></svg>
                     </button>
                   ))}
                 </div>
@@ -404,7 +404,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
             <datalist id="rp-folders">{knownFolders.map(f => <option key={f} value={f} />)}</datalist>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
               <button onClick={() => setSaveDialog(false)} style={{ height: 36, padding: '0 16px', borderRadius: 10, border: '1px solid rgba(0,0,0,.12)', background: '#fff', color: '#3a4636', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={confirmSave} style={{ height: 36, padding: '0 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontFamily: FONT, fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}>Save</button>
+              <button onClick={confirmSave} style={{ height: 36, padding: '0 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#ff5a2c', fontFamily: FONT, fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}>Save</button>
             </div>
           </div>
         </div>
@@ -413,7 +413,7 @@ export default function GeneratedReport({ templateKey, onBack, onSave, onDelete,
       <style>{`
         @keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
         .rp-scroll::-webkit-scrollbar{height:9px;width:9px}
-        .rp-scroll::-webkit-scrollbar-thumb{background:rgba(26,58,26,.16);border-radius:8px}
+        .rp-scroll::-webkit-scrollbar-thumb{background:rgba(20,29,21,.16);border-radius:8px}
         .rp-row:hover{background:#fafcf5}
         .rp-card:hover{box-shadow:0 10px 24px -16px rgba(14,27,18,.5)}
         .rp-card:hover .rp-card-open{opacity:1}
@@ -437,10 +437,10 @@ function agoLabel(t: number): string {
   if (s < 86400) return `Synced ${Math.floor(s / 3600)}h ago`
   return `Synced ${Math.floor(s / 86400)}d ago`
 }
-const pill: React.CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(26,58,26,.14)', borderRadius: 11, padding: '9px 13px', fontSize: 13, fontWeight: 600, color: '#3a4636', cursor: 'pointer', fontFamily: FONT }
+const pill: React.CSSProperties = { position: 'relative', display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid rgba(20,29,21,.14)', borderRadius: 11, padding: '9px 13px', fontSize: 13, fontWeight: 600, color: '#3a4636', cursor: 'pointer', fontFamily: FONT }
 const pillSelect: React.CSSProperties = { position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer', fontFamily: FONT }
-const panelStyle: React.CSSProperties = { background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 20, boxShadow: '0 12px 30px -22px rgba(14,27,18,.4)', marginBottom: 20 }
-const toolBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, height: 32, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: '0 12px', fontFamily: FONT, fontSize: 14, fontWeight: 500, color: '#3a4636', cursor: 'pointer' }
+const panelStyle: React.CSSProperties = { background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 20, boxShadow: '0 12px 30px -22px rgba(14,27,18,.4)', marginBottom: 20 }
+const toolBtn: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, height: 32, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.1)', borderRadius: 10, padding: '0 12px', fontFamily: FONT, fontSize: 14, fontWeight: 500, color: '#3a4636', cursor: 'pointer' }
 const Chevron = () => <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="#7c8577" strokeWidth="1.7"><path d="M2 4l4 4 4-4" strokeLinecap="round" /></svg>
 
 // Soft lime-green heat fill for a cell, strength 0..1 (matches the design's heatmap).
@@ -520,7 +520,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
     <div style={panelStyle}>
       {/* toolbar — wraps on narrow screens so Custom / Table settings / AI tags never crop off-screen
           (a horizontal scroller here would clip the absolutely-positioned dropdown menus). */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, rowGap: 8, flexWrap: 'wrap', padding: '16px 18px', borderBottom: '1px solid rgba(26,58,26,.08)', position: 'relative' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, rowGap: 8, flexWrap: 'wrap', padding: '16px 18px', borderBottom: '1px solid rgba(20,29,21,.08)', position: 'relative' }}>
         {menu && <div onClick={() => setMenu(null)} style={{ position: 'fixed', inset: 0, zIndex: 19 }} />}
 
         {/* Custom (presets) */}
@@ -532,16 +532,16 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
           {menu === 'custom' && (
             <div style={{ ...menuBox, width: 220 }}>
               <input autoFocus value={presetQ} onChange={e => setPresetQ(e.target.value)} placeholder="Search presets…"
-                style={{ width: '100%', padding: '7px 10px', marginBottom: 6, borderRadius: 8, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, outline: 'none', boxSizing: 'border-box' }} />
+                style={{ width: '100%', padding: '7px 10px', marginBottom: 6, borderRadius: 8, border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 12.5, outline: 'none', boxSizing: 'border-box' }} />
               {(presets || []).filter((p: any) => !presetQ || p.name.toLowerCase().includes(presetQ.toLowerCase())).map((p: any) => (
                 <button key={p.name} onClick={() => { onApplyPreset(p); setMenu(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
                   onMouseEnter={e => e.currentTarget.style.background = '#f4f6f0'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
                   <span style={{ flex: 1 }}>{p.name}</span>{p.builtin && <span style={{ fontSize: 9, fontWeight: 700, color: '#9aa196' }}>PRESET</span>}
                 </button>
               ))}
-              <div style={{ height: 1, background: 'rgba(26,58,26,.08)', margin: '6px 4px' }} />
+              <div style={{ height: 1, background: 'rgba(20,29,21,.08)', margin: '6px 4px' }} />
               <button onClick={() => { onCustomize(); setMenu(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 700, color: '#2d7a2d', fontFamily: FONT }}
-                onMouseEnter={e => e.currentTarget.style.background = '#f0f7ee'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>⚙ Customize columns</button>
+                onMouseEnter={e => e.currentTarget.style.background = '#f4f0e6'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>⚙ Customize columns</button>
             </div>
           )}
         </div>
@@ -568,7 +568,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               <SettingRow label="Color formatting">
                 <div style={{ display: 'flex', gap: 5 }}>
                   {([['none', '#e6e9e0', 'None'], ['green', '#8cc84a', 'Green'], ['red', '#e8837a', 'Red'], ['gradient', 'linear-gradient(90deg,#e8837a,#f0d878,#8cc84a)', 'Gradient']] as const).map(([mode, bg, title]) => (
-                    <button key={mode} title={title} onClick={() => setColorMode(mode)} style={{ width: 26, height: 20, borderRadius: 6, cursor: 'pointer', background: bg, border: settings.colorMode === mode ? '2px solid #0e1b12' : '1px solid rgba(26,58,26,.18)' }} />
+                    <button key={mode} title={title} onClick={() => setColorMode(mode)} style={{ width: 26, height: 20, borderRadius: 6, cursor: 'pointer', background: bg, border: settings.colorMode === mode ? '2px solid #0e1b12' : '1px solid rgba(20,29,21,.18)' }} />
                   ))}
                 </div>
               </SettingRow>
@@ -581,7 +581,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               <SettingRow label="Show tags"><Toggle on={settings.showTags} onClick={() => setShowTags(!settings.showTags)} /></SettingRow>
               <SettingRow label="Show active status"><Toggle on={settings.showStatus} onClick={() => setShowStatus(!settings.showStatus)} /></SettingRow>
               <SettingRow label="Show launch date"><Toggle on={settings.showLaunch} onClick={() => setShowLaunch(!settings.showLaunch)} /></SettingRow>
-              <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(26,58,26,.06)', marginTop: 4 }}>
+              <div style={{ padding: '8px 10px', borderTop: '1px solid rgba(20,29,21,.06)', marginTop: 4 }}>
                 <div style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', marginBottom: 8 }}>Creative aspect ratio</div>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                   {([['9 / 16', '9:16'], ['4 / 5', '4:5'], ['1 / 1', '1:1']] as const).map(([val, lbl]) => {
@@ -601,7 +601,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
 
         {/* AI tags */}
         <div style={{ position: 'relative', zIndex: 20 }}>
-          <button className="mds-int" style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(26,58,26,.12)' }} onClick={() => setMenu(menu === 'aitags' ? null : 'aitags')}>
+          <button className="mds-int" style={{ ...toolBtn, background: '#fff', border: '1px solid rgba(20,29,21,.12)' }} onClick={() => setMenu(menu === 'aitags' ? null : 'aitags')}>
             <svg width="13" height="13" viewBox="0 0 20 20" fill="#7c3aed"><path d="M10 1.5l1.7 4.6 4.8 1.7-4.8 1.7L10 14.1 8.3 9.5 3.5 7.8l4.8-1.7z" /></svg>
             AI tags <Chevron />
           </button>
@@ -613,7 +613,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
                   {AI_TAG_COLS.filter(c => c.group === grp).map(c => {
                     const on = tagCols.includes(c.key)
                     return (
-                      <button key={c.key} onClick={() => onToggleTagCol(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: on ? '#f0f7ee' : 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
+                      <button key={c.key} onClick={() => onToggleTagCol(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '7px 10px', borderRadius: 8, border: 'none', background: on ? '#f4f0e6' : 'transparent', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#0e1b12', fontFamily: FONT }}
                         onMouseEnter={e => { if (!on) e.currentTarget.style.background = '#f4f6f0' }} onMouseLeave={e => { if (!on) e.currentTarget.style.background = 'transparent' }}>
                         <span style={{ flex: 1 }}>{c.label}</span>
                         {on && <svg width="13" height="13" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#2d7a2d" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}
@@ -633,10 +633,10 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
       <div className="rp-scroll" style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 760 }}>
           <thead>
-            <tr style={{ background: '#fafcf5', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+            <tr style={{ background: '#fafcf5', borderBottom: '1px solid rgba(20,29,21,.08)' }}>
               <th style={{ ...thStyle, textAlign: 'left', minWidth: 240, paddingLeft: 18 }}>
                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 11 }}>
-                  <button onClick={toggleAll} title={allSel ? 'Deselect all' : 'Select all'} style={{ width: 16, height: 16, borderRadius: 5, border: allSel ? 'none' : '1.6px solid #9aa196', background: allSel ? '#0e1b12' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>{allSel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#dffe95" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
+                  <button onClick={toggleAll} title={allSel ? 'Deselect all' : 'Select all'} style={{ width: 16, height: 16, borderRadius: 5, border: allSel ? 'none' : '1.6px solid #9aa196', background: allSel ? '#0e1b12' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', padding: 0 }}>{allSel && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#ff5a2c" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
                   {(groupLabel || 'Creative').toUpperCase()}
                 </span>
               </th>
@@ -652,10 +652,10 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
           </thead>
           <tbody>
             {visibleRows.map((r: any, i: number) => (
-              <tr key={r.key + i} className="rp-row" style={{ height: 56, borderBottom: '1px solid rgba(26,58,26,.06)', transition: 'background .12s' }}>
+              <tr key={r.key + i} className="rp-row" style={{ height: 56, borderBottom: '1px solid rgba(20,29,21,.06)', transition: 'background .12s' }}>
                 <td style={{ ...tdStyle, textAlign: 'left', paddingLeft: 18 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0 }}>
-                    <button onClick={() => toggleRow(r.key)} style={{ width: 16, height: 16, borderRadius: 5, border: sel.has(r.key) ? '1.6px solid #6fb03a' : '1.6px solid #c2ccc0', background: sel.has(r.key) ? '#dffe95' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0 }}>{sel.has(r.key) && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#1a3a1a" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
+                    <button onClick={() => toggleRow(r.key)} style={{ width: 16, height: 16, borderRadius: 5, border: sel.has(r.key) ? '1.6px solid #6fb03a' : '1.6px solid #c2ccc0', background: sel.has(r.key) ? '#ff5a2c' : '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, cursor: 'pointer', padding: 0 }}>{sel.has(r.key) && <svg width="10" height="10" viewBox="0 0 12 12" fill="none"><path d="M2.5 6.2l2.2 2.3L9.5 3.5" stroke="#141d15" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" /></svg>}</button>
                     <span onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ display: 'flex', alignItems: 'center', gap: 11, minWidth: 0, cursor: r.adId ? 'pointer' : 'default' }}>
                     <Thumb src={r.thumbnail} format={r.format} />
                     <div style={{ minWidth: 0 }}>
@@ -697,7 +697,7 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
               </td>
               {dimCols.map(dc => <td key={dc.key} style={{ ...tdStyle, textAlign: 'left', color: '#5f6b5a' }}>—</td>)}
               {metrics.map((m: MetricKey) => (
-                <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14, fontSize: 13, fontWeight: 700, color: isAvg(m) ? '#dffe95' : '#f4f7ef', fontVariantNumeric: 'tabular-nums' }}>
+                <td key={m} style={{ ...tdStyle, paddingRight: m === metrics[metrics.length - 1] ? 18 : 14, fontSize: 13, fontWeight: 700, color: isAvg(m) ? '#ff5a2c' : '#f4f7ef', fontVariantNumeric: 'tabular-nums' }}>
                   {isAvg(m) ? 'Avg ' : ''}{fmtMetric(computedNet[m] || 0, m, currency)}
                 </td>
               ))}
@@ -709,9 +709,9 @@ function TablePanel({ rows, metrics, sort, dir, currency, net, groupLabel, onSor
   )
 }
 
-const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(26,58,26,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
-const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
-const chartSel: React.CSSProperties = { padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
+const menuBox: React.CSSProperties = { position: 'absolute', left: 0, top: '112%', zIndex: 21, background: '#fff', border: '1px solid rgba(20,29,21,.12)', borderRadius: 12, boxShadow: '0 14px 40px rgba(0,0,0,.16)', padding: 8, width: 260 }
+const miniSelect: React.CSSProperties = { padding: '4px 8px', borderRadius: 7, border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
+const chartSel: React.CSSProperties = { padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }
 // Metric order-badge palette — Motion cycles a small ordered pastel set by slot position: violet,
 // salmon, teal, then more. Mapped to the metric INDEX (not identity); these exactly match the
 // metric-selection checkbox fills.
@@ -732,7 +732,7 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
   return (
     <div style={{ display: 'grid', gridTemplateColumns: `repeat(auto-fill, minmax(min(${minW}px,100%),1fr))`, gap: 12 }}>
       {rows.map((r: any, i: number) => (
-        <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(26,58,26,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
+        <div key={r.key + i} className="rp-card" onClick={() => r.adId && onOpenAd?.(r.adId, r.name)} style={{ border: '1px solid rgba(20,29,21,.1)', borderRadius: 16, overflow: 'hidden', background: '#fff', cursor: r.adId ? 'pointer' : 'default' }}>
           {/* creative preview — aspect set by the card display setting (9:16 / 4:5 / 1:1) */}
           <div style={{ position: 'relative', aspectRatio: aspect, background: '#0e1b12', overflow: 'hidden' }}>
             {r.thumbnail
@@ -743,7 +743,7 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
             {/* click-to-view — revealed on hover */}
             {r.adId && (
               <div className="rp-card-open" style={{ position: 'absolute', inset: 0, background: 'rgba(14,27,18,.42)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: 0, transition: 'opacity .15s' }}>
-                <span style={{ width: 46, height: 46, borderRadius: '50%', background: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <span style={{ width: 46, height: 46, borderRadius: '50%', background: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0e1b12" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" /></svg>
                 </span>
                 <span style={{ fontSize: 12, fontWeight: 800, color: '#fff' }}>View details</span>
@@ -756,7 +756,7 @@ function CardsGrid({ rows, metrics, sort, currency, aspect = '4 / 5', onSee, onO
             <TagPills tags={r.tags} max={3} rows={rows} onSee={onSee} />
             <div style={{ marginTop: 11 }}>
               {metrics.map((m: MetricKey, idx: number) => (
-                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 28, borderTop: idx === 0 ? 'none' : '1px solid rgba(26,58,26,.07)' }}>
+                <div key={m} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 28, borderTop: idx === 0 ? 'none' : '1px solid rgba(20,29,21,.07)' }}>
                   <span style={{ fontSize: 14, fontWeight: 400, color: '#6f6f6f' }}>{METRICS[m]?.label || m}</span>
                   <span style={{ fontSize: 14, fontWeight: idx === 0 ? 700 : 600, color: metricColor(m, r.metrics[m]) || '#171717', fontVariantNumeric: 'tabular-nums' }}>{fmtMetric(r.metrics[m], m, currency)}</span>
                 </div>
@@ -907,17 +907,17 @@ function SprintView({ templateKey, dateRange, groupBy, sort, metrics, currency }
     <div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
         <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>Metric:</span>
-        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
+        <select value={metric} onChange={e => setMetric(e.target.value as MetricKey)} style={{ padding: '6px 10px', borderRadius: 9, border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
           {metrics.map((m: MetricKey) => <option key={m} value={m}>{METRICS[m]?.label || m}</option>)}
         </select>
         <button onClick={analyzeTrends} disabled={aiLoading || !data?.series?.length} title="Mello reads the momentum trends"
-          style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#0e1b12', border: 'none', borderRadius: 999, padding: '6px 13px', fontSize: 12, fontWeight: 800, color: '#dffe95', cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.series?.length ? 0.6 : 1 }}>
+          style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#0e1b12', border: 'none', borderRadius: 999, padding: '6px 13px', fontSize: 12, fontWeight: 800, color: '#ff5a2c', cursor: aiLoading ? 'default' : 'pointer', fontFamily: FONT, opacity: aiLoading || !data?.series?.length ? 0.6 : 1 }}>
           ✨ {aiLoading ? 'Reading trends…' : 'Analyze trends'}
         </button>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 10, padding: 3 }}>
+        <div style={{ display: 'flex', gap: 3, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.1)', borderRadius: 10, padding: 3 }}>
           {(['daily', 'weekly', 'monthly'] as const).map(inc => (
-            <button key={inc} onClick={() => setIncrement(inc)} style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize', color: increment === inc ? '#dffe95' : '#7c8577', background: increment === inc ? '#0e1b12' : 'transparent' }}>{inc}</button>
+            <button key={inc} onClick={() => setIncrement(inc)} style={{ padding: '5px 11px', borderRadius: 7, border: 'none', cursor: 'pointer', fontFamily: FONT, fontSize: 11.5, fontWeight: 700, textTransform: 'capitalize', color: increment === inc ? '#ff5a2c' : '#7c8577', background: increment === inc ? '#0e1b12' : 'transparent' }}>{inc}</button>
           ))}
         </div>
       </div>
@@ -1043,7 +1043,7 @@ function TagPills({ tags, max = 3, rows, onSee }: { tags: any; max?: number; row
       {hover && typeof document !== 'undefined' && createPortal(
         <div style={{ position: 'fixed', left: Math.min(hover.x, window.innerWidth - 280), top: hover.y, transform: hover.below ? 'none' : 'translateY(-100%)', zIndex: 4000, width: 260, background: '#0e1b12', color: '#f4f7ef', borderRadius: 12, padding: 14, boxShadow: '0 16px 40px rgba(0,0,0,.4)', pointerEvents: 'none', fontFamily: FONT }}>
           <div style={{ fontSize: 10.5, fontWeight: 700, color: '#9aa196', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>{DIM_LABEL[hover.k] || hover.k}</div>
-          <div style={{ fontSize: 15, fontWeight: 800, color: '#dffe95', marginBottom: 2 }}>{hover.v}</div>
+          <div style={{ fontSize: 15, fontWeight: 800, color: '#ff5a2c', marginBottom: 2 }}>{hover.v}</div>
           {TAG_DESC[hover.v] && <div style={{ fontSize: 12, color: '#c9d2bf', marginBottom: 10 }}>{TAG_DESC[hover.v]}</div>}
           <div style={{ fontSize: 11.5, fontWeight: 600, color: '#9aa196', marginBottom: thumbs.length ? 8 : 0, borderTop: '1px solid rgba(255,255,255,.1)', paddingTop: 8 }}>{sib.length} {sib.length === 1 ? 'creative' : 'creatives'} with this tag</div>
           {thumbs.length > 0 && (

@@ -39,7 +39,7 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
       <div onClick={e => e.stopPropagation()} style={{ width: 860, maxWidth: '100%', maxHeight: 'calc(100vh - 64px)', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 20, boxShadow: '0 40px 90px -20px rgba(0,0,0,.55)', overflow: 'hidden' }}>
         {/* search */}
         <div style={{ padding: '18px 22px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.1)', borderRadius: 11, padding: '10px 14px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.1)', borderRadius: 11, padding: '10px 14px' }}>
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa196" strokeWidth="2"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" strokeLinecap="round" /></svg>
             <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search KPIs" style={{ flex: 1, border: 'none', background: 'transparent', outline: 'none', fontFamily: FONT, fontSize: 14, color: '#0e1b12' }} />
           </div>
@@ -47,10 +47,10 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
 
         <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 0, overflow: 'hidden', flex: 1 }}>
           {/* selected */}
-          <div style={{ borderRight: '1px solid rgba(26,58,26,.08)', padding: '10px 16px 16px', overflowY: 'auto' }}>
+          <div style={{ borderRight: '1px solid rgba(20,29,21,.08)', padding: '10px 16px 16px', overflowY: 'auto' }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: '#9aa196', textTransform: 'uppercase', letterSpacing: '.05em', margin: '6px 4px 10px' }}>Selected metrics</div>
             {sel.map((m, i) => (
-              <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 9, background: '#f8faf4', border: '1px solid rgba(26,58,26,.07)', marginBottom: 6 }}>
+              <div key={m} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 10px', borderRadius: 9, background: '#f8faf4', border: '1px solid rgba(20,29,21,.07)', marginBottom: 6 }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   <button onClick={() => move(i, -1)} disabled={i === 0} style={arrow}>▲</button>
                   <button onClick={() => move(i, 1)} disabled={i === sel.length - 1} style={arrow}>▼</button>
@@ -77,7 +77,7 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
               {AI_TAGS.map(t => {
                 const on = tags.includes(t.key)
                 return (
-                  <button key={t.key} onClick={() => toggleTag(t.key)} style={{ ...addRow, background: on ? '#f0f7ee' : '#fff', borderColor: on ? '#c8e6c0' : 'rgba(26,58,26,.1)' }}>
+                  <button key={t.key} onClick={() => toggleTag(t.key)} style={{ ...addRow, background: on ? '#f4f0e6' : '#fff', borderColor: on ? '#c8e6c0' : 'rgba(20,29,21,.1)' }}>
                     <span style={{ color: on ? '#2d7a2d' : '#7c3aed', fontWeight: 800 }}>{on ? '✓' : '✨'}</span> {t.label}
                   </button>
                 )
@@ -87,7 +87,7 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
         </div>
 
         {/* footer */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', borderTop: '1px solid rgba(26,58,26,.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 22px', borderTop: '1px solid rgba(20,29,21,.08)' }}>
           <div style={{ flex: 1 }} />
           <button onClick={async () => { const n = await promptText({ title: 'Preset name?', placeholder: 'e.g. My KPIs' }); if (n) onSavePreset(n, sel, tags) }} style={btnGhost}>Save as new preset</button>
           <button onClick={onClose} style={btnGhost}>Cancel</button>
@@ -99,8 +99,8 @@ export default function MetricPicker({ metrics, tagCols, onApply, onSavePreset, 
 }
 
 const arrow: React.CSSProperties = { border: 'none', background: 'transparent', cursor: 'pointer', color: '#9aa196', fontSize: 8, lineHeight: 1, padding: 0 }
-const addRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 7, textAlign: 'left', padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(26,58,26,.1)', background: '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12' }
-const btnGhost: React.CSSProperties = { padding: '9px 15px', borderRadius: 10, border: '1px solid rgba(26,58,26,.14)', background: '#fff', color: '#3a4636', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: FONT }
-const btnPrimary: React.CSSProperties = { padding: '9px 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }
+const addRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 7, textAlign: 'left', padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(20,29,21,.1)', background: '#fff', cursor: 'pointer', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12' }
+const btnGhost: React.CSSProperties = { padding: '9px 15px', borderRadius: 10, border: '1px solid rgba(20,29,21,.14)', background: '#fff', color: '#3a4636', fontWeight: 600, fontSize: 13, cursor: 'pointer', fontFamily: FONT }
+const btnPrimary: React.CSSProperties = { padding: '9px 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }
 
 export { AI_LABEL }

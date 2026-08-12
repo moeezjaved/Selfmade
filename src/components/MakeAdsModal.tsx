@@ -10,7 +10,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { X, Image as ImageIcon, Video, Sparkles } from 'lucide-react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
 const IMG_ACTION = 'image_clone_pro', VID_ACTION = 'video_clone'   // the per-action costs Mello would incur
 
 export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId: string | null; brandName?: string | null; onClose: () => void }) {
@@ -46,10 +46,10 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(8,16,10,.5)', zIndex: 3000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, border: `1px solid ${LINE}`, boxShadow: '0 30px 90px -30px rgba(23,37,28,.4)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, sans-serif" }}>
+      <div onClick={e => e.stopPropagation()} style={{ width: '100%', maxWidth: 440, background: '#fff', borderRadius: 20, border: `1px solid ${LINE}`, boxShadow: '0 30px 90px -30px rgba(20,29,21,.4)', overflow: 'hidden', fontFamily: "'Inter', -apple-system, sans-serif" }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px 20px', borderBottom: `1px solid ${LINE}` }}>
           <b style={{ fontSize: 15.5, color: INK }}>Have Mello make ads for you</b>
-          <button onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', color: '#3c473e', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }}><X size={15} /></button>
+          <button onClick={onClose} aria-label="Close" style={{ width: 28, height: 28, borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', color: '#3a382f', cursor: 'pointer', display: 'grid', placeItems: 'center', padding: 0 }}><X size={15} /></button>
         </div>
 
         {done ? (

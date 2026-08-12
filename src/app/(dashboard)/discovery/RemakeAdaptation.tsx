@@ -13,7 +13,7 @@ import { Sparkles } from 'lucide-react'
 type Adaptation = { studied: string; hook: string; primaryText: string; scenes: string[]; voiceover: string }
 type Brand = { id: string; name: string }
 
-const FOREST = '#17251c', LIME = '#dffe95', INK = '#111514', MUTED = '#6b7280', LINE = '#e2e8f0'
+const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#111514', MUTED = '#6b7280', LINE = '#e2e8f0'
 const cacheKey = (adId: string, brandId: string) => `remake_adapt:${adId}:${brandId}`
 
 export default function RemakeAdaptation({ adId, isVideo, videoUrl, poster }: { adId: string; isVideo?: boolean; videoUrl?: string | null; poster?: string | null }) {
@@ -70,7 +70,7 @@ export default function RemakeAdaptation({ adId, isVideo, videoUrl, poster }: { 
   const ad = data?.adaptation
 
   return (
-    <div style={{ background: 'linear-gradient(180deg,#f7fbef,#ffffff)', border: `1px solid #d9ecb4`, borderRadius: 16, padding: '20px 22px', marginBottom: 18, boxShadow: '0 24px 50px -40px rgba(23,37,28,.4)' }}>
+    <div style={{ background: 'linear-gradient(180deg,#f7fbef,#ffffff)', border: `1px solid #d9ecb4`, borderRadius: 16, padding: '20px 22px', marginBottom: 18, boxShadow: '0 24px 50px -40px rgba(20,29,21,.4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
         <span style={{ width: 26, height: 26, borderRadius: 8, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', flexShrink: 0 }}><Sparkles size={14} /></span>
         <div style={{ fontSize: 14.5, fontWeight: 850, color: INK }}>Mello studied this campaign{data?.brand ? ` and adapted it for ${data.brand.name}` : ''}.</div>

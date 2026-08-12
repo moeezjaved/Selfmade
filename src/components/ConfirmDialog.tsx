@@ -12,7 +12,7 @@
 import { useEffect, useRef, useState } from 'react'
 
 const EVT = 'selfmade:confirm'
-const INK = '#17251c', SUB = '#6b7280'
+const INK = '#141d15', SUB = '#6b7280'
 
 export interface ConfirmOpts {
   title: string
@@ -87,7 +87,7 @@ export default function ConfirmHost() {
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 22 }}>
           {/* Alerts have a single OK button — no cancel. */}
           {!p.alert && <button onClick={() => close(false)} style={{ background: '#fff', color: INK, border: '1.5px solid #e2e8f0', borderRadius: 100, padding: '9px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{p.cancelLabel || 'Cancel'}</button>}
-          <button onClick={() => close(true)} disabled={isInput && !val.trim()} style={{ background: danger ? '#c0392b' : '#17251c', color: danger ? '#fff' : '#dffe95', border: 'none', borderRadius: 100, padding: '9px 20px', fontSize: 13.5, fontWeight: 800, cursor: (isInput && !val.trim()) ? 'not-allowed' : 'pointer', opacity: (isInput && !val.trim()) ? 0.5 : 1, fontFamily: 'inherit' }}>{p.confirmLabel || (isInput ? 'Save' : 'Confirm')}</button>
+          <button onClick={() => close(true)} disabled={isInput && !val.trim()} style={{ background: danger ? '#c0392b' : '#141d15', color: danger ? '#fff' : '#ff5a2c', border: 'none', borderRadius: 100, padding: '9px 20px', fontSize: 13.5, fontWeight: 800, cursor: (isInput && !val.trim()) ? 'not-allowed' : 'pointer', opacity: (isInput && !val.trim()) ? 0.5 : 1, fontFamily: 'inherit' }}>{p.confirmLabel || (isInput ? 'Save' : 'Confirm')}</button>
         </div>
       </div>
     </div>

@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 
-const INK = '#17251c', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#141d15', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#141d15', LIME = '#ff5a2c'
 
 type Alert = { pageId: string; brand: string; kind: string; newCount: number; activeCount: number; headline: string; detail: string; image?: string | null; href: string }
 type Mention = { source: string; title: string; url: string; where: string; kind: 'you' | 'shoppers' }

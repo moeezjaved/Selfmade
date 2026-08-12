@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description: 'Selfmade turns 3M+ proven Meta ads into your next winner — discover what’s working, remake or generate your own with AI, and launch. Learn what we’re building.',
   alternates: { canonical: '/about' },
 }
-const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const LIME = '#ff5a2c', INK = '#0e1b12', GREEN = '#16a34a'
 
 export default function About() {
   return (

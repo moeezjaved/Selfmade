@@ -44,13 +44,13 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
       <div onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: '100%', maxWidth: 1080, height: '94vh', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 40px 90px -20px rgba(0,0,0,.5)' }}>
 
         {/* Top bar */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: '1px solid rgba(20,29,21,.08)' }}>
           <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'baseline', gap: 8 }}>
             <span style={{ fontSize: 16, fontWeight: 800, color: '#0e1b12', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name || name || 'Ad'}</span>
             <span style={{ fontSize: 11, color: '#9aa196', flexShrink: 0 }}>{adId}</span>
           </div>
           <div style={{ position: 'relative' }}>
-            <select value={dr} onChange={e => setDr(e.target.value)} style={{ appearance: 'none', padding: '8px 30px 8px 32px', borderRadius: 10, border: '1px solid rgba(26,58,26,.14)', background: '#fff', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', cursor: 'pointer' }}>
+            <select value={dr} onChange={e => setDr(e.target.value)} style={{ appearance: 'none', padding: '8px 30px 8px 32px', borderRadius: 10, border: '1px solid rgba(20,29,21,.14)', background: '#fff', fontFamily: FONT, fontSize: 12.5, fontWeight: 600, color: '#0e1b12', cursor: 'pointer' }}>
               {[['last_7d', 'Last 7 days'], ['last_14d', 'Last 14 days'], ['last_30d', 'Last 30 days'], ['last_90d', 'Last 90 days']].map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
             <span style={{ position: 'absolute', left: 11, top: 9, pointerEvents: 'none' }}>📅</span>
@@ -63,8 +63,8 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
             column made the centered modal wider than a phone, cropping the creative off the left edge. */}
         <div style={{ display: isMobile ? 'block' : 'grid', gridTemplateColumns: isMobile ? undefined : '380px 1fr', flex: 1, minHeight: 0, overflowY: isMobile ? 'auto' : undefined }}>
           {/* Left — creative */}
-          <div style={{ borderRight: isMobile ? 'none' : '1px solid rgba(26,58,26,.08)', borderBottom: isMobile ? '1px solid rgba(26,58,26,.08)' : 'none', overflowY: isMobile ? 'visible' : 'auto', padding: 20, background: '#fafcf9' }}>
-            <div style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 14, overflow: 'hidden' }}>
+          <div style={{ borderRight: isMobile ? 'none' : '1px solid rgba(20,29,21,.08)', borderBottom: isMobile ? '1px solid rgba(20,29,21,.08)' : 'none', overflowY: isMobile ? 'visible' : 'auto', padding: 20, background: '#fafcf9' }}>
+            <div style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 14, overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '11px 13px' }}>
                 <div style={{ width: 30, height: 30, borderRadius: '50%', background: '#eef4dc', color: '#41611b', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>{(c.headline || c.name || 'A')[0]}</div>
                 <div style={{ minWidth: 0 }}>
@@ -88,7 +88,7 @@ export default function AdDetailDrawer({ adId, name, dateRange = 'last_14d', onC
 
           {/* Right — tabs */}
           <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-            <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0', borderBottom: '1px solid rgba(26,58,26,.08)', overflowX: 'auto' }}>
+            <div style={{ display: 'flex', gap: 4, padding: '10px 20px 0', borderBottom: '1px solid rgba(20,29,21,.08)', overflowX: 'auto' }}>
               {TABS.map(t => (
                 <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 12px', border: 'none', background: 'transparent', cursor: 'pointer', fontFamily: FONT, fontSize: 13.5, fontWeight: 600, color: tab === t ? '#0e1b12' : '#9aa196', borderBottom: tab === t ? '2px solid #0e1b12' : '2px solid transparent', marginBottom: -1 }}>{t}</button>
               ))}
@@ -114,13 +114,13 @@ function Overview({ data, cur, adId, name }: any) {
   const roasColor = o.roas >= 2 ? '#2d7a2d' : o.roas >= 1 ? '#b8860b' : '#c0392b'
   return (
     <div>
-      <div style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 14, padding: 18, marginBottom: 16 }}>
+      <div style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 14, padding: 18, marginBottom: 16 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
           <span style={{ fontSize: 12.5, fontWeight: 600, color: '#7c8577' }}>Spend</span>
           {o.launchedRecently && <span style={{ fontSize: 10, fontWeight: 800, background: '#eef4dc', color: '#41611b', padding: '2px 8px', borderRadius: 100 }}>New</span>}
         </div>
         <div style={{ fontSize: 30, fontWeight: 800, color: '#0e1b12' }}>{compact(o.spend, cur)}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginTop: 16, borderTop: '1px solid rgba(26,58,26,.07)', paddingTop: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginTop: 16, borderTop: '1px solid rgba(20,29,21,.07)', paddingTop: 14 }}>
           <div><div style={lbl}>ROAS</div><div style={{ fontSize: 18, fontWeight: 800, color: roasColor }}>{(o.roas || 0).toFixed(2)}</div></div>
           <div><div style={lbl}>Launch date</div><div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12' }}>{o.launchDate || '—'}</div></div>
           <div><div style={lbl}>Status</div><div style={{ fontSize: 15, fontWeight: 700, color: o.status === 'active' ? '#15803d' : '#7c8577', display: 'flex', alignItems: 'center', gap: 5 }}><span style={{ width: 7, height: 7, borderRadius: '50%', background: o.status === 'active' ? '#22c55e' : '#9aa196' }} />{(o.status || 'paused').replace(/^\w/, (m: string) => m.toUpperCase())}</div></div>
@@ -132,7 +132,7 @@ function Overview({ data, cur, adId, name }: any) {
         <div style={{ fontSize: 22, marginBottom: 6 }}>✨</div>
         <div style={{ fontSize: 15, fontWeight: 800, color: '#0e1b12' }}>Ask Mello about this creative</div>
         <div style={{ fontSize: 12.5, color: '#5a6b52', margin: '5px 0 14px', lineHeight: 1.5 }}>Analyze this ad, find what's working, and get next steps for your team.</div>
-        <button onClick={() => window.location.href = `/mello?ad=${adId}`} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Analyze with Mello →</button>
+        <button onClick={() => window.location.href = `/mello?ad=${adId}`} style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#0e1b12', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: FONT }}>Analyze with Mello →</button>
       </div>
     </div>
   )
@@ -211,18 +211,18 @@ function Performance({ data, cur }: any) {
       <section>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
           <span style={{ fontSize: 15, fontWeight: 800, color: '#0e1b12' }}>Performance metrics</span>
-          <select value={preset} onChange={e => setPreset(e.target.value)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(26,58,26,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
+          <select value={preset} onChange={e => setPreset(e.target.value)} style={{ padding: '5px 10px', borderRadius: 8, border: '1px solid rgba(20,29,21,.14)', fontFamily: FONT, fontSize: 12, fontWeight: 600, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
             {BUILTIN_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}
           </select>
         </div>
         <div>
           {presetMetrics.map((k, i) => (
-            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 2px', borderTop: i === 0 ? 'none' : '1px solid rgba(26,58,26,.06)' }}>
+            <div key={k} style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 2px', borderTop: i === 0 ? 'none' : '1px solid rgba(20,29,21,.06)' }}>
               <span style={{ fontSize: 13.5, color: '#3a4636' }}>{METRICS[k]?.label || k}</span>
               <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12', fontVariantNumeric: 'tabular-nums' }}>{fmtM(k)}</span>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 2px', borderTop: '1px solid rgba(26,58,26,.06)' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '11px 2px', borderTop: '1px solid rgba(20,29,21,.06)' }}>
             <span style={{ fontSize: 13.5, color: '#3a4636' }}>AOV</span>
             <span style={{ fontSize: 13.5, fontWeight: 700, color: '#0e1b12' }}>{money(m.aov, cur)}</span>
           </div>
@@ -257,19 +257,19 @@ function NotesTab({ adId }: { adId: string }) {
               <div style={{ fontSize: 12.5, color: '#7c8577', marginTop: 5, lineHeight: 1.5 }}>Save insights, opportunities, and learnings here for easy access later. Start typing to add a note.</div>
             </div>
           ) : notes.map(n => (
-            <div key={n.id} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
+            <div key={n.id} style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 12, padding: '12px 14px', marginBottom: 10 }}>
               <div style={{ fontSize: 13.5, color: '#1a2a1a', lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>{n.text}</div>
               <div style={{ fontSize: 11, color: '#9aa196', marginTop: 6 }}>{n.author} · {new Date(n.at).toLocaleDateString()}</div>
             </div>
           ))}
       </div>
-      <div style={{ border: '1px solid rgba(26,58,26,.14)', borderRadius: 14, padding: 12, marginTop: 12 }}>
+      <div style={{ border: '1px solid rgba(20,29,21,.14)', borderRadius: 14, padding: 12, marginTop: 12 }}>
         <textarea value={text} onChange={e => setText(e.target.value)} placeholder="Start writing a note…" rows={2}
           onKeyDown={e => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) add() }}
           style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', fontFamily: FONT, fontSize: 14, color: '#0e1b12', background: 'transparent', boxSizing: 'border-box' }} />
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-          <span title="Slack integration coming soon" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#9aa196', border: '1px solid rgba(26,58,26,.12)', borderRadius: 8, padding: '5px 10px', cursor: 'default' }}>💬 Connect to Slack</span>
-          <button onClick={add} disabled={busy || !text.trim()} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: text.trim() ? '#0e1b12' : '#e2e6dc', color: '#dffe95', cursor: text.trim() ? 'pointer' : 'default', fontSize: 15 }}>↑</button>
+          <span title="Slack integration coming soon" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12, fontWeight: 600, color: '#9aa196', border: '1px solid rgba(20,29,21,.12)', borderRadius: 8, padding: '5px 10px', cursor: 'default' }}>💬 Connect to Slack</span>
+          <button onClick={add} disabled={busy || !text.trim()} style={{ width: 32, height: 32, borderRadius: 9, border: 'none', background: text.trim() ? '#0e1b12' : '#e2e6dc', color: '#ff5a2c', cursor: text.trim() ? 'pointer' : 'default', fontSize: 15 }}>↑</button>
         </div>
       </div>
     </div>
@@ -321,7 +321,7 @@ function CommentsTab({ adId }: { adId: string }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
       <div style={{ fontSize: 12, fontWeight: 600, color: '#7c8577' }}>{comments.length} comment{comments.length === 1 ? '' : 's'} on this ad’s post</div>
       {comments.map(c => (
-        <div key={c.id} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '12px 14px' }}>
+        <div key={c.id} style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 12, padding: '12px 14px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
             <span style={{ fontSize: 12.5, fontWeight: 700, color: '#0e1b12' }}>{c.author}</span>
             <span style={{ fontSize: 11, color: '#9aa196' }}>{c.likes ? `♥ ${c.likes}` : ''}</span>

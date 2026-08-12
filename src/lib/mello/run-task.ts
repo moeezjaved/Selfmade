@@ -179,10 +179,10 @@ export async function runTask(admin: any, ctx: RunTaskCtx, task: any): Promise<a
   if (email && result?.url) {
     const link = result.url.startsWith('http') ? result.url : `${APP}${result.url}`
     const noun = result.emailNoun || 'work'
-    const grounded = task.kind === 'research' && result.groundedOnAds ? `<p style="color:#68756b;font-size:13px">Grounded on ${result.groundedOnAds} competitor ads.</p>` : ''
+    const grounded = task.kind === 'research' && result.groundedOnAds ? `<p style="color:#6f6d5a;font-size:13px">Grounded on ${result.groundedOnAds} competitor ads.</p>` : ''
     sendEmail(email, `Mello finished: ${result.title || task.title}`,
       `<p>Done — I finished the ${noun} you kicked off:</p><p style="font-size:16px;font-weight:600">${result.title || task.title}</p>` +
-      `<p><a href="${link}" style="background:#17251c;color:#dffe95;padding:11px 20px;border-radius:100px;text-decoration:none;font-weight:700">${result.cta || 'Open it →'}</a></p>${grounded}`
+      `<p><a href="${link}" style="background:#141d15;color:#ff5a2c;padding:11px 20px;border-radius:100px;text-decoration:none;font-weight:700">${result.cta || 'Open it →'}</a></p>${grounded}`
     ).catch(() => {})
   }
 

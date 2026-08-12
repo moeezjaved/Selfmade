@@ -7,7 +7,7 @@ import { COMPANY } from '@/lib/company'
  * hero, and a dark footer with the legal links. Content is styled through the scoped `.legal`
  * stylesheet so pages just write plain <h2>/<p>/<ul> and read consistently.
  */
-const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#dffe95'
+const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#ff5a2c'
 
 export default function LegalShell({ eyebrow = 'Legal', title, updated, intro, children }: {
   eyebrow?: string; title: string; updated?: string; intro?: React.ReactNode; children: React.ReactNode

@@ -271,7 +271,7 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                     ? <video src={c.image_url || ''} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     // eslint-disable-next-line @next/next/no-img-element
                     : c.image_url ? <img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    : <span style={{ color: c.status === 'processing' ? '#dffe95' : '#666', fontSize: '11px' }}>{c.status === 'processing' ? '⏳ processing' : 'no image'}</span>}
+                    : <span style={{ color: c.status === 'processing' ? '#ff5a2c' : '#666', fontSize: '11px' }}>{c.status === 'processing' ? '⏳ processing' : 'no image'}</span>}
                   <span style={{ position: 'absolute', top: 5, left: 5, background: 'rgba(0,0,0,.65)', color: '#fff', borderRadius: 5, fontSize: 9, fontWeight: 700, padding: '2px 5px', textTransform: 'capitalize' }}>{c.type}</span>
                 </div>
                 <div style={{ padding: '7px 8px' }}>

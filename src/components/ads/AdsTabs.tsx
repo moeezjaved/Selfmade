@@ -18,15 +18,15 @@ const TABS = [
 export default function AdsTabs() {
   const pathname = usePathname()
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, borderBottom: '1px solid #e7ece7', paddingBottom: 2 }}>
+    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, borderBottom: '1px solid #efece2', paddingBottom: 2 }}>
       {TABS.map((t) => {
         const active = pathname === t.href || pathname.startsWith(t.href + '/')
         return (
           <Link key={t.href} href={t.href} style={{
             padding: '8px 14px', borderRadius: '10px 10px 0 0', fontSize: 13.5, fontWeight: 750, textDecoration: 'none', fontFamily: 'inherit',
-            color: active ? '#17251c' : '#7a9a7a',
+            color: active ? '#141d15' : '#7a9a7a',
             background: active ? '#eef6e4' : 'transparent',
-            borderBottom: active ? '2px solid #3f8f4f' : '2px solid transparent',
+            borderBottom: active ? '2px solid #ef4a1e' : '2px solid transparent',
             marginBottom: -2,
           }}>{t.label}</Link>
         )

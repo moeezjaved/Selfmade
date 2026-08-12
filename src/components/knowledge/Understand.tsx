@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#2f7a3f', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', GREEN = '#2f7a3f', FOREST = '#141d15', LIME = '#ff5a2c'
 
 type Report = { headline: string; hook?: string; emotion?: string; audience?: string; offer?: string; visualStyle?: string; story: string[]; storyLines?: string[]; bullets: string[]; confidence: number }
 

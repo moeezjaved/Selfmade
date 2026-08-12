@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 
-const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#dffe95'
+const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#ff5a2c'
 
 function Success() {
   const params = useSearchParams()

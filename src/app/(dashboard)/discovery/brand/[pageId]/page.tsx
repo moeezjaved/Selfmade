@@ -8,7 +8,7 @@ import CloneVideoModal from '../../CloneVideoModal'
 
 const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#10b981', Carousel: '#f59e0b' }
 const fmtDate = (s?: string | null) => (s ? new Date(s).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
-const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(223,254,149,0.5)' : '#fff', cursor: 'pointer', color: '#111', fontFamily: 'inherit' })
+const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(255,90,44,0.5)' : '#fff', cursor: 'pointer', color: '#111', fontFamily: 'inherit' })
 
 // ── Types ────────────────────────────────────────────────────
 interface Ad {
@@ -81,7 +81,7 @@ function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
         <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[fmt] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{fmt}</span>
         {(ad.daysRunning || 0) > 0 && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{ad.daysRunning}d</span>}
         {ad.snapshotUrl && <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" title="Open original" style={{ position: 'absolute', inset: 0, zIndex: 1 }} />}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(ad) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 2, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#dffe95', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</button>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(ad) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 2, display: 'inline-flex', alignItems: 'center', gap: 5, background: '#ff5a2c', color: '#111', border: 'none', borderRadius: 20, fontSize: 11.5, fontWeight: 800, padding: '6px 11px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</button>}
       </div>
     </div>
   )
@@ -274,7 +274,7 @@ export default function BrandPage() {
 
         <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           {/* Brand avatar */}
-          <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#1a3a1a', color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, flexShrink: 0 }}>
+          <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#141d15', color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, fontWeight: 900, flexShrink: 0 }}>
             {initials}
           </div>
 
@@ -299,9 +299,9 @@ export default function BrandPage() {
               disabled={followLoading}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
-                background: isFollowing ? '#f0fdf4' : '#1a3a1a',
-                color: isFollowing ? '#1a3a1a' : '#dffe95',
-                border: `1px solid ${isFollowing ? '#bbf7d0' : '#1a3a1a'}`,
+                background: isFollowing ? '#f0fdf4' : '#141d15',
+                color: isFollowing ? '#141d15' : '#ff5a2c',
+                border: `1px solid ${isFollowing ? '#bbf7d0' : '#141d15'}`,
                 borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               {isFollowing ? '✓ Following' : '+ Follow'}
@@ -316,8 +316,8 @@ export default function BrandPage() {
               style={{
                 padding: '10px 16px', background: 'none', border: 'none', cursor: 'pointer',
                 fontSize: 13, fontWeight: activeTab === tab ? 700 : 500,
-                color: activeTab === tab ? '#1a3a1a' : '#6b7280',
-                borderBottom: `2px solid ${activeTab === tab ? '#1a3a1a' : 'transparent'}`,
+                color: activeTab === tab ? '#141d15' : '#6b7280',
+                borderBottom: `2px solid ${activeTab === tab ? '#141d15' : 'transparent'}`,
                 whiteSpace: 'nowrap', fontFamily: 'inherit', marginBottom: -1,
               }}>
               {tab}
@@ -340,7 +340,7 @@ export default function BrandPage() {
             </div>
             <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=US&view_all_page_id=${pageId}`}
               target="_blank" rel="noopener noreferrer"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#141d15', color: '#ff5a2c', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
               <ExternalLink size={14} /> View on Meta Ads Library
             </a>
           </div>
@@ -412,7 +412,7 @@ export default function BrandPage() {
                   {hooks.slice(0, 5).map((h, i) => <TextItem key={i} text={h} index={i} />)}
                   {hooks.length > 5 && (
                     <button onClick={() => setActiveTab('Hooks')}
-                      style={{ marginTop: 8, fontSize: 13, color: '#1a3a1a', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ marginTop: 8, fontSize: 13, color: '#141d15', fontWeight: 700, background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
                       View all {hooks.length} hooks →
                     </button>
                   )}
@@ -448,7 +448,7 @@ export default function BrandPage() {
                 {libHasMore && (
                   <div style={{ textAlign: 'center', marginTop: 24 }}>
                     <button onClick={() => loadLib(libPage + 1, false)} disabled={libLoading}
-                      style={{ padding: '10px 28px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: libLoading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: libLoading ? 0.7 : 1 }}>
+                      style={{ padding: '10px 28px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 9, fontSize: 14, fontWeight: 700, cursor: libLoading ? 'wait' : 'pointer', fontFamily: 'inherit', opacity: libLoading ? 0.7 : 1 }}>
                       {libLoading ? 'Loading…' : 'Load more'}
                     </button>
                   </div>
@@ -492,13 +492,13 @@ export default function BrandPage() {
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px,100%), 1fr))', gap: 12 }}>
                     {themes.map(([name, count]) => (
                       <div key={name} style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 22px' }}>
-                        <div style={{ fontSize: 28, fontWeight: 900, color: '#1a3a1a', marginBottom: 4 }}>{count}</div>
+                        <div style={{ fontSize: 28, fontWeight: 900, color: '#141d15', marginBottom: 4 }}>{count}</div>
                         <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>{name}</div>
                         <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                           {Math.round(count / ads.length * 100)}% of ads
                         </div>
                         <div style={{ marginTop: 10, height: 4, background: '#f1f5f9', borderRadius: 4 }}>
-                          <div style={{ height: '100%', background: '#1a3a1a', borderRadius: 4, width: `${Math.round(count / ads.length * 100)}%` }} />
+                          <div style={{ height: '100%', background: '#141d15', borderRadius: 4, width: `${Math.round(count / ads.length * 100)}%` }} />
                         </div>
                       </div>
                     ))}
@@ -517,7 +517,7 @@ export default function BrandPage() {
                     <div style={{ fontSize: 13, color: '#6b7280' }}>Mello is reading all ad copy and extracting intelligence</div>
                     <div style={{ marginTop: 20, display: 'flex', gap: 8, justifyContent: 'center' }}>
                       {[...Array(4)].map((_, i) => (
-                        <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#1a3a1a', animation: `bounce 1s ease-in-out ${i * 0.15}s infinite` }} />
+                        <div key={i} style={{ width: 8, height: 8, borderRadius: '50%', background: '#141d15', animation: `bounce 1s ease-in-out ${i * 0.15}s infinite` }} />
                       ))}
                     </div>
                   </div>

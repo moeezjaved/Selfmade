@@ -70,9 +70,9 @@ export const AdComposition: React.FC<{ timeline: Timeline }> = ({ timeline }) =>
         )
         if (l.type === 'endcard') return (
           <Sequence key={i} from={sec(l.atSec, fps)}>
-            <AbsoluteFill style={{ background: timeline.brand?.colors?.accent || '#dffe95', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 40, padding: 80 }}>
-              <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 800, fontSize: 78, lineHeight: 1.1, color: timeline.brand?.colors?.text || '#17251c', textAlign: 'center' }}>{l.headline}</div>
-              {l.cta ? <div style={{ background: timeline.brand?.colors?.cta || '#17251c', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 800, fontSize: 48, padding: '24px 52px', borderRadius: 999 }}>{l.cta}</div> : null}
+            <AbsoluteFill style={{ background: timeline.brand?.colors?.accent || '#ff5a2c', justifyContent: 'center', alignItems: 'center', flexDirection: 'column', gap: 40, padding: 80 }}>
+              <div style={{ fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 800, fontSize: 78, lineHeight: 1.1, color: timeline.brand?.colors?.text || '#141d15', textAlign: 'center' }}>{l.headline}</div>
+              {l.cta ? <div style={{ background: timeline.brand?.colors?.cta || '#141d15', color: '#fff', fontFamily: 'Inter, system-ui, sans-serif', fontWeight: 800, fontSize: 48, padding: '24px 52px', borderRadius: 999 }}>{l.cta}</div> : null}
             </AbsoluteFill>
           </Sequence>
         )

@@ -22,8 +22,8 @@ import MelloFace, { type MelloState } from '@/components/MelloFace'
 import { ChannelLogo } from '@/components/brand/logos'
 import { planEntitlements } from '@/lib/plans'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95'
-const GREEN = '#3f8f4f', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', LIME = '#ff5a2c'
+const GREEN = '#ef4a1e', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 
 type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'culture' | 'integrations' | 'offer' | 'night' | 'plan'
 type Note = { kind: string; content: string }
@@ -174,7 +174,7 @@ function BrandPalette({ q, setQ, suggested, results, picks, loading, onToggle, e
         </div>
       )}
       {open && (groups.length > 0 || loading) && (
-        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 20px 44px -22px rgba(23,37,28,.5)', padding: 6, zIndex: 40, maxHeight: 320, overflowY: 'auto' }}>
+        <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 20px 44px -22px rgba(20,29,21,.5)', padding: 6, zIndex: 40, maxHeight: 320, overflowY: 'auto' }}>
           {groups.length === 0 && loading && <div style={{ fontSize: 12.5, color: MUTED, padding: '10px 12px' }}>Scanning my index…</div>}
           {groups.map(g => (
             <div key={g.label}>
@@ -691,7 +691,7 @@ export default function InterviewPage() {
 
           {/* ── BEAT 7 · THE AGREEMENT ── */}
           {phase === 'offer' && (
-            <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(23,37,28,.25)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(20,29,21,.25)', position: 'relative', overflow: 'hidden' }}>
               <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: LIME }} />
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#8a927f', marginBottom: 18 }}>MARKETING EMPLOYEE AGREEMENT</div>
               {[['Employee', 'Mello & your marketing team'], ['Employer', gName || 'Your company'], ['Department', 'Marketing — the whole company'], ['Working hours', '24 / 7'], ['Start date', 'Today'], ['Mission', 'Help grow this business']].map(([k, v]) => (

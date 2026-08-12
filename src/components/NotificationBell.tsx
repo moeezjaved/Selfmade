@@ -48,8 +48,8 @@ export function NotificationBell() {
   return (
     <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
       <button onClick={toggle} aria-label="Notifications"
-        style={{ position: 'relative', width: 34, height: 34, borderRadius: 9, border: '1px solid #e7ece7', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-        <Bell size={17} color="#3c473e" />
+        style={{ position: 'relative', width: 34, height: 34, borderRadius: 9, border: '1px solid #efece2', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
+        <Bell size={17} color="#3a382f" />
         {unread > 0 && (
           <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 99, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #f6f8f5' }}>
             {unread > 9 ? '9+' : unread}

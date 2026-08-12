@@ -18,7 +18,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
-const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#17251c', LIME = '#dffe95', FAINT = '#9aa79a'
+const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#141d15', LIME = '#ff5a2c', FAINT = '#9aa79a'
 const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
 type Move = {

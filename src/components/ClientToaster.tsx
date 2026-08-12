@@ -26,7 +26,7 @@ export default function ClientToaster() {
         style: {
           background: '#152928',
           color: '#ffffff',
-          border: '1px solid rgba(223,254,149,0.2)',
+          border: '1px solid rgba(255,90,44,0.2)',
           fontFamily: 'Hanken Grotesk, sans-serif',
           fontSize: '15px',
           fontWeight: 600,
@@ -36,7 +36,7 @@ export default function ClientToaster() {
           borderRadius: '14px',
           boxShadow: '0 12px 40px -8px rgba(0,0,0,0.45)',
         },
-        success: { duration: 5000, iconTheme: { primary: '#dffe95', secondary: '#10211f' } },
+        success: { duration: 5000, iconTheme: { primary: '#ff5a2c', secondary: '#10211f' } },
         // Errors linger + get a red edge so they read as errors at a glance.
         error: { duration: 10000, style: { border: '1px solid rgba(248,113,113,0.55)' }, iconTheme: { primary: '#f87171', secondary: '#10211f' } },
       }}

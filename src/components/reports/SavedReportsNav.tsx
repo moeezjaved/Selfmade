@@ -87,7 +87,7 @@ export default function SavedReportsNav() {
           style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, minWidth: 0, height: '100%', padding: '0 4px 0 10px', border: 'none', background: 'transparent', color: 'rgba(255,255,255,0.7)', fontSize: 14, fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
           <span style={{ fontSize: 13, flexShrink: 0 }}>{emoji}</span>
           <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</span>
-          {badge && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#8aaa8a', flexShrink: 0 }}>{badge}</span>}
+          {badge && <span style={{ fontSize: 8.5, fontWeight: 800, color: '#8b8a72', flexShrink: 0 }}>{badge}</span>}
         </button>
         {canDelete && hover && (
           <button onClick={() => del(r)} title="Delete report"
@@ -111,7 +111,7 @@ export default function SavedReportsNav() {
   return (
     <div style={{ padding: '4px 12px 8px' }}>
       <button onClick={() => router.push('/reports?create=1')}
-        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 9, border: '1px dashed rgba(223,254,149,0.3)', background: 'rgba(223,254,149,0.06)', color: '#dffe95', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '8px 12px', borderRadius: 9, border: '1px dashed rgba(255,90,44,0.3)', background: 'rgba(255,90,44,0.06)', color: '#ff5a2c', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
         <Plus size={15} /> Create report
       </button>
 

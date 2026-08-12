@@ -22,7 +22,7 @@ interface Brand {
 
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }
 const input: React.CSSProperties = { width: '100%', padding: '8px 10px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 13, fontFamily: 'inherit', marginBottom: 8 }
-const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
+const btn: React.CSSProperties = { padding: '8px 14px', borderRadius: 8, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }
 const csv = (s: string) => s.split(',').map(x => x.trim()).filter(Boolean)
 // Pasted product image URLs are often referrer/hotlink-protected → a raw <img> renders broken.
 // Route through the weserv proxy (same as every other image surface). R2 objects pass through.
@@ -163,7 +163,7 @@ export default function BrandsPage() {
           {/* What kind of brand — a physical product (we composite real product photos) or a
               service/app/website (the creator talks about it; we never render a physical product). */}
           <div style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3c473e', marginBottom: 7 }}>What are you promoting?</div>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#3a382f', marginBottom: 7 }}>What are you promoting?</div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
                 ['physical', '🧴 A physical product', 'Something you ship — a bottle, box, gadget, apparel. We place your real product photos into ads.'],
@@ -284,8 +284,8 @@ function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, 
             </>
           ) : (
             <>
-              <button onClick={() => { resetEf(); setEditing(true) }} style={{ background: 'none', border: 'none', color: '#1a3a1a', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Edit</button>
-              <button onClick={onWatch} style={{ background: 'none', border: 'none', color: '#3f8f4f', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Watch competitors</button>
+              <button onClick={() => { resetEf(); setEditing(true) }} style={{ background: 'none', border: 'none', color: '#141d15', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Edit</button>
+              <button onClick={onWatch} style={{ background: 'none', border: 'none', color: '#ef4a1e', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Watch competitors</button>
               <button onClick={onDelete} style={{ background: 'none', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Delete</button>
             </>
           )}

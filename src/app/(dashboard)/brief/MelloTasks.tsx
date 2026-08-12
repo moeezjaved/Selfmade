@@ -8,7 +8,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e6ece2', GREEN = '#3f8f4f'
+const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', LINE = '#e6ece2', GREEN = '#ef4a1e'
 const KIND: Record<string, { label: string; run: string }> = {
   research: { label: 'Research', run: 'Reading their ads · writing the report…' },
   creative: { label: 'Creative', run: 'Designing the ad…' },

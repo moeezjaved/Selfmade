@@ -11,7 +11,7 @@ import { AdComposition } from './AdComposition'
 import { ASPECT_DIMS, totalDurationInFrames, type Aspect, type Timeline, type Layer } from '@/lib/video/timeline'
 
 const ASPECTS: Aspect[] = ['9:16', '4:5', '1:1', '16:9']
-const CTA_COLORS = ['#639922', '#25d366', '#378add', '#d4537e', '#17251c']
+const CTA_COLORS = ['#639922', '#25d366', '#378add', '#d4537e', '#141d15']
 
 export default function RemotionEditor({ jobId }: { jobId?: string }) {
   const [timeline, setTimeline] = useState<Timeline | null>(null)
@@ -63,12 +63,12 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
   const hasLogo = !!timeline?.layers.find((l) => l.type === 'logo')
 
   if (err) return <div style={{ color: '#a33', fontSize: 14 }}>Couldn’t load a timeline: {err}</div>
-  if (!timeline || !mounted) return <div style={{ fontSize: 14, color: '#68756b' }}>Loading the editor…</div>
+  if (!timeline || !mounted) return <div style={{ fontSize: 14, color: '#6f6d5a' }}>Loading the editor…</div>
 
   const label: React.CSSProperties = { fontSize: 11, letterSpacing: '.05em', textTransform: 'uppercase', color: '#7a8872', marginBottom: 6 }
   const card: React.CSSProperties = { background: '#fff', border: '1px solid #e6ece2', borderRadius: 12, padding: '12px 14px' }
   const swatch = (c: string, active: boolean, on: () => void) => (
-    <button key={c} onClick={on} aria-label={`colour ${c}`} style={{ width: 24, height: 24, borderRadius: 6, background: c, border: active ? '2px solid #17251c' : '1px solid #d7ddd2', cursor: 'pointer' }} />
+    <button key={c} onClick={on} aria-label={`colour ${c}`} style={{ width: 24, height: 24, borderRadius: 6, background: c, border: active ? '2px solid #141d15' : '1px solid #d7ddd2', cursor: 'pointer' }} />
   )
 
   return (
@@ -108,7 +108,7 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
                 <button key={st} onClick={() => patch((t) => ({ ...t, layers: t.layers.map((l) => l.type === 'captions' ? { ...l, style: st } : l) }))} style={{ fontSize: 12, padding: '5px 11px', borderRadius: 999, cursor: 'pointer', border: '1px solid ' + (capLayer.style === st ? '#639922' : '#d7ddd2'), background: capLayer.style === st ? '#eaf3de' : '#fff', color: '#20321c', fontWeight: 700, textTransform: 'capitalize' }}>{st}</button>
               ))}
               <span style={{ width: 1, height: 20, background: '#e6ece2', margin: '0 4px' }} />
-              {['#ffffff', '#dffe95', '#25d366'].map((c) => swatch(c, capLayer.color === c, () => patch((t) => ({ ...t, layers: t.layers.map((l) => l.type === 'captions' ? { ...l, color: c } : l) }))))}
+              {['#ffffff', '#ff5a2c', '#25d366'].map((c) => swatch(c, capLayer.color === c, () => patch((t) => ({ ...t, layers: t.layers.map((l) => l.type === 'captions' ? { ...l, color: c } : l) }))))}
             </div>
           </div>
         )}
@@ -134,7 +134,7 @@ export default function RemotionEditor({ jobId }: { jobId?: string }) {
           <button onClick={save} disabled={!editable || saveState === 'saving'} style={{ fontSize: 13, fontWeight: 700, padding: '9px 16px', borderRadius: 999, cursor: 'pointer', border: '1px solid #d7ddd2', background: '#fff', color: '#20321c' }}>
             {saveState === 'saving' ? 'Saving…' : saveState === 'saved' ? '✓ Saved' : 'Save edits'}
           </button>
-          <button onClick={exportAll} disabled={!editable || renderStatus === 'requested' || renderStatus === 'rendering'} style={{ fontSize: 13, fontWeight: 800, padding: '9px 18px', borderRadius: 999, cursor: 'pointer', border: 'none', background: '#17251c', color: '#fff' }}>
+          <button onClick={exportAll} disabled={!editable || renderStatus === 'requested' || renderStatus === 'rendering'} style={{ fontSize: 13, fontWeight: 800, padding: '9px 18px', borderRadius: 999, cursor: 'pointer', border: 'none', background: '#141d15', color: '#fff' }}>
             {renderStatus === 'requested' || renderStatus === 'rendering' ? 'Rendering…' : `Export ${timeline.aspect} →`}
           </button>
           {renderStatus === 'failed' && <span style={{ fontSize: 12, color: '#a33' }}>Render failed — try again.</span>}

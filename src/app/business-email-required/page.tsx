@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-const LIME = '#dffe95', INK = '#0e1b12'
+const LIME = '#ff5a2c', INK = '#0e1b12'
 
 export default function BusinessEmailRequired() {
   const router = useRouter()

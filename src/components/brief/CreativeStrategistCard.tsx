@@ -7,7 +7,7 @@
 import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 
-const INK = '#17251c', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const INK = '#141d15', MUTED = '#6b6b6b', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
 
 type Idea = {
   title: string; format: string; why: string; basedOn: 'fatigue' | 'winner' | 'competitor'

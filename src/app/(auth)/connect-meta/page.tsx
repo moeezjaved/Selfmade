@@ -26,10 +26,10 @@ function ConnectMetaContent() {
 
   return (
     <div style={{minHeight:'100vh',background:'#10211f',display:'flex',flexDirection:'column'}}>
-      <div style={{background:'#152928',borderBottom:'1px solid rgba(223,254,149,0.13)',padding:'0 40px',height:64,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <span style={{fontSize:22,fontWeight:900,color:'#dffe95',fontFamily:'Georgia,serif',fontStyle:'italic'}}>Selfmade</span>
+      <div style={{background:'#152928',borderBottom:'1px solid rgba(255,90,44,0.13)',padding:'0 40px',height:64,display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <span style={{fontSize:22,fontWeight:900,color:'#ff5a2c',fontFamily:'Georgia,serif',fontStyle:'italic'}}>Selfmade</span>
         <div style={{fontSize:12,fontWeight:700,color:'rgba(255,255,255,0.4)'}}>
-          Account ✓ › Setup ✓ › Payment ✓ › <span style={{color:'#dffe95'}}>Connect Meta</span> › Dashboard
+          Account ✓ › Setup ✓ › Payment ✓ › <span style={{color:'#ff5a2c'}}>Connect Meta</span> › Dashboard
         </div>
         <div style={{width:120}}/>
       </div>
@@ -40,7 +40,7 @@ function ConnectMetaContent() {
             <div style={{fontSize:64,marginBottom:16}}>🎉</div>
             <h1 style={{fontSize:28,fontWeight:900,color:'white',marginBottom:10}}>Meta account connected!</h1>
             <p style={{fontSize:15,color:'rgba(255,255,255,0.5)',marginBottom:28,lineHeight:1.7}}>Your campaigns are syncing. Your dashboard will be ready in seconds.</p>
-            <button onClick={() => router.push('/dashboard')} style={{background:'#dffe95',color:'#10211f',border:'none',padding:'14px 36px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+            <button onClick={() => router.push('/dashboard')} style={{background:'#ff5a2c',color:'#10211f',border:'none',padding:'14px 36px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
               Go to Dashboard →
             </button>
           </div>
@@ -54,15 +54,15 @@ function ConnectMetaContent() {
 
             {state==='error' && <div style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:12,padding:'12px 16px',marginBottom:16,fontSize:13,color:'#f87171'}}>⚠️ {errorMsg || 'Connection failed. Please try again.'}</div>}
 
-            <div style={{background:'#152928',border:'1px solid rgba(223,254,149,0.1)',borderRadius:18,padding:20,marginBottom:16}}>
+            <div style={{background:'#152928',border:'1px solid rgba(255,90,44,0.1)',borderRadius:18,padding:20,marginBottom:16}}>
               {[
                 {icon:'📊',title:'Campaign & ad performance data',desc:'Read spend, ROAS, CPA, CTR across all campaigns.'},
                 {icon:'⚡',title:'Full ads_management access',desc:'Execute approved actions — pause, scale, create campaigns.'},
                 {icon:'✅',title:'Approval-first always',desc:'Nothing changes without your explicit approval.'},
                 {icon:'🔒',title:'Secure OAuth',desc:'No password stored. Revoke anytime from Facebook Settings.'},
               ].map(p => (
-                <div key={p.title} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid rgba(223,254,149,0.06)'}}>
-                  <div style={{width:36,height:36,borderRadius:10,background:'rgba(223,254,149,0.08)',border:'1px solid rgba(223,254,149,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{p.icon}</div>
+                <div key={p.title} style={{display:'flex',gap:12,padding:'12px 0',borderBottom:'1px solid rgba(255,90,44,0.06)'}}>
+                  <div style={{width:36,height:36,borderRadius:10,background:'rgba(255,90,44,0.08)',border:'1px solid rgba(255,90,44,0.15)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:16,flexShrink:0}}>{p.icon}</div>
                   <div><div style={{fontSize:13,fontWeight:700,color:'white',marginBottom:2}}>{p.title}</div><div style={{fontSize:12,color:'rgba(255,255,255,0.4)',lineHeight:1.5}}>{p.desc}</div></div>
                 </div>
               ))}

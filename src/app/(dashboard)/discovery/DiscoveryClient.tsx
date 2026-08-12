@@ -340,7 +340,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
           display: 'flex', alignItems: 'center', gap: 7,
           padding: '7px 13px',
           background: selected.length ? '#f4fbe6' : '#fff',
-          border: `1px solid ${selected.length ? '#a8cf6f' : '#e7ece7'}`,
+          border: `1px solid ${selected.length ? '#a8cf6f' : '#efece2'}`,
           borderRadius: 999, fontSize: 12.5, fontWeight: 600,
           color: selected.length ? '#2c4a1f' : '#333d35',
           cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
@@ -349,7 +349,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
         {leadIcon && <span style={{ display: 'inline-flex', color: selected.length ? '#5f9032' : '#7d8a7f' }}>{leadIcon}</span>}
         {label}
         {selected.length > 0 && (
-          <span style={{ background: '#17251c', color: '#dffe95', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
+          <span style={{ background: '#141d15', color: '#ff5a2c', borderRadius: 100, fontSize: 10, fontWeight: 800, padding: '1px 6px' }}>
             {selected.length}
           </span>
         )}
@@ -383,7 +383,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
             )}
             {visible.map(o => (
               <label key={o.value} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 14px', cursor: 'pointer', fontSize: 13, color: '#111' }}>
-                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => onToggle(o.value)} style={{ accentColor: '#1a3a1a' }} />
+                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => onToggle(o.value)} style={{ accentColor: '#141d15' }} />
                 {o.icon && <span>{o.icon}</span>}
                 {o.label}
               </label>
@@ -408,14 +408,14 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)}
-        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 999, fontSize: 12.5, fontWeight: 650, color: '#333d35', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+        style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 14px', background: '#fff', border: '1px solid #efece2', borderRadius: 999, fontSize: 12.5, fontWeight: 650, color: '#333d35', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
         <span style={{ color: '#f5b301' }}>✦</span> Sort: <b>{current.label}</b> <ChevronDown size={12} style={{ opacity: 0.55, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .15s' }} />
       </button>
       {open && (
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 180, padding: '6px 0' }}>
           {SORT_OPTS.map(o => (
             <button key={o.value} onClick={() => { onChange(o.value); setOpen(false) }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: o.value === value ? '#1a3a1a' : '#374151', fontWeight: o.value === value ? 700 : 400, background: o.value === value ? '#f0fdf4' : 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: o.value === value ? '#141d15' : '#374151', fontWeight: o.value === value ? 700 : 400, background: o.value === value ? '#f0fdf4' : 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
               {o.label}
             </button>
           ))}
@@ -444,10 +444,10 @@ function CountryDropdown({ value, onChange }: { value: string; onChange: (v: str
     <div ref={ref} style={{ position: 'relative' }}>
       <button onClick={() => setOpen(o => !o)} style={{
         display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px',
-        background: isFiltered ? '#1a3a1a' : '#fff',
-        border: `1px solid ${isFiltered ? '#1a3a1a' : '#e2e8f0'}`,
+        background: isFiltered ? '#141d15' : '#fff',
+        border: `1px solid ${isFiltered ? '#141d15' : '#e2e8f0'}`,
         borderRadius: 8, fontSize: 13, fontWeight: 600,
-        color: isFiltered ? '#dffe95' : '#374151',
+        color: isFiltered ? '#ff5a2c' : '#374151',
         cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
       }}>
         <span>{current.flag}</span>
@@ -472,7 +472,7 @@ function CountryDropdown({ value, onChange }: { value: string; onChange: (v: str
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
                   padding: '9px 14px', fontSize: 13, background: c.code === value ? '#f0fdf4' : 'none',
-                  color: c.code === value ? '#1a3a1a' : '#111', fontWeight: c.code === value ? 700 : 400,
+                  color: c.code === value ? '#141d15' : '#111', fontWeight: c.code === value ? 700 : 400,
                   border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 }}>
                 <span style={{ fontSize: 18 }}>{c.flag}</span>
@@ -500,7 +500,7 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
         borderRadius: 999, background: isActive ? '#f4fbe6' : 'transparent',
         padding: '0 8px', height: 28,
       }}>
-        <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#2c4a1f' : '#68756b', whiteSpace: 'nowrap' }}>{label}</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: isActive ? '#2c4a1f' : '#6f6d5a', whiteSpace: 'nowrap' }}>{label}</span>
         <input
           type="number"
           value={value}
@@ -606,7 +606,7 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
               placeholder="Board name…"
               style={{ flex: 1, padding: '8px 12px', border: '1px solid #e2e8f0', borderRadius: 8, fontSize: 13, outline: 'none', fontFamily: 'inherit' }} />
             <button onClick={createAndSave} disabled={creating || !newName.trim()}
-              style={{ padding: '8px 14px', background: '#1a3a1a', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ padding: '8px 14px', background: '#141d15', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
               {creating ? '…' : 'Save'}
             </button>
           </div>
@@ -647,7 +647,7 @@ function InfiniteScrollSentinel({ loading, onLoad }: { loading: boolean; onLoad:
 }
 
 // ── AdCard ───────────────────────────────────────────────────
-const AVATAR_COLORS = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
+const AVATAR_COLORS = ['#141d15','#1e3a5f','#4a1942','#3a1a1a','#1a3a38','#2d3a1a','#3a2a1a']
 function avatarColor(name: string) {
   let h = 0; for (const c of name) h = (h * 31 + c.charCodeAt(0)) % AVATAR_COLORS.length
   return AVATAR_COLORS[h]
@@ -746,8 +746,8 @@ function ScriptsMenu({ adId }: { adId: string }) {
       <button
         onClick={() => router.push(`/discovery/${encodeURIComponent(adId)}?script=1`)}
         style={{
-          background: '#dffe95',
-          color: '#1a3a1a',
+          background: '#ff5a2c',
+          color: '#141d15',
           border: 'none',
           padding: '7px 14px',
           borderRadius: 8,
@@ -1017,7 +1017,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
           onClick={goStudio}
           style={{
             pointerEvents: 'auto',
-            background: '#dffe95',
+            background: '#ff5a2c',
             color: '#14281a',
             border: 'none',
             padding: '8px 14px',
@@ -1033,7 +1033,7 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
             boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
           }}
           onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
-          onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
+          onMouseLeave={e => (e.currentTarget.style.background = '#ff5a2c')}
         >
           <Copy size={14} strokeWidth={2.4} /> Remake
         </button>
@@ -1047,9 +1047,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
         <div className="hover-overlay" style={{ position: 'absolute', bottom: 44, left: 12, opacity: 0, transition: 'opacity .18s', pointerEvents: 'none', zIndex: 8 }}>
           <button
             onClick={goStudio}
-            style={{ pointerEvents: 'auto', background: '#dffe95', color: '#14281a', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
+            style={{ pointerEvents: 'auto', background: '#ff5a2c', color: '#14281a', border: 'none', padding: '8px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 7, boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}
             onMouseEnter={e => (e.currentTarget.style.background = '#eaffad')}
-            onMouseLeave={e => (e.currentTarget.style.background = '#dffe95')}
+            onMouseLeave={e => (e.currentTarget.style.background = '#ff5a2c')}
           >
             <Film size={14} strokeWidth={2.4} /> Remake
           </button>
@@ -1124,7 +1124,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
     >
       {/* ── Brand header (compact) ── */}
       <div style={{ padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 7 }}>
-        <div style={{ width: 22, height: 22, borderRadius: '50%', background: avatarBg, color: '#dffe95', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.3px', overflow: 'hidden', position: 'relative' }}>
+        <div style={{ width: 22, height: 22, borderRadius: '50%', background: avatarBg, color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0, letterSpacing: '-0.3px', overflow: 'hidden', position: 'relative' }}>
           {brandPicture ? (
             <>
               <span style={{ position: 'absolute' }}>{initials}</span>
@@ -1183,7 +1183,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
         )}
         <div style={{ display: 'flex', alignItems: 'center', gap: 0, position: 'relative' }}>
           <button onClick={() => setShowSaveModal(true)} title="Save to board"
-            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#1a3a1a' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s', display: 'inline-flex' }}>
+            style={{ background: 'none', border: 'none', cursor: 'pointer', color: isSaved ? '#141d15' : '#9ca3af', padding: 3, borderRadius: 4, transition: 'color .15s', display: 'inline-flex' }}>
             <span key={isSaved ? 'saved' : 'unsaved'} style={{ display: 'inline-flex', animation: isSaved ? 'savepop .3s ease' : 'none' }}>
               {isSaved ? <BookmarkCheck size={14} /> : <Bookmark size={14} />}
             </span>
@@ -1912,11 +1912,11 @@ export default function DiscoveryPage() {
               </div>
             )}
             <button onClick={() => toggleFollow(hoverBrand, hbName)}
-              style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: isFollowed ? '1px solid #1a3a1a' : '1px solid #ef4444', background: isFollowed ? '#f0fdf4' : '#fff', color: isFollowed ? '#1a3a1a' : '#ef4444' }}>
+              style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: isFollowed ? '1px solid #141d15' : '1px solid #ef4444', background: isFollowed ? '#f0fdf4' : '#fff', color: isFollowed ? '#141d15' : '#ef4444' }}>
               {isFollowed ? '✓ Following' : '♡ Follow'}
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
-              <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
+              <button onClick={viewAds} style={{ flex: 1, padding: '9px', borderRadius: 9, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>View ads</button>
               <button onClick={() => { window.open(`/discovery/brand/${hoverBrand}`, '_blank', 'noopener'); setHoverBrand(null) }} style={{ flex: 1, padding: '9px', borderRadius: 9, border: '1px solid #e2e8f0', background: '#fff', color: '#374151', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit' }}>Details</button>
             </div>
           </div>
@@ -1945,10 +1945,10 @@ export default function DiscoveryPage() {
               <a key={tab.href} href={tab.href}
                 style={{
                   padding: '6px 15px', borderRadius: 9, fontSize: 13, fontWeight: 700,
-                  background: tab.href === '/discovery' ? '#17251c' : 'transparent',
-                  color: tab.href === '/discovery' ? '#dffe95' : '#5b6a55',
+                  background: tab.href === '/discovery' ? '#141d15' : 'transparent',
+                  color: tab.href === '/discovery' ? '#ff5a2c' : '#5b6a55',
                   textDecoration: 'none',
-                  boxShadow: tab.href === '/discovery' ? '0 2px 6px rgba(23,37,28,0.25)' : 'none',
+                  boxShadow: tab.href === '/discovery' ? '0 2px 6px rgba(20,29,21,0.25)' : 'none',
                 }}>
                 {tab.label}
               </a>
@@ -1965,7 +1965,7 @@ export default function DiscoveryPage() {
                   onFocus={() => { if (searchInput.trim()) setShowDropdown(true) }}
                   onKeyDown={e => { if (e.key === 'Escape') setShowDropdown(false) }}
                   placeholder="Search for ads or brands with AI…"
-                  style={{ width: '100%', padding: '10px 36px', border: `1.5px solid ${showDropdown && searchInput ? '#17251c' : '#dcebc4'}`, borderRadius: showDropdown && searchInput ? '12px 12px 0 0' : 12, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#fff', color: '#161c17', boxSizing: 'border-box', transition: 'border-color 0.15s', boxShadow: '0 2px 8px rgba(23,37,28,0.05)' }}
+                  style={{ width: '100%', padding: '10px 36px', border: `1.5px solid ${showDropdown && searchInput ? '#141d15' : '#dcebc4'}`, borderRadius: showDropdown && searchInput ? '12px 12px 0 0' : 12, fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#fff', color: '#161c17', boxSizing: 'border-box', transition: 'border-color 0.15s', boxShadow: '0 2px 8px rgba(20,29,21,0.05)' }}
                 />
                 {searchInput && (
                   <button type="button" onClick={() => { setSearchInput(''); setQuery(''); setShowDropdown(false) }}
@@ -2076,7 +2076,7 @@ export default function DiscoveryPage() {
           </div>
           <button onClick={() => { if (query.trim()) fetchAds(true) }} disabled={loading || !query.trim()}
             title={query.trim() ? 'Refresh results' : 'Enter a search term first'}
-            style={{ padding: '8px 10px', background: '#fff', border: '1px solid #dcebc4', borderRadius: 10, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#3c473e' : '#9aa79a', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
+            style={{ padding: '8px 10px', background: '#fff', border: '1px solid #dcebc4', borderRadius: 10, cursor: loading || !query.trim() ? 'not-allowed' : 'pointer', color: query.trim() ? '#3a382f' : '#9aa79a', display: 'flex', alignItems: 'center', flexShrink: 0, opacity: !query.trim() ? 0.5 : 1 }}>
             <RefreshCw size={13} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
           </button>
         </div>
@@ -2096,7 +2096,7 @@ export default function DiscoveryPage() {
             <button key={p.label} onClick={() => { p.apply(); setActiveChip(p.label) }}
               onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
               onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
-              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#17251c' : '#fff', color: on ? '#dffe95' : '#333d35', border: on ? '1px solid #17251c' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
+              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#141d15' : '#fff', color: on ? '#ff5a2c' : '#333d35', border: on ? '1px solid #141d15' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
               {p.label}
               {p.tip && chipTip?.label === p.label && (
                 <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
@@ -2113,9 +2113,9 @@ export default function DiscoveryPage() {
         {/* Filter tray — Motion-style: icon pills with chevrons in one soft container, the
             coming-soon set on a quieter second row, numeric filters as compact pills, Sort right. */}
         <div style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center',
-          background: '#fcfdfb', border: '1px solid #e7ece7', borderRadius: 16, padding: '10px 12px' }}>
+          background: '#fcfdfb', border: '1px solid #efece2', borderRadius: 16, padding: '10px 12px' }}>
           {/* Time filter (segmented) */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px', background: '#fff', borderRadius: 11, border: '1px solid #e7ece7', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px', background: '#fff', borderRadius: 11, border: '1px solid #efece2', flexShrink: 0 }}>
             {[
               { label: 'All time', days: 0 },
               { label: '7d', days: 7 },
@@ -2126,8 +2126,8 @@ export default function DiscoveryPage() {
               <button key={f.days} onClick={() => setTimeDays(f.days)}
                 style={{
                   padding: '5px 11px', borderRadius: 8, fontSize: 11.5, fontWeight: 700,
-                  background: timeDays === f.days ? '#17251c' : 'transparent',
-                  color: timeDays === f.days ? '#dffe95' : '#68756b',
+                  background: timeDays === f.days ? '#141d15' : 'transparent',
+                  color: timeDays === f.days ? '#ff5a2c' : '#6f6d5a',
                   border: 'none',
                   cursor: 'pointer', fontFamily: 'inherit',
                 }}>
@@ -2153,7 +2153,7 @@ export default function DiscoveryPage() {
           <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable comingSoon />
 
           {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap', maxWidth: '100%', padding: '4px 8px', background: '#fff', border: '1px solid #e7ece7', borderRadius: 14, flexShrink: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap', maxWidth: '100%', padding: '4px 8px', background: '#fff', border: '1px solid #efece2', borderRadius: 14, flexShrink: 1 }}>
             <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
             <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
             <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
@@ -2192,13 +2192,13 @@ export default function DiscoveryPage() {
             <div style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.7, marginBottom: 28 }}>
               Meta requires identity confirmation before allowing Ads Library access.<br /><br />
               <strong style={{ color: '#111' }}>One-time setup (~ 1 min):</strong><br />
-              1. Go to <a href="https://www.facebook.com/ads/library/api/" target="_blank" rel="noopener noreferrer" style={{ color: '#1a3a1a', fontWeight: 700 }}>facebook.com/ads/library/api</a><br />
+              1. Go to <a href="https://www.facebook.com/ads/library/api/" target="_blank" rel="noopener noreferrer" style={{ color: '#141d15', fontWeight: 700 }}>facebook.com/ads/library/api</a><br />
               2. Click <strong>"Confirm Identity"</strong> and complete verification<br />
               3. Come back here and refresh
             </div>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <a href="https://www.facebook.com/ads/library/api/" target="_blank" rel="noopener noreferrer"
-                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#1a3a1a', color: '#dffe95', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, padding: '12px 24px', background: '#141d15', color: '#ff5a2c', borderRadius: 10, fontSize: 14, fontWeight: 700, textDecoration: 'none' }}>
                 🔑 Confirm Identity on Meta
               </a>
               <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${country === 'ALL' ? 'US' : country}${query ? `&q=${encodeURIComponent(query)}` : ''}&media_type=all`}
@@ -2251,7 +2251,7 @@ export default function DiscoveryPage() {
               {['Nike', 'Skincare', 'Weight loss', 'SAAS', 'Fashion', 'Coffee', 'Gym', 'Travel'].map(term => (
                 <button key={term} onClick={() => { setSearchInput(term); setQuery(term) }}
                   style={{ padding: '8px 18px', background: '#fff', border: '1.5px solid #e2e8f0', borderRadius: 100, fontSize: 13, fontWeight: 600, color: '#374151', cursor: 'pointer', fontFamily: 'inherit' }}
-                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#1a3a1a'; e.currentTarget.style.color = '#1a3a1a' }}
+                  onMouseEnter={e => { e.currentTarget.style.borderColor = '#141d15'; e.currentTarget.style.color = '#141d15' }}
                   onMouseLeave={e => { e.currentTarget.style.borderColor = '#e2e8f0'; e.currentTarget.style.color = '#374151' }}>
                   {term}
                 </button>
@@ -2295,7 +2295,7 @@ export default function DiscoveryPage() {
                     onMouseEnter={(e) => openHover(brand.pageId, e.currentTarget as HTMLElement)}
                     onMouseLeave={closeHover}>
                     <button onClick={viewAds}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200, border: `1.5px solid ${hovered ? '#1a3a1a' : '#e2e8f0'}`, boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none' }}>
+                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200, border: `1.5px solid ${hovered ? '#141d15' : '#e2e8f0'}`, boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none' }}>
                       <div style={{ width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg, hsl(${hue},62%,52%), hsl(${(hue + 28) % 360},60%,44%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: `0 2px 6px hsla(${hue},55%,40%,0.35)` }}>
                         {brand.name.charAt(0).toUpperCase()}
                       </div>
@@ -2359,7 +2359,7 @@ export default function DiscoveryPage() {
                 (users were assuming "that's all the ads"). */}
             {loading && hasMore && filteredAds.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, padding: '30px 0 40px', color: '#64748b', fontSize: 13.5, fontWeight: 600 }}>
-                <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #e2e8f0', borderTopColor: '#1a3a1a', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
+                <span style={{ width: 16, height: 16, borderRadius: '50%', border: '2px solid #e2e8f0', borderTopColor: '#141d15', display: 'inline-block', animation: 'spin 0.7s linear infinite' }} />
                 Finding more winning ads…
               </div>
             )}

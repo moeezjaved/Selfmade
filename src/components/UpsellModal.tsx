@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { PLANS, type PlanId } from '@/lib/plans'
 
-const DARK = '#14281a', LIME = '#dffe95', ACCENT = '#3a7000'
+const DARK = '#14281a', LIME = '#ff5a2c', ACCENT = '#3a7000'
 const EVT = 'selfmade:upsell'
 
 export interface UpsellPayload { limit?: string; current?: number; max?: number | null; upgradeTo?: PlanId; atLimit?: boolean; message?: string }
@@ -44,7 +44,7 @@ export default function UpsellModalHost() {
       `}</style>
       <div className="um-card" onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, padding: '32px 30px', width: 440, maxWidth: '94vw', textAlign: 'center', boxShadow: '0 30px 80px rgba(0,0,0,0.35)' }}>
         <div style={{ width: 56, height: 56, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24 }}>↑</div>
-        <div style={{ display: 'inline-block', background: '#eef5eb', color: ACCENT, fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>Plan limit reached</div>
+        <div style={{ display: 'inline-block', background: '#f3eee3', color: ACCENT, fontSize: 11, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>Plan limit reached</div>
         <h2 style={{ fontSize: 21, fontWeight: 800, color: '#111', margin: '0 0 8px' }}>{p.atLimit ? 'You’ve reached your limit' : 'Time to upgrade'}</h2>
         <p style={{ fontSize: 14, color: '#6b7280', lineHeight: 1.6, margin: '0 0 22px' }}>
           {p.message || `You've hit your plan's ${p.limit || ''} limit${p.max != null ? ` (${p.current}/${p.max})` : ''}. Upgrade to ${PLANS[need].label} for more.`}

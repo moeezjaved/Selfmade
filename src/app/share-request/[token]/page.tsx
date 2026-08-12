@@ -61,7 +61,7 @@ export default function ShareRequestPage() {
             <div style={{ fontSize: 19, fontWeight: 800, color: '#0e1b12', lineHeight: 1.3, marginBottom: 18, paddingRight: 20 }}>
               {invite.ownerName} wants to collaborate on a report with you
             </div>
-            <div style={{ background: '#f4f6f0', border: '1px solid rgba(26,58,26,.08)', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
+            <div style={{ background: '#f4f6f0', border: '1px solid rgba(20,29,21,.08)', borderRadius: 12, padding: '14px 16px', marginBottom: 20 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#0e1b12', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontSize: 18 }}>{invite.emoji}</span>{invite.reportName}
               </div>
@@ -69,7 +69,7 @@ export default function ShareRequestPage() {
             </div>
 
             <div style={{ fontSize: 13, fontWeight: 600, color: '#3a4636', marginBottom: 7 }}>Select a workspace</div>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid rgba(26,58,26,.16)', borderRadius: 11, padding: '11px 14px', fontSize: 14, fontWeight: 600, color: '#0e1b12', marginBottom: 22 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: '1px solid rgba(20,29,21,.16)', borderRadius: 11, padding: '11px 14px', fontSize: 14, fontWeight: 600, color: '#0e1b12', marginBottom: 22 }}>
               {workspace}
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="#7c8577" strokeWidth="1.7"><path d="M2 4l4 4 4-4" strokeLinecap="round" /></svg>
             </div>
@@ -90,4 +90,4 @@ export default function ShareRequestPage() {
 }
 
 const btnDark: React.CSSProperties = { padding: '10px 20px', borderRadius: 11, border: 'none', background: '#0e1b12', color: '#f4f7ef', fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: FONT }
-const btnGhost: React.CSSProperties = { padding: '10px 18px', borderRadius: 11, border: '1px solid rgba(26,58,26,.16)', background: '#fff', color: '#3a4636', fontWeight: 600, fontSize: 13.5, cursor: 'pointer', fontFamily: FONT }
+const btnGhost: React.CSSProperties = { padding: '10px 18px', borderRadius: 11, border: '1px solid rgba(20,29,21,.16)', background: '#fff', color: '#3a4636', fontWeight: 600, fontSize: 13.5, cursor: 'pointer', fontFamily: FONT }

@@ -6,7 +6,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { confirmAction } from '@/components/ConfirmDialog'
 
-const INK = '#0e1b12', LIME = '#dffe95'
+const INK = '#0e1b12', LIME = '#ff5a2c'
 type Member = { id: string; user_id: string; email: string; role: string; isYou: boolean; accounts: string[] | null; allAccounts: boolean }
 type Invite = { id: string; email: string; role: string; link: string }
 type Account = { account_id: string; account_name: string | null }

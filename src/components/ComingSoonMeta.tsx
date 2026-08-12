@@ -41,11 +41,11 @@ export default function ComingSoonMeta({ feature }: { feature: string }) {
         </p>
         <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
           <button onClick={notify} disabled={state !== 'idle'}
-            style={{ background: state === 'done' ? '#dcfce7' : '#1a3a1a', color: state === 'done' ? '#15803d' : '#dffe95', border: state === 'done' ? '1px solid #86efac' : 'none', fontWeight: 800, fontSize: 14, padding: '13px 24px', borderRadius: 12, cursor: state === 'idle' ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+            style={{ background: state === 'done' ? '#dcfce7' : '#141d15', color: state === 'done' ? '#15803d' : '#ff5a2c', border: state === 'done' ? '1px solid #86efac' : 'none', fontWeight: 800, fontSize: 14, padding: '13px 24px', borderRadius: 12, cursor: state === 'idle' ? 'pointer' : 'default', fontFamily: 'inherit' }}>
             {state === 'done' ? "You're on the list ✓" : state === 'sending' ? 'Adding you…' : 'Notify me when it launches'}
           </button>
           <Link href="/discovery"
-            style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', color: '#1a3a1a', border: '1.5px solid #cdd8cf', fontWeight: 700, fontSize: 14, padding: '13px 24px', borderRadius: 12, textDecoration: 'none' }}>
+            style={{ display: 'inline-flex', alignItems: 'center', background: '#fff', color: '#141d15', border: '1.5px solid #cdd8cf', fontWeight: 700, fontSize: 14, padding: '13px 24px', borderRadius: 12, textDecoration: 'none' }}>
             Remake a winning ad now →
           </Link>
         </div>

@@ -12,13 +12,13 @@ interface Interest { name: string; category: string; why: string; size: string; 
 interface Grade { campaign_name: string; grade: string; emoji: string; label: string; why: string; action: string; action_reason: string; applied?: boolean }
 
 const S = {
-  input: {width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(0,0,0,0.12)',background:'#ffffff',color:'#1a3a1a',fontSize:14,fontFamily:'inherit',outline:'none'} as React.CSSProperties,
-  label: {display:'block',fontSize:11,fontWeight:700,color:'#5a7a5a',marginBottom:6,textTransform:'uppercase',letterSpacing:'.07em'} as React.CSSProperties,
+  input: {width:'100%',padding:'10px 14px',borderRadius:10,border:'1.5px solid rgba(0,0,0,0.12)',background:'#ffffff',color:'#141d15',fontSize:14,fontFamily:'inherit',outline:'none'} as React.CSSProperties,
+  label: {display:'block',fontSize:11,fontWeight:700,color:'#6b6a58',marginBottom:6,textTransform:'uppercase',letterSpacing:'.07em'} as React.CSSProperties,
   card: {background:'#ffffff',border:'1px solid rgba(0,0,0,0.08)',borderRadius:20,overflow:'hidden',boxShadow:'0 2px 12px rgba(0,0,0,0.05)'} as React.CSSProperties,
   head: {padding:'20px 24px',borderBottom:'1px solid rgba(0,0,0,0.07)'} as React.CSSProperties,
   body: {padding:24} as React.CSSProperties,
   foot: {padding:'16px 24px',borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',justifyContent:'space-between'} as React.CSSProperties,
-  back: {background:'#f0f7ee',border:'1.5px solid rgba(0,0,0,0.1)',color:'#1a3a1a',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'} as React.CSSProperties,
+  back: {background:'#f4f0e6',border:'1.5px solid rgba(0,0,0,0.1)',color:'#141d15',padding:'10px 22px',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'} as React.CSSProperties,
 }
 
 
@@ -68,9 +68,9 @@ function LocationPicker({selected, onChange}: {selected: any[], onChange: (v: an
       {selected.length > 0 && (
         <div style={{display:'flex',flexWrap:'wrap',gap:6,marginBottom:8}}>
           {selected.map((loc:any) => (
-            <span key={loc.key} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#1a3a1a',color:'#dffe95',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700}}>
+            <span key={loc.key} style={{display:'inline-flex',alignItems:'center',gap:4,background:'#141d15',color:'#ff5a2c',padding:'3px 10px',borderRadius:100,fontSize:11,fontWeight:700}}>
               {typeLabel(loc.type)} {loc.name}{loc.country_code ? `, ${loc.country_code}` : ''}
-              <button onClick={()=>remove(loc.key)} style={{background:'none',border:'none',color:'#dffe95',cursor:'pointer',fontSize:12,padding:0,lineHeight:1}}>×</button>
+              <button onClick={()=>remove(loc.key)} style={{background:'none',border:'none',color:'#ff5a2c',cursor:'pointer',fontSize:12,padding:0,lineHeight:1}}>×</button>
             </span>
           ))}
         </div>
@@ -80,25 +80,25 @@ function LocationPicker({selected, onChange}: {selected: any[], onChange: (v: an
         value={query}
         onChange={e=>setQuery(e.target.value)}
         placeholder="Search country, city, region..."
-        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#1a3a1a',boxSizing:'border-box' as any}}
+        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#141d15',boxSizing:'border-box' as any}}
       />
       {/* Results dropdown */}
       {(results.length > 0 || loading) && (
         <div style={{position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid rgba(0,0,0,0.1)',borderRadius:10,marginTop:4,zIndex:100,maxHeight:200,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.1)'}}>
-          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8aaa8a'}}>Searching...</div>}
+          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8b8a72'}}>Searching...</div>}
           {results.map((r:any) => (
             <button key={r.key} onClick={()=>add(r)} style={{width:'100%',display:'flex',alignItems:'center',gap:8,padding:'10px 14px',background:'none',border:'none',cursor:'pointer',textAlign:'left',borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
               <span style={{fontSize:14}}>{typeLabel(r.type)}</span>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:'#1a3a1a'}}>{r.name}</div>
-                <div style={{fontSize:11,color:'#8aaa8a'}}>{r.type}{r.country_name ? ` · ${r.country_name}` : ''}</div>
+                <div style={{fontSize:13,fontWeight:600,color:'#141d15'}}>{r.name}</div>
+                <div style={{fontSize:11,color:'#8b8a72'}}>{r.type}{r.country_name ? ` · ${r.country_name}` : ''}</div>
               </div>
             </button>
           ))}
         </div>
       )}
       {selected.length === 0 && query.length === 0 && (
-        <div style={{fontSize:11,color:'#8aaa8a',marginTop:4}}>Search and add multiple countries, cities, or regions</div>
+        <div style={{fontSize:11,color:'#8b8a72',marginTop:4}}>Search and add multiple countries, cities, or regions</div>
       )}
     </div>
   )
@@ -138,18 +138,18 @@ function InterestSearch({onAdd}: {onAdd: (interest: {id:string,name:string,topic
         value={query}
         onChange={e=>setQuery(e.target.value)}
         placeholder="Search Meta interests (e.g. Hair care, Rogaine, Men's Health)..."
-        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#1a3a1a',boxSizing:'border-box' as any}}
+        style={{width:'100%',padding:'10px 14px',borderRadius:10,border:'1px solid rgba(0,0,0,0.1)',fontSize:13,fontFamily:'inherit',outline:'none',background:'#ffffff',color:'#141d15',boxSizing:'border-box' as any}}
       />
       {(results.length > 0 || loading) && (
         <div style={{position:'absolute',top:'100%',left:0,right:0,background:'white',border:'1px solid rgba(0,0,0,0.1)',borderRadius:10,marginTop:4,zIndex:200,maxHeight:240,overflowY:'auto',boxShadow:'0 8px 24px rgba(0,0,0,0.1)'}}>
-          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8aaa8a'}}>Searching Meta...</div>}
+          {loading && <div style={{padding:'10px 14px',fontSize:12,color:'#8b8a72'}}>Searching Meta...</div>}
           {results.map((r:any) => (
             <button key={r.id} onClick={()=>{onAdd({id:r.id,name:r.name,topic:r.topic});setQuery('');setResults([])}} style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,padding:'10px 14px',background:'none',border:'none',cursor:'pointer',textAlign:'left',borderBottom:'1px solid rgba(0,0,0,0.04)'}}>
               <div>
-                <div style={{fontSize:13,fontWeight:600,color:'#1a3a1a'}}>{r.name}</div>
-                {r.topic && <div style={{fontSize:11,color:'#8aaa8a'}}>{r.topic}</div>}
+                <div style={{fontSize:13,fontWeight:600,color:'#141d15'}}>{r.name}</div>
+                {r.topic && <div style={{fontSize:11,color:'#8b8a72'}}>{r.topic}</div>}
               </div>
-              {r.audience_size_lower_bound && <div style={{fontSize:11,color:'#5a7a5a',fontWeight:700,whiteSpace:'nowrap'}}>{formatSize(r.audience_size_lower_bound)}</div>}
+              {r.audience_size_lower_bound && <div style={{fontSize:11,color:'#6b6a58',fontWeight:700,whiteSpace:'nowrap'}}>{formatSize(r.audience_size_lower_bound)}</div>}
             </button>
           ))}
         </div>
@@ -522,10 +522,10 @@ function M4Inner() {
   }
 
   const CopyBox = ({copy,setCopy,type,title}:{copy:any,setCopy:any,type:'main'|'retargeting'|'retainer',title:string}) => (
-    <div style={{background:'#f8fcf6',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:18,marginBottom:16}}>
+    <div style={{background:'#f9f5ec',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:18,marginBottom:16}}>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
-        <div style={{fontSize:13,fontWeight:800,color:'#1a3a1a'}}>{title}</div>
-        <button onClick={()=>generateCopy(type)} disabled={genCopy!==null||!form.product} style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',color:'#1a3a1a',padding:'6px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:genCopy!==null||!form.product?0.5:1}}>
+        <div style={{fontSize:13,fontWeight:800,color:'#141d15'}}>{title}</div>
+        <button onClick={()=>generateCopy(type)} disabled={genCopy!==null||!form.product} style={{background:'rgba(255,90,44,0.1)',border:'1px solid rgba(239,74,30,0.2)',color:'#141d15',padding:'6px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:genCopy!==null||!form.product?0.5:1}}>
           {genCopy===type?'Writing…':'AI Write'}
         </button>
       </div>
@@ -542,26 +542,26 @@ function M4Inner() {
 
   const UploadBox = ({list,setter,label}:{list:Creative[],setter:React.Dispatch<React.SetStateAction<Creative[]>>,label:string}) => (
     <div style={{marginBottom:16}}>
-      {list.length===0?<div style={{padding:20,textAlign:'center',border:'2px dashed rgba(255,255,255,0.08)',borderRadius:12,fontSize:13,color:'#8aaa8a',marginBottom:10}}>{label}</div>:(
+      {list.length===0?<div style={{padding:20,textAlign:'center',border:'2px dashed rgba(255,255,255,0.08)',borderRadius:12,fontSize:13,color:'#8b8a72',marginBottom:10}}>{label}</div>:(
         <div style={{display:'flex',flexDirection:'column',gap:8,marginBottom:10}}>
           {list.map((c,i)=>(
             <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f5f9f3',border:'1px solid rgba(0,0,0,0.07)'}}>
-              <div style={{width:26,height:26,borderRadius:7,background:'rgba(223,254,149,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#1a3a1a',flexShrink:0}}>A{i+1}</div>
-              <input value={c.name} onChange={e=>setter(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'#1a3a1a',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
-              <span style={{fontSize:11,color:c.uploaded?'#2d7a2d':c.uploading?'#b8860b':'#8aaa8a'}}>{c.uploading?'⏳ Uploading…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'Video':'Image'}</span>
-              <button onClick={()=>setter(prev=>prev.filter(x=>x.id!==c.id))} style={{background:'none',border:'none',color:'#8aaa8a',cursor:'pointer',fontSize:16,padding:0}}>x</button>
+              <div style={{width:26,height:26,borderRadius:7,background:'rgba(255,90,44,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#141d15',flexShrink:0}}>A{i+1}</div>
+              <input value={c.name} onChange={e=>setter(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'#141d15',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
+              <span style={{fontSize:11,color:c.uploaded?'#2d7a2d':c.uploading?'#b8860b':'#8b8a72'}}>{c.uploading?'⏳ Uploading…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'Video':'Image'}</span>
+              <button onClick={()=>setter(prev=>prev.filter(x=>x.id!==c.id))} style={{background:'none',border:'none',color:'#8b8a72',cursor:'pointer',fontSize:16,padding:0}}>x</button>
             </div>
           ))}
         </div>
       )}
-      <label style={{background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',color:'#1a3a1a',padding:'8px 16px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
+      <label style={{background:'rgba(255,90,44,0.1)',border:'1px solid rgba(239,74,30,0.2)',color:'#141d15',padding:'8px 16px',borderRadius:100,fontSize:13,fontWeight:700,cursor:'pointer',display:'inline-flex',alignItems:'center',gap:8}}>
         Upload Image / Video (up to 200MB)<input type="file" accept="image/*,video/*" multiple onChange={e=>handleUpload(e,setter)} style={{display:'none'}}/>
       </label>
     </div>
   )
 
   const nb = (onClick:()=>void,label:string,disabled=false) => (
-    <button onClick={onClick} disabled={disabled} style={{background:disabled?'#e8ede6':'#1a3a1a',color:disabled?'#9caa9c':'#dffe95',border:'none',padding:'10px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:disabled?'not-allowed':'pointer'}}>{label}</button>
+    <button onClick={onClick} disabled={disabled} style={{background:disabled?'#e8ede6':'#141d15',color:disabled?'#9caa9c':'#ff5a2c',border:'none',padding:'10px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:disabled?'not-allowed':'pointer'}}>{label}</button>
   )
 
   return (
@@ -569,51 +569,51 @@ function M4Inner() {
       <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       <div style={{marginBottom:24}}>
         <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:10}}>
-          <div style={{width:40,height:40,borderRadius:10,background:'rgba(223,254,149,0.1)',border:'1px solid rgba(74,138,0,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:'#1a3a1a'}}>M4</div>
-          <div><h1 style={{fontSize:22,fontWeight:800,color:'#1a3a1a'}}>M4 Method</h1><p style={{fontSize:13,color:'#7a9a7a'}}>Find winners, scale them, retarget everyone</p></div>
+          <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,90,44,0.1)',border:'1px solid rgba(239,74,30,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:'#141d15'}}>M4</div>
+          <div><h1 style={{fontSize:22,fontWeight:800,color:'#141d15'}}>M4 Method</h1><p style={{fontSize:13,color:'#7a9a7a'}}>Find winners, scale them, retarget everyone</p></div>
         </div>
-        <div style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#1a3a1a':STEPS.indexOf(step)>i?'rgba(26,58,26,0.3)':'rgba(0,0,0,0.08)'}}/>)}</div>
+        <div style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#141d15':STEPS.indexOf(step)>i?'rgba(20,29,21,0.3)':'rgba(0,0,0,0.08)'}}/>)}</div>
       </div>
 
       {step==='welcome'&&(
         <div style={{...S.card,padding:36,position:'relative'}}>
-          <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#dffe95,transparent)'}}/>
+          <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#ff5a2c,transparent)'}}/>
           {prefilled&&(
-            <div style={{background:'rgba(45,122,45,0.08)',border:'1px solid rgba(45,122,45,0.25)',borderRadius:14,padding:'13px 18px',marginBottom:20,fontSize:13.5,color:'#1a3a1a',lineHeight:1.6}}>
+            <div style={{background:'rgba(45,122,45,0.08)',border:'1px solid rgba(45,122,45,0.25)',borderRadius:14,padding:'13px 18px',marginBottom:20,fontSize:13.5,color:'#141d15',lineHeight:1.6}}>
               <strong style={{color:'#2d7a2d'}}>Your approved ad is loaded.</strong> It&rsquo;s already attached in the Creatives step — walk through setup, set your budget, and confirm to go live. Nothing spends until you do.
             </div>
           )}
-          <h2 style={{fontSize:24,fontWeight:900,color:'#1a3a1a',marginBottom:8}}>The complete M4 ad system.</h2>
-          <p style={{fontSize:14,color:'#5a7a5a',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
+          <h2 style={{fontSize:24,fontWeight:900,color:'#141d15',marginBottom:8}}>The complete M4 ad system.</h2>
+          <p style={{fontSize:14,color:'#6b6a58',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:12,marginBottom:28}}>
             {[{color:'#2d7a2d',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#1a5c1a',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
               <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}25`,borderRadius:16,padding:18}}>
                 <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.1em',marginBottom:6}}>{c.label}</div>
-                <div style={{fontSize:14,fontWeight:700,color:'#1a3a1a',marginBottom:4}}>{c.title}</div>
+                <div style={{fontSize:14,fontWeight:700,color:'#141d15',marginBottom:4}}>{c.title}</div>
                 <div style={{fontSize:12,color:'#6b8f6b',lineHeight:1.6}}>{c.desc}</div>
               </div>
             ))}
           </div>
           <div style={{display:'flex',gap:12}}>
-            <button onClick={()=>goTo('pixel')} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
-            <button onClick={gradeNow} disabled={loading} style={{background:'none',border:'1.5px solid rgba(223,254,149,0.2)',color:'#1a3a1a',padding:'13px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.6:1}}>{loading?'Analysing…':'Grade and Scale My Campaigns'}</button>
+            <button onClick={()=>goTo('pixel')} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'13px 32px',borderRadius:100,fontSize:15,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Start M4 Setup</button>
+            <button onClick={gradeNow} disabled={loading} style={{background:'none',border:'1.5px solid rgba(255,90,44,0.2)',color:'#141d15',padding:'13px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.6:1}}>{loading?'Analysing…':'Grade and Scale My Campaigns'}</button>
           </div>
         </div>
       )}
 
       {step==='pixel'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 1 — Product and Competitor Intelligence</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>The more detail you give, the smarter Selfmade targets your audience.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 1 — Product and Competitor Intelligence</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>The more detail you give, the smarter Selfmade targets your audience.</div></div>
           <div style={S.body}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
-              <div><label style={S.label}>Product Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Your brand or product name — synced from your Facebook Page.</div><input value={form.product} onChange={e=>handleProductChange(e.target.value)} placeholder="e.g. HairResQ" style={S.input}/></div>
-              <div><label style={S.label}>Campaign Name</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>Auto-generated from your product name and today's date. Edit freely.</div><input value={form.campaignName} onChange={e=>set('campaignName',e.target.value)} placeholder="e.g. HairResQ — 2 May 2025" style={S.input}/></div>
+              <div><label style={S.label}>Product Name</label><div style={{fontSize:11,color:'#8b8a72',marginBottom:6}}>Your brand or product name — synced from your Facebook Page.</div><input value={form.product} onChange={e=>handleProductChange(e.target.value)} placeholder="e.g. HairResQ" style={S.input}/></div>
+              <div><label style={S.label}>Campaign Name</label><div style={{fontSize:11,color:'#8b8a72',marginBottom:6}}>Auto-generated from your product name and today's date. Edit freely.</div><input value={form.campaignName} onChange={e=>set('campaignName',e.target.value)} placeholder="e.g. HairResQ — 2 May 2025" style={S.input}/></div>
             </div>
-            <div style={{marginBottom:14}}><label style={S.label}>What do you sell?</label><div style={{fontSize:11,color:'#8aaa8a',marginBottom:6}}>The juicier the details, the smarter our targeting. Benefits, guarantees, who it is for.</div><textarea value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Describe your product, unique benefits, guarantee..." style={{...S.input,resize:'vertical',minHeight:70,lineHeight:1.6} as React.CSSProperties}></textarea></div>
+            <div style={{marginBottom:14}}><label style={S.label}>What do you sell?</label><div style={{fontSize:11,color:'#8b8a72',marginBottom:6}}>The juicier the details, the smarter our targeting. Benefits, guarantees, who it is for.</div><textarea value={form.description} onChange={e=>set('description',e.target.value)} placeholder="Describe your product, unique benefits, guarantee..." style={{...S.input,resize:'vertical',minHeight:70,lineHeight:1.6} as React.CSSProperties}></textarea></div>
             <div style={{marginBottom:20}}>
               <label style={S.label}>Target Customer</label>
               <div style={{fontSize:13,fontWeight:600,color:'#2d5a2d',marginBottom:4}}>The more detail you give, the better your ads will perform.</div>
-              <div style={{fontSize:11,color:'#8aaa8a',marginBottom:8}}>Describe age, gender, pain points, and what they want. Used to write your ad copy and find the right audiences.</div>
+              <div style={{fontSize:11,color:'#8b8a72',marginBottom:8}}>Describe age, gender, pain points, and what they want. Used to write your ad copy and find the right audiences.</div>
               <div style={{display:'flex',gap:8,alignItems:'flex-start'}}>
                 <input value={form.targetCustomer} onChange={e=>set('targetCustomer',e.target.value)} placeholder="e.g. Men and women 25-45 struggling with hair loss, want to regrow hair confidently" style={{...S.input,flex:1}}/>
                 <button disabled={genTarget||!form.product} onClick={async()=>{
@@ -624,7 +624,7 @@ function M4Inner() {
                     if(d.targetCustomer) set('targetCustomer',d.targetCustomer)
                   }catch{}
                   setGenTarget(false)
-                }} style={{background:'rgba(26,58,26,0.08)',border:'1.5px solid rgba(26,58,26,0.15)',color:'#1a3a1a',padding:'10px 14px',borderRadius:10,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap',opacity:genTarget||!form.product?0.5:1}}>
+                }} style={{background:'rgba(20,29,21,0.08)',border:'1.5px solid rgba(20,29,21,0.15)',color:'#141d15',padding:'10px 14px',borderRadius:10,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap',opacity:genTarget||!form.product?0.5:1}}>
                   {genTarget?'Generating…':'✦ Auto-fill'}
                 </button>
               </div>
@@ -632,14 +632,14 @@ function M4Inner() {
             <div style={{background:'rgba(147,197,253,0.05)',border:'1px solid rgba(147,197,253,0.15)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:8}}>
                 <div style={{fontSize:13,fontWeight:800,color:'#1a5c1a'}}>Competitor Intelligence</div>
-                {detecting&&<div style={{fontSize:11,color:'#8aaa8a',display:'flex',alignItems:'center',gap:6}}>
-                  <span style={{display:'inline-block',width:10,height:10,border:'2px solid #8aaa8a',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}}/>Detecting from Meta…
+                {detecting&&<div style={{fontSize:11,color:'#8b8a72',display:'flex',alignItems:'center',gap:6}}>
+                  <span style={{display:'inline-block',width:10,height:10,border:'2px solid #8b8a72',borderTopColor:'transparent',borderRadius:'50%',animation:'spin 1s linear infinite'}}/>Detecting from Meta…
                 </div>}
               </div>
 
               {/* Detection result banner */}
               {detectionContext&&!detecting&&(
-                <div style={{background:'rgba(26,58,26,0.06)',border:'1px solid rgba(26,58,26,0.1)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:12,color:'#1a5c1a',lineHeight:1.6}}>
+                <div style={{background:'rgba(20,29,21,0.06)',border:'1px solid rgba(20,29,21,0.1)',borderRadius:10,padding:'10px 14px',marginBottom:14,fontSize:12,color:'#1a5c1a',lineHeight:1.6}}>
                   🔍 <strong>Detected:</strong> {detectionContext.category} · {detectionContext.country}
                   {detectionContext.confidence<0.7&&<span style={{marginLeft:8,color:'#b8860b',fontWeight:700}}>— Low confidence, please review</span>}
                 </div>
@@ -649,7 +649,7 @@ function M4Inner() {
               {detectedGroups&&(
                 <div style={{marginBottom:14}}>
                   {([
-                    {key:'local', label:`🏠 Local — ${detectionContext?.country||'Your Market'}`, bg:'rgba(26,58,26,0.08)', border:'rgba(26,58,26,0.15)'},
+                    {key:'local', label:`🏠 Local — ${detectionContext?.country||'Your Market'}`, bg:'rgba(20,29,21,0.08)', border:'rgba(20,29,21,0.15)'},
                     {key:'regional', label:'🌍 Regional', bg:'rgba(251,191,36,0.08)', border:'rgba(251,191,36,0.25)'},
                     {key:'global', label:'🌐 Global', bg:'rgba(147,197,253,0.1)', border:'rgba(147,197,253,0.3)'},
                   ] as const).map(grp=>{
@@ -657,7 +657,7 @@ function M4Inner() {
                     if(!group?.length) return null
                     return(
                       <div key={grp.key} style={{marginBottom:10}}>
-                        <div style={{fontSize:10,fontWeight:700,color:'#8aaa8a',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{grp.label} ({group.length})</div>
+                        <div style={{fontSize:10,fontWeight:700,color:'#8b8a72',textTransform:'uppercase',letterSpacing:'.07em',marginBottom:6}}>{grp.label} ({group.length})</div>
                         <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
                           {group.map((c:any)=>{
                             const url = c.domain
@@ -666,11 +666,11 @@ function M4Inner() {
                               ? `https://www.instagram.com/${c.instagram.replace('@','')}/`
                               : null
                             return(
-                            <div key={c.name} style={{display:'flex',alignItems:'center',gap:5,background:grp.bg,border:`1px solid ${grp.border}`,borderRadius:100,padding:'4px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
+                            <div key={c.name} style={{display:'flex',alignItems:'center',gap:5,background:grp.bg,border:`1px solid ${grp.border}`,borderRadius:100,padding:'4px 12px',fontSize:12,fontWeight:600,color:'#141d15'}}>
                               {url ? (
-                                <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#1a3a1a',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                                <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#141d15',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
                                   <span style={{fontSize:10}}>{c.domain ? '🌐' : '📸'}</span>
-                                  <span style={{borderBottom:'1px dashed rgba(26,58,26,0.3)'}}>{c.name}</span>
+                                  <span style={{borderBottom:'1px dashed rgba(20,29,21,0.3)'}}>{c.name}</span>
                                 </a>
                               ) : (
                                 <span>{c.name}</span>
@@ -700,10 +700,10 @@ function M4Inner() {
                         ? `https://www.instagram.com/${c.replace('@','')}/`
                         : (c.startsWith('http') ? c : `https://${c}`)
                       return(
-                      <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(26,58,26,0.08)',border:'1px solid rgba(26,58,26,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#1a3a1a'}}>
-                        <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#1a3a1a',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
+                      <div key={i} style={{display:'flex',alignItems:'center',gap:6,background:'rgba(20,29,21,0.08)',border:'1px solid rgba(20,29,21,0.15)',borderRadius:100,padding:'5px 12px',fontSize:12,fontWeight:600,color:'#141d15'}}>
+                        <a href={url} target="_blank" rel="noopener noreferrer" title={url} style={{color:'#141d15',textDecoration:'none',display:'flex',alignItems:'center',gap:4}}>
                           <span style={{fontSize:10}}>{isIG?'📸':'🌐'}</span>
-                          <span style={{borderBottom:'1px dashed rgba(26,58,26,0.3)'}}>{c}</span>
+                          <span style={{borderBottom:'1px dashed rgba(20,29,21,0.3)'}}>{c}</span>
                         </a>
                         <span onClick={()=>setCompetitorList(p=>p.filter(e=>e!==c))} style={{cursor:'pointer',fontSize:14,lineHeight:1,color:'#7a9a7a'}}>×</span>
                       </div>
@@ -719,20 +719,20 @@ function M4Inner() {
               </div>
               <div style={{display:'flex',gap:8}}>
                 <input value={competitorInput} onChange={e=>setCompetitorInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&(e.preventDefault(),addCompetitor())} placeholder="Add domain or @handle" style={{...S.input,flex:1}}/>
-                <button onClick={addCompetitor} style={{background:'#1a3a1a',color:'#dffe95',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
+                <button onClick={addCompetitor} style={{background:'#141d15',color:'#ff5a2c',border:'none',padding:'10px 18px',borderRadius:10,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',whiteSpace:'nowrap'}}>+ Add</button>
               </div>
             </div>
             <div style={{marginBottom:8}}><label style={S.label}>Meta Pixel</label></div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:14}}>
-              <div onClick={()=>{setPixelChoice('existing');if(pixels.length===0)fetchPixels()}} style={{padding:14,borderRadius:12,border:`2px solid ${pixelChoice==='existing'?'#dffe95':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='existing'?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
-                <div style={{fontSize:18,marginBottom:4}}>Yes</div><div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>I have a pixel</div>
+              <div onClick={()=>{setPixelChoice('existing');if(pixels.length===0)fetchPixels()}} style={{padding:14,borderRadius:12,border:`2px solid ${pixelChoice==='existing'?'#ff5a2c':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='existing'?'rgba(255,90,44,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
+                <div style={{fontSize:18,marginBottom:4}}>Yes</div><div style={{fontSize:13,fontWeight:700,color:'#141d15'}}>I have a pixel</div>
               </div>
-              <div onClick={()=>setPixelChoice('new')} style={{padding:14,borderRadius:12,border:`2px solid ${pixelChoice==='new'?'#dffe95':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='new'?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
-                <div style={{fontSize:18,marginBottom:4}}>No</div><div style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>I need one</div>
+              <div onClick={()=>setPixelChoice('new')} style={{padding:14,borderRadius:12,border:`2px solid ${pixelChoice==='new'?'#ff5a2c':'rgba(255,255,255,0.08)'}`,background:pixelChoice==='new'?'rgba(255,90,44,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer'}}>
+                <div style={{fontSize:18,marginBottom:4}}>No</div><div style={{fontSize:13,fontWeight:700,color:'#141d15'}}>I need one</div>
               </div>
             </div>
             {pixelChoice==='existing'&&(loadingPixels?<div style={{fontSize:13,color:'#7a9a7a'}}>Loading…</div>:pixels.length>0?<select value={pixelId} onChange={e=>setPixelId(e.target.value)} style={{...S.input,background:'#ffffff'}}><option value="">Select pixel…</option>{pixels.map(p=><option key={p.id} value={p.id}>{p.name} {p.id}</option>)}</select>:<input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="Enter Pixel ID" style={S.input}/>)}
-            {pixelChoice==='new'&&<div style={{background:'rgba(223,254,149,0.05)',border:'1px solid rgba(223,254,149,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#5a7a5a',lineHeight:1.8}}>Meta Events Manager → Connect Data Sources → Web → Pixel → Copy ID<br/><a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#1a3a1a',fontWeight:700}}>Open Events Manager</a></div>}
+            {pixelChoice==='new'&&<div style={{background:'rgba(255,90,44,0.05)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#6b6a58',lineHeight:1.8}}>Meta Events Manager → Connect Data Sources → Web → Pixel → Copy ID<br/><a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#141d15',fontWeight:700}}>Open Events Manager</a></div>}
           </div>
           <div style={S.foot}>
             <button onClick={()=>goTo('welcome')} style={S.back}>Back</button>
@@ -743,36 +743,36 @@ function M4Inner() {
 
       {step==='creatives'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 2 — Prospecting Creatives and Ad Copy</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>For Broad and Interest campaigns targeting new audiences only.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 2 — Prospecting Creatives and Ad Copy</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>For Broad and Interest campaigns targeting new audiences only.</div></div>
           <div style={S.body}>
             <div style={{background:'rgba(134,239,172,0.05)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:12,padding:'12px 16px',marginBottom:16,display:'flex',gap:12}}>
               <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:'#2d7a2d'}}>One creative per ad set.</strong> Each image gets its own ad set so you know exactly which creative wins.</div>
             </div>
-            <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:'#1a3a1a'}}>Prospecting Creatives</div>
+            <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:'#141d15'}}>Prospecting Creatives</div>
             <UploadBox list={creatives} setter={setCreatives} label="Upload prospecting creatives"/>
             <CopyBox copy={adCopy} setCopy={setAdCopy} type="main" title="Prospecting Ad Copy"/>
-            <div style={{background:'#f8fcf6',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:16}}>
-              <div style={{fontSize:13,fontWeight:800,color:'#1a3a1a',marginBottom:10}}>Facebook Page and Instagram</div>
+            <div style={{background:'#f9f5ec',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:16}}>
+              <div style={{fontSize:13,fontWeight:800,color:'#141d15',marginBottom:10}}>Facebook Page and Instagram</div>
               {pages.length>0?(
                 <div>
                   <select value={selectedPageId} onChange={e=>{setSelectedPageId(e.target.value);const pg=pages.find(p=>p.id===e.target.value);setSelectedInstagramId(pg?.instagram?.id||'')}} style={{...S.input,background:'#ffffff',marginBottom:8}}>
                     {pages.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   {pages.find(p=>p.id===selectedPageId)?.instagram?(
-                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f8fcf6',border:'1px solid rgba(134,239,172,0.2)'}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f9f5ec',border:'1px solid rgba(134,239,172,0.2)'}}>
                       <span>Instagram Connected</span><span style={{color:'#2d7a2d',fontWeight:700}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</span>
                     </div>
                   ):(
-                    <div style={{background:'#f8fcf6',border:'1px solid rgba(134,239,172,0.2)',borderRadius:10,padding:14,marginTop:4}}>
-                      <div style={{fontSize:12,fontWeight:700,color:'#1a3a1a',marginBottom:6}}>Instagram — optional</div>
+                    <div style={{background:'#f9f5ec',border:'1px solid rgba(134,239,172,0.2)',borderRadius:10,padding:14,marginTop:4}}>
+                      <div style={{fontSize:12,fontWeight:700,color:'#141d15',marginBottom:6}}>Instagram — optional</div>
                       <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>
-                        Your ads will still run on Instagram automatically through this Facebook Page — you don’t need to do anything here to launch. To show them from a specific IG account instead, paste its ID below, or <a href="/connect-meta" target="_blank" rel="noopener" style={{color:'#1a3a1a',fontWeight:700}}>reconnect in a new tab ↗</a> (opens separately so nothing you’ve filled here is lost).
+                        Your ads will still run on Instagram automatically through this Facebook Page — you don’t need to do anything here to launch. To show them from a specific IG account instead, paste its ID below, or <a href="/connect-meta" target="_blank" rel="noopener" style={{color:'#141d15',fontWeight:700}}>reconnect in a new tab ↗</a> (opens separately so nothing you’ve filled here is lost).
                       </div>
                       <input value={selectedInstagramId} onChange={e=>setSelectedInstagramId(e.target.value)} placeholder="Instagram Account ID (optional — find in Meta Business Suite)" style={{...S.input,fontSize:12}}/>
                     </div>
                   )}
                 </div>
-              ):<div style={{fontSize:13,color:'#8aaa8a'}}>Loading pages…</div>}
+              ):<div style={{fontSize:13,color:'#8b8a72'}}>Loading pages…</div>}
             </div>
           </div>
           <div style={S.foot}>
@@ -784,17 +784,17 @@ function M4Inner() {
 
       {step==='retargeting'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 3 — Retargeting and Retainer Campaigns</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Convert warm visitors and reward past buyers with different messaging.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 3 — Retargeting and Retainer Campaigns</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Convert warm visitors and reward past buyers with different messaging.</div></div>
           <div style={S.body}>
             <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:14,padding:18,marginBottom:20}}>
               <div style={{fontSize:13,fontWeight:800,color:'#fbbf24',marginBottom:10}}>Smart Budget Split</div>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
-                <div style={{textAlign:'center',padding:12,background:'#f5f9f3',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#1a3a1a'}}>60%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Broad + Interest — New customers</div></div>
+                <div style={{textAlign:'center',padding:12,background:'#f5f9f3',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#141d15'}}>60%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Broad + Interest — New customers</div></div>
                 <div style={{textAlign:'center',padding:12,background:'#f5f9f3',borderRadius:10}}><div style={{fontSize:28,fontWeight:900,color:'#fbbf24'}}>40%</div><div style={{fontSize:12,color:'#6b8f6b',marginTop:4}}>Retargeting + Retainer — Warm audiences</div></div>
               </div>
             </div>
             <div style={{marginBottom:20}}>
-              <div style={{fontSize:14,fontWeight:800,color:'#1a3a1a',marginBottom:4}}>Retargeting Campaign</div>
+              <div style={{fontSize:14,fontWeight:800,color:'#141d15',marginBottom:4}}>Retargeting Campaign</div>
               <div style={{fontSize:12,color:'#7a9a7a',marginBottom:12}}>Website visitors last 60 days — audiences created automatically from your pixel</div>
               <UploadBox list={retargetingCreatives} setter={setRetargetingCreatives} label="Upload retargeting creative — remind them why they visited"/>
               <CopyBox copy={retargetingCopy} setCopy={setRetargetingCopy} type="retargeting" title="Retargeting Ad Copy"/>
@@ -802,10 +802,10 @@ function M4Inner() {
             <div style={{border:'1px solid rgba(249,168,212,0.2)',borderRadius:14,padding:18,background:'rgba(249,168,212,0.03)'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:includeRetainer?16:0}}>
                 <div>
-                  <div style={{fontSize:14,fontWeight:800,color:'#1a3a1a'}}>Retainer Campaign <span style={{fontSize:10,padding:'2px 8px',borderRadius:100,background:'rgba(249,168,212,0.1)',color:'#f9a8d4',marginLeft:6}}>OPTIONAL</span></div>
+                  <div style={{fontSize:14,fontWeight:800,color:'#141d15'}}>Retainer Campaign <span style={{fontSize:10,padding:'2px 8px',borderRadius:100,background:'rgba(249,168,212,0.1)',color:'#f9a8d4',marginLeft:6}}>OPTIONAL</span></div>
                   <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>Past purchasers — loyalty offers, repeat buyers, LTV maximization</div>
                 </div>
-                <div onClick={()=>setIncludeRetainer(v=>!v)} style={{width:44,height:24,borderRadius:100,background:includeRetainer?'#dffe95':'#c4c4c4',cursor:'pointer',position:'relative',flexShrink:0}}>
+                <div onClick={()=>setIncludeRetainer(v=>!v)} style={{width:44,height:24,borderRadius:100,background:includeRetainer?'#ff5a2c':'#c4c4c4',cursor:'pointer',position:'relative',flexShrink:0}}>
                   <div style={{position:'absolute',top:3,left:includeRetainer?22:3,width:18,height:18,borderRadius:'50%',background:includeRetainer?'#10211f':'white',transition:'left .2s'}}/>
                 </div>
               </div>
@@ -826,29 +826,29 @@ function M4Inner() {
 
       {step==='interests'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 4 — Select Interests</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Core product interests + buyer persona targeting — all validated against Meta's real database.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 4 — Select Interests</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Core product interests + buyer persona targeting — all validated against Meta's real database.</div></div>
           <div style={S.body}>
             {interests.length===0?(
               <div style={{textAlign:'center',padding:32}}>
-                <button onClick={generateInterests} disabled={loading} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Mello is thinking…':'Generate Interest Suggestions'}</button>
+                <button onClick={generateInterests} disabled={loading} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'12px 28px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:loading?0.7:1}}>{loading?'Mello is thinking…':'Generate Interest Suggestions'}</button>
               </div>
             ):(
               <div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {interests.map((interest,i)=>(
-                  <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.1)'}`,background:interest.selected?'rgba(26,58,26,0.06)':'#ffffff',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
-                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#1a3a1a':'rgba(0,0,0,0.15)'}`,background:interest.selected?'#1a3a1a':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#dffe95',flexShrink:0,marginTop:2}}>{interest.selected?'✓':''}</div>
+                  <div key={i} onClick={()=>setInterests(prev=>prev.map((x,j)=>j===i?{...x,selected:!x.selected}:x))} style={{padding:14,borderRadius:14,border:`2px solid ${interest.selected?'#141d15':'rgba(0,0,0,0.1)'}`,background:interest.selected?'rgba(20,29,21,0.06)':'#ffffff',cursor:'pointer',display:'flex',alignItems:'flex-start',gap:12}}>
+                    <div style={{width:22,height:22,borderRadius:6,border:`2px solid ${interest.selected?'#141d15':'rgba(0,0,0,0.15)'}`,background:interest.selected?'#141d15':'none',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:900,color:'#ff5a2c',flexShrink:0,marginTop:2}}>{interest.selected?'✓':''}</div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4,flexWrap:'wrap'}}>
-                        <span style={{fontSize:14,fontWeight:700,color:'#1a3a1a'}}>{interest.name}</span>
-                        {interest.category==='Core'&&<span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:100,background:'rgba(26,58,26,0.12)',color:'#1a5c1a',textTransform:'uppercase',letterSpacing:'.05em'}}>CORE</span>}
+                        <span style={{fontSize:14,fontWeight:700,color:'#141d15'}}>{interest.name}</span>
+                        {interest.category==='Core'&&<span style={{fontSize:10,fontWeight:800,padding:'2px 8px',borderRadius:100,background:'rgba(20,29,21,0.12)',color:'#1a5c1a',textTransform:'uppercase',letterSpacing:'.05em'}}>CORE</span>}
                       </div>
-                      <div style={{fontSize:12,color:'#5a7a5a',lineHeight:1.5,marginBottom:6}}>{interest.why}</div>
+                      <div style={{fontSize:12,color:'#6b6a58',lineHeight:1.5,marginBottom:6}}>{interest.why}</div>
                       <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
                         {/* Intent badge */}
                         <span style={{
                           fontSize:11,fontWeight:700,padding:'2px 10px',borderRadius:100,
-                          background: (interest.intentType==='problem'||interest.intentType==='solution') ? 'rgba(220,38,38,0.08)' : interest.intentType==='category' ? 'rgba(26,58,26,0.08)' : 'rgba(0,0,0,0.05)',
-                          color: (interest.intentType==='problem'||interest.intentType==='solution') ? '#dc2626' : interest.intentType==='category' ? '#1a5c1a' : '#5a7a5a',
+                          background: (interest.intentType==='problem'||interest.intentType==='solution') ? 'rgba(220,38,38,0.08)' : interest.intentType==='category' ? 'rgba(20,29,21,0.08)' : 'rgba(0,0,0,0.05)',
+                          color: (interest.intentType==='problem'||interest.intentType==='solution') ? '#dc2626' : interest.intentType==='category' ? '#1a5c1a' : '#6b6a58',
                         }}>{interest.intentBadge || (interest.category==='Core' ? 'Core Category 🎯' : 'Support ⚡')}</span>
                         {/* Audience size */}
                         {(interest.audienceSize||0) > 0 && (
@@ -863,7 +863,7 @@ function M4Inner() {
                   </div>
                 ))}
                 <div style={{marginTop:8}}>
-                  <div style={{fontSize:11,color:'#8aaa8a',marginBottom:6,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Search & add from Meta's interest database</div>
+                  <div style={{fontSize:11,color:'#8b8a72',marginBottom:6,fontWeight:600,textTransform:'uppercase',letterSpacing:'.06em'}}>Search & add from Meta's interest database</div>
                   <InterestSearch onAdd={(interest)=>{
                     setInterests(prev=>{
                       if(prev.find(i=>i.name===interest.name)) return prev
@@ -875,7 +875,7 @@ function M4Inner() {
             )}
           </div>
           <div style={S.foot}>
-            <div><button onClick={()=>goTo('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#1a3a1a',fontWeight:600}}>{selectedInterests.length} selected</span></div>
+            <div><button onClick={()=>goTo('retargeting')} style={S.back}>Back</button><span style={{marginLeft:14,fontSize:13,color:'#141d15',fontWeight:600}}>{selectedInterests.length} selected</span></div>
             {nb(()=>goTo('budget'),'Set Budget →',selectedInterests.length<2)}
           </div>
         </div>
@@ -883,14 +883,14 @@ function M4Inner() {
 
       {step==='budget'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 5 — Budget and Targeting</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Total budget split 60% new users and 40% warm audiences automatically.</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 5 — Budget and Targeting</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>Total budget split 60% new users and 40% warm audiences automatically.</div></div>
           <div style={S.body}>
             <div style={{marginBottom:20}}>
               <label style={S.label}>Campaign Goal</label>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 {[{id:'OUTCOME_SALES',icon:'Cart',title:'Sales'},{id:'OUTCOME_LEADS',icon:'Target',title:'Leads'},{id:'OUTCOME_TRAFFIC',icon:'Globe',title:'Traffic'},{id:'OUTCOME_AWARENESS',icon:'Bell',title:'Awareness'}].map(o=>(
-                  <div key={o.id} onClick={()=>set('objective',o.id)} style={{padding:12,borderRadius:12,border:`2px solid ${form.objective===o.id?'#dffe95':'rgba(255,255,255,0.08)'}`,background:form.objective===o.id?'rgba(223,254,149,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
-                    <span style={{fontSize:13,fontWeight:700,color:'#1a3a1a'}}>{o.title}</span>
+                  <div key={o.id} onClick={()=>set('objective',o.id)} style={{padding:12,borderRadius:12,border:`2px solid ${form.objective===o.id?'#ff5a2c':'rgba(255,255,255,0.08)'}`,background:form.objective===o.id?'rgba(255,90,44,0.06)':'rgba(255,255,255,0.02)',cursor:'pointer',display:'flex',alignItems:'center',gap:10}}>
+                    <span style={{fontSize:13,fontWeight:700,color:'#141d15'}}>{o.title}</span>
                   </div>
                 ))}
               </div>
@@ -899,7 +899,7 @@ function M4Inner() {
               <div>
                 <label style={S.label}>Total Daily Budget ({accountCurrency})</label>
                 <input type="number" value={form.budget} onChange={e=>set('budget',e.target.value)} style={S.input}/>
-                <div style={{fontSize:11,color:'#8aaa8a',marginTop:4}}>60% = {Math.round(parseFloat(form.budget||'0')*0.6)} new users — 40% = {Math.round(parseFloat(form.budget||'0')*0.4)} retargeting</div>
+                <div style={{fontSize:11,color:'#8b8a72',marginTop:4}}>60% = {Math.round(parseFloat(form.budget||'0')*0.6)} new users — 40% = {Math.round(parseFloat(form.budget||'0')*0.4)} retargeting</div>
               </div>
               <div><label style={S.label}>Gender</label><select value={form.gender} onChange={e=>set('gender',e.target.value)} style={{...S.input,background:'#ffffff'}}><option value="ALL">All</option><option value="MALE">Men</option><option value="FEMALE">Women</option></select></div>
             </div>
@@ -915,39 +915,39 @@ function M4Inner() {
 
       {step==='review'&&(
         <div style={S.card}>
-          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#1a3a1a'}}>Step 6 — Review and Launch</div></div>
+          <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 6 — Review and Launch</div></div>
           <div style={S.body}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
               {[{color:'#2d7a2d',label:'Broad',count:creatives.length,pct:30},{color:'#1a5c1a',label:'Interest',count:selectedInterests.length,pct:30},{color:'#fbbf24',label:'Retargeting',count:retargetingCreatives.length,pct:40},...(includeRetainer?[{color:'#f9a8d4',label:'Retainer',count:retainerCreatives.length,pct:20}]:[])].map(c=>(
                 <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}20`,borderRadius:14,padding:16}}>
                   <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>{c.label}</div>
-                  <div style={{fontSize:22,fontWeight:900,color:'#1a3a1a',marginBottom:4}}>{c.count} <span style={{fontSize:12,fontWeight:500,color:'#7a9a7a'}}>ad sets</span></div>
+                  <div style={{fontSize:22,fontWeight:900,color:'#141d15',marginBottom:4}}>{c.count} <span style={{fontSize:12,fontWeight:500,color:'#7a9a7a'}}>ad sets</span></div>
                   <div style={{fontSize:12,color:'#6b8f6b'}}>{accountCurrency} {Math.round(parseFloat(form.budget||'0')*c.pct/100)}/day</div>
                 </div>
               ))}
             </div>
-            <button onClick={launch} disabled={loading} style={{width:'100%',background:loading?'rgba(223,254,149,0.5)':'#dffe95',color:'#1a3a1a',border:'none',padding:15,borderRadius:14,fontSize:16,fontWeight:800,fontFamily:'inherit',cursor:loading?'not-allowed':'pointer'}}>
+            <button onClick={launch} disabled={loading} style={{width:'100%',background:loading?'rgba(255,90,44,0.5)':'#ff5a2c',color:'#141d15',border:'none',padding:15,borderRadius:14,fontSize:16,fontWeight:800,fontFamily:'inherit',cursor:loading?'not-allowed':'pointer'}}>
               {loading?'Creating in Meta Ads Manager…':'Launch All Campaigns (PAUSED for review)'}
             </button>
           </div>
-          <div style={{padding:'12px 24px'}}><button onClick={()=>goTo('budget')} style={{background:'none',border:'none',color:'#8aaa8a',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Back to budget</button></div>
+          <div style={{padding:'12px 24px'}}><button onClick={()=>goTo('budget')} style={{background:'none',border:'none',color:'#8b8a72',fontSize:13,cursor:'pointer',fontFamily:'inherit'}}>Back to budget</button></div>
         </div>
       )}
 
       {step==='grades'&&(
         <div>
-          <div style={{marginBottom:20}}><h2 style={{fontSize:20,fontWeight:800,color:'#1a3a1a',marginBottom:4}}>M4 Campaign Grades</h2><p style={{fontSize:13,color:'#7a9a7a'}}>Based on ROAS vs account average. Scale winners, pause losers.</p></div>
+          <div style={{marginBottom:20}}><h2 style={{fontSize:20,fontWeight:800,color:'#141d15',marginBottom:4}}>M4 Campaign Grades</h2><p style={{fontSize:13,color:'#7a9a7a'}}>Based on ROAS vs account average. Scale winners, pause losers.</p></div>
           {loading?(
             <div style={{...S.card,padding:48,textAlign:'center'}}>
               <img src='/favicon.png' alt='' style={{width:44,height:44,borderRadius:11,animation:'spin 1s linear infinite',margin:'0 auto 16px',display:'block'}}/>
-              <div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>Analysing campaigns…</div>
+              <div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>Analysing campaigns…</div>
             </div>
           ):grades.length===0?(
             <div style={{...S.card,padding:48,textAlign:'center'}}>
               <div style={{fontSize:32,marginBottom:12}}>Chart</div>
-              <div style={{fontSize:16,fontWeight:700,color:'#1a3a1a',marginBottom:8}}>No campaign data yet</div>
+              <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No campaign data yet</div>
               <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Run campaigns for 7 days then grade.</div>
-              <button onClick={gradeNow} style={{background:'#dffe95',color:'#1a3a1a',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
+              <button onClick={gradeNow} style={{background:'#ff5a2c',color:'#141d15',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
             </div>
           ):(
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
@@ -959,18 +959,18 @@ function M4Inner() {
                       <div style={{flex:1}}>
                         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
                           <span style={{fontSize:24}}>{grade.emoji}</span>
-                          <div><div style={{fontSize:13,fontWeight:800,color:cfg.color,textTransform:'uppercase'}}>{grade.label}</div><div style={{fontSize:15,fontWeight:700,color:'#1a3a1a'}}>{grade.campaign_name}</div></div>
+                          <div><div style={{fontSize:13,fontWeight:800,color:cfg.color,textTransform:'uppercase'}}>{grade.label}</div><div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>{grade.campaign_name}</div></div>
                           {grade.applied&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:100,background:'rgba(134,239,172,0.15)',color:'#2d7a2d'}}>Applied</span>}
                         </div>
                         <div style={{background:'rgba(0,0,0,0.2)',borderRadius:10,padding:'12px 16px',marginBottom:10,fontSize:13,color:'rgba(255,255,255,0.75)',lineHeight:1.7}}>{grade.why}</div>
                         <div style={{background:'rgba(0,0,0,0.15)',borderLeft:`3px solid ${cfg.color}`,borderRadius:'0 10px 10px 0',padding:'12px 16px'}}>
-                          <div style={{fontSize:13,color:'#1a3a1a',fontWeight:600,marginBottom:4}}>{grade.action}</div>
+                          <div style={{fontSize:13,color:'#141d15',fontWeight:600,marginBottom:4}}>{grade.action}</div>
                           <div style={{fontSize:12,color:'#6b8f6b',lineHeight:1.6}}>{grade.action_reason}</div>
                         </div>
                       </div>
                       {!grade.applied&&(
                         <div style={{display:'flex',flexDirection:'column',gap:8,flexShrink:0}}>
-                          <button onClick={()=>applyAction(grade)} disabled={!!applying||!!scaling} style={{background:cfg.color,color:'#1a3a1a',border:'none',padding:'10px 18px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:(applying||scaling)?0.7:1,whiteSpace:'nowrap'}}>
+                          <button onClick={()=>applyAction(grade)} disabled={!!applying||!!scaling} style={{background:cfg.color,color:'#141d15',border:'none',padding:'10px 18px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer',opacity:(applying||scaling)?0.7:1,whiteSpace:'nowrap'}}>
                             {scaling===grade.campaign_name?'Scaling…':applying===grade.campaign_name?'Applying…':grade.grade==='GRADUATE'?'Scale Winner':grade.grade==='HOLD'?'Keep Running':'Pause This Ad'}
                           </button>
                           <button style={{background:'none',border:'1.5px solid rgba(0,0,0,0.1)',color:'#7a9a7a',padding:'8px 16px',borderRadius:100,fontSize:12,fontFamily:'inherit',cursor:'pointer'}}>Skip</button>
@@ -980,7 +980,7 @@ function M4Inner() {
                   </div>
                 )
               })}
-              <button onClick={()=>goTo('welcome')} style={{background:'none',border:'1.5px solid rgba(223,254,149,0.2)',color:'#1a3a1a',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',alignSelf:'flex-start'}}>Launch Another Campaign</button>
+              <button onClick={()=>goTo('welcome')} style={{background:'none',border:'1.5px solid rgba(255,90,44,0.2)',color:'#141d15',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer',alignSelf:'flex-start'}}>Launch Another Campaign</button>
             </div>
           )}
         </div>

@@ -200,7 +200,7 @@ export default function IndexerAdminPage() {
   }
 
   const card = { background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', padding: 20 }
-  const btn = (color = '#1a3a1a', text = '#dffe95') => ({ padding: '8px 18px', background: color, color: text, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' } as const)
+  const btn = (color = '#141d15', text = '#ff5a2c') => ({ padding: '8px 18px', background: color, color: text, border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' } as const)
 
   if (loading) return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200, fontSize: 16, color: '#6b7280' }}>Loading indexer stats…</div>
 
@@ -227,7 +227,7 @@ export default function IndexerAdminPage() {
       {/* Stat cards */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(180px,1fr))', gap: 12, marginBottom: 24 }}>
         {[
-          { label: 'Total Ads Indexed', value: stats?.totalAds?.toLocaleString() || '0', icon: '📦', color: '#1a3a1a' },
+          { label: 'Total Ads Indexed', value: stats?.totalAds?.toLocaleString() || '0', icon: '📦', color: '#141d15' },
           { label: 'With Thumbnails', value: stats?.withThumbnail?.toLocaleString() || '0', icon: '🖼️', color: '#0891b2' },
           { label: 'AI Classified', value: stats?.classified?.toLocaleString() || '0', icon: '🤖', color: '#7c3aed' },
           { label: 'With Embeddings', value: stats?.withEmbedding?.toLocaleString() || '0', icon: '🔢', color: '#1d4ed8' },
@@ -317,7 +317,7 @@ export default function IndexerAdminPage() {
                     <span style={{ color: '#6b7280' }}>{count?.toLocaleString()}</span>
                   </div>
                   <div style={{ height: 6, background: '#f1f5f9', borderRadius: 3 }}>
-                    <div style={{ height: '100%', background: '#1a3a1a', borderRadius: 3, width: `${Math.min(100, (count / max) * 100)}%` }} />
+                    <div style={{ height: '100%', background: '#141d15', borderRadius: 3, width: `${Math.min(100, (count / max) * 100)}%` }} />
                   </div>
                 </div>
               )
@@ -370,7 +370,7 @@ export default function IndexerAdminPage() {
                 </div>
               )}
               <a href="/discovery" target="_blank"
-                style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#1a3a1a', textDecoration: 'none', padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7 }}>
+                style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 600, color: '#141d15', textDecoration: 'none', padding: '5px 12px', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 7 }}>
                 Open Discovery →
               </a>
             </div>
@@ -396,7 +396,7 @@ export default function IndexerAdminPage() {
                   const body = (ad.body || ad.title || '').slice(0, 100)
                   const isActive = ad.is_active
                   const initials = (ad.page_name || '?').split(' ').map((w: string) => w[0]).join('').toUpperCase().slice(0, 2)
-                  const bgColors = ['#1a3a1a','#1e3a5f','#4a1942','#3a1a1a','#1a3a38']
+                  const bgColors = ['#141d15','#1e3a5f','#4a1942','#3a1a1a','#1a3a38']
                   const bgColor = bgColors[(ad.page_name || '').charCodeAt(0) % bgColors.length]
                   return (
                     <a key={ad.ad_id} href={ad.snapshot_url} target="_blank" rel="noopener noreferrer"
@@ -408,7 +408,7 @@ export default function IndexerAdminPage() {
                       <div style={{ position: 'relative', height: 160, overflow: 'hidden', flexShrink: 0 }}>
                         {/* Always-visible initials base layer */}
                         <div style={{ position: 'absolute', inset: 0, background: bgColor, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <span style={{ fontSize: 36, fontWeight: 800, color: '#dffe95', letterSpacing: -1 }}>{initials}</span>
+                          <span style={{ fontSize: 36, fontWeight: 800, color: '#ff5a2c', letterSpacing: -1 }}>{initials}</span>
                         </div>
                         {/* Brand/creative image on top — covers initials when it loads */}
                         {thumb && (
@@ -510,7 +510,7 @@ export default function IndexerAdminPage() {
                 <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {COUNTRIES.map(c => (
                     <button key={c} onClick={() => setNewCountries(prev => prev.includes(c) ? prev.filter(x => x !== c) : [...prev, c])}
-                      style={{ padding: '4px 10px', background: newCountries.includes(c) ? '#1a3a1a' : '#f1f5f9', color: newCountries.includes(c) ? '#dffe95' : '#374151', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
+                      style={{ padding: '4px 10px', background: newCountries.includes(c) ? '#141d15' : '#f1f5f9', color: newCountries.includes(c) ? '#ff5a2c' : '#374151', border: 'none', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>
                       {c}
                     </button>
                   ))}

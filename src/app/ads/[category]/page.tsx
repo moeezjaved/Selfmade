@@ -16,7 +16,7 @@ import type { Metadata } from 'next'
 
 export const revalidate = 3600   // refresh hourly (keeps "Updated" fresh + picks up new crawls)
 
-const LIME = '#dffe95', INK = '#0e1b12'
+const LIME = '#ff5a2c', INK = '#0e1b12'
 const PLATFORM = 'Meta', PLATFORM_SLUG = 'meta'
 // Categories the footer links — always valid pages (render a noindex "indexing more" state when
 // thin, never 404), so footer links can't break. Merged with the live niche taxonomy.

@@ -16,9 +16,9 @@ import { useCredits, confirmCredits, refreshCredits } from '@/components/credits
 import Storyboard from '@/components/video/Storyboard'
 // The Remotion editor is browser-only (@remotion/player) — load it client-side and show it INLINE the
 // moment a video finishes, so editing (captions/CTA/logo/aspect) happens in the same window, no click.
-const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor'), { ssr: false, loading: () => <div style={{ fontSize: 13, color: '#68756b' }}>Loading the editor…</div> })
+const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor'), { ssr: false, loading: () => <div style={{ fontSize: 13, color: '#6f6d5a' }}>Loading the editor…</div> })
 
-const FOREST = '#17251c', LIME = '#dffe95', INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', GREEN = '#3f8f4f'
+const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', GREEN = '#ef4a1e'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
 // ── UGC RECORDING BOOTH — UGC is one continuous selfie take, so there are no shots to strip. The
@@ -41,7 +41,7 @@ function UgcRecording({ script }: { script: string }) {
   return (
     <div style={{ display: 'flex', justifyContent: 'center', marginTop: 14, marginBottom: 4 }}>
       <style>{`@keyframes ugcrec{0%,100%{opacity:1}50%{opacity:.25}}@keyframes ugcwave{0%,100%{transform:scaleY(.35)}50%{transform:scaleY(1)}}@media(prefers-reduced-motion:reduce){.ugc-rec,.ugc-wave span{animation:none!important}}`}</style>
-      <div style={{ position: 'relative', width: 236, aspectRatio: '9 / 16', borderRadius: 22, overflow: 'hidden', background: 'radial-gradient(120% 80% at 50% 22%, #2a3b2e 0%, #141d16 60%, #0c120e 100%)', boxShadow: '0 24px 60px -22px rgba(14,27,18,.55), inset 0 0 0 1px rgba(223,254,149,.08)' }}>
+      <div style={{ position: 'relative', width: 236, aspectRatio: '9 / 16', borderRadius: 22, overflow: 'hidden', background: 'radial-gradient(120% 80% at 50% 22%, #2a3b2e 0%, #141d16 60%, #0c120e 100%)', boxShadow: '0 24px 60px -22px rgba(14,27,18,.55), inset 0 0 0 1px rgba(255,90,44,.08)' }}>
         {/* REC + timecode */}
         <div style={{ position: 'absolute', top: 12, left: 12, display: 'flex', alignItems: 'center', gap: 6, zIndex: 3 }}>
           <span className="ugc-rec" style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff4d4d', display: 'inline-block', boxShadow: '0 0 10px 1px rgba(255,77,77,.7)', animation: 'ugcrec 1.2s ease-in-out infinite' }} />
@@ -57,16 +57,16 @@ function UgcRecording({ script }: { script: string }) {
             <div style={{ fontSize: 13, lineHeight: 1.5, fontWeight: 700, color: 'rgba(255,255,255,.55)', letterSpacing: '-.01em', minHeight: 38 }}>
               {shown.map((w, i) => {
                 const isLast = i === shown.length - 1
-                return <span key={n - shown.length + i} style={{ color: isLast ? '#dffe95' : 'rgba(255,255,255,.85)', transition: 'color .2s' }}>{w} </span>
+                return <span key={n - shown.length + i} style={{ color: isLast ? '#ff5a2c' : 'rgba(255,255,255,.85)', transition: 'color .2s' }}>{w} </span>
               })}
-              {words.length > 0 && <span style={{ display: 'inline-block', width: 2, height: 14, background: '#dffe95', verticalAlign: '-2px' }} />}
+              {words.length > 0 && <span style={{ display: 'inline-block', width: 2, height: 14, background: '#ff5a2c', verticalAlign: '-2px' }} />}
             </div>
           </div>
         </div>
         {/* live waveform */}
         <div className="ugc-wave" style={{ position: 'absolute', left: 0, right: 0, bottom: 16, display: 'flex', gap: 3, alignItems: 'center', justifyContent: 'center', height: 20, zIndex: 3 }}>
           {[0, .12, .28, .05, .34, .18, .4, .1, .3, .22, .38, .08, .26, .15].map((d, i) => (
-            <span key={i} style={{ width: 3, height: 18, borderRadius: 3, background: '#dffe95', opacity: .85, transformOrigin: 'center', animation: `ugcwave ${0.7 + (i % 4) * 0.12}s ease-in-out ${d}s infinite` }} />
+            <span key={i} style={{ width: 3, height: 18, borderRadius: 3, background: '#ff5a2c', opacity: .85, transformOrigin: 'center', animation: `ugcwave ${0.7 + (i % 4) * 0.12}s ease-in-out ${d}s infinite` }} />
           ))}
         </div>
       </div>
@@ -109,7 +109,7 @@ function RenderFilmstrip({ jobId, progress }: { jobId: string; progress: { label
             {src
               ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', filter: done ? 'none' : active ? 'none' : 'grayscale(.5)' }} />
               : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: '#5d675c', fontSize: 13, fontWeight: 700 }}>{i + 1}</div>}
-            {done && <div style={{ position: 'absolute', inset: 0, background: 'rgba(23,37,28,.55)', display: 'grid', placeItems: 'center', color: LIME, fontSize: 15, fontWeight: 900 }}>✓</div>}
+            {done && <div style={{ position: 'absolute', inset: 0, background: 'rgba(20,29,21,.55)', display: 'grid', placeItems: 'center', color: LIME, fontSize: 15, fontWeight: 900 }}>✓</div>}
             {active && <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, background: FOREST, color: LIME, fontSize: 8, fontWeight: 800, letterSpacing: '.04em', textAlign: 'center', padding: '2px 0' }}>FILMING</div>}
           </div>
         )

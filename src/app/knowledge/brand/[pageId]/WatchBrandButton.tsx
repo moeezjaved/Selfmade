@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
-const LIME = '#dffe95', FOREST = '#17251c'
+const LIME = '#ff5a2c', FOREST = '#141d15'
 
 export default function WatchBrandButton({ pageId, name }: { pageId: string; name: string }) {
   const router = useRouter()

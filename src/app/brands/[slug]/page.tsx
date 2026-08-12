@@ -83,7 +83,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
 
   return (
     <div style={{ background: '#ffffff', minHeight: '100vh' }}>
-    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#1a3a1a' }}>
+    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#141d15' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
 
       {/* Breadcrumb / nav */}
@@ -113,9 +113,9 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
 
       {/* Creative-DNA teasers — the intelligence we collect, to make visitors curious for the full set */}
       {page.insights.classified > 0 && (
-        <section style={{ margin: '4px 0 28px', padding: '20px 22px', background: '#f8fcf6', border: '1px solid #e6ede2', borderRadius: 14 }}>
-          <div style={{ fontSize: 17, fontWeight: 800, color: '#1a3a1a', marginBottom: 2 }}>What we found in {name}'s ads</div>
-          <div style={{ fontSize: 13, color: '#5a7a5a', marginBottom: 16 }}>Creative DNA from their top-performing ads — analyzed by AI.</div>
+        <section style={{ margin: '4px 0 28px', padding: '20px 22px', background: '#f9f5ec', border: '1px solid #e6ede2', borderRadius: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: '#141d15', marginBottom: 2 }}>What we found in {name}'s ads</div>
+          <div style={{ fontSize: 13, color: '#6b6a58', marginBottom: 16 }}>Creative DNA from their top-performing ads — analyzed by AI.</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(210px,100%), 1fr))', gap: 18 }}>
             <InsightBlock title="Top hooks" items={page.insights.topHooks} />
             <InsightBlock title="Emotions they trigger" items={page.insights.topEmotions} />
@@ -127,12 +127,12 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
               <div style={{ fontSize: 11, fontWeight: 700, color: '#6b8f6b', textTransform: 'uppercase', letterSpacing: 0.4, marginBottom: 7 }}>Themes they run</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {page.insights.topTopics.map((t) => (
-                  <span key={t.label} style={{ fontSize: 12, fontWeight: 600, color: '#1a3a1a', background: '#eef6e6', padding: '5px 11px', borderRadius: 100, textTransform: 'capitalize' }}>{t.label}</span>
+                  <span key={t.label} style={{ fontSize: 12, fontWeight: 600, color: '#141d15', background: '#eef6e6', padding: '5px 11px', borderRadius: 100, textTransform: 'capitalize' }}>{t.label}</span>
                 ))}
               </div>
             </div>
           )}
-          <div style={{ marginTop: 16, fontSize: 13, color: '#2d6a00', fontWeight: 700 }}>
+          <div style={{ marginTop: 16, fontSize: 13, color: '#c2410c', fontWeight: 700 }}>
             Unlock the full breakdown — CTAs, personas, hook-by-hook analysis + performance scores for all {ref.adCount.toLocaleString()} ads →
           </div>
         </section>
@@ -168,7 +168,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
             moment {name} launches a new ad. Free to start.
           </p>
           <Link href={`/login?next=/discovery/brand-spy/${ref.pageId}`}
-            style={{ display: 'inline-block', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 15, padding: '13px 30px', borderRadius: 100, textDecoration: 'none' }}>
+            style={{ display: 'inline-block', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 15, padding: '13px 30px', borderRadius: 100, textDecoration: 'none' }}>
             Unlock {name}'s ads — free →
           </Link>
         </div>
@@ -181,7 +181,7 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
             {related.map((b) => (
               <Link key={b.pageId} href={`/brands/${b.slug}`}
-                style={{ fontSize: 13, fontWeight: 600, color: '#1a3a1a', background: '#f3f4f6', padding: '7px 13px', borderRadius: 8, textDecoration: 'none' }}>
+                style={{ fontSize: 13, fontWeight: 600, color: '#141d15', background: '#f3f4f6', padding: '7px 13px', borderRadius: 8, textDecoration: 'none' }}>
                 {titleCase(b.name)} ads
               </Link>
             ))}
@@ -212,8 +212,8 @@ function InsightBlock({ title, items }: { title: string; items: { label: string;
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         {items.map((it) => (
           <div key={it.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 13, fontWeight: 600, color: '#1a2e1a' }}>{it.label}</span>
-            <span style={{ fontSize: 11, color: '#5a7a5a', background: '#eef6e6', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>{it.count}</span>
+            <span style={{ fontSize: 13, fontWeight: 600, color: '#141d15' }}>{it.label}</span>
+            <span style={{ fontSize: 11, color: '#6b6a58', background: '#eef6e6', padding: '2px 8px', borderRadius: 100, flexShrink: 0 }}>{it.count}</span>
           </div>
         ))}
       </div>

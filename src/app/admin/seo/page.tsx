@@ -20,7 +20,7 @@ export default function AdminSeo() {
   const t = g?.totals
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>SEO — Brand Pages</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>SEO — Brand Pages</h1>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
         Programmatic pages at <code>/brands/[slug]</code> for brands with ≥{d.min_ads} ads.
         Sitemap: <a href={d.sitemap_url} target="_blank" rel="noreferrer" style={{ color: '#2075ff' }}>{d.sitemap_url}</a>
@@ -82,7 +82,7 @@ function ProgrammaticSeo() {
   const s = p.summary
   return (
     <div style={{ marginTop: 32, borderTop: '1px solid #eee', paddingTop: 24 }}>
-      <h2 style={{ fontSize: 17, fontWeight: 800, color: '#1a3a1a', margin: '0 0 4px' }}>SEO — Ad &amp; Comparison Pages</h2>
+      <h2 style={{ fontSize: 17, fontWeight: 800, color: '#141d15', margin: '0 0 4px' }}>SEO — Ad &amp; Comparison Pages</h2>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>
         <code>/ads/[industry]</code>, <code>/ads/format/[hook]</code>, and <code>/alternatives/[competitor]</code>. A page goes <b>live</b> (indexable) at ≥{p.min_ads} real ads; below that it&rsquo;s <b>noindex</b> (thin-content guard).
       </div>

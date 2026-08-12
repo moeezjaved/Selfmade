@@ -28,8 +28,8 @@ const KEYFRAMES = `
 @keyframes lh-metrics{0%,69%{opacity:0;transform:translateY(10px);}74%{opacity:1;transform:translateY(0);}94%{opacity:1;}99%,100%{opacity:0;}}
 @media (prefers-reduced-motion: reduce){.lh-anim{animation:none !important;opacity:1 !important;transform:none !important;}.lh-hide-static{display:none !important;}}
 `
-const chip = (a: string): React.CSSProperties => ({ position: 'absolute', background: '#dffe95', color: '#0e1b12', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', padding: '5px 11px', borderRadius: 999, animation: a })
-const dna = (top: number, a: string): React.CSSProperties => ({ position: 'absolute', left: 290, top, background: '#1a3a1a', color: '#dffe95', fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 7, animation: a })
+const chip = (a: string): React.CSSProperties => ({ position: 'absolute', background: '#ff5a2c', color: '#0e1b12', fontSize: 11, fontWeight: 800, letterSpacing: '.08em', padding: '5px 11px', borderRadius: 999, animation: a })
+const dna = (top: number, a: string): React.CSSProperties => ({ position: 'absolute', left: 290, top, background: '#141d15', color: '#ff5a2c', fontSize: 11, fontWeight: 600, padding: '5px 10px', borderRadius: 7, animation: a })
 
 export default function LandingHero() {
   const [m, setM] = useState({ roas: '0.0', ctr: '0.0' })
@@ -45,23 +45,23 @@ export default function LandingHero() {
   return (
     <div style={{ position: 'relative', width: 720, height: 420, maxWidth: '100%', overflow: 'hidden', borderRadius: 20, background: 'radial-gradient(120% 130% at 50% -10%, #16281a 0%, #0e1b12 65%)', fontFamily: 'Inter, sans-serif' }}>
       <style>{KEYFRAMES}</style>
-      <div className="lh-anim" style={{ position: 'absolute', inset: -24, backgroundImage: 'radial-gradient(rgba(223,254,149,.06) 1.4px, transparent 1.4px)', backgroundSize: '24px 24px', animation: 'lh-grid 3.5s linear infinite' }} />
+      <div className="lh-anim" style={{ position: 'absolute', inset: -24, backgroundImage: 'radial-gradient(rgba(255,90,44,.06) 1.4px, transparent 1.4px)', backgroundSize: '24px 24px', animation: 'lh-grid 3.5s linear infinite' }} />
 
       <div className="lh-anim" style={{ ...chip('lh-chipSpy 6.5s linear infinite'), left: 118, top: 70 }}>SPY</div>
 
       {/* original competitor card + radar ring */}
       <div className="lh-anim" style={{ position: 'absolute', left: 120, top: 112, animation: 'lh-cardO 6.5s linear infinite' }}>
         <div className="lh-anim" style={{ position: 'absolute', left: '50%', top: '50%', width: 150, height: 195, transform: 'translate(-50%,-50%)', animation: 'lh-ringGate 6.5s linear infinite' }}>
-          <div className="lh-anim" style={{ position: 'absolute', left: '50%', top: '50%', width: 150, height: 150, borderRadius: '50%', border: '2px solid #dffe95', animation: 'lh-ring 1.5s ease-out infinite' }} />
+          <div className="lh-anim" style={{ position: 'absolute', left: '50%', top: '50%', width: 150, height: 150, borderRadius: '50%', border: '2px solid #ff5a2c', animation: 'lh-ring 1.5s ease-out infinite' }} />
         </div>
         <div style={{ position: 'relative', width: 150, height: 195, background: '#fff', borderRadius: 12, boxShadow: '0 14px 30px -12px rgba(0,0,0,.5)', overflow: 'hidden' }}>
           <div style={{ height: '56%', background: 'repeating-linear-gradient(135deg,#e6e8e3 0 10px,#dcded8 10px 20px)' }} />
           <div style={{ padding: 12 }}>
-            <div style={{ height: 8, width: '82%', borderRadius: 5, background: '#1a3a1a' }} />
+            <div style={{ height: 8, width: '82%', borderRadius: 5, background: '#141d15' }} />
             <div style={{ height: 7, width: '58%', borderRadius: 4, background: '#c9ccc6', marginTop: 8 }} />
           </div>
           <div className="lh-anim" style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '100%', animation: 'lh-scanGate 6.5s linear infinite' }}>
-            <div className="lh-anim" style={{ position: 'absolute', left: 0, right: 0, height: 26, background: 'linear-gradient(180deg,rgba(223,254,149,0) 0%,rgba(223,254,149,.55) 50%,rgba(223,254,149,0) 100%)', boxShadow: '0 0 12px rgba(223,254,149,.6)', animation: 'lh-beam .9s ease-in-out infinite' }} />
+            <div className="lh-anim" style={{ position: 'absolute', left: 0, right: 0, height: 26, background: 'linear-gradient(180deg,rgba(255,90,44,0) 0%,rgba(255,90,44,.55) 50%,rgba(255,90,44,0) 100%)', boxShadow: '0 0 12px rgba(255,90,44,.6)', animation: 'lh-beam .9s ease-in-out infinite' }} />
           </div>
         </div>
       </div>
@@ -73,21 +73,21 @@ export default function LandingHero() {
       <div className="lh-anim" style={{ ...chip('lh-chipClone 6.5s linear infinite'), left: 452, top: 70 }}>REMAKE</div>
       <div className="lh-anim lh-hide-static" style={{ ...chip('lh-chipLaunch 6.5s linear infinite'), left: 452, top: 70 }}>LAUNCH</div>
 
-      <div className="lh-anim lh-hide-static" style={{ position: 'absolute', left: 454, top: 112, width: 150, height: 195, borderRadius: 12, background: 'rgba(223,254,149,.18)', border: '2px solid rgba(223,254,149,.5)', animation: 'lh-ghost 6.5s linear infinite' }} />
+      <div className="lh-anim lh-hide-static" style={{ position: 'absolute', left: 454, top: 112, width: 150, height: 195, borderRadius: 12, background: 'rgba(255,90,44,.18)', border: '2px solid rgba(255,90,44,.5)', animation: 'lh-ghost 6.5s linear infinite' }} />
 
       {/* clone card */}
       <div className="lh-anim" style={{ position: 'absolute', left: 454, top: 112, animation: 'lh-cardC 6.5s linear infinite', transformOrigin: 'center' }}>
-        <div style={{ position: 'relative', width: 150, height: 195, background: '#fff', borderRadius: 12, boxShadow: '0 14px 34px -12px rgba(0,0,0,.55), 0 0 0 1.5px rgba(223,254,149,.4)', overflow: 'hidden' }}>
+        <div style={{ position: 'relative', width: 150, height: 195, background: '#fff', borderRadius: 12, boxShadow: '0 14px 34px -12px rgba(0,0,0,.55), 0 0 0 1.5px rgba(255,90,44,.4)', overflow: 'hidden' }}>
           <div style={{ height: '56%', position: 'relative', background: 'repeating-linear-gradient(135deg,#e6e8e3 0 10px,#dcded8 10px 20px)' }}>
-            <div className="lh-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(150deg,#dffe95 0%,#8fd66a 55%,#1a3a1a 120%)', animation: 'lh-cimg 6.5s linear infinite' }} />
+            <div className="lh-anim" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(150deg,#ff5a2c 0%,#ff7a4c 55%,#141d15 120%)', animation: 'lh-cimg 6.5s linear infinite' }} />
           </div>
           <div style={{ padding: 12 }}>
-            <div className="lh-anim" style={{ height: 8, width: '82%', borderRadius: 5, background: '#1a3a1a', transformOrigin: 'left', animation: 'lh-cbar 6.5s linear infinite' }} />
+            <div className="lh-anim" style={{ height: 8, width: '82%', borderRadius: 5, background: '#141d15', transformOrigin: 'left', animation: 'lh-cbar 6.5s linear infinite' }} />
             <div className="lh-anim" style={{ height: 7, width: '58%', borderRadius: 4, background: '#c9ccc6', marginTop: 8, transformOrigin: 'left', animation: 'lh-cbar 6.5s linear infinite' }} />
           </div>
         </div>
-        <div className="lh-anim lh-hide-static" style={{ position: 'absolute', left: '50%', top: '100%', width: 22, height: 120, background: 'linear-gradient(180deg,rgba(223,254,149,.85) 0%,rgba(223,254,149,0) 100%)', borderRadius: '0 0 40% 40%', filter: 'blur(3px)', transformOrigin: 'top', animation: 'lh-exhaust 6.5s linear infinite' }} />
-        {[{ tx: '-18px', ty: '34px', c: '#dffe95' }, { tx: '16px', ty: '44px', c: '#8fbf3d' }, { tx: '2px', ty: '52px', c: '#fff' }].map((p, i) => (
+        <div className="lh-anim lh-hide-static" style={{ position: 'absolute', left: '50%', top: '100%', width: 22, height: 120, background: 'linear-gradient(180deg,rgba(255,90,44,.85) 0%,rgba(255,90,44,0) 100%)', borderRadius: '0 0 40% 40%', filter: 'blur(3px)', transformOrigin: 'top', animation: 'lh-exhaust 6.5s linear infinite' }} />
+        {[{ tx: '-18px', ty: '34px', c: '#ff5a2c' }, { tx: '16px', ty: '44px', c: '#8fbf3d' }, { tx: '2px', ty: '52px', c: '#fff' }].map((p, i) => (
           <span key={i} className="lh-anim lh-hide-static" style={{ position: 'absolute', left: '50%', top: '100%', width: 5, height: 5, borderRadius: 1, background: p.c, ['--tx' as string]: p.tx, ['--ty' as string]: p.ty, animation: 'lh-lp 6.5s linear infinite' } as React.CSSProperties} />
         ))}
       </div>
@@ -95,10 +95,10 @@ export default function LandingHero() {
       {/* metrics */}
       <div className="lh-anim" style={{ position: 'absolute', left: 0, right: 0, bottom: 34, display: 'flex', justifyContent: 'center', gap: 14, animation: 'lh-metrics 6.5s linear infinite' }}>
         {[{ l: 'ROAS', v: `${m.roas}×` }, { l: 'CTR', v: `${m.ctr}%` }].map(x => (
-          <div key={x.l} style={{ display: 'flex', alignItems: 'baseline', gap: 7, background: 'rgba(26,58,26,.55)', border: '1px solid rgba(223,254,149,.2)', padding: '9px 15px', borderRadius: 12 }}>
+          <div key={x.l} style={{ display: 'flex', alignItems: 'baseline', gap: 7, background: 'rgba(20,29,21,.55)', border: '1px solid rgba(255,90,44,.2)', padding: '9px 15px', borderRadius: 12 }}>
             <span style={{ fontSize: 11, fontWeight: 600, color: '#9fb08f' }}>{x.l}</span>
             <span style={{ fontSize: 17, fontWeight: 800, color: '#fff' }}>{x.v}</span>
-            <span style={{ fontSize: 12, color: '#dffe95' }}>▲</span>
+            <span style={{ fontSize: 12, color: '#ff5a2c' }}>▲</span>
           </div>
         ))}
       </div>

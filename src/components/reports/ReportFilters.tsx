@@ -50,7 +50,7 @@ export default function ReportFilters({ filters, onChange, currency = 'PKR' }: {
       {filters.map((f, i) => (
         <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '5px 10px', borderRadius: 100, background: '#eef4ec', border: '1px solid rgba(0,0,0,0.06)', fontSize: 12, fontWeight: 700, color: '#2a4a2a' }}>
           {chipLabel(f)}
-          <button onClick={() => remove(i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8aaa8a', fontSize: 13, padding: 0, lineHeight: 1 }}>✕</button>
+          <button onClick={() => remove(i)} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: '#8b8a72', fontSize: 13, padding: 0, lineHeight: 1 }}>✕</button>
         </span>
       ))}
       <div style={{ position: 'relative' }}>
@@ -75,8 +75,8 @@ export default function ReportFilters({ filters, onChange, currency = 'PKR' }: {
                         <div key={g}>
                           <div style={{ fontSize: 10, fontWeight: 800, color: '#9ab09a', textTransform: 'uppercase', letterSpacing: '.05em', padding: '8px 10px 4px' }}>{g}</div>
                           {items.map(f => (
-                            <button key={f.key} onClick={() => pick(f.key)} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#1a3a1a', fontFamily: 'inherit' }}
-                              onMouseEnter={e => e.currentTarget.style.background = '#f0f7ee'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{f.label}</button>
+                            <button key={f.key} onClick={() => pick(f.key)} style={{ width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', background: 'transparent', cursor: 'pointer', fontSize: 13, color: '#141d15', fontFamily: 'inherit' }}
+                              onMouseEnter={e => e.currentTarget.style.background = '#f4f0e6'} onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>{f.label}</button>
                           ))}
                         </div>
                       )
@@ -111,7 +111,7 @@ export default function ReportFilters({ filters, onChange, currency = 'PKR' }: {
                     )}
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-                    <button onClick={add} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#1a3a1a', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
+                    <button onClick={add} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#141d15', color: '#ff5a2c', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Add filter</button>
                   </div>
                 </div>
               )}
@@ -123,7 +123,7 @@ export default function ReportFilters({ filters, onChange, currency = 'PKR' }: {
   )
 }
 
-const sel: React.CSSProperties = { padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.14)', fontFamily: 'inherit', fontSize: 12.5, color: '#1a3a1a', background: '#fff', outline: 'none', boxSizing: 'border-box' }
+const sel: React.CSSProperties = { padding: '8px 10px', borderRadius: 9, border: '1px solid rgba(0,0,0,0.14)', fontFamily: 'inherit', fontSize: 12.5, color: '#141d15', background: '#fff', outline: 'none', boxSizing: 'border-box' }
 
 // Numeric input with an optional trailing currency suffix (PKR for money metrics).
 function NumInput({ value, onChange, onEnter, suffix, autoFocus }: { value: string; onChange: (v: string) => void; onEnter: () => void; suffix?: string; autoFocus?: boolean }) {

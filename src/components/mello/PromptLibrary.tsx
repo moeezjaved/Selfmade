@@ -33,7 +33,7 @@ export function PromptLibrary({ onClose, onPick }: { onClose: () => void; onPick
           {/* Category nav */}
           <div style={{ width: 168, borderRight: '1px solid #eef2ec', padding: 8, overflowY: 'auto', flexShrink: 0 }}>
             {[{ key: 'all', label: 'All', icon: '⭐' } as any, ...PROMPT_CATEGORIES].map((c: any) => (
-              <button key={c.key} onClick={() => setCat(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: cat === c.key ? '#eef6e6' : 'transparent', color: cat === c.key ? '#2d5a27' : '#566550', fontSize: 13, fontWeight: cat === c.key ? 700 : 500 }}>
+              <button key={c.key} onClick={() => setCat(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', textAlign: 'left', padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer', background: cat === c.key ? '#eef6e6' : 'transparent', color: cat === c.key ? '#141d15' : '#566550', fontSize: 13, fontWeight: cat === c.key ? 700 : 500 }}>
                 <span>{c.icon}</span>{c.label}
               </button>
             ))}

@@ -25,7 +25,7 @@ export default async function BrandsHub() {
 
   return (
     <div style={{ background: '#ffffff', minHeight: '100vh' }}>
-    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#1a3a1a' }}>
+    <main style={{ maxWidth: 1120, margin: '0 auto', padding: '32px 20px 64px', fontFamily: 'inherit', color: '#141d15' }}>
       <h1 style={{ fontSize: 34, fontWeight: 800, marginBottom: 10, textAlign: 'center' }}>Search any brand's Facebook ads</h1>
       <p style={{ fontSize: 15, color: '#4b5563', maxWidth: 620, margin: '0 auto 22px', lineHeight: 1.5, textAlign: 'center' }}>
         Browse the live Facebook & Instagram ads of {brands.length.toLocaleString()}+ brands. Free.
@@ -33,11 +33,11 @@ export default async function BrandsHub() {
 
       <BrandSearch />
 
-      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#1a3a1a', margin: '28px 0 12px' }}>Popular brands</h2>
+      <h2 style={{ fontSize: 16, fontWeight: 700, color: '#141d15', margin: '28px 0 12px' }}>Popular brands</h2>
       <section style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
         {top.map((b) => (
           <Link key={b.pageId} href={`/brands/${b.slug}`}
-            style={{ fontSize: 13, fontWeight: 600, color: '#1a3a1a', background: '#f3f4f6', padding: '8px 13px', borderRadius: 8, textDecoration: 'none' }}>
+            style={{ fontSize: 13, fontWeight: 600, color: '#141d15', background: '#f3f4f6', padding: '8px 13px', borderRadius: 8, textDecoration: 'none' }}>
             {titleCase(b.name)} <span style={{ color: '#9ca3af' }}>· {b.adCount}</span>
           </Link>
         ))}

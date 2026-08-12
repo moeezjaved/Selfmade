@@ -22,7 +22,7 @@ export default function ForYou() {
   if (!data) return null
 
   return (
-    <div style={{ margin: '34px 0 0', borderLeft: '3px solid #dffe95', paddingLeft: 18 }}>
+    <div style={{ margin: '34px 0 0', borderLeft: '3px solid #ff5a2c', paddingLeft: 18 }}>
       <div style={{ fontSize: 10.5, fontWeight: 900, letterSpacing: '.16em', color: '#7a827c', textTransform: 'uppercase' }}>
         Today · For {data.brandName || 'your brand'}
       </div>

@@ -1,0 +1,92 @@
+<meta charset="utf-8">
+<title>Selfmade — the S as a spaceship</title>
+<style>
+  :root{ --orange:#EF4A1E; --cream:#FFF7EC; --night:#14140f; --paper:#F3EEE3; --muted:#6f6d5a;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; --mono:ui-monospace,Menlo,monospace }
+  *{box-sizing:border-box}
+  .pg{background:var(--paper);color:var(--night);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+  .wrap{max-width:1040px;margin:0 auto;padding:56px 24px 110px}
+  .kick{font:700 12px/1 var(--mono);letter-spacing:.22em;text-transform:uppercase;color:var(--orange)}
+  h1{font-size:clamp(30px,5vw,52px);letter-spacing:-.035em;line-height:1.03;margin:16px 0 0;font-weight:800}
+  h1 em{font-style:normal;color:var(--orange)}
+  .lede{color:var(--muted);margin:16px 0 0;max-width:66ch;font-size:16px;line-height:1.55}
+  .lede b{color:var(--night)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:16px;margin-top:32px}
+  .card{background:#fff;border:1px solid #e6dfcd;border-radius:14px;overflow:hidden}
+  .card.win{border-color:var(--orange);box-shadow:0 0 0 1px var(--orange)}
+  .big{aspect-ratio:1.05/1;background:var(--orange);color:var(--cream);display:grid;place-items:center;position:relative}
+  .big svg{width:58%;height:58%}
+  .big .fl{position:absolute;left:12px;top:10px;font:800 13px var(--sans);color:var(--cream)}
+  .big .pk{position:absolute;right:11px;top:10px;font:700 8.5px/1 var(--mono);color:var(--orange);background:var(--cream);padding:5px 8px;border-radius:20px}
+  .m{padding:13px 15px 15px}.m b{font-size:14.5px}.m p{margin:6px 0 0;font-size:12px;color:var(--muted);line-height:1.5}
+  .row{display:flex;gap:8px;margin-top:12px;align-items:center}
+  .f{width:16px;height:16px;border-radius:3px;background:var(--orange);color:var(--cream);display:grid;place-items:center;flex:none}.f svg{width:12px;height:12px}
+  .oc{width:26px;height:26px;border-radius:6px;background:var(--cream);color:var(--orange);display:grid;place-items:center;border:1px solid #ecdfc7}.oc svg{width:60%;height:60%}
+  .ni{width:26px;height:26px;border-radius:6px;background:var(--night);color:var(--cream);display:grid;place-items:center}.ni svg{width:60%;height:60%}
+  .stk{width:28px;height:28px;border-radius:50%;background:var(--orange);border:2.5px solid #fff;display:grid;place-items:center;box-shadow:0 3px 6px -2px rgba(0,0,0,.4)}.stk svg{width:58%;height:58%;color:var(--cream)}
+  .lbl{font:600 9px/1 var(--mono);color:#b8b39c;letter-spacing:.04em;margin-left:2px}
+  .note{margin-top:26px;font-size:13.5px;color:var(--muted);border-top:1px solid #ded6c4;padding-top:18px;max-width:76ch;line-height:1.6}.note b{color:var(--night)}
+</style>
+
+<div class="pg"><div class="wrap">
+  <div class="kick">Selfmade &middot; the S, as a spaceship</div>
+  <h1>The S <em>is the flight path.</em></h1>
+  <p class="lede">A rocket leaves a trail. Make that trail an <b>S</b> and you get both at once: a ship in motion, and the initial of the name. You read the rocket first, the letter a beat later &mdash; which is exactly what makes a mark stick. Bold cream-on-orange, tested at 16px, night, and sticker.</p>
+
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>
+    <!-- 1 CONTRAIL-S: the S is the trail; a nose at the top, exhaust at the tail -->
+    <symbol id="q1" viewBox="0 0 120 120">
+      <path d="M72 48 A16 16 0 1 0 60 61 A16 16 0 1 1 48 74" fill="none" stroke="currentColor" stroke-width="13" stroke-linecap="round"/>
+      <path d="M72 48 L88 40 L78 56 Z" fill="currentColor"/>
+      <circle cx="42" cy="82" r="5.5" fill="currentColor"/>
+      <circle cx="33" cy="90" r="3.6" fill="currentColor"/>
+    </symbol>
+    <!-- 2 ROCKET + S-PLUME: an upright rocket with an S of smoke below -->
+    <symbol id="q2" viewBox="0 0 120 120">
+      <path d="M60 14 C69 14 69 28 69 36 L69 46 L51 46 L51 36 C51 28 51 14 60 14 Z" fill="currentColor"/>
+      <circle cx="60" cy="30" r="6" fill="var(--bgc,#EF4A1E)"/>
+      <path d="M51 38 L39 52 L51 47 Z" fill="currentColor"/>
+      <path d="M69 38 L81 52 L69 47 Z" fill="currentColor"/>
+      <path d="M60 50 C47 58 47 68 60 74 C73 80 73 90 59 96" fill="none" stroke="currentColor" stroke-width="10" stroke-linecap="round"/>
+    </symbol>
+    <!-- 3 S-CRAFT: the S bent into a ship — pointed nose, porthole, twin flame -->
+    <symbol id="q3" viewBox="0 0 120 120">
+      <path d="M74 44 A17 17 0 1 0 60 61 A17 17 0 1 1 46 78" fill="none" stroke="currentColor" stroke-width="15" stroke-linecap="butt"/>
+      <path d="M74 44 L86 33 L80 49 Z" fill="currentColor"/>
+      <path d="M46 78 L34 89 L40 73 Z" fill="currentColor"/>
+      <circle cx="60" cy="60" r="4.5" fill="var(--bgc,#EF4A1E)"/>
+    </symbol>
+    <!-- 4 SWOOSH-S: a fast banking ship — filled S ribbon with a sharp nose -->
+    <symbol id="q4" viewBox="0 0 120 120">
+      <path d="M60 24 A36 36 0 0 0 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(-6 0)"/>
+      <path d="M60 24 A36 36 0 0 1 60 96 A18 18 0 0 0 60 60 A18 18 0 0 1 60 24 Z" fill="currentColor" transform="translate(6 0)"/>
+      <path d="M86 30 L104 26 L96 42 Z" fill="currentColor"/>
+    </symbol>
+  </defs></svg>
+
+  <div class="grid" id="grid"></div>
+
+  <p class="note"><b>My pick: 01 &middot; Contrail-S.</b> It&rsquo;s the cleanest read of both ideas &mdash; a bold S with a sharp nose at the leading tip and two exhaust puffs at the tail, so it&rsquo;s obviously a ship that just flew an S. It stays legible at 16px and looks fast. <b>02 &middot; Rocket + plume</b> is the most obviously a spaceship (upright rocket) with the S in the smoke, best for stickers/merch. <b>03 &middot; S-Craft</b> turns the S itself into the ship (nose + flame). Tell me which and I&rsquo;ll refine the geometry and wire it in as the live favicon + nav mark.</p>
+</div></div>
+
+<script>
+const G=[
+ ["q1","01 &middot; Contrail-S","A bold S with a nose at the tip and exhaust puffs at the tail. Reads as a ship that flew an S.",true],
+ ["q2","02 &middot; Rocket + plume","An upright rocket trailing an S of smoke. The most obviously a spaceship &mdash; great on merch.",false],
+ ["q3","03 &middot; S-Craft","The S itself bent into a craft: pointed nose, porthole, tail flame.",false],
+ ["q4","04 &middot; Swoosh-S","The filled Channel S given a sharp nose &mdash; a fast ship banking through the turn.",false],
+];
+document.getElementById('grid').innerHTML=G.map(([id,n,p,win])=>`
+ <div class="card ${win?'win':''}">
+   <div class="big"><span class="fl">${n.split('&middot;')[0].trim()}</span>${win?'<span class="pk">Pick</span>':''}<svg><use href="#${id}"/></svg></div>
+   <div class="m"><b>${n.split('&middot;')[1].trim()}</b><p>${p}</p>
+     <div class="row">
+       <div class="f"><svg><use href="#${id}"/></svg></div><span class="lbl">16px</span>
+       <div class="oc"><svg><use href="#${id}"/></svg></div>
+       <div class="ni"><svg><use href="#${id}"/></svg></div>
+       <div class="stk"><svg><use href="#${id}"/></svg></div>
+       <span class="lbl">cream / night / sticker</span>
+     </div>
+   </div>
+ </div>`).join('');
+</script>

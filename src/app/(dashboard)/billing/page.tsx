@@ -103,7 +103,7 @@ export default function BillingPage() {
 
   return (
     <div style={{ padding: '32px 28px', maxWidth: 1120, fontFamily: 'system-ui, sans-serif' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Billing & plans</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Billing & plans</h1>
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Choose a plan, buy top-ups, or manage your subscription.</p>
 
       {/* Full pricing (shared with the landing page — one source of truth). */}
@@ -134,14 +134,14 @@ export default function BillingPage() {
 
       {/* Active subscription card */}
       {isActive && (
-        <div style={{ background: '#152928', border: '1px solid rgba(223,254,149,0.22)', borderRadius: 20, padding: 28, marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
-          <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1.5px', background: 'linear-gradient(90deg,transparent,#dffe95,transparent)' }} />
+        <div style={{ background: '#152928', border: '1px solid rgba(255,90,44,0.22)', borderRadius: 20, padding: 28, marginBottom: 24, position: 'relative', overflow: 'hidden' }}>
+          <div style={{ position: 'absolute', top: 0, left: '20%', right: '20%', height: '1.5px', background: 'linear-gradient(90deg,transparent,#ff5a2c,transparent)' }} />
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(223,254,149,0.6)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Your subscription</div>
-              <div style={{ fontSize: 34, fontWeight: 900, color: '#dffe95', lineHeight: 1 }}>Selfmade {PLANS[normalizePlan(profile?.plan_id)].label}</div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,90,44,0.6)', textTransform: 'uppercase', letterSpacing: '.1em', marginBottom: 8 }}>Your subscription</div>
+              <div style={{ fontSize: 34, fontWeight: 900, color: '#ff5a2c', lineHeight: 1 }}>Selfmade {PLANS[normalizePlan(profile?.plan_id)].label}</div>
             </div>
-            <span style={{ background: '#dffe9520', border: '1px solid #dffe9540', color: '#dffe95', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
+            <span style={{ background: '#ff5a2c20', border: '1px solid #ff5a2c40', color: '#ff5a2c', fontSize: 11, fontWeight: 700, padding: '4px 12px', borderRadius: 100 }}>✓ Active</span>
           </div>
           {/* No Stripe "Manage subscription" portal — we bill through PayPal, which has no hosted
               portal, so that button dead-ended on an empty Stripe page. The plan cards above + Cancel
@@ -185,7 +185,7 @@ export default function BillingPage() {
             <button
               onClick={redeemCode}
               disabled={inviteLoading || !inviteCode.trim()}
-              style={{ padding: '10px 20px', background: '#152928', color: '#dffe95', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: inviteLoading || !inviteCode.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: !inviteCode.trim() ? 0.5 : 1 }}
+              style={{ padding: '10px 20px', background: '#152928', color: '#ff5a2c', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700, cursor: inviteLoading || !inviteCode.trim() ? 'not-allowed' : 'pointer', fontFamily: 'inherit', opacity: !inviteCode.trim() ? 0.5 : 1 }}
             >
               {inviteLoading ? 'Checking…' : 'Apply'}
             </button>
@@ -204,12 +204,12 @@ export default function BillingPage() {
       {showCancel && (
         <div onClick={() => !loading && setShowCancel(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(16,24,15,0.55)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, padding: '26px 28px', maxWidth: 420, width: '100%', boxShadow: '0 30px 80px -20px rgba(16,24,15,0.5)' }}>
-            <div style={{ fontSize: 18, fontWeight: 800, color: '#1a3a1a', marginBottom: 8 }}>Cancel your subscription?</div>
-            <div style={{ fontSize: 13.5, color: '#5a7a5a', lineHeight: 1.6, marginBottom: 20 }}>
+            <div style={{ fontSize: 18, fontWeight: 800, color: '#141d15', marginBottom: 8 }}>Cancel your subscription?</div>
+            <div style={{ fontSize: 13.5, color: '#6b6a58', lineHeight: 1.6, marginBottom: 20 }}>
               You keep full access until the end of your current billing period, then move to Free. You can reactivate anytime before then — nothing is lost.
             </div>
             <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-              <button onClick={() => setShowCancel(false)} disabled={loading} style={{ background: '#f2f4ef', color: '#1a3a1a', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Keep my plan</button>
+              <button onClick={() => setShowCancel(false)} disabled={loading} style={{ background: '#f2f4ef', color: '#141d15', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Keep my plan</button>
               <button onClick={cancelPlan} disabled={loading} style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, cursor: loading ? 'default' : 'pointer', fontFamily: 'inherit' }}>{loading ? 'Cancelling…' : 'Cancel subscription'}</button>
             </div>
           </div>

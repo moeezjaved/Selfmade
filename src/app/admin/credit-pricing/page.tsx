@@ -98,7 +98,7 @@ export default function CreditPricingPage() {
                     <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: '#374151' }}>{row.action_type}</td>
                     <td style={td}><input value={row.label ?? ''} onChange={e => patch(row.action_type, 'label', e.target.value)} style={{ ...inputStyle, width: 180 }} /></td>
                     <td style={td}><input type="number" min={0} value={row.credits} onChange={e => patch(row.action_type, 'credits', Number(e.target.value))} style={inputStyle} /></td>
-                    <td style={{ ...td, fontWeight: 700, color: '#1a3a1a' }}>${price.toFixed(2)}</td>
+                    <td style={{ ...td, fontWeight: 700, color: '#141d15' }}>${price.toFixed(2)}</td>
                     <td style={td}><input type="number" min={0} step="0.0001" value={row.est_cost_usd ?? ''} onChange={e => patch(row.action_type, 'est_cost_usd', e.target.value === '' ? null : Number(e.target.value))} style={inputStyle} placeholder="—" /></td>
                     <td style={{ ...td, color: margin !== '—' && parseInt(margin) < 0 ? '#dc2626' : '#059669', fontWeight: 700 }}>{margin}</td>
                     <td style={td}>
@@ -107,7 +107,7 @@ export default function CreditPricingPage() {
                     <td style={td}>
                       <button onClick={() => save(row)} disabled={saving === row.action_type}
                         style={{ padding: '6px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
-                          background: savedAt === row.action_type ? '#dcfce7' : '#1a3a1a', color: savedAt === row.action_type ? '#166534' : '#dffe95' }}>
+                          background: savedAt === row.action_type ? '#dcfce7' : '#141d15', color: savedAt === row.action_type ? '#166534' : '#ff5a2c' }}>
                         {saving === row.action_type ? '…' : savedAt === row.action_type ? '✓ Saved' : 'Save'}
                       </button>
                     </td>
@@ -119,9 +119,9 @@ export default function CreditPricingPage() {
                 <td style={td}><input value={adding.action_type} onChange={e => setAdding(a => ({ ...a, action_type: e.target.value }))} placeholder="new_action_type" style={{ ...inputStyle, width: 150, fontFamily: 'monospace' }} /></td>
                 <td style={td}><input value={adding.label} onChange={e => setAdding(a => ({ ...a, label: e.target.value }))} placeholder="Label" style={{ ...inputStyle, width: 180 }} /></td>
                 <td style={td}><input type="number" min={0} value={adding.credits} onChange={e => setAdding(a => ({ ...a, credits: Number(e.target.value) }))} style={inputStyle} /></td>
-                <td style={{ ...td, fontWeight: 700, color: '#1a3a1a' }}>${dollars(adding.credits).toFixed(2)}</td>
+                <td style={{ ...td, fontWeight: 700, color: '#141d15' }}>${dollars(adding.credits).toFixed(2)}</td>
                 <td style={td} colSpan={3}></td>
-                <td style={td}><button onClick={addNew} disabled={saving === '__new__' || !adding.action_type.trim()} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #1a3a1a', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', background: '#fff', color: '#1a3a1a' }}>+ Add</button></td>
+                <td style={td}><button onClick={addNew} disabled={saving === '__new__' || !adding.action_type.trim()} style={{ padding: '6px 14px', borderRadius: 7, border: '1px solid #141d15', cursor: 'pointer', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', background: '#fff', color: '#141d15' }}>+ Add</button></td>
               </tr>
             </tbody>
           </table>

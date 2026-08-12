@@ -7,7 +7,7 @@
 import { useState } from 'react'
 import { Plus, Check } from 'lucide-react'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15'
 
 export default function BriefWishlist() {
   const [open, setOpen] = useState(false)
@@ -26,7 +26,7 @@ export default function BriefWishlist() {
 
   if (sent) return (
     <div style={{ marginTop: 22, fontSize: 13, color: MUTED, display: 'flex', alignItems: 'center', gap: 7 }}>
-      <Check size={15} color="#3f8f4f" /> Noted — Mello will factor that into your brief. Thanks.
+      <Check size={15} color="#ef4a1e" /> Noted — Mello will factor that into your brief. Thanks.
     </div>
   )
 
@@ -43,7 +43,7 @@ export default function BriefWishlist() {
             <input value={text} onChange={e => setText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') submit() }} autoFocus
               placeholder="e.g. show my ad spend, weekly winners, TikTok trends…"
               style={{ flex: 1, border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 13px', fontSize: 13, color: INK, outline: 'none', fontFamily: 'inherit' }} />
-            <button onClick={submit} disabled={busy || !text.trim()} style={{ background: FOREST, color: '#dffe95', border: 'none', borderRadius: 10, padding: '0 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Sending…' : 'Send'}</button>
+            <button onClick={submit} disabled={busy || !text.trim()} style={{ background: FOREST, color: '#ff5a2c', border: 'none', borderRadius: 10, padding: '0 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', flexShrink: 0 }}>{busy ? 'Sending…' : 'Send'}</button>
           </div>
         </div>
       )}

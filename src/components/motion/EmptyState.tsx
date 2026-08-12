@@ -28,7 +28,7 @@ export default function EmptyState({
 
         {/* magnifying glass */}
         <div className="es-anim" style={{ position: 'absolute', left: 0, top: 0, width: 54, height: 54, animation: 'es-glass 6s ease-in-out infinite' }}>
-          <div style={{ position: 'absolute', left: 38, top: 38, width: 26, height: 9, borderRadius: 5, background: '#1a3a1a', transform: 'rotate(45deg)', transformOrigin: 'left center' }} />
+          <div style={{ position: 'absolute', left: 38, top: 38, width: 26, height: 9, borderRadius: 5, background: '#141d15', transform: 'rotate(45deg)', transformOrigin: 'left center' }} />
           <div style={{ position: 'absolute', left: 0, top: 0, width: 44, height: 44, borderRadius: '50%', border: '4px solid #8fbf3d', background: 'rgba(143,191,61,.12)', overflow: 'hidden', boxShadow: '0 4px 12px -4px rgba(0,0,0,.3)' }}>
             <div className="es-anim" style={{ position: 'absolute', top: 0, left: 0, width: '60%', height: '100%', background: 'linear-gradient(90deg, rgba(255,255,255,0), rgba(255,255,255,.5), rgba(255,255,255,0))', animation: 'es-sheen 6s ease-in-out infinite' }} />
           </div>

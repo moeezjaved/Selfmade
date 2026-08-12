@@ -75,14 +75,14 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
         {onBack && <button onClick={onBack} style={{ border: 'none', background: '#f4f6f0', borderRadius: 9, width: 32, height: 32, cursor: 'pointer', fontSize: 16, color: '#3a4636' }}>←</button>}
         <span style={{ fontSize: 22 }}>🚀</span>
         <input value={name} onChange={e => setName(e.target.value)} style={{ fontSize: 21, fontWeight: 800, color: '#0e1b12', border: 'none', background: 'transparent', outline: 'none', fontFamily: 'inherit', flex: 1, minWidth: 120 }} />
-        {onSave && <button onClick={save} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#0e1b12', color: '#dffe95', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>}
+        {onSave && <button onClick={save} style={{ padding: '8px 16px', borderRadius: 100, border: 'none', background: '#0e1b12', color: '#ff5a2c', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: 'inherit' }}>Save</button>}
       </div>
 
       {/* Goal + windows bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 12, padding: '10px 14px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, flexWrap: 'wrap', background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 12, padding: '10px 14px' }}>
         {/* Goal */}
         <div style={{ position: 'relative' }}>
-          <button onClick={() => setGoalEdit(g => !g)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#f0f7ee', border: '1px solid #cfe6c4', borderRadius: 9, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#2d5a2d' }}>
+          <button onClick={() => setGoalEdit(g => !g)} style={{ display: 'flex', alignItems: 'center', gap: 7, background: '#f4f0e6', border: '1px solid #cfe6c4', borderRadius: 9, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#2d5a2d' }}>
             🎯 Goal: ROAS ≥ {goalRoas}{goalSpend > 0 ? `, Spend ≥ ${money(goalSpend, currency)}` : ''} <span style={{ color: '#7c8577' }}>▾</span>
           </button>
           {goalEdit && (
@@ -106,7 +106,7 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
         <div style={{ flex: 1 }} />
         {/* Performance window (distinct) */}
         <Selector label="Perf." value={perfRange} setValue={setPerfRange} opts={PERF_RANGES} />
-        <button onClick={() => setPicker(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f4f6f0', border: '1px solid rgba(26,58,26,.12)', borderRadius: 9, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#3a4636' }}>＋ Add metric</button>
+        <button onClick={() => setPicker(true)} style={{ display: 'flex', alignItems: 'center', gap: 5, background: '#f4f6f0', border: '1px solid rgba(20,29,21,.12)', borderRadius: 9, padding: '7px 12px', cursor: 'pointer', fontFamily: 'inherit', fontSize: 12.5, fontWeight: 700, color: '#3a4636' }}>＋ Add metric</button>
       </div>
 
       {/* Funnel */}
@@ -116,7 +116,7 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
           { icon: '📈', label: 'Scaled', value: funnel.scaled, sub: goalSpend > 0 ? `spend ≥ ${money(goalSpend, currency)}` : 'has spend', color: '#b8860b' },
           { icon: '🏆', label: 'Winners', value: funnel.winners, sub: `ROAS ≥ ${goalRoas}`, color: '#2d7a2d' },
         ].map(s => (
-          <div key={s.label} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
+          <div key={s.label} style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 14, padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 14 }}>
             <span style={{ fontSize: 26 }}>{s.icon}</span>
             <div>
               <div style={{ fontSize: 26, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
@@ -135,7 +135,7 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
             {data.cohorts.map((c: any) => {
               const shown = !!open[c.key]
               return (
-                <div key={c.key} style={{ background: '#fff', border: '1px solid rgba(26,58,26,.1)', borderRadius: 14, overflow: 'hidden' }}>
+                <div key={c.key} style={{ background: '#fff', border: '1px solid rgba(20,29,21,.1)', borderRadius: 14, overflow: 'hidden' }}>
                   <button onClick={() => setOpen(o => ({ ...o, [c.key]: !o[c.key] }))}
                     style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '12px 16px', border: 'none', background: '#fafcf5', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
                     <span style={{ fontSize: 11, color: '#9aa196', transform: shown ? 'rotate(90deg)' : 'none', transition: 'transform .12s' }}>▶</span>
@@ -146,7 +146,7 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
                     <div className="rp-scroll" style={{ overflowX: 'auto' }}>
                       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 720 }}>
                         <thead>
-                          <tr style={{ borderBottom: '1px solid rgba(26,58,26,.08)' }}>
+                          <tr style={{ borderBottom: '1px solid rgba(20,29,21,.08)' }}>
                             <th style={{ ...th, textAlign: 'left', paddingLeft: 16, minWidth: 260 }}>Creative</th>
                             <th style={th}>Achievements</th>
                             <th style={th}>Lifetime spend</th>
@@ -156,7 +156,7 @@ export default function LaunchReport({ templateKey, savedId, initialName, initia
                         </thead>
                         <tbody>
                           {c.rows.map((r: any) => (
-                            <tr key={r.key} style={{ borderBottom: '1px solid rgba(26,58,26,.05)' }}>
+                            <tr key={r.key} style={{ borderBottom: '1px solid rgba(20,29,21,.05)' }}>
                               <td style={{ ...td, textAlign: 'left', paddingLeft: 16 }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
                                   <div style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', background: '#f0f4ec', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -209,13 +209,13 @@ function Selector({ label, value, setValue, opts }: { label: string; value: stri
   return (
     <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#7c8577', fontWeight: 700 }}>
       {label}
-      <select value={value} onChange={e => setValue(e.target.value)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid rgba(26,58,26,.14)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
+      <select value={value} onChange={e => setValue(e.target.value)} style={{ padding: '6px 9px', borderRadius: 8, border: '1px solid rgba(20,29,21,.14)', fontFamily: 'inherit', fontSize: 12, fontWeight: 700, color: '#0e1b12', background: '#fff', cursor: 'pointer' }}>
         {opts.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </label>
   )
 }
 
-const inp: React.CSSProperties = { width: 90, padding: '6px 9px', borderRadius: 8, border: '1px solid rgba(26,58,26,.16)', fontFamily: 'inherit', fontSize: 13, outline: 'none', textAlign: 'right' }
+const inp: React.CSSProperties = { width: 90, padding: '6px 9px', borderRadius: 8, border: '1px solid rgba(20,29,21,.16)', fontFamily: 'inherit', fontSize: 13, outline: 'none', textAlign: 'right' }
 const th: React.CSSProperties = { padding: '9px 12px', textAlign: 'right', fontSize: 10, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9aa196', whiteSpace: 'nowrap' }
 const td: React.CSSProperties = { padding: '9px 12px', textAlign: 'right', fontSize: 12.5, fontVariantNumeric: 'tabular-nums', whiteSpace: 'nowrap' }

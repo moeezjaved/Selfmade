@@ -66,7 +66,7 @@ function InlineWidget({ widget, onAnswer, disabled }: { widget: any; onAnswer: (
             <div style={{ flex: 1 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontWeight: 600, fontSize: 13.5, color: '#2c3a26' }}>{opt.label}</span>
-                {opt.recommended && <span style={{ fontSize: 10, fontWeight: 800, color: '#3d5a25', background: '#dffe95', padding: '1px 7px', borderRadius: 99 }}>RECOMMENDED</span>}
+                {opt.recommended && <span style={{ fontSize: 10, fontWeight: 800, color: '#3d5a25', background: '#ff5a2c', padding: '1px 7px', borderRadius: 99 }}>RECOMMENDED</span>}
               </div>
               {opt.description && <div style={{ fontSize: 12, color: '#6c7a66', marginTop: 2 }}>{opt.description}</div>}
             </div>
@@ -77,7 +77,7 @@ function InlineWidget({ widget, onAnswer, disabled }: { widget: any; onAnswer: (
         {widget.allow_skip && (
           <button onClick={() => onAnswer('Skip — use your best judgment.')} disabled={disabled} style={{ padding: '7px 14px', borderRadius: 8, border: '1px solid #d9e2d3', background: '#fff', color: '#566550', fontSize: 13, fontWeight: 600, cursor: disabled ? 'default' : 'pointer' }}>Skip</button>
         )}
-        <button onClick={() => onAnswer(chosen?.label ? `${chosen.label}` : selected)} disabled={disabled || !selected} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: disabled ? '#9bb37e' : '#2d5a27', color: '#fff', fontSize: 13, fontWeight: 700, cursor: disabled ? 'default' : 'pointer' }}>Confirm</button>
+        <button onClick={() => onAnswer(chosen?.label ? `${chosen.label}` : selected)} disabled={disabled || !selected} style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: disabled ? '#9bb37e' : '#141d15', color: '#fff', fontSize: 13, fontWeight: 700, cursor: disabled ? 'default' : 'pointer' }}>Confirm</button>
       </div>
     </div>
   )
@@ -92,7 +92,7 @@ export function ChatMessage({ msg, onWidgetAnswer, onFeedback, widgetLocked }: {
   if (msg.role === 'user') {
     return (
       <div style={{ display: 'flex', justifyContent: 'flex-end', margin: '14px 0' }}>
-        <div style={{ background: '#2d5a27', color: '#fff', padding: '10px 14px', borderRadius: '14px 14px 4px 14px', maxWidth: '78%', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+        <div style={{ background: '#141d15', color: '#fff', padding: '10px 14px', borderRadius: '14px 14px 4px 14px', maxWidth: '78%', fontSize: 14, lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
           {msg.content}
         </div>
       </div>
@@ -109,7 +109,7 @@ export function ChatMessage({ msg, onWidgetAnswer, onFeedback, widgetLocked }: {
         {showThinking && msg.thinking_steps!.map((t, i) => <ThinkingBlock key={i} durationMs={t.duration_ms} />)}
         {(msg.plan?.length || 0) > 0 && (
           <div style={{ margin: '4px 0 8px', padding: '8px 11px', background: 'rgba(45,90,39,0.06)', border: '1px solid rgba(45,90,39,0.15)', borderRadius: 10 }}>
-            <div style={{ fontSize: 10.5, fontWeight: 800, color: '#2d5a27', letterSpacing: '.05em', marginBottom: 4 }}>PLAN</div>
+            <div style={{ fontSize: 10.5, fontWeight: 800, color: '#141d15', letterSpacing: '.05em', marginBottom: 4 }}>PLAN</div>
             <ol style={{ margin: 0, paddingLeft: 18, fontSize: 12.5, color: '#3f5140', lineHeight: 1.55 }}>
               {msg.plan!.map((s, i) => <li key={i}>{s}</li>)}
             </ol>

@@ -100,7 +100,7 @@ export default function SeedsPage() {
 
   return (
     <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto' }}>
-      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1a3a1a', marginBottom: 4 }}>Auto-discovery Seed Terms</h1>
+      <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Auto-discovery Seed Terms</h1>
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 18 }}>
         Categories that auto-discovery searches across Meta to find new brands. Min {newSeed.min_followers.toLocaleString()}+ followers required.
       </p>
@@ -131,7 +131,7 @@ export default function SeedsPage() {
             style={{ ...inputStyle, width: 100 }} />
         </Field>
         <button onClick={addSeed} disabled={!newSeed.term.trim()}
-          style={{ padding: '9px 18px', background: newSeed.term.trim() ? '#1a3a1a' : '#ccc', color: '#dffe95', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: newSeed.term.trim() ? 'pointer' : 'not-allowed', height: 36, fontFamily: 'inherit' }}>
+          style={{ padding: '9px 18px', background: newSeed.term.trim() ? '#141d15' : '#ccc', color: '#ff5a2c', border: 'none', borderRadius: 8, fontSize: 13, fontWeight: 800, cursor: newSeed.term.trim() ? 'pointer' : 'not-allowed', height: 36, fontFamily: 'inherit' }}>
           + Add seed
         </button>
       </div>
@@ -161,7 +161,7 @@ export default function SeedsPage() {
                   {s.brands_found || 0} brands
                 </div>
                 <button onClick={() => preview(s.term)}
-                  style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#1a3a1a', fontFamily: 'inherit' }}>
+                  style={{ padding: '4px 10px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 11, fontWeight: 600, cursor: 'pointer', color: '#141d15', fontFamily: 'inherit' }}>
                   🔍 Preview
                 </button>
                 <button onClick={() => remove(s.id)}

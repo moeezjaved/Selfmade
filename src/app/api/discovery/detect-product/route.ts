@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
   const valid = colorList.filter((c) => rgb(c))
   const byLumAsc = [...valid].sort((a, b) => lum(a) - lum(b))
   const bySat = [...valid].sort((a, b) => sat(b) - sat(a))
-  const accent = bySat[0] || '#1a3a1a'
+  const accent = bySat[0] || '#141d15'
   const cta = bySat.find((c) => c !== accent) || accent
   const palette = {
     background: byLumAsc[byLumAsc.length - 1] && lum(byLumAsc[byLumAsc.length - 1]) > 0.6 ? byLumAsc[byLumAsc.length - 1] : '#ffffff',

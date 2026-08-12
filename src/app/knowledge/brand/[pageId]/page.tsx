@@ -14,7 +14,7 @@ import WatchBrandButton from './WatchBrandButton'
 
 export const revalidate = 3600   // pages stay fresh-ish without hammering the DB
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', LIME = '#dffe95', FOREST = '#17251c', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
 
 async function getBrand(pageId: string) {
   const admin = createAdminClient() as any
@@ -73,7 +73,7 @@ export default async function BrandKnowledgePage({ params }: { params: { pageId:
         {/* identity */}
         <div style={{ display: 'flex', gap: 16, alignItems: 'center', marginBottom: 8 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          {dir?.avatar_url ? <img src={dir.avatar_url} alt="" style={{ width: 58, height: 58, borderRadius: 16, objectFit: 'cover', border: `1px solid ${LINE}` }} /> : <span style={{ width: 58, height: 58, borderRadius: 16, background: '#e7ece7', display: 'inline-block' }} />}
+          {dir?.avatar_url ? <img src={dir.avatar_url} alt="" style={{ width: 58, height: 58, borderRadius: 16, objectFit: 'cover', border: `1px solid ${LINE}` }} /> : <span style={{ width: 58, height: 58, borderRadius: 16, background: '#efece2', display: 'inline-block' }} />}
           <div>
             <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.025em' }}>{name}</h1>
             <div style={{ fontSize: 13, color: MUTED, fontWeight: 600 }}>
@@ -112,13 +112,13 @@ export default async function BrandKnowledgePage({ params }: { params: { pageId:
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={a.m.image} alt={`${name} ad`} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
               {a.m.isVideo && <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', color: '#fff', fontSize: 20, textShadow: '0 2px 8px rgba(0,0,0,.5)' }}>▶</span>}
-              {!!a.days_running && a.days_running >= 21 && <span style={{ position: 'absolute', top: 7, left: 7, background: '#17251cd9', color: LIME, fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 8 }}>{a.days_running}d · survivor</span>}
+              {!!a.days_running && a.days_running >= 21 && <span style={{ position: 'absolute', top: 7, left: 7, background: '#141d15d9', color: LIME, fontSize: 9, fontWeight: 800, padding: '3px 7px', borderRadius: 8 }}>{a.days_running}d · survivor</span>}
             </Link>
           ))}
         </div>
 
         {/* depth gate */}
-        <div style={{ marginTop: 28, background: FOREST, borderRadius: 18, padding: '24px 26px', color: '#eef5eb', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div style={{ marginTop: 28, background: FOREST, borderRadius: 18, padding: '24px 26px', color: '#f3eee3', display: 'flex', gap: 16, alignItems: 'center', flexWrap: 'wrap' }}>
           <div style={{ flex: 1, minWidth: 240 }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: '#fff' }}>The full file goes deeper.</div>
             <div style={{ fontSize: 13, color: '#b9c6b6', marginTop: 4 }}>Every ad {name} has run, the full timeline, hook-by-hook breakdowns — and Mello watching them for you every night.</div>

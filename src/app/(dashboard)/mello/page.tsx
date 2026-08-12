@@ -115,7 +115,7 @@ export default function MelloPage() {
   const catPrompts = PROMPT_LIBRARY.filter(p => p.category === cat).slice(0, 5)
 
   return (
-    <div style={{ display: 'flex', height: isMobile ? 'calc(100dvh - 52px)' : '100vh', background: '#eef5eb', position: 'relative' }}>
+    <div style={{ display: 'flex', height: isMobile ? 'calc(100dvh - 52px)' : '100vh', background: '#f3eee3', position: 'relative' }}>
       {/* Backdrop behind the task drawer on mobile */}
       {isMobile && tasksOpen && (
         <div onClick={() => setTasksOpen(false)} style={{ position: 'absolute', inset: 0, background: 'rgba(14,27,18,0.4)', zIndex: 30 }} />
@@ -128,12 +128,12 @@ export default function MelloPage() {
             <MelloFace size={28} />
             <span style={{ fontWeight: 800, fontSize: 17, color: '#26331f' }}>Mello</span>
           </div>
-          <button onClick={newTask} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#2d5a27', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
+          <button onClick={newTask} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#141d15', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>
             <Plus size={16} /> New task
           </button>
           <div title="Coming soon" style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 12px', borderRadius: 9, color: '#9aa79a', fontWeight: 600, fontSize: 13.5, marginTop: 6, cursor: 'default' }}>
             <Zap size={15} /> Automations
-            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#5a7a5a', background: '#eef3e6', border: '1px solid #d8ebb9', borderRadius: 100, padding: '2px 7px' }}>Soon</span>
+            <span style={{ marginLeft: 'auto', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#6b6a58', background: '#eef3e6', border: '1px solid #d8ebb9', borderRadius: 100, padding: '2px 7px' }}>Soon</span>
           </div>
         </div>
         <div style={{ padding: '4px 14px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: '#9aa593', textTransform: 'uppercase' }}>My tasks</div>
@@ -154,7 +154,7 @@ export default function MelloPage() {
         {/* Mobile-only bar to open the task drawer */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderBottom: '1px solid #e2eadd', background: '#f6faf3' }}>
-            <button onClick={() => setTasksOpen(true)} aria-label="Open tasks" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#2d5a27', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+            <button onClick={() => setTasksOpen(true)} aria-label="Open tasks" style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', borderRadius: 9, border: '1px solid #d3e0cb', background: '#fff', color: '#141d15', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
               <PanelLeft size={15} /> Tasks
             </button>
           </div>
@@ -170,7 +170,7 @@ export default function MelloPage() {
                 {/* Category tabs */}
                 <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', margin: '26px 0 14px' }}>
                   {PROMPT_CATEGORIES.map(c => (
-                    <button key={c.key} onClick={() => setCat(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1px solid ${cat === c.key ? '#7aa856' : '#dde6d8'}`, background: cat === c.key ? '#eef6e6' : '#fff', color: cat === c.key ? '#2d5a27' : '#566550', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
+                    <button key={c.key} onClick={() => setCat(c.key)} style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 14px', borderRadius: 10, border: `1px solid ${cat === c.key ? '#7aa856' : '#dde6d8'}`, background: cat === c.key ? '#eef6e6' : '#fff', color: cat === c.key ? '#141d15' : '#566550', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>
                       <span>{c.icon}</span>{c.label}
                     </button>
                   ))}
@@ -209,7 +209,7 @@ export default function MelloPage() {
         </div>
 
         {/* Composer */}
-        <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #e2eadd', background: '#eef5eb' }}>
+        <div style={{ padding: '12px 24px 20px', borderTop: '1px solid #e2eadd', background: '#f3eee3' }}>
           <div style={{ maxWidth: 760, margin: '0 auto' }}>
             <ChatInput
               value={input}

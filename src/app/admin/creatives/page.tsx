@@ -48,7 +48,7 @@ export default function AdminCreatives() {
           {shown.map(c => (
             <div key={c.id} style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden' }}>
               <div style={{ aspectRatio: '1', background: '#0d120e', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                {c.status === 'processing' || c.status === 'analyzing' ? <span style={{ color: '#dffe95', fontSize: 12 }}>{c.status === 'analyzing' ? 'Analyzing…' : 'Generating…'}</span>
+                {c.status === 'processing' || c.status === 'analyzing' ? <span style={{ color: '#ff5a2c', fontSize: 12 }}>{c.status === 'analyzing' ? 'Analyzing…' : 'Generating…'}</span>
                   : !c.image_url ? <span style={{ color: '#9aa79a', fontSize: 11, textAlign: 'center', padding: 8 }}>{c.status === 'failed' ? '⚠️ Failed' : '📝 Draft · no output'}</span>
                   : c.media_type === 'video'
                     // Controls + first-frame preview (no autoplay) so admins can actually watch it.
@@ -80,7 +80,7 @@ export default function AdminCreatives() {
               </div>
               <div style={{ padding: '9px 11px' }}>
                 <div style={{ display: 'flex', gap: 4, marginBottom: 5, flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 10, fontWeight: 700, background: '#eef5eb', color: '#3f6b3f', borderRadius: 5, padding: '2px 6px', textTransform: 'capitalize' }}>{c.type}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, background: '#f3eee3', color: '#3f6b3f', borderRadius: 5, padding: '2px 6px', textTransform: 'capitalize' }}>{c.type}</span>
                   {c.media_type === 'video' && <span style={{ fontSize: 10, fontWeight: 700, background: '#111', color: '#fff', borderRadius: 5, padding: '2px 6px' }}>🎬</span>}
                 </div>
                 <div style={{ fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={c.email}>{c.email || '—'}</div>

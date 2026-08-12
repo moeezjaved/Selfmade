@@ -24,7 +24,7 @@ import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
 import { computeOpportunities, oppColor } from '@/lib/meta/opportunities'
 
-const INK = '#17251c', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#17251c', LIME = '#dffe95'
+const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#141d15', LIME = '#ff5a2c'
 const SERIF = "'Instrument Serif', Georgia, serif"
 const CARD: React.CSSProperties = { background: '#fff', borderRadius: 18, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 12px 32px -20px rgba(17,24,17,.14)' }
 const good = '#2f7d3a', warn = '#b7791f', bad = '#c0392b'
@@ -328,7 +328,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
             ))}
           </div>
           {m.recs.length > 3 && (
-            <button onClick={() => setShowAllRecs(s => !s)} style={{ marginTop: 12, background: 'none', border: 'none', color: '#3f8f4f', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+            <button onClick={() => setShowAllRecs(s => !s)} style={{ marginTop: 12, background: 'none', border: 'none', color: '#ef4a1e', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
               {showAllRecs ? 'Show fewer' : `Show ${m.recs.length - 3} more moves`} →
             </button>
           )}

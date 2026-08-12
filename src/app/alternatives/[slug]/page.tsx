@@ -9,7 +9,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 export const dynamic = 'force-static'
-const LIME = '#dffe95', INK = '#0e1b12', GREEN = '#16a34a'
+const LIME = '#ff5a2c', INK = '#0e1b12', GREEN = '#16a34a'
 
 type Comp = { name: string; lacks: string; blurb: string; rows: [string, boolean][] }
 const COMPETITORS: Record<string, Comp> = {
@@ -94,7 +94,7 @@ export default function AlternativePage({ params }: { params: { slug: string } }
           {c.rows.map(([label, comp], i) => (
             <div key={i} style={{ display: 'grid', gridTemplateColumns: '1fr 90px 90px', borderTop: i ? '1px solid #f2f4f1' : 'none', fontSize: 14 }}>
               <div style={{ padding: '13px 16px', color: '#374151', fontWeight: 500 }}>{label}</div>
-              <div style={{ padding: '13px 6px', textAlign: 'center', background: 'rgba(223,254,149,.28)' }}><Mark on /></div>
+              <div style={{ padding: '13px 6px', textAlign: 'center', background: 'rgba(255,90,44,.28)' }}><Mark on /></div>
               <div style={{ padding: '13px 6px', textAlign: 'center' }}><Mark on={comp} /></div>
             </div>
           ))}

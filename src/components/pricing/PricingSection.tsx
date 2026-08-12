@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import { ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
 import { openCredits } from '@/components/credits/CreditModal'
 
-const DARK = '#16321a', LIME = '#dffe95', ACCENT = '#3a7000', MUTED = '#6b7a6b'
+const DARK = '#16321a', LIME = '#ff5a2c', ACCENT = '#3a7000', MUTED = '#6b7a6b'
 const IMG_USD = (ACTION_COSTS.image_clone_pro / 100).toFixed(2)   // 1 credit = 1¢
 const VID_USD = String(Math.round(ACTION_COSTS.video_clone / 100))
 

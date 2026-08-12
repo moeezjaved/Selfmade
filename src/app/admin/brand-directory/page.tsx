@@ -5,7 +5,7 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
 
-const DARK = '#1a3a1a', LIME = '#dffe95'
+const DARK = '#141d15', LIME = '#ff5a2c'
 const BATCH = 1000          // rows per request
 const THROTTLE_MS = 250     // pause between batches — gentle on the DB
 

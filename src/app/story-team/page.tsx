@@ -9,7 +9,7 @@ import { useState } from 'react'
 import MelloFace from '@/components/MelloFace'
 import { ChannelLogo } from '@/components/brand/logos'
 
-const INK = '#161c17', MUTED = '#68756b', LINE = '#e7ece7', FOREST = '#17251c', LIME = '#dffe95', GREEN = '#3f8f4f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
 const PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 const TEAM: [string, string][] = [
   ['Research', 'Reads the market while you sleep'],
@@ -94,7 +94,7 @@ export default function StoryTeamPreview() {
 
         {/* ── 2 · THE AGREEMENT ── */}
         {step === 2 && (
-          <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(23,37,28,.25)', position: 'relative', overflow: 'hidden', textAlign: 'left' }}>
+          <div style={{ background: PAPER, border: `1px solid ${PAPERLINE}`, borderRadius: 18, padding: '30px 30px 26px', boxShadow: '0 30px 70px -30px rgba(20,29,21,.25)', position: 'relative', overflow: 'hidden', textAlign: 'left' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 5, background: LIME }} />
             <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.2em', color: '#8a927f', marginBottom: 18 }}>MARKETING EMPLOYEE AGREEMENT</div>
             {[['Employee', 'Mello & your marketing team'], ['Employer', 'Your company'], ['Department', 'Marketing — the whole company'], ['Working hours', '24 / 7'], ['Start date', 'Today'], ['Mission', 'Help grow this business']].map(([k, v]) => (

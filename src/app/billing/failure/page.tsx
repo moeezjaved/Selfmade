@@ -2,7 +2,7 @@
 import { Suspense } from 'react'
 import { useRouter } from 'next/navigation'
 
-const INK = '#0e1b12', LIME = '#dffe95'
+const INK = '#0e1b12', LIME = '#ff5a2c'
 
 function Failure() {
   const router = useRouter()

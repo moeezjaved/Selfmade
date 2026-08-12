@@ -42,7 +42,7 @@ export default function UsersPage() {
           onChange={e => setSearch(e.target.value)}
           style={{ width: '320px', padding: '10px 14px', border: '1px solid #e0e0e0', borderRadius: '8px', fontSize: '13px', outline: 'none', boxSizing: 'border-box' }}
         />
-        <a href="/api/admin/users/export" download style={{ padding: '10px 14px', border: '1px solid #16321a', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#16321a', textDecoration: 'none', background: '#eef5eb' }}>⬇ Export all emails (CSV)</a>
+        <a href="/api/admin/users/export" download style={{ padding: '10px 14px', border: '1px solid #16321a', borderRadius: '8px', fontSize: '13px', fontWeight: 700, color: '#16321a', textDecoration: 'none', background: '#f3eee3' }}>⬇ Export all emails (CSV)</a>
       </div>
 
       <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e8e8e8', overflow: 'hidden' }}>
