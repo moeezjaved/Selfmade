@@ -78,7 +78,10 @@
   .lv-key::before{content:"";position:absolute;inset:0;background:var(--lime);transform-origin:left;transform:scaleX(var(--sp,0));z-index:-1;transition:transform .1s linear}
   .lv-key .kt{transition:color .18s ease}
   .lv-logos{display:flex;flex-wrap:wrap;gap:clamp(12px,1.6vw,18px);justify-content:center;padding:clamp(16px,2.2vw,28px);border-top:1px solid rgba(255,255,255,.07);margin-top:clamp(12px,1.6vw,20px)}
-  .lv-logos .lg{width:clamp(40px,4.6vw,52px);height:clamp(40px,4.6vw,52px);border-radius:11px;background:#fff;display:grid;place-items:center;opacity:.4;transition:opacity .25s ease,transform .25s ease,box-shadow .25s ease}
+  .lv-logos .lg{width:clamp(40px,4.6vw,52px);height:clamp(40px,4.6vw,52px);border-radius:11px;background:#fff;display:grid;place-items:center;opacity:.5;cursor:pointer;transition:opacity .2s ease,transform .2s ease,box-shadow .2s ease}
+  .lv-logos .lg:hover{opacity:.85;transform:translateY(-2px)}
+  .lv-logos .lg.active{opacity:1;transform:translateY(-2px);box-shadow:0 0 0 3px rgba(255,90,44,.8)}
+  .lv-hint{text-align:center;font:600 9.5px/1 var(--mono);letter-spacing:.14em;text-transform:uppercase;color:#8fa088;padding:14px 0 2px}
   .lv-logos .lg svg{width:60%;height:60%}
   @media(max-width:640px){.learnviz{transform:none;border-radius:12px}}
   @media(prefers-reduced-motion:reduce){.lv-key::before{transform:scaleX(1)}.lv-key .kt{color:#0c120d}.lv-tag{opacity:1}.lv-logos .lg{opacity:.85}.lv-src .d{animation:none}}
@@ -418,12 +421,13 @@
           <div class="lv-line">Rival NovaMane’s top ad has run 248 days.</div>
           <div class="lv-line">Repeat buyers respond to premium, not discounts.</div>
         </div>
+        <div class="lv-hint">Tap a source to see what it learns there</div>
         <div class="lv-logos">
-          <span class="lg"><svg viewBox="0 0 48 48"><path fill="#95BF47" d="M30.6 9.3a.4.4 0 0 0-.3-.3l-2.5-.2s-1.7-1.6-1.9-1.8c-.2-.2-.5-.1-.6-.1l-1 .3c-.5-1.5-1.4-2.9-3-2.9h-.3c-.4-.5-.9-.8-1.4-.8-3.9 0-5.8 4.9-6.4 7.4l-2.7.8c-.8.3-.8.3-1 1.1L6 39.1l19.4 3.6 10.5-2.3S30.6 9.5 30.6 9.3z"/><path fill="#fff" d="M25.9 15l-1.3 3.9s-1.1-.6-2.5-.6c-2 0-2.1 1.3-2.1 1.6 0 1.7 4.5 2.4 4.5 6.5 0 3.2-2 5.3-4.8 5.3-3.3 0-5-2.1-5-2.1l.9-2.9s1.7 1.5 3.2 1.5c1 0 1.3-.7 1.3-1.3 0-2.2-3.7-2.3-3.7-6.1 0-3.1 2.3-6.2 6.9-6.2 1.8 0 2.6.5 2.6.5z"/></svg></span>
-          <span class="lg"><svg viewBox="0 0 48 48"><path fill="#0081FB" d="M9.4 16.7C11 14.3 13.1 12.7 15.6 12.7c2.9 0 5.2 1.8 8.4 6.7l-2.4 4c-3.1 5.3-4.9 7.2-7.5 7.2C8.4 30.6 7 26.9 7 23.7c0-2.5.8-4.9 2.4-7z"/><path fill="#0064E1" d="M23.6 19.4C20.4 14.5 18.1 12.7 15.6 12.7c-.9 0-1.7.2-2.5.6 2.3-2.6 5.1-4.6 8.4-4.6 3.4 0 6.5 2 9.6 6.9l-.5.9-2.6 4.2c-1.2-1.7-2.3-3.4-4.4-5.3z"/><path fill="#0082FB" d="M38.6 16.8C35.5 12 32.4 9 29 9c-3.3 0-6.1 2-8.4 4.6 3.2-.4 5.6 1.8 8.8 6.9l2.3 3.7c3.1 5 4.5 6.4 7 6.4 3.4 0 5.3-2.7 5.3-6.9 0-2.6-.8-5.1-2.4-6.9z"/></svg></span>
-          <span class="lg"><svg viewBox="0 0 48 48"><defs><radialGradient id="ig3" cx="30%" cy="107%" r="140%"><stop offset="0" stop-color="#FED576"/><stop offset=".26" stop-color="#F47133"/><stop offset=".61" stop-color="#BC3081"/><stop offset="1" stop-color="#4C63D2"/></radialGradient></defs><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#ig3)"/><rect x="14" y="14" width="20" height="20" rx="6" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="5.5" fill="none" stroke="#fff" stroke-width="3"/><circle cx="32.5" cy="15.5" r="1.9" fill="#fff"/></svg></span>
-          <span class="lg"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#25D366"/><path fill="#fff" d="M24 12a12 12 0 0 0-10.3 18.2L12 36l5.9-1.5A12 12 0 1 0 24 12z"/></svg></span>
-          <span class="lg"><svg viewBox="0 0 48 48"><path fill="#fff" stroke="#cfd6cd" d="M8.5 13.5h31a2 2 0 0 1 2 2v17a2 2 0 0 1-2 2h-31a2 2 0 0 1-2-2v-17a2 2 0 0 1 2-2z"/><path fill="#EA4335" d="M6.5 16.4v-.9a2 2 0 0 1 3.2-1.6L24 24.5 38.3 13.9a2 2 0 0 1 3.2 1.6v.9L24 29z"/><path fill="#4285F4" d="M41.5 15.5v17a2 2 0 0 1-2 2h-2.5V17z"/><path fill="#34A853" d="M6.5 15.5a2 2 0 0 1 2-2H11V34.5H8.5a2 2 0 0 1-2-2z"/></svg></span>
+          <span class="lg" data-src="shopify" role="button" tabindex="0" aria-label="Shopify"><svg viewBox="0 0 48 48"><path fill="#95BF47" d="M30.6 9.3a.4.4 0 0 0-.3-.3l-2.5-.2s-1.7-1.6-1.9-1.8c-.2-.2-.5-.1-.6-.1l-1 .3c-.5-1.5-1.4-2.9-3-2.9h-.3c-.4-.5-.9-.8-1.4-.8-3.9 0-5.8 4.9-6.4 7.4l-2.7.8c-.8.3-.8.3-1 1.1L6 39.1l19.4 3.6 10.5-2.3S30.6 9.5 30.6 9.3z"/><path fill="#fff" d="M25.9 15l-1.3 3.9s-1.1-.6-2.5-.6c-2 0-2.1 1.3-2.1 1.6 0 1.7 4.5 2.4 4.5 6.5 0 3.2-2 5.3-4.8 5.3-3.3 0-5-2.1-5-2.1l.9-2.9s1.7 1.5 3.2 1.5c1 0 1.3-.7 1.3-1.3 0-2.2-3.7-2.3-3.7-6.1 0-3.1 2.3-6.2 6.9-6.2 1.8 0 2.6.5 2.6.5z"/></svg></span>
+          <span class="lg" data-src="meta" role="button" tabindex="0" aria-label="Facebook"><svg viewBox="0 0 48 48"><path fill="#0081FB" d="M9.4 16.7C11 14.3 13.1 12.7 15.6 12.7c2.9 0 5.2 1.8 8.4 6.7l-2.4 4c-3.1 5.3-4.9 7.2-7.5 7.2C8.4 30.6 7 26.9 7 23.7c0-2.5.8-4.9 2.4-7z"/><path fill="#0064E1" d="M23.6 19.4C20.4 14.5 18.1 12.7 15.6 12.7c-.9 0-1.7.2-2.5.6 2.3-2.6 5.1-4.6 8.4-4.6 3.4 0 6.5 2 9.6 6.9l-.5.9-2.6 4.2c-1.2-1.7-2.3-3.4-4.4-5.3z"/><path fill="#0082FB" d="M38.6 16.8C35.5 12 32.4 9 29 9c-3.3 0-6.1 2-8.4 4.6 3.2-.4 5.6 1.8 8.8 6.9l2.3 3.7c3.1 5 4.5 6.4 7 6.4 3.4 0 5.3-2.7 5.3-6.9 0-2.6-.8-5.1-2.4-6.9z"/></svg></span>
+          <span class="lg" data-src="instagram" role="button" tabindex="0" aria-label="Instagram"><svg viewBox="0 0 48 48"><defs><radialGradient id="ig3" cx="30%" cy="107%" r="140%"><stop offset="0" stop-color="#FED576"/><stop offset=".26" stop-color="#F47133"/><stop offset=".61" stop-color="#BC3081"/><stop offset="1" stop-color="#4C63D2"/></radialGradient></defs><rect x="4" y="4" width="40" height="40" rx="12" fill="url(#ig3)"/><rect x="14" y="14" width="20" height="20" rx="6" fill="none" stroke="#fff" stroke-width="3"/><circle cx="24" cy="24" r="5.5" fill="none" stroke="#fff" stroke-width="3"/><circle cx="32.5" cy="15.5" r="1.9" fill="#fff"/></svg></span>
+          <span class="lg" data-src="whatsapp" role="button" tabindex="0" aria-label="WhatsApp"><svg viewBox="0 0 48 48"><circle cx="24" cy="24" r="20" fill="#25D366"/><path fill="#fff" d="M24 12a12 12 0 0 0-10.3 18.2L12 36l5.9-1.5A12 12 0 1 0 24 12z"/></svg></span>
+          <span class="lg" data-src="gmail" role="button" tabindex="0" aria-label="Email"><svg viewBox="0 0 48 48"><path fill="#fff" stroke="#cfd6cd" d="M8.5 13.5h31a2 2 0 0 1 2 2v17a2 2 0 0 1-2 2h-31a2 2 0 0 1-2-2v-17a2 2 0 0 1 2-2z"/><path fill="#EA4335" d="M6.5 16.4v-.9a2 2 0 0 1 3.2-1.6L24 24.5 38.3 13.9a2 2 0 0 1 3.2 1.6v.9L24 29z"/><path fill="#4285F4" d="M41.5 15.5v17a2 2 0 0 1-2 2h-2.5V17z"/><path fill="#34A853" d="M6.5 15.5a2 2 0 0 1 2-2H11V34.5H8.5a2 2 0 0 1-2-2z"/></svg></span>
         </div>
       </div>
     </div>
@@ -634,10 +638,10 @@
         if(stage){ var sr=stage.getBoundingClientRect();
           var ap=(vh*0.78 - sr.top)/(vh*0.66); ap=reduce?1:clamp(ap);
           stage.style.setProperty('--ap', ap.toFixed(3));
-          for(var ci=0;ci<chips.length;ci++){ var cp=reduce?1:clamp((ap-(0.05+ci*0.05))/0.34);
+          for(var ci=0;ci<chips.length;ci++){ var cp=reduce?1:clamp((ap-(0.03+ci*0.06))/0.30);
             var rot=chips[ci].getAttribute('data-rot')||'0';
-            chips[ci].style.transform='translate('+(cp*104)+'px,'+(cp*-8)+'px) rotate('+((1-cp)*+rot)+'deg) scale('+(1-cp*0.16)+')';
-            chips[ci].style.opacity=(1-cp*0.9).toFixed(3); }
+            chips[ci].style.transform='translateY('+((1-cp)*12).toFixed(1)+'px) rotate('+rot+'deg)';
+            chips[ci].style.opacity=(0.34+0.66*cp).toFixed(3); }
           for(var ki=0;ki<cards.length;ki++){ var lp=reduce?1:clamp((ap-cardStart[ki])/0.15);
             cards[ki].style.opacity=(0.14+0.86*lp).toFixed(3);
             cards[ki].style.transform='translateY('+((1-lp)*18).toFixed(1)+'px) scale('+(0.975+0.025*lp).toFixed(3)+')';
@@ -658,12 +662,11 @@
           if(role) role.textContent=(tp<0.34?'New hire':(tp<0.72?'Knows your brand':'Runs it like a pro')); }
         if(viz){ var r=viz.getBoundingClientRect();
           var p=(vh*0.82 - r.top)/(vh*0.55); p=reduce?1:Math.max(0,Math.min(1,p));
-          if(key) key.style.setProperty('--sp', Math.max(0,Math.min(1,(p-0.08)/0.4)).toFixed(3));
-          if(kt) kt.style.color=(p>0.30)?'#0c120d':'#fff';
+          var vkey=viz.querySelector('.lv-key'), vkt=vkey&&vkey.querySelector('.kt');
+          if(vkey) vkey.style.setProperty('--sp', Math.max(0,Math.min(1,(p-0.08)/0.4)).toFixed(3));
+          if(vkt) vkt.style.color=(p>0.30)?'#0c120d':'#fff';
           if(tag) tag.style.opacity=(p>0.48)?'1':'0';
-          for(var i=0;i<logos.length;i++){ var on=p>(0.14+i*0.13);
-            logos[i].style.opacity=on?'1':'0.4'; logos[i].style.transform=on?'scale(1.08)':'scale(1)';
-            logos[i].style.boxShadow=on?'0 0 0 3px rgba(255,90,44,.6)':'none'; } }
+ }
         if(pipe){ var pr=pipe.getBoundingClientRect();
           var wp=(vh*0.62 - pr.top)/pr.height; wp=reduce?1:Math.max(0,Math.min(1,wp));
           pipe.style.setProperty('--wp', wp.toFixed(3));
@@ -676,5 +679,55 @@
       function ons(){ if(!ticking){ ticking=true; requestAnimationFrame(upd); } }
       window.addEventListener('scroll',ons,{passive:true}); window.addEventListener('resize',ons); upd();
     })(); /* end scrub */
+
+    // interactive sources — click a logo to change what Selfmade is reading (Hyper-style)
+    (function(){
+      var viz=document.querySelector('.learnviz'); if(!viz) return;
+      var body=viz.querySelector('.lv-body'), srcEl=viz.querySelector('.lv-src');
+      var logos=[].slice.call(viz.querySelectorAll('.lv-logos .lg'));
+      if(!body||!srcEl||!logos.length) return;
+      var SRC={
+        shopify:{label:'reading your Shopify store',lines:[
+          'Bestseller · Vitamin-C serum — 4.8★, 1,204 reviews',
+          {k:'Repeat-purchase rate is 31% — your best customers come back.'},
+          'Bundles outsell single items 2 to 1.',
+          'Mobile checkout drops off sharply after 9pm.']},
+        meta:{label:'reading Facebook & Instagram ads',lines:[
+          'Rival NovaMane’s top ad has run 248 days.',
+          {k:'Your “picture ads” return 6.11× ROAS — your best format.'},
+          'UGC outperforms studio shots 2.4×.',
+          'Prospecting audiences fatigue after 6 days.']},
+        instagram:{label:'reading Instagram',lines:[
+          'Reels get 3× the saves of static posts.',
+          {k:'Your audience engages most between 8–10pm.'},
+          'Comments keep asking about sensitive skin.',
+          'Founder-led videos are rising fastest.']},
+        whatsapp:{label:'reading WhatsApp',lines:[
+          'Customers keep asking if it’s safe for sensitive skin.',
+          {k:'Most questions are about shipping time & ingredients.'},
+          'Replies under 2 hours lift repeat orders.',
+          'A code on the first reply converts 18%.']},
+        gmail:{label:'reading your email',lines:[
+          'Repeat buyers respond to premium, not discounts.',
+          {k:'Win-back emails recover 12% of lapsed customers.'},
+          'Subject lines with the product name win.',
+          'Thursday sends beat Monday.']}
+      };
+      function render(k){ var d=SRC[k]; if(!d) return;
+        srcEl.innerHTML='<span class="d"></span> AURA · '+d.label;
+        var h='<div class="lv-h">Tonight</div>';
+        for(var i=0;i<d.lines.length;i++){ var l=d.lines[i];
+          h+=(typeof l==='string')?('<div class="lv-line">'+l+'</div>')
+            :('<div class="lv-line lv-key"><span class="kt">'+l.k+'</span></div>'); }
+        body.innerHTML=h;
+        for(var j=0;j<logos.length;j++){ logos[j].classList.toggle('active', logos[j].getAttribute('data-src')===k); }
+        window.dispatchEvent(new Event('scroll')); /* re-run the highlight sweep on the new key line */
+      }
+      logos.forEach(function(g){
+        g.addEventListener('click',function(){ render(g.getAttribute('data-src')); });
+        g.addEventListener('keydown',function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); render(g.getAttribute('data-src')); } });
+      });
+      render('shopify');
+    })();
   </script>
 </body></html>
