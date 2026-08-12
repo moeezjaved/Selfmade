@@ -91,9 +91,13 @@
   .opener{font-family:var(--serif);font-weight:400;letter-spacing:-.015em;line-height:1;font-size:clamp(40px,6.4vw,86px)}
   .opener em{font-style:italic;color:var(--rust)}
   .mono-eyebrow{font-family:var(--mono);font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;color:var(--rust)}
-  .rv{opacity:0;transform:translateY(24px);transition:opacity .7s cubic-bezier(.2,.7,.2,1),transform .7s cubic-bezier(.2,.7,.2,1)}
+  /* Entrance runs from CSS on load (no JS gate) so section text never waits for React to hydrate.
+     .in is still added by the IntersectionObserver but is now just a harmless end-state alias. */
+  .rv{animation:rvIn .7s cubic-bezier(.2,.7,.2,1) both}
   .rv.in{opacity:1;transform:none}
-  .rv.d1{transition-delay:.1s}.rv.d2{transition-delay:.2s}
+  .rv.d1{animation-delay:.1s}.rv.d2{animation-delay:.2s}
+  @keyframes rvIn{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+  @media(prefers-reduced-motion:reduce){.rv{animation:none}}
 
   /* ============ 02 · BRAIN — one large, dense, real interface ============ */
   .brainsec{padding:110px 0 0;background:var(--paper)}
@@ -179,10 +183,10 @@
   .tilt-r{transform:rotate(.8deg)}
 
   /* ============ 04 · AGREEMENT (unchanged content) ============ */
-  .hire{background:#ef4a1e;color:#fff;padding:clamp(78px,10vw,120px) 0;text-align:left}
-  .p-lead{font-family:var(--sans);font-weight:700;font-size:clamp(30px,5.4vw,60px);letter-spacing:-.035em;max-width:20ch;margin:0 0 clamp(36px,5vw,54px);line-height:1.02;color:#fff}
+  .hire{background:#ef4a1e;color:#fff;padding:clamp(34px,4.5vw,54px) 0 clamp(78px,10vw,120px);text-align:center}
+  .p-lead{font-family:var(--sans);font-weight:700;font-size:clamp(30px,5.4vw,60px);letter-spacing:-.035em;max-width:20ch;margin:0 auto clamp(36px,5vw,54px);line-height:1.02;color:#fff;text-align:center}
   .p-lead em{font-family:var(--serif);font-style:italic;font-weight:400;color:#fff}
-  .paper{max-width:600px;margin:0;background:var(--white);color:var(--ink);border:1px solid rgba(20,29,21,.25);padding:36px 38px;text-align:left;box-shadow:16px 18px 0 rgba(20,29,21,.22)}
+  .paper{max-width:600px;margin:0 auto;background:var(--white);color:var(--ink);border:1px solid rgba(20,29,21,.25);padding:36px 38px;text-align:left;box-shadow:16px 18px 0 rgba(20,29,21,.22)}
   @media(max-width:560px){.paper{padding:26px 22px}}
   .p-eyebrow{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--rust);font-weight:700}
   .p-title{font-family:var(--serif);font-size:40px;letter-spacing:-.01em;margin:6px 0 3px;color:var(--ink)}
@@ -253,6 +257,17 @@
   .ac-kv{display:flex;justify-content:space-between;gap:12px;padding:6px 0;border-bottom:1px solid var(--hair);font-size:12.5px}
   .ac-kv:last-child{border-bottom:0}.ac-kv .k{color:var(--ink-soft)}.ac-kv b{font-weight:600;text-align:right}
   .ac-cap{padding:9px 13px;border-top:1px solid var(--hair);font-size:11.5px;color:var(--ink-soft)}
+  .ac-thumb{display:flex;align-items:center;gap:10px;margin-top:6px;padding-top:11px;border-top:1px solid var(--hair)}
+  .ac-thumb .ci{width:56px;height:36px;border-radius:5px;flex:none;position:relative;overflow:hidden;background:linear-gradient(135deg,#d9c3ae,#cfe0c4)}
+  .ac-thumb .ci::after{content:"";position:absolute;left:50%;bottom:-12%;width:24%;height:72%;transform:translateX(-50%);border-radius:44% 44% 46% 46%/60% 60% 40% 40%;background:linear-gradient(180deg,#fff,#eef4ea)}
+  .ac-thumb .tl{font:600 10.5px/1.35 var(--sans);color:var(--ink-soft)}
+  .ac-thumb .tl b{display:block;color:var(--ink);font-size:12px}
+  .ac-vars{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;padding:9px 13px 3px}
+  .ac-vars .var{position:relative;border-radius:6px;overflow:hidden;border:1px solid var(--hair)}
+  .ac-vars .var i{display:block;aspect-ratio:1/1;background:linear-gradient(135deg,#e9d6c4,#d7e6c0 60%,#cfe0d8)}
+  .ac-vars .var span{position:absolute;left:4px;bottom:4px;font:700 8px/1 var(--mono);color:#14201a;background:rgba(255,255,255,.88);padding:3px 4px;border-radius:3px}
+  .ac-vars .var.win{border-color:var(--lime);box-shadow:0 0 0 1px var(--lime)}
+  .ac-vars .var em{position:absolute;right:4px;top:4px;font:700 7.5px/1 var(--sans);font-style:normal;color:#fff;background:var(--lime);padding:3px 5px;border-radius:3px}
 
   /* generated image still */
   .ac-shot{position:relative;aspect-ratio:16/10;overflow:hidden;
@@ -285,15 +300,18 @@
   .poster-copy .ph em{font-family:var(--serif);font-style:italic;font-weight:400}
 
   /* rendered video */
-  .ac-video{position:relative;aspect-ratio:16/10;background:radial-gradient(120% 120% at 30% 20%,#2a3a2c,#141d15);overflow:hidden}
-  .ac-video .play{position:absolute;top:50%;left:50%;width:40px;height:40px;transform:translate(-50%,-50%);border-radius:50%;
+  .ac-video{position:relative;aspect-ratio:16/10;overflow:hidden;background:radial-gradient(120% 120% at 72% 12%,#ecd9c1,#d3c0a2)}
+  .ac-video::after{content:"";position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,rgba(20,29,21,.12),rgba(20,29,21,.5))}
+  .ac-video .bottle{z-index:1;width:22%;bottom:0}
+  .ac-video .roas{position:absolute;left:9px;top:9px;z-index:3;background:rgba(20,29,21,.82);color:#eaf3c9;font:700 8.5px/1 var(--mono);letter-spacing:.04em;padding:5px 7px;border-radius:5px}
+  .ac-video .play{position:absolute;top:50%;left:50%;z-index:3;width:48px;height:48px;transform:translate(-50%,-50%);border-radius:50%;box-shadow:0 6px 20px -6px rgba(0,0,0,.5);
     background:rgba(255,90,44,.92);display:grid;place-items:center}
   .ac-video .play::after{content:"";border-style:solid;border-width:7px 0 7px 12px;border-color:transparent transparent transparent #fff;margin-left:2px}
-  .ac-video .dur{position:absolute;top:9px;right:9px;background:rgba(0,0,0,.5);color:#eaf3c9;font:600 9.5px/1 var(--mono);padding:4px 6px;border-radius:4px}
-  .ac-video .cc{position:absolute;left:10px;bottom:20px;right:10px;text-align:center;color:#fff;font:800 13px/1.1 var(--sans);
+  .ac-video .dur{position:absolute;top:9px;right:9px;z-index:3;background:rgba(0,0,0,.5);color:#eaf3c9;font:600 9.5px/1 var(--mono);padding:4px 6px;border-radius:4px}
+  .ac-video .cc{position:absolute;left:10px;bottom:20px;right:10px;z-index:3;text-align:center;color:#fff;font:800 13px/1.1 var(--sans);
     text-shadow:0 1px 4px rgba(0,0,0,.6);letter-spacing:-.01em}
   .ac-video .cc b{background:var(--lime);color:#14201a;padding:0 3px;border-radius:2px}
-  .ac-video .scrub{position:absolute;left:0;right:0;bottom:0;height:4px;background:rgba(255,255,255,.18)}
+  .ac-video .scrub{position:absolute;left:0;right:0;bottom:0;z-index:3;height:4px;background:rgba(255,255,255,.25)}
   .ac-video .scrub i{position:absolute;left:0;top:0;bottom:0;width:calc(8% + var(--ap,0)*74%);background:var(--lime)}
 
   /* facebook ad — real chrome */
@@ -331,7 +349,7 @@
   @keyframes blip{0%,100%{opacity:1}50%{opacity:.3}}
 
   /* ── 03 · GETS BETTER : a live-drafting agent + a competence that climbs with scroll (--tp) ── */
-  .bettersec{background:#ef4a1e;color:#fff;padding:clamp(34px,4.5vw,56px) 0 clamp(78px,10vw,118px);position:relative;overflow:hidden}
+  .bettersec{background:#ef4a1e;color:#fff;padding:clamp(34px,4.5vw,56px) 0 clamp(44px,6vw,66px);position:relative;overflow:hidden}
   .bettersec .bs-item{margin-top:0}
   .bettersec .bs-h em{font-family:var(--serif);font-style:italic;font-weight:400;color:#fff}
   .better-stage{position:relative;display:grid;gap:clamp(16px,2.4vw,26px);grid-template-columns:.72fr 1.28fr;align-items:stretch;min-height:clamp(360px,42vw,440px)}
@@ -466,18 +484,24 @@
               <div class="ac-kv"><span class="k">Competitor</span><b>NovaMane</b></div>
               <div class="ac-kv"><span class="k">Winning angle</span><b>“Confidence, not chemicals”</b></div>
               <div class="ac-kv"><span class="k">Ad age</span><b>248 days · live</b></div>
+              <div class="ac-thumb"><div class="ci"></div><div class="tl">Their winning ad<b>NovaMane · Meta</b></div></div>
             </div>
           </div>
           <!-- image -->
           <div class="act-card ac2">
             <div class="ac-bar"><span>IMAGE</span><span class="st">✦ GENERATED</span></div>
             <div class="ac-shot"><div class="poster-copy"><div class="pk">AURA · NEW</div><div class="ph">Glow that <em>lasts.</em></div></div><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><div class="swash"></div><span class="badge">1024×1024</span></div>
-            <div class="ac-cap">Product hero · on your brand, your angle</div>
+            <div class="ac-vars">
+              <div class="var win"><i></i><span>Hook A</span><em>BEST</em></div>
+              <div class="var"><i></i><span>Hook B</span></div>
+              <div class="var"><i></i><span>Hook C</span></div>
+            </div>
+            <div class="ac-cap">3 concepts generated · winner selected</div>
           </div>
           <!-- video -->
           <div class="act-card ac3">
             <div class="ac-bar"><span>VIDEO</span><span class="st">✦ RENDERED</span></div>
-            <div class="ac-video"><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div></div>
+            <div class="ac-video"><div class="bottle"><span class="cap"></span><span class="neck"></span><span class="glass"></span><span class="label"><i></i><i></i><i></i></span><span class="shine"></span></div><span class="roas">3.2× ROAS ANGLE</span><span class="dur">0:14</span><span class="play"></span><div class="cc">Glow that <b>actually</b> lasts</div><div class="scrub"><i></i></div></div>
             <div class="ac-cap">UGC cut · captions burned in</div>
           </div>
           <!-- facebook ad -->
@@ -561,15 +585,6 @@
         <div class="p-row"><span>Position</span><b>Your AI marketing company</b></div>
         <div class="p-row"><span>Working hours</span><b>24/7 — nights included</b></div>
         <div class="p-row"><span>Reports to</span><b>You</b></div>
-        <div class="p-resp">
-          <div class="lbl">Responsibilities</div>
-          <ul>
-            <li>Research your market</li><li>Watch competitors</li>
-            <li>Create the marketing</li><li>Run the campaigns</li>
-            <li>Answer customers</li><li>Learn from results</li>
-            <li>Report every morning</li><li>Wait for your approval</li>
-          </ul>
-        </div>
         <div class="p-row"><span>Vacation</span><b>Never</b></div>
         <div class="p-row"><span>Notice period</span><b>None — end it any time</b></div>
         <div class="p-row"><span>Salary</span><b>$49 / month</b></div>
