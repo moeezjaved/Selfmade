@@ -652,7 +652,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           <button key={p.id} onClick={() => toggleSel(p.id)} style={{ position: 'relative', width: 88, height: 88, borderRadius: 13, overflow: 'hidden', border: on ? `2px solid ${SEL_BORDER}` : `2px solid ${L_LINE}`, background: '#f1f3f0', cursor: 'pointer', padding: 0 }}>
                             {/* eslint-disable-next-line @next/next/no-img-element */}
                             <img src={cdn(p.src)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: on ? 1 : 0.5 }} />
-                            {on && <span style={{ position: 'absolute', bottom: 4, right: 4, background: LIME, color: FOREST, borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
+                            {on && <span style={{ position: 'absolute', bottom: 4, right: 4, background: '#ef4a1e', color: '#fff', borderRadius: '50%', width: 18, height: 18, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Check size={12} strokeWidth={3} /></span>}
                           </button>
                         )
                       })}
@@ -964,7 +964,7 @@ function ReviewRow({ k, v, onEdit, last }: { k: string; v: string; onEdit?: () =
 }
 const input: React.CSSProperties = { background: '#fff', border: `1.5px solid ${L_LINE}`, borderRadius: 12, padding: '11px 14px', color: L_INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }
 const btnGhost: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 6, background: '#fff', border: `1.5px solid ${L_LINE}`, color: '#3a382f', borderRadius: 12, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
-const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
+const btnPrimary: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '11px 20px', fontSize: 14, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
 const photoAdd: React.CSSProperties = { width: 88, height: 88, borderRadius: 13, border: '1.5px dashed #c4d0c2', background: '#fcfdfb', color: GREEN, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }
 const errBox: React.CSSProperties = { background: '#fef2f2', border: '1px solid #fecaca', color: '#b42318', borderRadius: 10, padding: '10px 12px', fontSize: 12.5 }
 const noticeBox: React.CSSProperties = { background: SEL_BG, border: '1px solid #d8ebb9', color: SEL_TEXT, borderRadius: 10, padding: '10px 12px', fontSize: 12.5, lineHeight: 1.5 }

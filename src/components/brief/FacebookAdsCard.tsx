@@ -222,7 +222,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   <div style={{ marginTop: 8, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Scaled to {money(newBudget!)}/day</div>
                 ) : (
                   <button onClick={() => scaleCampaign(c)} disabled={busyRow}
-                    style={{ marginTop: 8, border: 'none', borderRadius: 100, padding: '7px 16px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: FOREST, color: LIME, opacity: busyRow ? 0.6 : 1 }}>
+                    style={{ marginTop: 8, border: 'none', borderRadius: 100, padding: '7px 16px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: '#ef4a1e', color: '#fff', opacity: busyRow ? 0.6 : 1 }}>
                     {busyRow ? 'Scaling…' : `Scale it → ${money(newBudget!)}/day`}
                   </button>
                 )
@@ -245,7 +245,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads</div>
           <div style={{ fontSize: 16, fontWeight: 750, color: '#fff', marginTop: 8 }}>No ad account linked to {brandName || 'this brand'} yet.</div>
           <div style={{ fontSize: 13, color: '#cbd7c6', marginTop: 6, lineHeight: 1.5 }}>Link {brandName || 'this brand'}&rsquo;s Facebook ad account and its real spend, ROAS and moves show up here — nothing from your other brands.</div>
-          <Link href="/connect-meta" style={{ display: 'inline-block', marginTop: 14, background: LIME, color: FOREST, borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Connect an ad account →</Link>
+          <Link href="/connect-meta" style={{ display: 'inline-block', marginTop: 14, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Connect an ad account →</Link>
         </div>
       </div>
     )
@@ -271,7 +271,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                   it and clears the stale extra "primary" flags that caused the €86 ↔ $687k confusion. */}
               {accounts && accounts.length > 1 && sel && !accounts.find(a => a.accountId === sel)?.isPrimary && (
                 <button onClick={makePrimary} disabled={busy}
-                  style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '3px 11px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
+                  style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '3px 11px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
                   ★ Set as main
                 </button>
               )}
@@ -361,7 +361,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       <div style={{ padding: '16px 24px 18px' }}>
         {/* Carry the account the founder is VIEWING into Reports, so "the full report" is for THIS
             account (PKR/ROY/…), not always the primary. */}
-        <Link href={sel ? `${ctaHref}${ctaHref.includes('?') ? '&' : '?'}account=${encodeURIComponent(sel)}` : ctaHref} onClick={onAct} style={{ display: 'inline-block', background: FOREST, color: LIME, borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{ctaLabel} →</Link>
+        <Link href={sel ? `${ctaHref}${ctaHref.includes('?') ? '&' : '?'}account=${encodeURIComponent(sel)}` : ctaHref} onClick={onAct} style={{ display: 'inline-block', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>{ctaLabel} →</Link>
       </div>
     </div>
   )

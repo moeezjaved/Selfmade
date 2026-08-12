@@ -26,7 +26,7 @@ export default function RenewPage() {
         <div style={{ fontSize: 40, marginBottom: 8 }}>🔄</div>
         <h1 style={{ fontSize: 24, fontWeight: 800, color: INK, letterSpacing: '-.02em', margin: 0 }}>Renewing your plan</h1>
         <p style={{ fontSize: 15, color: '#4b5563', margin: '12px 0 20px' }}>{msg}</p>
-        <button onClick={() => router.push('/pricing')} style={{ background: INK, color: LIME, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Choose a plan instead →</button>
+        <button onClick={() => router.push('/pricing')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>Choose a plan instead →</button>
       </div>
     </div>
   )

@@ -216,7 +216,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 <div style={{ marginTop: 22, display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
                   {hero.cta_href && (
                     <Link href={hero.cta_href} onClick={() => onAct(hero)}
-                      style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none', letterSpacing: '-.01em' }}>
+                      style={{ background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none', letterSpacing: '-.01em' }}>
                       {hero.cta_label || 'Review & approve'} →
                     </Link>
                   )}
@@ -244,7 +244,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{canLaunch ? 'Launch, scale, and manage campaigns from here — Mello audits them every morning.' : 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'}</div>
               </div>
               {/* Meta is a paid feature — Free users are sent to upgrade, not into an OAuth flow that dead-ends. */}
-              <Link href={canLaunch ? '/m4' : '/billing'} style={{ flexShrink: 0, background: LIME, color: FOREST, borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{canLaunch ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
+              <Link href={canLaunch ? '/m4' : '/billing'} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{canLaunch ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
             </div>
           )}
 
@@ -302,7 +302,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                         onClick={() => onAct(c)} className="bsx-row" style={{ display: 'flex', alignItems: 'center', gap: 14, textDecoration: 'none' }}>
                         {/* brand mark — initial avatar; the ad previews are the real face */}
                         <span style={{ position: 'relative', flexShrink: 0 }}>
-                          <span style={{ width: 40, height: 40, borderRadius: 12, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 800 }}>{name.charAt(0).toUpperCase()}</span>
+                          <span style={{ width: 40, height: 40, borderRadius: 12, background: '#ef4a1e', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 16, fontWeight: 800 }}>{name.charAt(0).toUpperCase()}</span>
                           {fresh && <span className="bsx-dot" title="Active in the last 24h" style={{ position: 'absolute', right: -2, top: -2, width: 10, height: 10, borderRadius: '50%', background: GREEN, border: '2px solid #fff' }} />}
                         </span>
                         <span style={{ flex: 1, minWidth: 0 }}>
@@ -331,7 +331,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               competitors.length === 0 && brief.summary.brandsWatched === 0
                 ? (
                   <button onClick={onAddCompetitor}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 20px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     + Add a competitor{activeBrandName ? ` for ${activeBrandName}` : ''}
                   </button>
                 )
@@ -375,7 +375,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                     playbook.playbook.offers[0]?.label && `${playbook.playbook.offers[0]?.label} offer`].filter(Boolean).join(', ')
                     || `the winning formula across your ${playbook.playbook.brandsCount} competitors`)
                 )}`} onClick={() => onAct(playbook)}
-                  style={{ background: FOREST, color: LIME, borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
+                  style={{ background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>
                   Make one like this →
                 </Link>
               </div>
@@ -486,7 +486,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               </div>
               <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, marginBottom: 14 }}>$49/mo, billed monthly · works while you sleep.</div>
               <button onClick={onGoFullTime} disabled={subscribing}
-                style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                style={{ width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit' }}>
                 {subscribing ? 'Opening…' : 'Go full-time →'}
               </button>
               {/* "or buy credits" removed 2026-07-30 — pay-as-you-go is retired as a public offer. */}
@@ -497,7 +497,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               <div style={{ fontSize: 16, fontWeight: 750, letterSpacing: '-.015em', color: INK }}>Need more this month?</div>
               <div style={{ fontSize: 13, color: MUTED, lineHeight: 1.5, margin: '4px 0 14px' }}>Top up credits — pay as you go, and they never expire.</div>
               <button onClick={onBuyCredits}
-                style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                style={{ width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '12px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                 Buy credits →
               </button>
             </div>

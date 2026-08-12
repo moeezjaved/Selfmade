@@ -58,7 +58,7 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
             <p style={{ fontSize: 13.5, color: MUTED, margin: '0 auto 18px', maxWidth: 320, lineHeight: 1.55 }}>
               I&rsquo;ll make <b>{count} {media}</b> ad{count === 1 ? '' : 's'} a day{brandName ? ` for ${brandName}` : ''} from what&rsquo;s winning — and bring them to your morning brief for approval. Nothing charges until an ad is actually made.
             </p>
-            <button onClick={onClose} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Got it</button>
+            <button onClick={onClose} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Got it</button>
           </div>
         ) : (
           <div style={{ padding: '20px 22px 22px' }}>
@@ -98,7 +98,7 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
             {err && <div style={{ fontSize: 12.5, color: '#b42318', marginBottom: 12 }}>{err}</div>}
 
             {affordable ? (
-              <button onClick={confirm} disabled={busy || loading} style={{ width: '100%', background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 0', fontSize: 14, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: busy || loading ? 0.6 : 1 }}>
+              <button onClick={confirm} disabled={busy || loading} style={{ width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 0', fontSize: 14, fontWeight: 800, cursor: busy ? 'wait' : 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: busy || loading ? 0.6 : 1 }}>
                 <Sparkles size={15} /> {busy ? 'Turning on…' : `Have Mello make ${count} ${media}${count === 1 ? '' : 's'} a day`}
               </button>
             ) : (

@@ -145,7 +145,7 @@ const S: Record<string, React.CSSProperties> = {
   input: { width: '100%', padding: '12px 13px', border: '1px solid #d7dbd7', borderRadius: 10, fontSize: 15, fontFamily: 'inherit', color: '#111', outline: 'none', background: '#fbfcfb', boxSizing: 'border-box' },
   err: { fontSize: 12, color: '#c0392b', marginTop: 5 },
   eye: { position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 15 },
-  submit: { width: '100%', background: LIME, color: INK, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 },
+  submit: { width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 },
   legal: { fontSize: 13, color: '#6b7280', textAlign: 'center', marginTop: 20 },
   link: { color: INK, fontWeight: 700, textDecoration: 'underline' },
 }

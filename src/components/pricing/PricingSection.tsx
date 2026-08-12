@@ -108,7 +108,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
             border: c.popular ? `2px solid ${DARK}` : '1px solid rgba(0,0,0,0.09)',
             boxShadow: c.popular ? '0 18px 44px rgba(20,40,26,0.16)' : '0 2px 12px rgba(0,0,0,0.04)',
           }}>
-            {c.popular && <div style={{ position: 'absolute', top: -11, left: 20, background: LIME, color: DARK, fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.05em' }}>Most popular</div>}
+            {c.popular && <div style={{ position: 'absolute', top: -11, left: 20, background: '#ef4a1e', color: '#fff', fontSize: 11, fontWeight: 800, padding: '5px 10px', borderRadius: 100, textTransform: 'uppercase', letterSpacing: '.05em' }}>Most popular</div>}
             <div style={{ fontSize: 13, fontWeight: 800, color: ACCENT, letterSpacing: '.06em', textTransform: 'uppercase' }}>{c.tier}</div>
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, margin: '8px 0 2px' }}>
               <span style={{ fontSize: 34, fontWeight: 900, letterSpacing: '-0.03em' }}>{c.price}</span>
@@ -123,7 +123,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#333' }}>
               {c.feats.map((f, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                  <span style={{ background: LIME, color: DARK, borderRadius: '50%', width: 17, height: 17, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>✓</span>
+                  <span style={{ background: '#ef4a1e', color: '#fff', borderRadius: '50%', width: 17, height: 17, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0, marginTop: 1 }}>✓</span>
                   {f}
                 </div>
               ))}

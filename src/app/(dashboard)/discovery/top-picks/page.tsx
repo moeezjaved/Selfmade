@@ -36,7 +36,7 @@ function PriceTag({ p }: { p: Pack }) {
 function Avatar({ url, name, size = 28 }: { url: string | null; name: string; size?: number }) {
   if (url) return <img src={url} alt={name} style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
   return (
-    <div style={{ width: size, height: size, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.42, fontWeight: 700, flexShrink: 0 }}>
+    <div style={{ width: size, height: size, borderRadius: '50%', background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: size * 0.42, fontWeight: 700, flexShrink: 0 }}>
       {name.slice(0, 1).toUpperCase()}
     </div>
   )
@@ -122,7 +122,7 @@ export default function TopPicksPage() {
                   {/* Cover */}
                   <div style={{ position: 'relative', height: 150, background: p.cover_url ? `center/cover no-repeat url(${p.cover_url})` : `linear-gradient(135deg, ${DARK}, #2d5a2d)` }}>
                     {p.is_early_bird && (
-                      <span style={{ position: 'absolute', top: 10, right: 10, background: LIME, color: DARK, fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
+                      <span style={{ position: 'absolute', top: 10, right: 10, background: '#ef4a1e', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 9px', borderRadius: 20, display: 'flex', alignItems: 'center', gap: 4 }}>
                         ⚡ EARLY BIRD
                       </span>
                     )}

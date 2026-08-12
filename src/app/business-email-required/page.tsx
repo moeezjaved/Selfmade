@@ -20,7 +20,7 @@ export default function BusinessEmailRequired() {
         <p style={{ fontSize: 15, color: '#4b5563', lineHeight: 1.6, margin: '0 0 24px' }}>
           Selfmade accounts need a company (work) email — personal addresses like Gmail, Yahoo, or Outlook aren&rsquo;t accepted for new signups. Please sign up again with your business email.
         </p>
-        <button onClick={signOut} style={{ width: '100%', background: LIME, color: INK, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+        <button onClick={signOut} style={{ width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
           Sign out &amp; use a work email
         </button>
         <p style={{ fontSize: 13, color: '#9ca3af', marginTop: 16 }}>Think this is a mistake? <a href="mailto:support@tryselfmade.ai" style={{ color: INK, fontWeight: 700 }}>Contact support</a>.</p>

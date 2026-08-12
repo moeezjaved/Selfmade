@@ -63,7 +63,7 @@ export default function BrandGuardianCard({ brandId }: { brandId?: string | null
               <div style={{ minWidth: 0, flex: 1 }}>
                 <div style={{ fontSize: 13.5, fontWeight: 750, color: INK, lineHeight: 1.35 }}>{a.headline}</div>
                 <div style={{ fontSize: 12.5, color: MUTED, lineHeight: 1.5, marginTop: 3 }}>{a.detail}</div>
-                <Link href={a.href} style={{ display: 'inline-block', marginTop: 8, background: FOREST, color: LIME, borderRadius: 100, padding: '6px 14px', fontSize: 12, fontWeight: 800, textDecoration: 'none' }}>See their ads →</Link>
+                <Link href={a.href} style={{ display: 'inline-block', marginTop: 8, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '6px 14px', fontSize: 12, fontWeight: 800, textDecoration: 'none' }}>See their ads →</Link>
               </div>
             </div>
           ))}

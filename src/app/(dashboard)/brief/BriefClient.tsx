@@ -173,7 +173,7 @@ function DeskView({ brief, greet, onAct, onDecision }: { brief: Brief; greet: st
             </div>
           )}
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {hl.cta_href && <Link href={hl.cta_href} onClick={() => { onAct(hl); onDecision(`Approved a creative from the desk: "${hl.title}" (${today()}).`) }} style={{ background: FOREST, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '10px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ {hl.cta_label || 'Review & approve'}</Link>}
+            {hl.cta_href && <Link href={hl.cta_href} onClick={() => { onAct(hl); onDecision(`Approved a creative from the desk: "${hl.title}" (${today()}).`) }} style={{ background: '#ef4a1e', color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '10px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ {hl.cta_label || 'Review & approve'}</Link>}
             <button onClick={() => { onAct(hl); onDecision(`Passed on a suggested creative: "${hl.title}" (${today()}).`); setPassed(true) }} style={{ background: '#fff', border: `1.5px solid ${PAPERLINE}`, color: '#2b2a22', fontSize: 12.5, fontWeight: 750, padding: '10px 16px', borderRadius: 100, cursor: 'pointer', fontFamily: 'inherit' }}>Not today</button>
           </div>
         </div>
@@ -515,7 +515,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
                   <div style={{ display: 'flex', alignItems: 'center', gap: 18, marginTop: 24 }}>
                     {hero.cta_href && headlineState !== 'passed' && (
                       <Link href={hero.cta_href} onClick={() => { markActed(hero); if (isHeadlineHero) { setHeadlineState('approved'); logDecision(`Approved a creative from the brief: "${hero.title}" (${today()}).`) } }}
-                        style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '12px 22px', borderRadius: 100, textDecoration: 'none' }}>
+                        style={{ background: '#ef4a1e', color: '#fff', fontSize: 13.5, fontWeight: 800, padding: '12px 22px', borderRadius: 100, textDecoration: 'none' }}>
                         {isHeadlineHero ? (headlineState === 'approved' ? 'Opening…' : `✓ ${hero.cta_label || 'Review & approve'}`) : (hero.cta_label || 'Open')}
                       </Link>
                     )}
@@ -630,7 +630,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
               <div style={{ fontSize: 13.5, color: MUTED, lineHeight: 1.55, marginTop: 4 }}>You&rsquo;re on Free &mdash; 75 credits to start (about 5 image ads), 1 competitor. Full-time unlocks video ads, every competitor watched, and fresh creatives every morning &mdash; or top up credits and pay as you go.</div>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 8 }}>
-              <button onClick={goFullTime} disabled={subscribing} style={{ background: FOREST, color: LIME, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{subscribing ? 'Opening…' : 'Go full-time · $49/mo'}</button>
+              <button onClick={goFullTime} disabled={subscribing} style={{ background: '#ef4a1e', color: '#fff', fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: subscribing ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>{subscribing ? 'Opening…' : 'Go full-time · $49/mo'}</button>
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <button onClick={() => openCredits('buy')} style={{ background: 'none', border: 'none', color: GREEN, fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Buy credits</button>
                 <button onClick={() => setPlanDismissed(true)} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>I&rsquo;m good on Free</button>

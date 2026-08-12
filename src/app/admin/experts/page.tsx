@@ -80,7 +80,7 @@ export default function AdminExpertsPage() {
       {loading ? <div style={{ color: '#9ca3af' }}>Loading…</div> : experts.map(ex => (
         <div key={ex.id} style={card}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            {ex.avatar_url ? <img src={ex.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{ex.name.slice(0, 1)}</div>}
+            {ex.avatar_url ? <img src={ex.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover' }} /> : <div style={{ width: 40, height: 40, borderRadius: '50%', background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{ex.name.slice(0, 1)}</div>}
             <div style={{ flex: 1 }}>
               <div style={{ fontSize: 15, fontWeight: 700, color: '#111' }}>{ex.name} {ex.handle && <span style={{ color: '#9ca3af', fontWeight: 400, fontSize: 13 }}>@{ex.handle.replace(/^@/, '')}</span>}</div>
               <div style={{ fontSize: 12, color: '#6b7280' }}>{ex.expert_packs.length} pack(s) · {ex.revenue_share_pct}% share · {ex.is_published ? <span style={{ color: '#059669', fontWeight: 700 }}>Published</span> : <span style={{ color: '#9ca3af' }}>Draft</span>}</div>

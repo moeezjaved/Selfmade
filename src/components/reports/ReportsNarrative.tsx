@@ -323,7 +323,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: oppColor(r.tone) }}>{r.impact}</span>
                   <Confidence level={r.level} />
                 </div>
-                <Link href={r.href} style={{ alignSelf: 'flex-start', background: FOREST, color: LIME, borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
+                <Link href={r.href} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
               </div>
             ))}
           </div>

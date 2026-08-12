@@ -66,14 +66,14 @@ export default function MelloTasks({ brandId }: { brandId?: string | null }) {
 
             <div style={{ marginTop: 11 }}>
               {done && t.result?.url ? (
-                <Link href={t.result.url} style={{ display: 'inline-block', background: LIME, color: FOREST, borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>{t.result.cta || 'Open it →'}</Link>
+                <Link href={t.result.url} style={{ display: 'inline-block', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>{t.result.cta || 'Open it →'}</Link>
               ) : running ? (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, color: GREEN, fontWeight: 600 }}>
                   <span className="mt-spin" style={{ width: 14, height: 14, border: `2px solid ${GREEN}`, borderTopColor: 'transparent', borderRadius: '50%', display: 'inline-block' }} /> {KIND[t.kind]?.run || 'Working…'}
                 </div>
               ) : (
                 <button onClick={() => run(t, i)} disabled={busy[t.id || t.suggested_key || String(i)]}
-                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                   {failed ? 'Try again' : 'Start'} {t.credits ? <span style={{ color: '#9db98a', fontWeight: 600 }}>· {t.credits} credits</span> : <span style={{ color: '#9db98a', fontWeight: 600 }}>· free</span>} →
                 </button>
               )}

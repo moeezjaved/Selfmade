@@ -65,6 +65,6 @@ const S: Record<string, React.CSSProperties> = {
   h1: { fontSize: 24, fontWeight: 800, color: '#111', textAlign: 'center', margin: '0 0 8px', letterSpacing: '-.02em' },
   label: { display: 'block', fontSize: 13, fontWeight: 700, color: '#374151', marginBottom: 6 },
   input: { width: '100%', padding: '12px 13px', border: '1px solid #d7dbd7', borderRadius: 10, fontSize: 15, fontFamily: 'inherit', color: '#111', outline: 'none', background: '#fbfcfb', boxSizing: 'border-box' },
-  submit: { width: '100%', background: LIME, color: INK, border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 },
+  submit: { width: '100%', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 12, padding: '13px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 4 },
   forgot: { display: 'block', textAlign: 'center', marginTop: 18, fontSize: 14, color: '#374151', fontWeight: 600, textDecoration: 'none' },
 }

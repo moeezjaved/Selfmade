@@ -22,7 +22,7 @@ const TEAM: [string, string][] = [
 
 const say: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 31, fontWeight: 400, letterSpacing: '-.015em', lineHeight: 1.14, color: INK, textAlign: 'center', maxWidth: 540, margin: '0 auto' }
 const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 440, margin: '10px auto 0', lineHeight: 1.6 }
-const btnMain: React.CSSProperties = { background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
+const btnMain: React.CSSProperties = { background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
 
 export default function StoryTeamPreview() {
   const [step, setStep] = useState(0)
@@ -72,7 +72,7 @@ export default function StoryTeamPreview() {
             <div style={{ display: 'block', textAlign: 'left', background: '#fff', border: `1.5px solid ${GREEN}`, borderRadius: 14, padding: '15px 18px', maxWidth: 430, margin: '16px auto 18px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <b style={{ fontSize: 14.5, color: INK }}>Connect Meta Ads →</b>
-                <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: LIME, color: FOREST, borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>
+                <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: '#ef4a1e', color: '#fff', borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>
               </div>
               <div style={{ fontSize: 12, color: MUTED, marginTop: 4 }}>So Media Buying sees what already worked.</div>
             </div>
@@ -127,7 +127,7 @@ export default function StoryTeamPreview() {
               ))}
             </div>
             <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The team studies your market all night. But I already have a first read for you.</p>
-            <button style={{ ...btnMain, background: LIME, color: FOREST, marginTop: 18 }} onClick={() => setStep(0)}>Read my first briefing →</button>
+            <button style={{ ...btnMain, background: '#ef4a1e', color: '#fff', marginTop: 18 }} onClick={() => setStep(0)}>Read my first briefing →</button>
             <div style={{ marginTop: 22, fontSize: 11.5, color: '#5d675c' }}>(preview — loops back to the start)</div>
           </>
         )}

@@ -27,7 +27,7 @@ export default function WatchBrandButton({ pageId, name }: { pageId: string; nam
 
   return (
     <button onClick={watch} disabled={state === 'busy'}
-      style={{ background: LIME, color: FOREST, fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: state === 'busy' ? 0.7 : 1 }}>
+      style={{ background: '#ef4a1e', color: '#fff', fontSize: 13.5, fontWeight: 800, padding: '11px 20px', borderRadius: 100, border: 'none', cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: state === 'busy' ? 0.7 : 1 }}>
       {state === 'busy' ? 'Adding…' : state === 'done' ? '✓ Watching — open Brand Spy →' : 'Watch this brand →'}
     </button>
   )

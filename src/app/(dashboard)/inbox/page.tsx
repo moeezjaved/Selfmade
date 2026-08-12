@@ -190,7 +190,7 @@ export default function InboxPage() {
     const draft = drafts[messageId] ?? fallback ?? ''
     return (
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button onClick={() => act(messageId, fallback, 'approve', from)} disabled={busy === messageId || !draft.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: busy === messageId ? 'default' : 'pointer', opacity: busy === messageId || !draft.trim() ? 0.6 : 1 }}>
+        <button onClick={() => act(messageId, fallback, 'approve', from)} disabled={busy === messageId || !draft.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: busy === messageId ? 'default' : 'pointer', opacity: busy === messageId || !draft.trim() ? 0.6 : 1 }}>
           {busy === messageId ? 'Sending…' : 'Approve & send →'}
         </button>
         <button onClick={() => act(messageId, fallback, 'skip', from)} disabled={busy === messageId} style={{ background: '#fff', color: SUB, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>Skip</button>
@@ -258,7 +258,7 @@ export default function InboxPage() {
                       </>
                     ) : (
                       <button onClick={() => connectChannel(c.k)} disabled={connecting === c.k}
-                        style={{ marginLeft: 2, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: connecting === c.k ? 'default' : 'pointer', opacity: connecting === c.k ? 0.6 : 1 }}>
+                        style={{ marginLeft: 2, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: connecting === c.k ? 'default' : 'pointer', opacity: connecting === c.k ? 0.6 : 1 }}>
                         {connecting === c.k ? '…' : 'Connect'}
                       </button>
                     )}
@@ -299,7 +299,7 @@ export default function InboxPage() {
           <input value={simText} onChange={e => setSimText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') simulate() }}
             placeholder="Try a customer message — e.g. “my order hasn't arrived” or “can I get a refund?”"
             style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f9f5ec', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />
-          <button onClick={simulate} disabled={simBusy || !simText.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: simBusy || !simText.trim() ? 'default' : 'pointer', opacity: simBusy || !simText.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+          <button onClick={simulate} disabled={simBusy || !simText.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: simBusy || !simText.trim() ? 'default' : 'pointer', opacity: simBusy || !simText.trim() ? 0.6 : 1, whiteSpace: 'nowrap' }}>
             {simBusy ? 'Triaging…' : 'Simulate a message'}
           </button>
         </div>

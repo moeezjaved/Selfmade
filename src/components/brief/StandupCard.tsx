@@ -71,7 +71,7 @@ export default function StandupCard({ brandId }: { brandId?: string | null }) {
       {/* Prepare everything — one tap fans out the free prep and lines up what needs your OK. */}
       <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid rgba(255,255,255,.12)` }}>
         {!open ? (
-          <button onClick={prepareEverything} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
+          <button onClick={prepareEverything} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>
             Should I prepare everything? →
           </button>
         ) : preparing ? (

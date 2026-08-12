@@ -72,7 +72,7 @@ export default function RemakeAdaptation({ adId, isVideo, videoUrl, poster }: { 
   return (
     <div style={{ background: 'linear-gradient(180deg,#f7fbef,#ffffff)', border: `1px solid #d9ecb4`, borderRadius: 16, padding: '20px 22px', marginBottom: 18, boxShadow: '0 24px 50px -40px rgba(20,29,21,.4)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
-        <span style={{ width: 26, height: 26, borderRadius: 8, background: FOREST, color: LIME, display: 'grid', placeItems: 'center', flexShrink: 0 }}><Sparkles size={14} /></span>
+        <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ef4a1e', color: '#fff', display: 'grid', placeItems: 'center', flexShrink: 0 }}><Sparkles size={14} /></span>
         <div style={{ fontSize: 14.5, fontWeight: 850, color: INK }}>Mello studied this campaign{data?.brand ? ` and adapted it for ${data.brand.name}` : ''}.</div>
         {brands.length > 1 && (
           <select value={brandId} onChange={(e) => setBrandId(e.target.value)} style={{ marginLeft: 'auto', border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 10px', fontSize: 12.5, fontWeight: 700, color: INK, fontFamily: 'inherit' }}>
@@ -110,7 +110,7 @@ export default function RemakeAdaptation({ adId, isVideo, videoUrl, poster }: { 
             {ad.primaryText && <Field label="Primary text"><div style={{ fontSize: 13, color: '#2c342d', lineHeight: 1.55 }}>{ad.primaryText}</div></Field>}
           </div>
 
-          <button onClick={goStudio} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: FOREST, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
+          <button onClick={goStudio} style={{ marginTop: 16, display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 850, cursor: 'pointer', fontFamily: 'inherit' }}>
             <Sparkles size={15} /> Generate this for {data?.brand?.name || 'my brand'} →
           </button>
           <div style={{ fontSize: 11, color: MUTED, marginTop: 8 }}>A starting draft — you approve everything before any credits are spent.</div>

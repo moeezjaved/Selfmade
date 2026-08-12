@@ -59,7 +59,7 @@ export default function UpgradeGate({ feature, name, children }: {
         {/* animated lock */}
         <div style={{ position: 'relative', width: 66, height: 66, margin: '0 auto 20px' }}>
           <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `2px solid ${LIME}`, animation: 'ug-ring 2.4s ease-out infinite' }} />
-          <div className="ug-lock" style={{ width: 66, height: 66, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🔒</div>
+          <div className="ug-lock" style={{ width: 66, height: 66, borderRadius: '50%', background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26 }}>🔒</div>
         </div>
 
         <div style={{ display: 'inline-block', background: '#f3eee3', color: ACCENT, fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', padding: '4px 12px', borderRadius: 100, marginBottom: 12 }}>{PLANS[need].label} feature</div>
@@ -72,14 +72,14 @@ export default function UpgradeGate({ feature, name, children }: {
         <div style={{ textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10, maxWidth: 340, margin: '0 auto 26px' }}>
           {(PERKS[feature] || []).map((perk, i) => (
             <div key={perk} className="ug-perk" style={{ animationDelay: `${0.12 + i * 0.08}s`, display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, color: '#333' }}>
-              <span style={{ background: LIME, color: DARK, borderRadius: '50%', width: 19, height: 19, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0 }}>✓</span>
+              <span style={{ background: '#ef4a1e', color: '#fff', borderRadius: '50%', width: 19, height: 19, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 900, flexShrink: 0 }}>✓</span>
               {perk}
             </div>
           ))}
         </div>
 
         <button className="ug-cta" onClick={() => router.push('/billing')} style={{
-          background: DARK, color: LIME, border: 'none', borderRadius: 100, padding: '14px 30px', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
+          background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '14px 30px', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', gap: 8,
         }}>
           Upgrade to {PLANS[need].label} <span style={{ fontSize: 17 }}>→</span>

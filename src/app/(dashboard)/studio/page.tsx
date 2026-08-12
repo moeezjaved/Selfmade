@@ -453,7 +453,7 @@ function StudioInner() {
                 <Globe size={15} color={MUTED} style={{ position: 'absolute', left: 12, top: 12 }} />
                 <input value={website} onChange={e => setWebsite(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') analyze() }} placeholder="yourbrand.com — I’ll pull your colors, logo & products" style={{ ...field, paddingLeft: 34 }} />
               </div>
-              <button onClick={analyze} disabled={detecting || !website.trim()} style={{ background: FOREST, color: LIME, border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>{detecting ? <><Loader2 size={14} className="spin" /> Analyzing…</> : 'Analyze site'}</button>
+              <button onClick={analyze} disabled={detecting || !website.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>{detecting ? <><Loader2 size={14} className="spin" /> Analyzing…</> : 'Analyze site'}</button>
             </div>
             {kitReady && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, fontSize: 12, color: MUTED, fontWeight: 600 }}>
@@ -580,7 +580,7 @@ function StudioInner() {
                 <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                   {/* PRIMARY approve action: straight into launch. M4 opens with THIS image already
                       attached; the founder still sets + confirms the budget there (never auto-spends). */}
-                  <a href={`/m4?img=${encodeURIComponent(result.url)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: FOREST, color: LIME, border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Approve &amp; run on Facebook →</a>
+                  <a href={`/m4?img=${encodeURIComponent(result.url)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Approve &amp; run on Facebook →</a>
                   <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Download</button>
                   <button onClick={() => { setResult(null); setVersions([]); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
                 </div>
@@ -588,7 +588,7 @@ function StudioInner() {
                   <div style={label}>Tweak it</div>
                   <div style={{ display: 'flex', gap: 8 }}>
                     <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyEdit() }} placeholder="e.g. darker background, bigger logo" style={field} />
-                    <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: LIME, color: FOREST, border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
+                    <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
                   </div>
                 </div>
 

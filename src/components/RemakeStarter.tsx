@@ -67,7 +67,7 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
       {variant === 'icon' ? (
         // The rail's ＋ — the single bold thing on the quiet shell; opens the same chooser.
         <button onClick={() => { setErr(null); setOpen(true) }} title="Create an ad" aria-label="Create an ad"
-          style={{ width: 38, height: 38, borderRadius: 12, background: LIME, color: FOREST, display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 8px 18px -8px rgba(20,29,21,.4)', padding: 0 }}>
+          style={{ width: 38, height: 38, borderRadius: 12, background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: 'pointer', boxShadow: '0 8px 18px -8px rgba(20,29,21,.4)', padding: 0 }}>
           <Plus size={20} strokeWidth={2.4} />
         </button>
       ) : (
@@ -81,7 +81,7 @@ export default function RemakeStarter({ variant = 'pill' }: { variant?: 'pill' |
             boxShadow: '0 6px 18px rgba(190,240,90,.25)',
           }}
         >
-          <span style={{ width: 30, height: 30, borderRadius: 9, background: FOREST, color: LIME, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>＋</span>
+          <span style={{ width: 30, height: 30, borderRadius: 9, background: '#ef4a1e', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, lineHeight: 1, flexShrink: 0 }}>＋</span>
           <span style={{ flex: 1, minWidth: 0 }}>
             <span style={{ display: 'block', fontSize: 14.5, fontWeight: 800, letterSpacing: '-.01em' }}>Create an ad</span>
             <span style={{ display: 'block', fontSize: 11.5, fontWeight: 600, color: '#41543f' }}>Remake a winner, upload your own, or start fresh</span>

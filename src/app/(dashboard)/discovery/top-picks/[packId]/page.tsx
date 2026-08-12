@@ -72,7 +72,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ packId: s
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
             {expert.avatar_url
               ? <img src={expert.avatar_url} alt={expert.name} style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-              : <div style={{ width: 32, height: 32, borderRadius: '50%', background: DARK, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{expert.name.slice(0, 1)}</div>}
+              : <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>{expert.name.slice(0, 1)}</div>}
             <span style={{ fontSize: 13, color: '#6b7280', fontWeight: 700 }}>{expert.name}{expert.handle ? ` · @${expert.handle.replace(/^@/, '')}` : ''}</span>
           </div>
           <h1 style={{ fontSize: 26, fontWeight: 800, color: '#111', margin: '0 0 6px' }}>{pack.title}</h1>
@@ -99,7 +99,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ packId: s
               {pack.original_price_cents ? <span style={{ fontSize: 15, color: '#9ca3af', textDecoration: 'line-through' }}>${dollars(pack.original_price_cents).toFixed(0)}</span> : null}
             </span>
             <button onClick={unlock} disabled={unlocking}
-              style={{ background: DARK, color: LIME, border: 'none', borderRadius: 10, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
+              style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: 'pointer' }}>
               {unlocking ? 'Unlocking…' : 'Unlock pack'}
             </button>
           </div>
@@ -129,7 +129,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ packId: s
             <div style={{ display: 'flex', gap: 8, padding: 10 }}>
               {ad.canvaUrl ? (
                 <a href={ad.canvaUrl} target="_blank" rel="noopener noreferrer"
-                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: DARK, color: LIME, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}>
+                  style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, background: '#ef4a1e', color: '#fff', borderRadius: 8, padding: '8px 10px', fontSize: 12.5, fontWeight: 700, textDecoration: 'none' }}>
                   <LayoutTemplate size={14} /> Edit in template
                 </a>
               ) : (

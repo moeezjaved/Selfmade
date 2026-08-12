@@ -63,7 +63,7 @@ function Reveal({ children, delay = 0, style }: { children: React.ReactNode; del
 function Mask({ children, delay = 0, style }: { children: React.ReactNode; delay?: number; style?: React.CSSProperties }) {
   return <span className="mask" style={style}><span style={{ transitionDelay: `${delay}ms` }}>{children}</span></span>
 }
-const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
+const btnPrimary: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', padding: '13px 24px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none', border: 'none', cursor: 'pointer' }
 const btnDark: React.CSSProperties = { ...btnPrimary, background: INK, color: '#fff' }
 const wrap: React.CSSProperties = { maxWidth: 1120, margin: '0 auto', padding: '0 24px' }
 
@@ -131,7 +131,7 @@ function HeroMock({ slots }: { slots: ({ image: string; video: string | null } |
                   : null}
               <span style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(14,27,18,.78)', color: '#fff', fontSize: 8, fontWeight: 700, padding: '2px 6px', borderRadius: 10, zIndex: 10 }}>🔥 9{i}</span>
               {s && (
-                <Link href="/signup" aria-label="Remake this ad" className="hm-remake" style={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10, background: LIME, color: INK, fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</Link>
+                <Link href="/signup" aria-label="Remake this ad" className="hm-remake" style={{ position: 'absolute', bottom: 6, right: 6, zIndex: 10, background: '#ef4a1e', color: '#fff', fontSize: 10, fontWeight: 800, padding: '4px 9px', borderRadius: 100, textDecoration: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.25)' }}>✨ Remake</Link>
               )}
             </div>
           ))}
@@ -368,7 +368,7 @@ export default function HomeLanding() {
               ))}
               <Reveal delay={620}>
                 <div style={{ display: 'flex', gap: 8, paddingLeft: 58 }}>
-                  <Link href="/signup" className="btn" style={{ background: INK, color: LIME, fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ Review my work</Link>
+                  <Link href="/signup" className="btn" style={{ background: '#ef4a1e', color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>✓ Review my work</Link>
                   <Link href="/signup" className="btn" style={{ background: '#fff', color: INK, border: '1.5px solid #efece2', fontSize: 12.5, fontWeight: 800, padding: '9px 16px', borderRadius: 100, textDecoration: 'none' }}>See the ads</Link>
                 </div>
               </Reveal>
@@ -572,7 +572,7 @@ export default function HomeLanding() {
                   <ShowMedia url={s.sourceVideo || null} poster={s.source} isVideo={!!s.sourceVideo} ring={false} alt="source winning ad" />
                   <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.04em', color: '#9ca3af', marginTop: 6, textTransform: 'uppercase' }}>Winning ad</div>
                 </div>
-                <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: LIME, color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>→</div>
+                <div style={{ flexShrink: 0, width: 34, height: 34, borderRadius: '50%', background: '#ef4a1e', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>→</div>
                 <div style={{ flex: 1, textAlign: 'center' }}>
                   <ShowMedia url={s.made} poster={s.video ? null : s.made} isVideo={s.video} ring alt="remade with Selfmade" />
                   <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', color: GREEN, marginTop: 6, textTransform: 'uppercase' }}>Your remake{s.video ? ' · video' : ''}</div>
@@ -597,7 +597,7 @@ export default function HomeLanding() {
                 <div key={i} style={{ width: 150, aspectRatio: '3/4', borderRadius: 14, overflow: 'hidden', background: ads.length ? '#0d120e' : `linear-gradient(160deg,#fff,${t})`, border: '1px solid #eef0ee', flexShrink: 0, position: 'relative' }}>
                   {ads.length && /* eslint-disable-next-line @next/next/no-img-element */
                     <img src={adImg(t, 240)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
-                  <span style={{ position: 'absolute', top: 8, left: 8, background: LIME, color: INK, fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>Discovery</span>
+                  <span style={{ position: 'absolute', top: 8, left: 8, background: '#ef4a1e', color: '#fff', fontSize: 9, fontWeight: 800, padding: '2px 7px', borderRadius: 10 }}>Discovery</span>
                 </div>
               ))}
             </div>
@@ -691,7 +691,7 @@ function SeoFooter() {
   const industries = ['Skincare', 'Supplements', 'Beauty', 'Apparel', 'Fitness', 'Health & Wellness', 'Hair Care', 'Pets', 'Home Goods', 'Food & Beverage', 'Jewelry', 'Baby & Kids', 'Personal Care', 'Cosmetics', 'Fragrance', 'Footwear', 'Accessories', 'Electronics']
   // Ad-format pages driven by the classifier's real hook_type taxonomy (/ads/format/[slug]).
   const formats = ['Testimonial', 'Before & After', 'Unboxing', 'Social Proof', 'Question', 'Educational', 'Story', 'Announcement', 'Urgency', 'Discount', 'Us vs Them', 'Pain Point']
-  const cta: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: LIME, color: INK, padding: '11px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }
+  const cta: React.CSSProperties = { display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', padding: '11px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }
   return (
     <footer style={{ marginTop: 40 }}>
       {/* top: brand + product/company + start CTA (white) */}

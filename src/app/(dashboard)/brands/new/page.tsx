@@ -18,7 +18,7 @@ const AddCompetitors = dynamic(() => import('@/components/AddCompetitors'), { ss
 const INK = '#141d15', SUB = '#6b776b', LINE = '#e2e8dd', FOREST = '#141d15', LIME = '#ff5a2c'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22, boxShadow: '0 1px 2px rgba(20,29,21,0.04)' }
 const input: React.CSSProperties = { width: '100%', padding: '10px 12px', border: `1px solid ${LINE}`, borderRadius: 10, fontSize: 14, fontFamily: 'inherit', background: '#fbfcfa', color: INK }
-const primary: React.CSSProperties = { padding: '10px 18px', borderRadius: 100, border: 'none', background: FOREST, color: LIME, fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
+const primary: React.CSSProperties = { padding: '10px 18px', borderRadius: 100, border: 'none', background: '#ef4a1e', color: '#fff', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }
 const ghost: React.CSSProperties = { padding: '10px 16px', borderRadius: 100, border: `1px solid ${LINE}`, background: '#fff', color: SUB, fontWeight: 700, fontSize: 13.5, cursor: 'pointer', fontFamily: 'inherit' }
 
 type Acct = { account_id: string; account_name: string | null; currency: string | null; brand_id: string | null }
