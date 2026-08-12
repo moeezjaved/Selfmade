@@ -198,7 +198,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
       <div onClick={() => setAcctOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
       <div style={{ ...style, width: 264, background: '#fff', border: '1px solid #efece2', borderRadius: 14, boxShadow: '0 14px 44px rgba(20,29,21,0.16)', zIndex: 60, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '14px 14px 12px', borderBottom: '1px solid #eef1ec' }}>
-          <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+          <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-white text-sm font-black flex-shrink-0">{initials}</div>
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: '#161c17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
             <div style={{ fontSize: 11, color: '#7d877e', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{planLabel} plan · {user?.email}</div>
@@ -279,7 +279,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           </nav>
           <div style={{ padding: 12, borderTop: '1px solid #e9ece8', position: 'relative' }}>
             <button onClick={() => setAcctOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', background: 'transparent', border: 'none', borderRadius: 10, padding: 6, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black flex-shrink-0">{initials}</div>
+              <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-white text-sm font-black flex-shrink-0">{initials}</div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#161c17', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
                 <div style={{ fontSize: 11, color: '#7d877e' }}>{planLabel}</div>
@@ -337,7 +337,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
             <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}><Settings size={19} /></RailIcon>
             <div style={{ position: 'relative', marginTop: 4 }}>
               <button onClick={() => setAcctOpen(o => !o)} aria-label="Account" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>
-                <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-dark text-sm font-black">{initials}</div>
+                <div className="w-9 h-9 rounded-full bg-lime flex items-center justify-center text-white text-sm font-black">{initials}</div>
               </button>
               {acctOpen && <AcctMenu style={{ position: 'fixed', bottom: 14, left: RAIL_W + 10 }} />}
             </div>

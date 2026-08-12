@@ -21,7 +21,7 @@ const FIELDS: { key: string; label: string; required?: boolean; guesses: string[
 ]
 
 const inp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontFamily: 'inherit' }
-const btn = (primary = true): React.CSSProperties => ({ padding: '9px 18px', borderRadius: 8, border: primary ? 'none' : '1px solid #d1d5db', background: primary ? DARK : '#fff', color: primary ? LIME : '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' })
+const btn = (primary = true): React.CSSProperties => ({ padding: '9px 18px', borderRadius: 8, border: primary ? 'none' : '1px solid #d1d5db', background: primary ? '#ef4a1e' : '#fff', color: primary ? '#fff' : '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' })
 
 // Minimal RFC-ish CSV parse: handles quoted fields with commas + escaped quotes.
 function parseCSV(text: string): string[][] {

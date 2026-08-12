@@ -23,7 +23,7 @@ interface SearchHit { ad_id: string; page_name: string; copy: string; is_active:
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e5e7eb', borderRadius: 12, padding: 16, marginBottom: 14 }
 const inp: React.CSSProperties = { padding: '7px 10px', border: '1px solid #d1d5db', borderRadius: 7, fontSize: 13, fontFamily: 'inherit', width: '100%' }
 const lbl: React.CSSProperties = { fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', display: 'block', marginBottom: 4 }
-const btn = (primary = true): React.CSSProperties => ({ padding: '8px 16px', borderRadius: 8, border: primary ? 'none' : '1px solid #d1d5db', background: primary ? DARK : '#fff', color: primary ? LIME : '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' })
+const btn = (primary = true): React.CSSProperties => ({ padding: '8px 16px', borderRadius: 8, border: primary ? 'none' : '1px solid #d1d5db', background: primary ? '#ef4a1e' : '#fff', color: primary ? '#fff' : '#374151', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' })
 
 export default function AdminExpertsPage() {
   const [experts, setExperts] = useState<Expert[]>([])

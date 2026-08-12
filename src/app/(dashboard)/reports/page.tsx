@@ -177,7 +177,7 @@ function ReportsPage() {
           <AccountSelector onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
           <div style={{ display: 'flex', gap: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: 3 }}>
             {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
-              <button key={r} onClick={() => setDateRange(r)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 750, fontSize: 12.5, cursor: 'pointer', background: dateRange === r ? FOREST : 'transparent', color: dateRange === r ? LIME : MUTED, transition: 'all .12s' }}>
+              <button key={r} onClick={() => setDateRange(r)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 750, fontSize: 12.5, cursor: 'pointer', background: dateRange === r ? '#ef4a1e' : 'transparent', color: dateRange === r ? '#fff' : MUTED, transition: 'all .12s' }}>
                 {r.replace('last_', '')}
               </button>
             ))}
@@ -216,7 +216,7 @@ function ReportsPage() {
           <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.07em', marginRight: 4 }}>Sort by</span>
             {sortBtns.map(b => (
-              <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '6px 13px', borderRadius: 100, border: `1px solid ${sortKey === b.key ? FOREST : LINE}`, fontFamily: 'inherit', fontWeight: 750, fontSize: 12, cursor: 'pointer', background: sortKey === b.key ? FOREST : '#fff', color: sortKey === b.key ? LIME : MUTED, transition: 'all .12s' }}>
+              <button key={b.key} onClick={() => setSortKey(b.key)} style={{ padding: '6px 13px', borderRadius: 100, border: `1px solid ${sortKey === b.key ? '#ef4a1e' : LINE}`, fontFamily: 'inherit', fontWeight: 750, fontSize: 12, cursor: 'pointer', background: sortKey === b.key ? '#ef4a1e' : '#fff', color: sortKey === b.key ? '#fff' : MUTED, transition: 'all .12s' }}>
                 {b.label}
               </button>
             ))}

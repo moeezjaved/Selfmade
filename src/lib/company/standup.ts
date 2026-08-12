@@ -57,9 +57,12 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
   // connected, it becomes a small chip in connectPrompts instead of a big line.
   const connectPrompts: ConnectPrompt[] = []
   let calendarConnected = false
+  // Calendar is off for now (too much test surface pre-users) — flip to true to re-enable the meeting
+  // line + "Add your calendar" prompt later.
+  const CALENDAR_ENABLED = false
   try {
-    const { data: cal } = await admin.from('channel_identities').select('external_id, meta, provider')
-      .eq('user_id', userId).eq('provider', 'calendar').eq('active', true).limit(1).maybeSingle()
+    const { data: cal } = CALENDAR_ENABLED ? await admin.from('channel_identities').select('external_id, meta, provider')
+      .eq('user_id', userId).eq('provider', 'calendar').eq('active', true).limit(1).maybeSingle() : { data: null }
     const acct = cal?.meta?.unipile_account_id || cal?.external_id
     if (acct) {
       calendarConnected = true
@@ -73,7 +76,7 @@ export async function assembleStandup(admin: any, userId: string, firstName?: st
       }
     }
   } catch { /* calendar is best-effort */ }
-  if (!calendarConnected) connectPrompts.push({ key: 'calendar', emoji: '📅', label: 'Add your calendar' })
+  if (CALENDAR_ENABLED && !calendarConnected) connectPrompts.push({ key: 'calendar', emoji: '📅', label: 'Add your calendar' })
 
   // Founder comms for the brief itself — Slack (teams) or WhatsApp (solo). Small chip if neither linked.
   try {

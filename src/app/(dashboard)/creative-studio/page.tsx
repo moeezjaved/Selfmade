@@ -127,7 +127,7 @@ function Generations() {
     <div>
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {(['all', 'clone', 'edit', 'inspired'] as const).map((f) => (
-          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? DARK : '#cbd5cb'}`, background: filter === f ? DARK : '#fff', color: filter === f ? LIME : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f === 'clone' ? 'remake' : f}</button>
+          <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? '#ef4a1e' : '#cbd5cb'}`, background: filter === f ? '#ef4a1e' : '#fff', color: filter === f ? '#fff' : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f === 'clone' ? 'remake' : f}</button>
         ))}
       </div>
 
@@ -186,7 +186,7 @@ function Generations() {
 }
 
 function Badge({ children, tone }: { children: React.ReactNode; tone?: 'pro' }) {
-  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, textTransform: 'capitalize', background: tone === 'pro' ? DARK : '#f3eee3', color: tone === 'pro' ? LIME : '#3f6b3f' }}>{children}</span>
+  return <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 6, textTransform: 'capitalize', background: tone === 'pro' ? '#ef4a1e' : '#f3eee3', color: tone === 'pro' ? '#fff' : '#3f6b3f' }}>{children}</span>
 }
 
 /* Full-view + re-edit (reuses the credit-charged edit endpoint; new edits are saved as generations). */

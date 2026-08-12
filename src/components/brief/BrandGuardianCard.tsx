@@ -100,7 +100,7 @@ export default function BrandGuardianCard({ brandId }: { brandId?: string | null
               <span style={{ fontSize: 11.5, color: staleCrawl ? '#b7791f' : '#a7b0a5', fontWeight: staleCrawl ? 700 : 500 }}>
                 {data.crawl.hours == null ? 'Competitors not checked yet' : `Competitors last checked ${data.crawl.hours}h ago`}{staleCrawl ? ' — that’s stale' : ''}
               </span>
-              <button onClick={recheck} disabled={rechecking} style={{ background: staleCrawl ? FOREST : '#f2f4ef', color: staleCrawl ? LIME : INK, border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 750, fontFamily: 'inherit', cursor: rechecking ? 'default' : 'pointer', opacity: rechecking ? 0.6 : 1 }}>
+              <button onClick={recheck} disabled={rechecking} style={{ background: staleCrawl ? '#ef4a1e' : '#f2f4ef', color: staleCrawl ? '#fff' : INK, border: 'none', borderRadius: 100, padding: '4px 12px', fontSize: 11.5, fontWeight: 750, fontFamily: 'inherit', cursor: rechecking ? 'default' : 'pointer', opacity: rechecking ? 0.6 : 1 }}>
                 {rechecking ? 'Queuing…' : '↻ Re-check now'}
               </button>
             </div>

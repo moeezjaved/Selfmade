@@ -338,7 +338,7 @@ function CampaignsInner() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
-          <img src='/favicon.png' style={{ width: 44, height: 44, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 16px', display: 'block' }} />
+          <div className="selfmade-loading" style={{ width: 44, height: 44, borderRadius: 12, margin: '0 auto 16px' }} />
           <div style={{ color: '#141d15', fontWeight: 700 }}>Loading campaigns...</div>
         </div>
       ) : campaigns.length === 0 ? (

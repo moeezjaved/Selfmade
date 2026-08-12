@@ -79,7 +79,7 @@ const say: React.CSSProperties = { fontFamily: "'Instrument Serif', Georgia, ser
 const sub: React.CSSProperties = { fontSize: 14, color: MUTED, textAlign: 'center', maxWidth: 420, margin: '10px auto 0', lineHeight: 1.6 }
 const btnMain: React.CSSProperties = { background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
 const btnGhost: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' }
-const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? FOREST : LINE}`, background: on ? FOREST : '#fff', color: on ? LIME : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
+const chip = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? '#ef4a1e' : LINE}`, background: on ? '#ef4a1e' : '#fff', color: on ? '#fff' : INK, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit' })
 const inputCss: React.CSSProperties = { border: `1.5px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', fontSize: 14, fontFamily: 'inherit', color: INK, background: '#fff', outline: 'none', width: '100%' }
 // Plan step
 const planCard: React.CSSProperties = { position: 'relative', flex: '1 1 200px', minWidth: 200, maxWidth: 230, background: '#fff', border: `1.5px solid ${LINE}`, borderRadius: 16, padding: '20px 18px' }

@@ -98,7 +98,7 @@ export default function Understand({ adId }: { adId: string }) {
                   <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                     <button onClick={canPlay ? () => play(i) : undefined}
                       style={{ position: 'relative', overflow: 'hidden', border: 'none', fontFamily: 'inherit', cursor: canPlay ? 'pointer' : 'default',
-                        background: active ? FOREST : '#f4fbe6', color: active ? LIME : '#2c4a1f', opacity: dimmed ? 0.5 : 1,
+                        background: active ? '#ef4a1e' : '#f4fbe6', color: active ? '#fff' : '#2c4a1f', opacity: dimmed ? 0.5 : 1,
                         fontSize: 11.5, fontWeight: 750, borderRadius: 100, padding: '5px 12px',
                         transition: 'background .3s ease, color .3s ease, opacity .3s ease' }}>
                       {s}

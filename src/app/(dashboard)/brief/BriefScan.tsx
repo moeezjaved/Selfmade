@@ -519,9 +519,9 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
               // Founder WhatsApp intentionally omitted — briefs are Slack-only (a shared WhatsApp sender
               // loops and never notifies a self-send). WhatsApp stays a CUSTOMER channel (Inbox), not a
               // founder-brief line.
+              // Calendar connect removed for now (adds too much test surface pre-users) — re-add later.
               const steps = [
                 { p: 'slack', label: 'Get your brief on Slack' },
-                { p: 'calendar', label: 'Connect your calendar' },
               ].filter(x => !connectedChannels.includes(x.p))
               if (!steps.length) return null
               return (
