@@ -37,6 +37,7 @@ type Graded = { campaignId: string; metaCampaignId: string; name: string; grade:
 export type AuditResult = {
   total: number; spend: number; avgRoas: number
   revenue?: number; purchases?: number   // account totals: Meta-attributed revenue + purchase count
+  impressions?: number; clicks?: number; ctr?: number; cpc?: number; cpm?: number   // account-level delivery metrics
   scale: Graded[]; watch: Graded[]; pause: Graded[]
 }
 
@@ -110,9 +111,14 @@ function grade(campaigns: any[]): AuditResult {
   // The Scale / Watch / Pause buckets ONLY show currently-DELIVERING campaigns — you can't scale, watch,
   // or pause one that's already off. This kills the "Mello says pause an ad that's already paused" bug.
   const live = graded.filter((x) => x.active)
+  // Account-level delivery metrics — CTR is derived from totals (not an average of averages), CPC/CPM
+  // straight from spend ÷ clicks / impressions. These are the canonical account numbers Mello quotes.
+  const cpc = totClicks > 0 ? totSpend / totClicks : 0
+  const cpm = totImpr > 0 ? (totSpend / totImpr) * 1000 : 0
   return {
     total: rows.length, spend: Math.round(totSpend), avgRoas: +avgRoas.toFixed(2),
     revenue: Math.round(totValue), purchases: Math.round(totPurch),
+    impressions: totImpr, clicks: totClicks, ctr: +avgCtr.toFixed(2), cpc: +cpc.toFixed(2), cpm: +cpm.toFixed(2),
     scale: live.filter((x) => x.grade === 'graduate').sort((a, b) => b.roas - a.roas),
     watch: live.filter((x) => x.grade === 'catchy').sort((a, b) => b.spend - a.spend),
     pause: live.filter((x) => x.grade === 'pause').sort((a, b) => b.spend - a.spend),
@@ -322,7 +328,7 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
       }
     })
   } catch { /* live campaign insights are best-effort → empty audit */ }
-  const audit = campaigns.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, revenue: 0, purchases: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
+  const audit = campaigns.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, revenue: 0, purchases: 0, impressions: 0, clicks: 0, ctr: 0, cpc: 0, cpm: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
 
   // Today's account-level spend — one quick live call (this is the "Spend today" figure).
   let spendToday = 0
@@ -361,7 +367,8 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   const result = {
     accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
     selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
-    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, revenue: audit.revenue ?? 0, purchases: audit.purchases ?? 0, spendToday: Math.round(spendToday),
+    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, revenue: audit.revenue ?? 0, purchases: audit.purchases ?? 0,
+    impressions: audit.impressions ?? 0, clicks: audit.clicks ?? 0, ctr: audit.ctr ?? 0, cpc: audit.cpc ?? 0, cpm: audit.cpm ?? 0, spendToday: Math.round(spendToday),
     counts: { scale: audit.scale.length, watch: audit.watch.length, pause: audit.pause.length },
     scale: audit.scale.slice(0, 3).map(slim), watch: audit.watch.slice(0, 3).map(slim), pause: audit.pause.slice(0, 3).map(slim),
     ads,

@@ -13,7 +13,7 @@ export type MetaPreset =
   | 'this_month' | 'last_month' | 'last_3d' | 'last_7d' | 'last_14d' | 'last_30d' | 'last_90d'
 
 export type Period = { preset: MetaPreset; label: string }
-export type MetricKind = 'spend' | 'roas' | 'revenue' | 'purchases' | 'cpa'
+export type MetricKind = 'spend' | 'roas' | 'revenue' | 'purchases' | 'cpa' | 'ctr' | 'cpc' | 'cpm' | 'impressions' | 'clicks'
 
 export const DEFAULT_PERIOD: Period = { preset: 'last_30d', label: 'last 30 days' }
 
@@ -33,17 +33,75 @@ export function parsePeriod(q: string): Period | null {
   return null
 }
 
-/** Which single account-level metric the question asks for. null = not a single-metric ask. */
-export function parseMetric(q: string): MetricKind | null {
-  const t = ` ${String(q || '').toLowerCase()} `
-  // "which/best/top/compare" ask for a breakdown, not one account number → let the diagnostic path handle it.
-  if (/\b(which|what campaign|what ad|best|worst|top|compare|versus|\bvs\b|improve|optimi|scale up|pause|fix|what should)\b/.test(t)) return null
+/** Detect the metric named in the text, WITHOUT the breakdown/compare guard (used by comparisons). */
+function detectMetric(t: string): MetricKind | null {
+  if (/\bcpm\b|cost per (thousand|mille|1000|1,000)/.test(t)) return 'cpm'
+  if (/\bcpc\b|cost per click/.test(t)) return 'cpc'
+  if (/\bctr\b|click.?through/.test(t)) return 'ctr'
   if (/\bcpa\b|cost per (acquisition|purchase|order|result|conversion|sale)/.test(t)) return 'cpa'
   if (/\broas\b|return on ad spend/.test(t)) return 'roas'
+  if (/\bimpressions?\b/.test(t)) return 'impressions'
+  if (/\bclicks?\b/.test(t)) return 'clicks'
   if (/\borders?\b|\bpurchases?\b|\bconversions?\b|\bsales count\b/.test(t)) return 'purchases'
   if (/\brevenue\b|\bsales\b|\bmade\b|\bearn(ed|ings)?\b|how much (did|have) we (make|made|earn)/.test(t)) return 'revenue'
   if (/\bspen[dt]\b|\bbudget\b|\bcost\b/.test(t)) return 'spend'
   return null
+}
+
+/** Which single account-level metric the question asks for. null = not a single-metric ask
+ *  (e.g. a "which campaign / best / compare" breakdown → the diagnostic path handles it). */
+export function parseMetric(q: string): MetricKind | null {
+  const t = ` ${String(q || '').toLowerCase()} `
+  if (/\b(which|what campaign|what ad|best|worst|top|compare|versus|\bvs\b|improve|optimi|scale up|pause|fix|what should)\b/.test(t)) return null
+  return detectMetric(t)
+}
+
+export type Comparison = { metric: MetricKind; a: Period; b: Period }
+
+/** A two-period comparison ("did we spend more this week than last week?"). Supports the week & month
+ *  pairs that map cleanly to Meta presets; anything else → null (diagnostic path). */
+export function parseComparison(q: string): Comparison | null {
+  const t = ` ${String(q || '').toLowerCase()} `
+  const isCompare = /\b(vs\.?|versus|compared? (to|with)|more than|less than|higher than|lower than|better than|worse than|than (last|previous|the previous))\b/.test(t)
+  if (!isCompare) return null
+  const metric = detectMetric(t) || 'spend'
+  if (/\b(this month|last month|previous month|month)\b/.test(t))
+    return { metric, a: { preset: 'this_month', label: 'this month' }, b: { preset: 'last_month', label: 'last month' } }
+  if (/\b(this week|last week|previous week|week)\b/.test(t))
+    return { metric, a: { preset: 'this_week_mon_today', label: 'this week' }, b: { preset: 'last_week_mon_sun', label: 'last week' } }
+  return null   // no clean preset pair → let the diagnostic path explain
+}
+
+/** Read one metric's value off an audit snapshot. */
+export function metricValue(a: any, metric: MetricKind): number {
+  if (!a) return 0
+  switch (metric) {
+    case 'spend': return Number(a.spend || 0)
+    case 'roas': return Number(a.avgRoas || 0)
+    case 'revenue': return Number(a.revenue || 0)
+    case 'purchases': return Number(a.purchases || 0)
+    case 'cpa': return Number(a.purchases) > 0 ? Number(a.spend) / Number(a.purchases) : 0
+    case 'ctr': return Number(a.ctr || 0)
+    case 'cpc': return Number(a.cpc || 0)
+    case 'cpm': return Number(a.cpm || 0)
+    case 'impressions': return Number(a.impressions || 0)
+    case 'clicks': return Number(a.clicks || 0)
+  }
+}
+
+const money = (n: number, currency: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
+// Per-unit costs (CPC/CPM/CPA) need cents — rounding CPC $0.45 to "$0" is useless.
+const money2 = (n: number, currency: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n || 0) } catch { return `${(n || 0).toFixed(2)}` } }
+
+/** Format a metric value in its natural unit. */
+export function formatMetric(metric: MetricKind, value: number, currency: string): string {
+  switch (metric) {
+    case 'spend': case 'revenue': return money(value, currency)
+    case 'cpa': case 'cpc': case 'cpm': return money2(value, currency)
+    case 'roas': return `${(+value).toFixed(2)}x`
+    case 'ctr': return `${(+value).toFixed(2)}%`
+    case 'impressions': case 'clicks': case 'purchases': return Math.round(value).toLocaleString()
+  }
 }
 
 export type MetricProvenance = {
@@ -58,8 +116,6 @@ export type MetricProvenance = {
   fetchedAt: string
   aggregation: 'account'
 }
-
-const money = (n: number, currency: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
 
 /**
  * Deterministic answer for a single (metric × period) — the number comes straight from the canonical
@@ -92,7 +148,29 @@ export function buildMetricAnswer(a: any, metric: MetricKind, period: Period): {
     const p = Number(a.purchases || 0)
     if (!p) return { reply: `No Meta-attributed purchases ${period.label}, so I can't compute a cost per purchase yet.`, provenance: prov(0) }
     const cpa = a.spend / p
-    return { reply: `Your Meta cost per purchase ${period.label} is **${money(cpa, cur)}** (${money(a.spend, cur)} ÷ ${p} attributed purchases, ${acct}).`, provenance: prov(+cpa.toFixed(2)) }
+    return { reply: `Your Meta cost per purchase ${period.label} is **${formatMetric('cpa', cpa, cur)}** (${money(a.spend, cur)} ÷ ${p} attributed purchases, ${acct}).`, provenance: prov(+cpa.toFixed(2)) }
+  }
+  // Delivery metrics — straight from the canonical account totals.
+  if (metric === 'impressions' || metric === 'clicks' || metric === 'ctr' || metric === 'cpc' || metric === 'cpm') {
+    if (!a.total) return { reply: `No delivery ${period.label} yet — nothing served, so there's no ${metric.toUpperCase()} to report.`, provenance: prov(0) }
+    const v = metricValue(a, metric)
+    const NAME: Record<string, string> = { impressions: 'impressions', clicks: 'clicks', ctr: 'CTR', cpc: 'CPC', cpm: 'CPM' }
+    return { reply: `Your Meta ${NAME[metric]} ${period.label} is **${formatMetric(metric, v, cur)}** (${acct}).`, provenance: prov(v) }
   }
   return null
+}
+
+/** Deterministic two-period comparison — the numbers come from the canonical audits, only the framing is
+ *  words. The caller fetches an audit for each period and passes both here. */
+export function buildComparisonAnswer(aA: any, aB: any, cmp: Comparison, currency: string): string {
+  const va = metricValue(aA, cmp.metric)
+  const vb = metricValue(aB, cmp.metric)
+  const diff = va - vb
+  const pct = vb !== 0 ? (diff / Math.abs(vb)) * 100 : (va > 0 ? 100 : 0)
+  const dir = diff > 0 ? 'up' : diff < 0 ? 'down' : 'flat'
+  const NAME: Record<MetricKind, string> = { spend: 'spend', roas: 'ROAS', revenue: 'revenue', purchases: 'purchases', cpa: 'CPA', ctr: 'CTR', cpc: 'CPC', cpm: 'CPM', impressions: 'impressions', clicks: 'clicks' }
+  const abs = formatMetric(cmp.metric, Math.abs(diff), currency)
+  const head = `Meta ${NAME[cmp.metric]} is **${formatMetric(cmp.metric, va, currency)}** ${cmp.a.label} vs **${formatMetric(cmp.metric, vb, currency)}** ${cmp.b.label}`
+  if (dir === 'flat') return `${head} — flat.`
+  return `${head} — ${dir} ${abs} (${dir === 'up' ? '+' : '-'}${Math.abs(pct).toFixed(0)}%).`
 }
