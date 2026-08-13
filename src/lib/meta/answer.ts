@@ -14,7 +14,7 @@
 import { auditAccount } from '@/lib/meta/audit'
 import { recall } from '@/lib/brain'
 import { resolveBrandScopedAccount } from '@/lib/meta/scope'
-import { parsePeriod, parseMetric, buildMetricAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
+import { parsePeriod, parseMetric, buildMetricAnswer, parseComparison, buildComparisonAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
 
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
@@ -23,9 +23,15 @@ const MY_ADS = /\b(?:my|our) (?:ads?|campaigns?|roas|ad account|account|spend|pe
 // not the slow agent (which timed out on "what is sales today"). Grounded on the Meta audit today.
 const PERF = /\b(sales|revenue|profit|how much (?:did|have|are|is)|how (?:are|'?s|is) (?:we|things|business|it going)|today'?s?\s+(?:numbers|sales|revenue|spend)|this (?:week|month)|are we (?:doing )?(?:ok|okay|good|profitable))\b/i
 
+// HARD RULE: any measurable Meta metric noun routes to the canonical service — never the Brain/LLM.
+const METRIC_NOUN = /\b(roas|cpa|cpc|cpm|ctr|impressions?|clicks?|purchases?|orders?|conversions?|revenue|spend|spent|budget)\b/i
+
 export function isAdsQuestion(message: string): boolean {
   const q = String(message || '')
   if (MY_ADS.test(q) || PERF.test(q)) return true
+  // A measurable metric is always a canonical-data question (spend/roas/orders/impressions/…), so it must
+  // reach auditAccount and never be answered from memory or a generic LLM.
+  if (METRIC_NOUN.test(q)) return true
   // "ads performance", "campaign results", "how are the ads doing" — route to the GROUNDED audit, not
   // the free agent (which had no numbers and invented ROAS). A performance question needs no ADS_VERB.
   if (/\b(ads?|campaigns?)\s+(performance|results?|doing|numbers?|stats?)\b/i.test(q)) return true
@@ -135,17 +141,31 @@ Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","meta
 export async function answerAdsQuestion(admin: any, userId: string, message: string, opts?: { brandId?: string | null }): Promise<{ reply: string } | null> {
   if (!isAdsQuestion(message)) return null
 
+  // Resolve the account ONCE (same brand the Brief uses).
+  let scopedAccountId: string | undefined = undefined
+  try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId, opts?.brandId ?? undefined))?.account_id || undefined } catch { /* fall back to primary */ }
+
+  // COMPARISON ("did we spend more this week than last week?") → fetch BOTH canonical periods and let
+  // deterministic code compute the diff + %; the number is never the LLM's job.
+  const cmp = parseComparison(message)
+  if (cmp) {
+    let aA: any = null, aB: any = null
+    try { [aA, aB] = await Promise.all([auditAccount(admin, userId, scopedAccountId, cmp.a.preset), auditAccount(admin, userId, scopedAccountId, cmp.b.preset)]) } catch { /* fall through */ }
+    if (aA && aB) {
+      const reply = buildComparisonAnswer(aA, aB, cmp, aA.currency || 'USD')
+      try { console.log('[mello:metric]', JSON.stringify({ userId, account: aA.selected, brandId: opts?.brandId ?? null, metric: cmp.metric, compare: [cmp.a.preset, cmp.b.preset] })) } catch { /* debug */ }
+      return { reply: `${reply}\n\n_Meta Ads · ${aA.accountName || 'your account'} · ${cmp.a.label} vs ${cmp.b.label} · live audit_` }
+    }
+  }
+
   // CANONICAL CONTRACT: resolve the exact (metric × period) the question names, so the number matches
   // its own claim and the Brief. Period → native Meta preset; default last_30d (the brief's own window).
   const period = parsePeriod(message) || DEFAULT_PERIOD
   const metric = parseMetric(message)
 
+  // Audit the ACTIVE BRAND's account (scopedAccountId resolved above with the explicit brandId) for the
+  // exact period — the #1 "brief right, Mello wrong" cause was resolving from the cookie/primary here.
   let a: any = null
-  // Audit the account for the ACTIVE BRAND. Pass the explicit brandId (from the surface) so Mello audits
-  // the SAME account the Brief does — the #1 "brief right, Mello wrong" cause was resolving from the cookie
-  // (or primary) here while the brief passed the viewed brand.
-  let scopedAccountId: string | undefined = undefined
-  try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId, opts?.brandId ?? undefined))?.account_id || undefined } catch { /* fall back to primary */ }
   try { a = await auditAccount(admin, userId, scopedAccountId, period.preset) } catch { /* safe reply below */ }
   // No-guess guard: if there's no account or no data, say so plainly — never fabricate a number.
   if (!a) return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }

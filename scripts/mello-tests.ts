@@ -10,7 +10,7 @@ import { shouldRemember } from '@/lib/mello/remember'
 import { freshnessLabel, isTrustedStatus } from '@/lib/brain'
 import { factIsGrounded } from '@/lib/brain/ingest'
 import { detectTopicTrends, detectLaunchSpikes, detectTopPerformer } from '@/lib/brain/signals'
-import { parsePeriod, parseMetric, buildMetricAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
+import { parsePeriod, parseMetric, buildMetricAnswer, parseComparison, buildComparisonAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -196,6 +196,42 @@ console.log('\nMELLO ROUTING TESTS\n')
 
   // Parity: a no-period metric question resolves to last_30d — the SAME window the Brief card uses.
   ok('Parity: default window = brief window (last_30d)', (parsePeriod('what did we spend on facebook') || DEFAULT_PERIOD).preset === 'last_30d')
+}
+
+// Full Meta metric matrix — every measurable metric is deterministic + routed to canonical data.
+{
+  // HARD RULE: any measurable metric noun must route to the ads/canonical path (never Brain/LLM).
+  ok('Route: impressions → ads_metric', classifyIntent('how many impressions did we get?') === 'ads_metric')
+  ok('Route: clicks → ads_metric', classifyIntent('how many clicks yesterday?') === 'ads_metric')
+  ok('Route: ctr → ads_metric', classifyIntent("what's our ctr?") === 'ads_metric')
+  ok('Route: cpc → ads_metric', classifyIntent("what's our cpc this week?") === 'ads_metric')
+  ok('Route: purchases → ads_metric', classifyIntent('how many purchases did we get?') === 'ads_metric')
+
+  // Delivery-metric parsing.
+  ok('Metric: ctr', parseMetric("what's our ctr this month?") === 'ctr')
+  ok('Metric: cpc', parseMetric('what is our cpc') === 'cpc')
+  ok('Metric: cpm', parseMetric('what is our cpm') === 'cpm')
+  ok('Metric: impressions', parseMetric('how many impressions did we get?') === 'impressions')
+  ok('Metric: clicks', parseMetric('how many clicks yesterday?') === 'clicks')
+
+  // Deterministic delivery answers from canonical totals.
+  const del = { spend: 2000, avgRoas: 2.5, revenue: 5000, purchases: 60, ctr: 1.8, cpc: 0.45, cpm: 12, impressions: 250000, clicks: 4500, currency: 'USD', accountName: 'X Ads', total: 5, selected: 'act_1' }
+  ok('Answer: ctr exact', /1\.80%/.test(buildMetricAnswer(del, 'ctr', { preset: 'last_30d', label: 'last 30 days' })!.reply))
+  ok('Answer: cpc exact (cents)', /\$0\.45/.test(buildMetricAnswer(del, 'cpc', { preset: 'last_30d', label: 'last 30 days' })!.reply))
+  ok('Answer: impressions formatted', /250,000/.test(buildMetricAnswer(del, 'impressions', { preset: 'yesterday', label: 'yesterday' })!.reply))
+  ok('Answer: clicks formatted', /4,500/.test(buildMetricAnswer(del, 'clicks', { preset: 'yesterday', label: 'yesterday' })!.reply))
+
+  // Comparisons — two canonical periods, deterministic diff + %.
+  const cSpendWk = parseComparison('did we spend more this week than last week?')
+  ok('Compare: spend this vs last week', !!cSpendWk && cSpendWk.metric === 'spend' && cSpendWk.a.preset === 'this_week_mon_today' && cSpendWk.b.preset === 'last_week_mon_sun')
+  const cRoasMo = parseComparison('compare roas this month vs last month')
+  ok('Compare: roas this vs last month', !!cRoasMo && cRoasMo.metric === 'roas' && cRoasMo.a.preset === 'this_month' && cRoasMo.b.preset === 'last_month')
+  ok('Compare: plain metric question is NOT a comparison', parseComparison('what did we spend this week') === null)
+
+  const up = buildComparisonAnswer({ spend: 5000 }, { spend: 4000 }, cSpendWk!, 'USD')
+  ok('Compare answer: up +25% with delta', /up/.test(up) && /\$1,000/.test(up) && /25%/.test(up))
+  const down = buildComparisonAnswer({ spend: 3000 }, { spend: 4000 }, cSpendWk!, 'USD')
+  ok('Compare answer: down -25%', /down/.test(down) && /25%/.test(down))
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)
