@@ -101,7 +101,7 @@ export async function answerGrounded(
   if (intent === 'ads_metric') {
     try {
       const { answerAdsQuestion } = await import('@/lib/meta/answer')
-      const ads = await answerAdsQuestion(admin, userId, q)
+      const ads = await answerAdsQuestion(admin, userId, q, { brandId })   // pass the SAME brand the brief uses
       if (ads) return { handled: true, intent, sources: ['Meta Ads audit'], reply: ads.reply }
     } catch { /* fall through to agent */ }
   }

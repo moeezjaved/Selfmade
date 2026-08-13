@@ -14,6 +14,7 @@
 import { auditAccount } from '@/lib/meta/audit'
 import { recall } from '@/lib/brain'
 import { resolveBrandScopedAccount } from '@/lib/meta/scope'
+import { parsePeriod, parseMetric, buildMetricAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
 
 const ADS_NOUN = /\b(ads?|campaigns?|roas|spend(?:ing)?|budget|meta ads?|facebook ads?|ad account|ad performance)\b/i
 const ADS_VERB = /\b(improve|fix|optimi[sz]e|scale|pause|kill|cut|stop|help|grow|lower|reduce|what should i do|what do i (?:need to )?do|how (?:are|is|'?s|do|should)|which|worst|best|winning|losing|bleeding|wasting)\b/i
@@ -34,14 +35,14 @@ export function isAdsQuestion(message: string): boolean {
 const fmtMoney = (n: number, currency: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0).toLocaleString()}` } }
 
 /** Phase 1 — deterministic answer straight from the audit rules. The fallback, and the safety net. */
-function deterministicAnswer(a: any): string {
+function deterministicAnswer(a: any, windowLabel = 'the last 30 days'): string {
   const money = (n: number) => fmtMoney(n, a.currency)
   const scale = a.scale?.[0], pause = a.pause?.[0], watch = a.watch?.[0]
   const cur = a.currency || 'USD'
 
   // Rich, grounded breakdown — same shape as the full Mello analysis, but computed straight from the
   // audit (no LLM, can't hang). Renders as Markdown in both the brief and /mello.
-  let out = `**${a.accountName || 'Your account'}** — ${money(a.spend)} spent over 30 days at **${a.avgRoas}x** ROAS across ${a.total} campaign${a.total === 1 ? '' : 's'} (${money(a.spendToday)} today).\n\n`
+  let out = `**${a.accountName || 'Your account'}** — ${money(a.spend)} spent over ${windowLabel} at **${a.avgRoas}x** ROAS across ${a.total} campaign${a.total === 1 ? '' : 's'} (${money(a.spendToday)} today).\n\n`
 
   const ads = Array.isArray(a.ads) ? a.ads.slice(0, 5) : []
   if (ads.length) {
@@ -91,14 +92,14 @@ async function writeActions(admin: any, userId: string, currency: string, action
 }
 
 /** Phase 2 — reasoning model over the grounded snapshot. Returns the prose answer, or null on any issue. */
-async function reasonedAnswer(admin: any, userId: string, a: any): Promise<string | null> {
+async function reasonedAnswer(admin: any, userId: string, a: any, windowLabel = 'last 30 days'): Promise<string | null> {
   if (!process.env.OPENAI_API_KEY) return null
   const { default: OpenAI } = await import('openai')
   const model = process.env.MELLO_MODEL || 'gpt-4o'
   const validIds = new Set<string>([...(a.scale || []), ...(a.watch || []), ...(a.pause || [])].map((c: any) => String(c.metaCampaignId)).filter(Boolean))
 
   const snapshot = {
-    account: a.accountName, currency: a.currency, window: 'last 30 days',
+    account: a.accountName, currency: a.currency, window: windowLabel,
     spend: a.spend, avgRoas: a.avgRoas, spendToday: a.spendToday, totalCampaigns: a.total,
     readyToScale: a.scale, catchyButNotConverting: a.watch, burningBudget: a.pause,
     topAds: (a.ads || []).map((ad: any) => ({ name: ad.name, spend: ad.spend, impressions: ad.impressions, clicks: ad.clicks, ctr: ad.ctr, cpc: ad.cpc, roas: ad.roas })),
@@ -131,31 +132,48 @@ Reply ONLY as JSON: {"answer": string, "actions": [{"type":"pause"|"scale","meta
   return answer + (Array.isArray(parsed.actions) && parsed.actions.length ? ` I've queued ${parsed.actions.length === 1 ? 'that' : 'those'} as one-click action${parsed.actions.length === 1 ? '' : 's'} in your brief — say yes and I'll make the change.` : '')
 }
 
-export async function answerAdsQuestion(admin: any, userId: string, message: string): Promise<{ reply: string } | null> {
+export async function answerAdsQuestion(admin: any, userId: string, message: string, opts?: { brandId?: string | null }): Promise<{ reply: string } | null> {
   if (!isAdsQuestion(message)) return null
 
+  // CANONICAL CONTRACT: resolve the exact (metric × period) the question names, so the number matches
+  // its own claim and the Brief. Period → native Meta preset; default last_30d (the brief's own window).
+  const period = parsePeriod(message) || DEFAULT_PERIOD
+  const metric = parseMetric(message)
+
   let a: any = null
-  // Audit the account for the ACTIVE BRAND (the one the founder is viewing on the brief), not always the
-  // org primary — otherwise a founder on Aura (ROY 1) got numbers for a different account entirely.
+  // Audit the account for the ACTIVE BRAND. Pass the explicit brandId (from the surface) so Mello audits
+  // the SAME account the Brief does — the #1 "brief right, Mello wrong" cause was resolving from the cookie
+  // (or primary) here while the brief passed the viewed brand.
   let scopedAccountId: string | undefined = undefined
-  try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId))?.account_id || undefined } catch { /* fall back to primary */ }
-  try { a = await auditAccount(admin, userId, scopedAccountId, 'last_30d') } catch { /* safe reply below */ }
+  try { scopedAccountId = (await resolveBrandScopedAccount(admin, userId, opts?.brandId ?? undefined))?.account_id || undefined } catch { /* fall back to primary */ }
+  try { a = await auditAccount(admin, userId, scopedAccountId, period.preset) } catch { /* safe reply below */ }
   // No-guess guard: if there's no account or no data, say so plainly — never fabricate a number.
   if (!a) return { reply: `You don't have a Meta ad account connected yet — connect one from Settings and I'll audit it every morning and tell you exactly what to scale and pause.` }
-  if (!a.total) return { reply: `I checked ${a.accountName || 'your account'} — no active campaigns with spend in the last 30 days, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
 
-  // Provenance — every company number Mello quotes must be traceable to its source, period, and that
-  // it's the live audit (the SAME auditAccount the Morning Brief reads, so chat and brief agree).
-  const provenance = `\n\n_Meta Ads · ${a.accountName || 'your account'} · last 30 days · live audit_`
+  // Provenance — every company number Mello quotes is traceable to its source, the ACTUAL period, and
+  // that it's the live audit (same auditAccount the Brief reads). No more silent "last 30 days" label.
+  const provenance = `\n\n_Meta Ads · ${a.accountName || 'your account'} · ${period.label} · live audit_`
+  try { console.log('[mello:metric]', JSON.stringify({ userId, account: a.selected, brandId: opts?.brandId ?? null, metric: metric ?? 'diagnostic', preset: period.preset, spend: a.spend, roas: a.avgRoas, revenue: a.revenue, purchases: a.purchases })) } catch { /* debug only */ }
 
-  // Phase 2 first (reasoned), hard-capped so it can never hang; Phase 1 (deterministic) is the fallback.
+  // SPECIFIC single-metric question ("what did we spend yesterday / roas this month / how many purchases")
+  // → answer DETERMINISTICALLY from the canonical number for THAT period. Never the LLM (it can misattribute
+  // the wrong field/window). buildMetricAnswer returns null only when the field genuinely isn't available.
+  if (metric) {
+    const built = buildMetricAnswer(a, metric, period)
+    if (built) return { reply: built.reply + provenance }
+  }
+
+  if (!a.total) return { reply: `I checked ${a.accountName || 'your account'} — no active campaigns with spend ${period.label}, so there's nothing to tune yet. Launch one and I'll start grading it and flag what to scale or cut.` }
+
+  // Diagnostic / open-ended ("how are my ads doing", "what should I do") → the reasoning model over the
+  // grounded snapshot for THIS period. Hard-capped; deterministic breakdown is the fallback.
   try {
     const reasoned: string | null = await Promise.race([
-      reasonedAnswer(admin, userId, a),
+      reasonedAnswer(admin, userId, a, period.label),
       new Promise<null>((resolve) => setTimeout(() => resolve(null), 22000)),
     ])
     if (reasoned) return { reply: reasoned + provenance }
   } catch { /* fall through to deterministic */ }
 
-  return { reply: deterministicAnswer(a) + provenance }
+  return { reply: deterministicAnswer(a, period.label) + provenance }
 }

@@ -10,6 +10,7 @@ import { shouldRemember } from '@/lib/mello/remember'
 import { freshnessLabel, isTrustedStatus } from '@/lib/brain'
 import { factIsGrounded } from '@/lib/brain/ingest'
 import { detectTopicTrends, detectLaunchSpikes, detectTopPerformer } from '@/lib/brain/signals'
+import { parsePeriod, parseMetric, buildMetricAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -160,6 +161,41 @@ console.log('\nMELLO ROUTING TESTS\n')
   ok('Signals: no false standout when even', detectTopPerformer([
     { name: 'A', spend: 300, value: 600 }, { name: 'B', spend: 300, value: 600 },
   ]) === null)
+}
+
+// Canonical Meta metric contract — the fix for "Brief right, Mello wrong".
+{
+  // Period parsing → native Meta presets (the actual window the founder named).
+  ok('Period: yesterday', parsePeriod('how much did we spend yesterday?')?.preset === 'yesterday')
+  ok('Period: this month', parsePeriod("what's our roas this month?")?.preset === 'this_month')
+  ok('Period: last 7 days', parsePeriod('spend over the last 7 days')?.preset === 'last_7d')
+  ok('Period: last week', parsePeriod('how did we do last week')?.preset === 'last_week_mon_sun')
+  ok('Period: none → default last_30d', parsePeriod('what is our roas') === null && DEFAULT_PERIOD.preset === 'last_30d')
+
+  // Metric parsing → the single account metric (or null for breakdowns/diagnostics).
+  ok('Metric: spend', parseMetric('how much did we spend yesterday?') === 'spend')
+  ok('Metric: roas', parseMetric("what's our roas this month?") === 'roas')
+  ok('Metric: orders → purchases', parseMetric('how many orders did facebook generate?') === 'purchases')
+  ok('Metric: revenue', parseMetric('how much revenue came from meta?') === 'revenue')
+  ok('Metric: "which campaign" is a breakdown (null)', parseMetric('which campaign spent the most?') === null)
+  ok('Metric: "how are my ads doing" is diagnostic (null)', parseMetric('how are my ads doing?') === null)
+
+  // Deterministic answers come straight from the canonical numbers — no LLM.
+  const audit = { spend: 4100, avgRoas: 3.2, revenue: 13120, purchases: 120, currency: 'USD', accountName: 'Aura Ads', total: 5, selected: 'act_1' }
+  const spendA = buildMetricAnswer(audit, 'spend', { preset: 'yesterday', label: 'yesterday' })
+  ok('MetricAnswer spend: exact number + period', !!spendA && /\$4,100/.test(spendA.reply) && /yesterday/.test(spendA.reply))
+  ok('MetricAnswer spend: provenance carries the real window', spendA?.provenance.preset === 'yesterday' && spendA?.provenance.value === 4100)
+  const roasA = buildMetricAnswer(audit, 'roas', { preset: 'this_month', label: 'this month' })
+  ok('MetricAnswer roas: 3.2x this month', !!roasA && /3\.2x/.test(roasA.reply) && /this month/.test(roasA.reply))
+  const ordA = buildMetricAnswer(audit, 'purchases', { preset: 'yesterday', label: 'yesterday' })
+  ok('MetricAnswer purchases: count + honest Shopify caveat', !!ordA && /120/.test(ordA.reply) && /Shopify/i.test(ordA.reply))
+  const revA = buildMetricAnswer(audit, 'revenue', { preset: 'this_month', label: 'this month' })
+  ok('MetricAnswer revenue: Meta-attributed', !!revA && /\$13,120/.test(revA.reply))
+  const cpaA = buildMetricAnswer(audit, 'cpa', { preset: 'last_30d', label: 'last 30 days' })
+  ok('MetricAnswer cpa: spend ÷ purchases (~$34)', !!cpaA && /\$34/.test(cpaA.reply))
+
+  // Parity: a no-period metric question resolves to last_30d — the SAME window the Brief card uses.
+  ok('Parity: default window = brief window (last_30d)', (parsePeriod('what did we spend on facebook') || DEFAULT_PERIOD).preset === 'last_30d')
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)

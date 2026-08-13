@@ -36,6 +36,7 @@ const sameAcct = (a?: string, b?: string) => String(a || '').replace(/^act_/, ''
 type Graded = { campaignId: string; metaCampaignId: string; name: string; grade: 'graduate' | 'catchy' | 'pause' | 'hold'; spend: number; roas: number; ctr: number; conversions: number; impressions: number; clicks: number; dailyBudget: number | null; active?: boolean }
 export type AuditResult = {
   total: number; spend: number; avgRoas: number
+  revenue?: number; purchases?: number   // account totals: Meta-attributed revenue + purchase count
   scale: Graded[]; watch: Graded[]; pause: Graded[]
 }
 
@@ -91,6 +92,7 @@ function grade(campaigns: any[]): AuditResult {
   const totSpend = rows.reduce((s, r) => s + Number(r.i.spend || 0), 0)
   const avgSpend = rows.length ? totSpend / rows.length : 0
   const totValue = rows.reduce((s, r) => s + Number(r.i.conversion_value || 0), 0)
+  const totPurch = rows.reduce((s, r) => s + Number(r.i.purchases ?? r.i.conversions ?? 0), 0)
   const avgRoas = totSpend > 0 ? totValue / totSpend : 0
   const totClicks = rows.reduce((s, r) => s + Number(r.i.clicks || 0), 0)
   const totImpr = rows.reduce((s, r) => s + Number(r.i.impressions || 0), 0)
@@ -110,6 +112,7 @@ function grade(campaigns: any[]): AuditResult {
   const live = graded.filter((x) => x.active)
   return {
     total: rows.length, spend: Math.round(totSpend), avgRoas: +avgRoas.toFixed(2),
+    revenue: Math.round(totValue), purchases: Math.round(totPurch),
     scale: live.filter((x) => x.grade === 'graduate').sort((a, b) => b.roas - a.roas),
     watch: live.filter((x) => x.grade === 'catchy').sort((a, b) => b.spend - a.spend),
     pause: live.filter((x) => x.grade === 'pause').sort((a, b) => b.spend - a.spend),
@@ -254,7 +257,10 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
  * DB (no Graph sync, no writes), lists all connected accounts for the dropdown, and fetches TODAY's
  * account-level spend with a single live Graph call. Returns everything the card needs to switch instantly.
  */
-const RANGES = new Set(['last_3d', 'last_7d', 'last_14d', 'last_30d'])
+// Native Meta date_presets Mello can ask for — rolling windows PLUS calendar periods (today, yesterday,
+// this/last week, this/last month), so "how much did we spend yesterday / this month" resolves to the
+// ACTUAL window. Meta interprets these in the ad account's own timezone. Anything else → last_30d.
+const RANGES = new Set(['today', 'yesterday', 'this_week_mon_today', 'last_week_mon_sun', 'this_month', 'last_month', 'last_3d', 'last_7d', 'last_14d', 'last_30d', 'last_90d'])
 export async function auditAccount(admin: any, userId: string, accountId?: string, rangeIn = 'last_30d') {
   const range = RANGES.has(rangeIn) ? rangeIn : 'last_30d'
   // Cache per (user, account, range) — collapses the redundant re-fetches that were blowing Meta's rate limit.
@@ -289,7 +295,17 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   try {
     const ci = await graph(`act_${acct.account_id}/insights?level=campaign&fields=campaign_id,campaign_name,spend,impressions,clicks,ctr,actions,action_values&date_preset=${range}&limit=300`, token)
     campaigns = (ci?.data || []).map((r: any) => {
-      const rev = Number((r.action_values || []).find((a: any) => /purchase/.test(a.action_type))?.value || 0)
+      // Revenue: prefer omni_purchase (Meta's deduped cross-channel value), else any purchase action_value.
+      const av = r.action_values || []
+      const rev = Number(av.find((a: any) => a.action_type === 'omni_purchase')?.value || av.find((a: any) => /purchase/.test(a.action_type))?.value || 0)
+      // PURE purchase count (omni_purchase → purchase → pixel/web purchase), kept distinct from the blended
+      // conversion count so "how many purchases/orders" is answered honestly, not with purchases+leads+regs.
+      const acts = r.actions || []
+      const purch = Math.round(Number(
+        acts.find((a: any) => a.action_type === 'omni_purchase')?.value
+        || acts.find((a: any) => a.action_type === 'purchase')?.value
+        || acts.filter((a: any) => /fb_pixel_purchase|web_in_store_purchase|onsite_web_purchase/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0)
+        || 0))
       const conv = Math.round(Number((r.actions || []).filter((a: any) => /purchase|complete_registration|lead/.test(a.action_type)).reduce((s: number, a: any) => s + Number(a.value || 0), 0)))
       const spend = Number(r.spend || 0)
       const live: any = liveById.get(String(r.campaign_id))
@@ -302,11 +318,11 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
         // Meta's live daily_budget is in MINOR units (cents); the synced meta.daily_budget is already
         // major (syncAccount ÷100). Normalize the live one so the whole app treats budgets as MAJOR.
         status, daily_budget: live?.daily_budget != null ? Number(live.daily_budget) / 100 : (meta.daily_budget ?? null),
-        campaign_insights: [{ spend, conversion_value: rev, roas: spend > 0 ? rev / spend : 0, ctr: Number(r.ctr || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), conversions: conv, date_stop: '9999' }],
+        campaign_insights: [{ spend, conversion_value: rev, purchases: purch, roas: spend > 0 ? rev / spend : 0, ctr: Number(r.ctr || 0), impressions: Number(r.impressions || 0), clicks: Number(r.clicks || 0), conversions: conv, date_stop: '9999' }],
       }
     })
   } catch { /* live campaign insights are best-effort → empty audit */ }
-  const audit = campaigns.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
+  const audit = campaigns.length ? grade(campaigns) : { total: 0, spend: 0, avgRoas: 0, revenue: 0, purchases: 0, scale: [] as Graded[], watch: [] as Graded[], pause: [] as Graded[] }
 
   // Today's account-level spend — one quick live call (this is the "Spend today" figure).
   let spendToday = 0
@@ -345,7 +361,7 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
   const result = {
     accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
     selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
-    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, spendToday: Math.round(spendToday),
+    total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, revenue: audit.revenue ?? 0, purchases: audit.purchases ?? 0, spendToday: Math.round(spendToday),
     counts: { scale: audit.scale.length, watch: audit.watch.length, pause: audit.pause.length },
     scale: audit.scale.slice(0, 3).map(slim), watch: audit.watch.slice(0, 3).map(slim), pause: audit.pause.slice(0, 3).map(slim),
     ads,
