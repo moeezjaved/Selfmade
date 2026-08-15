@@ -162,9 +162,11 @@ function ReportsPage() {
 
       <AdsTabs />
 
-      {/* Your saved reports — the Save button persists to saved_reports, and this surfaces them (each
-          deep-links to ?report=<id>). Was orphaned (never mounted), so saved reports had no home. */}
-      <SavedReportsNav />
+      {/* Two-column: the saved-reports list is a left SIDEBAR (it was a full-width column dominating the
+          page), report content on the right. Each saved report deep-links to ?report=<id>. */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '236px minmax(0,1fr)', gap: isMobile ? 12 : 28, alignItems: 'start' }}>
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}><SavedReportsNav /></div>
+        <div style={{ minWidth: 0 }}>
 
       {/* Header — editorial serif title, quiet controls */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22, flexWrap: 'wrap', gap: 14 }}>
@@ -187,7 +189,7 @@ function ReportsPage() {
 
       {loading ? (
         <div style={{ textAlign: 'center', padding: 80 }}>
-          <img src='/favicon.png' alt='' style={{ width: 44, height: 44, borderRadius: 11, animation: 'spin 1s linear infinite', margin: '0 auto 16px', display: 'block' }} />
+          <div className="selfmade-loading" style={{ width: 44, height: 44, borderRadius: 12, margin: '0 auto 16px' }} />
           <div style={{ color: '#141d15', fontWeight: 700 }}>Loading your reports...</div>
         </div>
       ) : error ? (
@@ -363,8 +365,8 @@ function ReportsPage() {
 
         </div>
       )}
-
-      <style>{`@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}`}</style>
+        </div>
+      </div>
     </div>
   )
 }

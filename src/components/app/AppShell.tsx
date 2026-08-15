@@ -333,7 +333,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           <div style={{ flex: 1 }} onMouseEnter={() => setFlyout(null)} />
 
           <div onMouseEnter={() => setFlyout(null)} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-            <NotificationBell />
+            <NotificationBell up />
             <RailIcon href="/settings" title="Settings" active={!melloActive && pathname === '/settings'}><Settings size={19} /></RailIcon>
             <div style={{ position: 'relative', marginTop: 4 }}>
               <button onClick={() => setAcctOpen(o => !o)} aria-label="Account" style={{ border: 'none', background: 'transparent', cursor: 'pointer', padding: 0 }}>

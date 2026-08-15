@@ -939,7 +939,7 @@ function M4Inner() {
           <div style={{marginBottom:20}}><h2 style={{fontSize:20,fontWeight:800,color:'#141d15',marginBottom:4}}>M4 Campaign Grades</h2><p style={{fontSize:13,color:'#7a9a7a'}}>Based on ROAS vs account average. Scale winners, pause losers.</p></div>
           {loading?(
             <div style={{...S.card,padding:48,textAlign:'center'}}>
-              <img src='/favicon.png' alt='' style={{width:44,height:44,borderRadius:11,animation:'spin 1s linear infinite',margin:'0 auto 16px',display:'block'}}/>
+              <div className="selfmade-loading" style={{width:44,height:44,borderRadius:12,margin:'0 auto 16px'}}/>
               <div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>Analysing campaigns…</div>
             </div>
           ):grades.length===0?(

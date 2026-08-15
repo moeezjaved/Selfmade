@@ -11,6 +11,7 @@ import { freshnessLabel, isTrustedStatus } from '@/lib/brain'
 import { factIsGrounded } from '@/lib/brain/ingest'
 import { detectTopicTrends, detectLaunchSpikes, detectTopPerformer } from '@/lib/brain/signals'
 import { parsePeriod, parseMetric, buildMetricAnswer, parseComparison, buildComparisonAnswer, DEFAULT_PERIOD } from '@/lib/meta/metric-contract'
+import { productHowTo } from '@/lib/mello/intent'
 
 let pass = 0, fail = 0
 const ok = (name: string, cond: boolean, detail = '') => { if (cond) { pass++; console.log(`  ✓ ${name}`) } else { fail++; console.log(`  ✗ ${name}${detail ? ` — ${detail}` : ''}`) } }
@@ -232,6 +233,16 @@ console.log('\nMELLO ROUTING TESTS\n')
   ok('Compare answer: up +25% with delta', /up/.test(up) && /\$1,000/.test(up) && /25%/.test(up))
   const down = buildComparisonAnswer({ spend: 3000 }, { spend: 4000 }, cSpendWk!, 'USD')
   ok('Compare answer: down -25%', /down/.test(down) && /25%/.test(down))
+}
+
+// Product how-to — every in-app question gets real steps, never competitor waffle.
+{
+  ok('HowTo: add competitor', /add a competitor|Spy on a competitor/i.test(productHowTo('how may i add new competitor in selfmade') || ''))
+  ok('HowTo: spy a brand', !!productHowTo('how may i spy a brand'))
+  ok('HowTo: cancel subscription', /cancel/i.test(productHowTo('want to cancel my subscription') || ''))
+  ok('HowTo: download video', /download/i.test(productHowTo('how do i download my generated video') || ''))
+  ok('HowTo: connect meta', /meta/i.test(productHowTo('how do i connect meta?') || ''))
+  ok('HowTo: NOT a how-to → null', productHowTo('how are my ads doing this week') === null)
 }
 
 console.log(`\n${pass} passed, ${fail} failed\n`)

@@ -26,7 +26,7 @@ export type MelloIntent =
  */
 export function productHowTo(q: string): string | null {
   const t = q.toLowerCase()
-  const asksHow = /\b(how|where|can i|help me|guide|steps?|set ?up|connect|link|add|enable|turn on|upgrade)\b/.test(t) || t.includes('?')
+  const asksHow = /\b(how|where|can i|help me|guide|steps?|set ?up|connect|link|add|enable|turn on|upgrade|cancel|stop|unsubscribe|downgrade|download|save|export)\b/.test(t) || t.includes('?')
   if (!asksHow) return null
   if (/\b(meta|facebook)\b/.test(t) && /\b(connect|link|ad account|account|integrat)/.test(t))
     return `Connecting Meta is a Creator (paid) feature — you don't need it to use me, everything already runs off the crawled ad library. To turn it on: open Billing and upgrade to Creator, then on the brief's “Run your ads on Meta” card hit Connect and either partner-share your ad account (60 seconds in Meta Business Settings) or paste a System-User token. After that I audit your account every morning.`
@@ -36,6 +36,11 @@ export function productHowTo(q: string): string | null {
     return `Settings → “Add to Slack” — approve me and pick a channel. You'll get the brief with one-tap Approve buttons right in Slack.`
   if (/\b(competitor|rival|spy|watch)\b/.test(t) && /\b(add|watch|track|spy|how)/.test(t))
     return `On the brief hit “+ Add a competitor” (or “Spy on a competitor”). Search their name, or paste their Meta Ad Library link — I start pulling every ad they run right away. Free tracks 1; upgrade to watch more.`
+  // Cancel must come BEFORE upgrade (both mention "subscription").
+  if (/\b(cancel|stop|end|unsubscribe|downgrade)\b/.test(t) && /\b(subscri|plan|billing|membership|account|renew|mello)/.test(t))
+    return `Open Billing → “Cancel subscription”. You keep everything until the end of the current period — nothing's charged after that, and you can reactivate any time from the same page.`
+  if (/\b(download|save|export)\b/.test(t) && /\b(video|ad|image|creative|clip|generat)/.test(t))
+    return `Open the ad in Studio → “My Work” (My Creatives), open it, and hit Download — images save straight to your device, videos download as an .mp4.`
   if (/\b(upgrade|plan|pricing|subscri|paid|creator)\b/.test(t))
     return `Tap “Go full-time / Hire Mello full-time” on the brief, or open Billing — it's $49/mo and unlocks tracking all your competitors, connecting Meta, and the full daily work.`
   if (/\b(make|create|generate|design)\b/.test(t) && /\b(ad|creative|video|image|ugc)\b/.test(t))

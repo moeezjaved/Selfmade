@@ -141,7 +141,7 @@ function InsightsPage() {
 
       {loading ? (
         <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
-          <img src='/favicon.png' alt='' style={{width:44,height:44,borderRadius:11,animation:'spin 1s linear infinite',margin:'0 auto 16px',display:'block'}}/>
+          <div className="selfmade-loading" style={{width:44,height:44,borderRadius:12,margin:'0 auto 16px'}}/>
           <div style={{fontSize:15,color:'#141d15',fontWeight:700}}>Analyzing your campaigns...</div>
         </div>
       ) : campaigns.length === 0 ? (
