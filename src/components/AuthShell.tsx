@@ -16,21 +16,21 @@ const TRUST = {
   soc2: true,
   trustedByLabel: 'Trusted by 3,000+ teams, including:',
   trustedLogos: [
-    { name: 'Sevenly', src: '/logos/sevenly.svg' },
-    { name: 'Ridge', src: '/logos/ridge.svg' },
-    { name: 'Spacemen', src: '/logos/spacemen.svg' },
-    { name: 'Aura', src: '/logos/aura.svg' },
-    { name: 'PLAUD', src: '/logos/plaud.svg' },
-    { name: 'Virgin Teez', src: '/logos/virginteez.svg' },
-    { name: 'Ejad Labs', src: '/logos/ejadlabs.svg' },
-  ] as { name: string; src?: string }[],
+    { name: 'Sevenly', src: '/logos/sevenly.svg', h: 16 },
+    { name: 'Ridge', src: '/logos/ridge.svg', h: 15 },
+    { name: 'Spacemen', src: '/logos/spacemen.svg', h: 17 },
+    { name: 'Aura', src: '/logos/aura.svg', h: 17 },
+    { name: 'PLAUD', src: '/logos/plaud.svg', h: 13 },
+    { name: 'Virgin Teez', src: '/logos/virginteez.svg', h: 26 },
+    { name: 'Ejad Labs', src: '/logos/ejadlabs.svg', h: 22 },
+  ] as { name: string; src?: string; h?: number }[],
   builtByLabel: 'Built by engineers from',
   builtByLogos: [
-    { name: 'Meta', src: '/logos/meta.svg' },
-    { name: 'TikTok', src: '/logos/tiktok.svg' },
-    { name: 'Amazon', src: '/logos/amazon.svg' },
-    { name: 'Microsoft', src: '/logos/microsoft.svg' },
-  ] as { name: string; src?: string }[],
+    { name: 'Meta', src: '/logos/meta.svg', h: 20 },
+    { name: 'TikTok', src: '/logos/tiktok.svg', h: 16 },
+    { name: 'Amazon', src: '/logos/amazon.svg', h: 16 },
+    { name: 'Microsoft', src: '/logos/microsoft.svg', h: 16 },
+  ] as { name: string; src?: string; h?: number }[],
   testimonials: [
     { quote: 'Selfmade replaced my whole freelance stack. It writes, designs, and ships ads while I sleep — and the morning brief tells me exactly what to approve.', name: 'Sarah M.', role: 'Founder, DTC skincare' },
     { quote: 'It clones a competitor’s winning ad onto my product in minutes. What used to take my agency a week now happens overnight.', name: 'Daniel R.', role: 'Ecommerce owner' },
@@ -125,7 +125,7 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
   )
 }
 
-function LogoRow({ label, logos }: { label: string; logos: { name: string; src?: string }[] }) {
+function LogoRow({ label, logos }: { label: string; logos: { name: string; src?: string; h?: number }[] }) {
   return (
     <div>
       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', opacity: .75, marginBottom: 10 }}>{label}</div>
@@ -133,7 +133,7 @@ function LogoRow({ label, logos }: { label: string; logos: { name: string; src?:
         {logos.map(l => (
           <div key={l.name} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 40, padding: '0 16px', background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: 12, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
             {l.src
-              ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={l.src} alt={l.name} style={{ height: 17, filter: 'brightness(0) invert(1)' }} />)
+              ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={l.src} alt={l.name} style={{ height: l.h ?? 17, filter: 'brightness(0) invert(1)' }} />)
               : <span style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>{l.name}</span>}
           </div>
         ))}
