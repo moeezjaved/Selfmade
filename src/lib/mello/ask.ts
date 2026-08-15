@@ -11,6 +11,7 @@ import { runAgentToText } from '@/lib/mello/agent'
 import { answerGrounded } from '@/lib/mello/grounded'
 import { logMelloAnswer } from '@/lib/mello/observe'
 import { productHowTo } from '@/lib/mello/intent'
+import { loadMelloContext, toStateLite, type MelloContext } from '@/lib/mello/context'
 
 // Back-compat: productHowTo now lives in the intent router (the product-help knowledge layer).
 export { productHowTo } from '@/lib/mello/intent'
@@ -22,14 +23,19 @@ export async function askMello(admin: any, userId: string, message: string, opts
   if (!q) return { reply: 'Say that again?' }
   const t0 = Date.now()
 
+  // Phase 2.2 — load the authoritative account-state snapshot ONCE (plan, integrations, brand,
+  // competitors) and thread it through so every deterministic answer reads state, never guesses it.
+  let ctx: MelloContext | null = null
+  try { ctx = await loadMelloContext(admin, userId, opts?.brandId ?? null) } catch { /* fail-soft */ }
+
   // 0 · PRODUCT HOW-TO wins first — "how do I add a competitor / cancel / download / connect Meta" gets
-  // the real in-app steps even when the /brief widget attaches a stale focus item (which otherwise routed
-  // the question into item-reflection and produced competitor waffle).
-  const guide = productHowTo(q)
+  // the real in-app steps even when the /brief widget attaches a stale focus item. Now STATE-AWARE, so a
+  // Creator never hears "Connecting Meta is a paid feature" and a plan question gets the real plan.
+  const guide = productHowTo(q, toStateLite(ctx))
   if (guide) { logMelloAnswer(admin, { userId, brandId: opts?.brandId, surface, question: q, intent: 'product_help', path: 'product_help', ms: Date.now() - t0 }); return { reply: guide } }
 
-  // 1-4.5 · the shared grounded pipeline (source of truth per intent).
-  const g = await answerGrounded(admin, userId, q, { item, brandId: opts?.brandId })
+  // 1-4.5 · the shared grounded pipeline (source of truth per intent) — reuse the snapshot we just built.
+  const g = await answerGrounded(admin, userId, q, { item, brandId: opts?.brandId, ctx })
   if (g.handled) {
     logMelloAnswer(admin, { userId, brandId: opts?.brandId, surface, question: q, intent: g.intent, path: `grounded:${g.intent}`, sources: g.sources, memoryIds: g.memoryIds, ms: Date.now() - t0 })
     return { reply: g.reply }
