@@ -14,7 +14,7 @@ const TRUST = {
   poster: '/login-bg.jpg',
   rating: null as null | { score: string; source: string },
   soc2: true,
-  trustedByLabel: 'Trusted by 3,000+ teams',
+  trustedByLabel: 'Trusted by 20,000+ teams, including:',
   trustedLogos: [
     { name: 'Sevenly', src: '/logos/sevenly.svg' },
     { name: 'Ridge', src: '/logos/ridge.svg' },
@@ -67,9 +67,10 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
           <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(180deg, rgba(9,14,11,.74) 0%, rgba(9,14,11,.50) 34%, rgba(9,14,11,.52) 62%, rgba(9,14,11,.82) 100%)' }} />
           <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'rgba(9,14,11,.14)' }} />
 
-          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 18 }}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/selfmade-wordmark-cream.png" alt="Selfmade" style={{ height: 32, filter: 'brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.55))' }} />
+          <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 18 }}>
+            {/* eslint-disable-next-line @next/next/no-img-element — width:auto + flex-start so the column
+                doesn't stretch the wordmark full-width (that was the giant/stretched logo). */}
+            <img src="/selfmade-wordmark-cream.png" alt="Selfmade" style={{ height: 26, width: 'auto', alignSelf: 'flex-start', filter: 'brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.55))' }} />
             {(TRUST.rating || TRUST.soc2) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 {TRUST.rating && (
@@ -80,8 +81,10 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
                   </div>
                 )}
                 {TRUST.soc2 && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, background: 'rgba(255,255,255,.14)', border: '1px solid rgba(255,255,255,.25)', borderRadius: 100, padding: '4px 12px' }}>
-                    <span style={{ fontSize: 12 }}>🛡️</span><span style={{ fontSize: 12.5, fontWeight: 700 }}>SOC 2 certified</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src="/logos/soc2.svg" alt="SOC 2 certified" style={{ height: 40, width: 40, filter: 'drop-shadow(0 2px 8px rgba(0,0,0,.4))' }} />
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>SOC 2 certified</span>
                   </div>
                 )}
               </div>
