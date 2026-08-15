@@ -18,6 +18,7 @@ const TRUST = {
   trustedLogos: [
     { name: 'Sevenly', src: '/logos/sevenly.svg' },
     { name: 'Ridge', src: '/logos/ridge.svg' },
+    { name: 'Spacemen', src: '/logos/spacemen.svg' },
     { name: 'Aura', src: '/logos/aura.svg' },
     { name: 'PLAUD', src: '/logos/plaud.svg' },
     { name: 'Virgin Teez', src: '/logos/virginteez.svg' },
