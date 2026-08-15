@@ -69,7 +69,7 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
 
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/selfmade-wordmark-cream.png" alt="Selfmade" style={{ height: 30, filter: 'drop-shadow(0 2px 10px rgba(0,0,0,.5))' }} />
+            <img src="/selfmade-wordmark-cream.png" alt="Selfmade" style={{ height: 32, filter: 'brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.55))' }} />
             {(TRUST.rating || TRUST.soc2) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 {TRUST.rating && (
