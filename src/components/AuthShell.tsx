@@ -57,16 +57,19 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
   return (
     <div style={{ minHeight: '100vh', display: 'flex', fontFamily: "'Inter', -apple-system, sans-serif", background: '#fff' }}>
       {!narrow && (
-        <div style={{ flex: '1 1 52%', position: 'relative', overflow: 'hidden', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '40px 44px' }}>
+        <div style={{ flex: '1 1 52%', position: 'relative', overflow: 'hidden', color: '#fff', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: '40px 44px', textShadow: '0 1px 8px rgba(0,0,0,.5)' }}>
           <video autoPlay muted loop playsInline poster={TRUST.poster}
             style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }}>
             <source src={TRUST.video} type="video/mp4" />
           </video>
-          <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(160deg, rgba(14,27,18,.55) 0%, rgba(14,27,18,.35) 45%, rgba(239,74,30,.35) 100%)' }} />
+          {/* Strong scrim — heavy at top (logo/badge) and bottom (logo walls) so white text stays legible
+              over bright video frames (the sunset was washing it out). */}
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(180deg, rgba(9,14,11,.74) 0%, rgba(9,14,11,.50) 34%, rgba(9,14,11,.52) 62%, rgba(9,14,11,.82) 100%)' }} />
+          <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'rgba(9,14,11,.14)' }} />
 
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1)' }} />
+            <img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.55))' }} />
             {(TRUST.rating || TRUST.soc2) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 {TRUST.rating && (
@@ -124,7 +127,7 @@ function LogoRow({ label, logos }: { label: string; logos: { name: string; src?:
       <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', opacity: .7, marginBottom: 10 }}>{label}</div>
       <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
         {logos.map(l => l.src
-          ? (/* eslint-disable-next-line @next/next/no-img-element */ <img key={l.name} src={l.src} alt={l.name} style={{ height: 22, opacity: .95, filter: 'brightness(0) invert(1)' }} />)
+          ? (/* eslint-disable-next-line @next/next/no-img-element */ <img key={l.name} src={l.src} alt={l.name} style={{ height: 22, opacity: .95, filter: 'brightness(0) invert(1) drop-shadow(0 1px 6px rgba(0,0,0,.6))' }} />)
           : <span key={l.name} style={{ fontSize: 14, fontWeight: 800, opacity: .9 }}>{l.name}</span>)}
       </div>
     </div>
