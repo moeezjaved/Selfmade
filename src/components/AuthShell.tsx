@@ -14,7 +14,7 @@ const TRUST = {
   poster: '/login-bg.jpg',
   rating: null as null | { score: string; source: string },
   soc2: true,
-  trustedByLabel: 'Trusted by 20,000+ teams, including:',
+  trustedByLabel: 'Trusted by 3,000+ teams, including:',
   trustedLogos: [
     { name: 'Sevenly', src: '/logos/sevenly.svg' },
     { name: 'Ridge', src: '/logos/ridge.svg' },
