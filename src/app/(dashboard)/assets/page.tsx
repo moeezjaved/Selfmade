@@ -125,14 +125,22 @@ export default function AssetsPage() {
   const uploaders = Array.from(new Set(assets.map(a => a.uploader_name).filter(Boolean))) as string[]
   const allTags = Array.from(new Set(assets.flatMap(a => a.tags || []))).sort()
   // Apply uploader + tag filters + sort client-side. When searching, keep the semantic ranking.
-  const hasVideos = assets.some(a => a.file_type === 'video')
+  // Clip filters only mean anything once video enrichment has populated these fields. Show each filter
+  // ONLY when at least one video actually carries that value, so we never present a dead control that
+  // silently matches nothing. (When GEMINI enrichment hasn't run, these are all null → filters hidden.)
+  const hasScene = assets.some(a => a.file_type === 'video' && !!a.scene)
+  const hasRoll = assets.some(a => a.file_type === 'video' && !!a.roll)
+  const hasCap = assets.some(a => a.file_type === 'video' && typeof a.has_captions === 'boolean')
+  const hasAudio = assets.some(a => a.file_type === 'video' && !!a.audio_kind)
+  const hasClipData = hasScene || hasRoll || hasCap || hasAudio
   let shown = assets
     .filter(a => !uploaderF || a.uploader_name === uploaderF)
     .filter(a => !tagFilter || (a.tags || []).includes(tagFilter))
-    .filter(a => !sceneF || a.scene === sceneF)
-    .filter(a => !audioF || a.audio_kind === audioF)
-    .filter(a => !capF || (capF === 'yes' ? a.has_captions === true : a.has_captions === false))
-    .filter(a => !rollF || a.roll === rollF)
+    // Clip filters apply to VIDEOS only — images/audio are never hidden by them.
+    .filter(a => !sceneF || a.file_type !== 'video' || a.scene === sceneF)
+    .filter(a => !audioF || a.file_type !== 'video' || a.audio_kind === audioF)
+    .filter(a => !capF || a.file_type !== 'video' || (capF === 'yes' ? a.has_captions === true : a.has_captions === false))
+    .filter(a => !rollF || a.file_type !== 'video' || a.roll === rollF)
   if (!search) shown = [...shown].sort((a, b) =>
     sortBy === 'name' ? (a.file_name || '').localeCompare(b.file_name || '') :
     sortBy === 'size' ? (b.size_bytes || 0) - (a.size_bytes || 0) :
@@ -195,28 +203,36 @@ export default function AssetsPage() {
               {allTags.map(t => <option key={t} value={t}>{t}</option>)}
             </select>
           )}
-          {hasVideos && <>
+          {hasClipData && <>
             <span style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', alignSelf: 'center' }}>Clip:</span>
+            {hasScene && (
             <select value={sceneF} onChange={e => setSceneF(e.target.value)} style={selStyle}>
               <option value="">Scene: All</option>
               {['unboxing', 'talking_head', 'lifestyle', 'product_demo', 'other'].map(s => <option key={s} value={s}>{s.replace('_', ' ')}</option>)}
             </select>
+            )}
+            {hasRoll && (
             <select value={rollF} onChange={e => setRollF(e.target.value)} style={selStyle}>
               <option value="">A/B-roll: All</option>
               <option value="a_roll">A-roll</option>
               <option value="b_roll">B-roll</option>
             </select>
+            )}
+            {hasCap && (
             <select value={capF} onChange={e => setCapF(e.target.value)} style={selStyle}>
               <option value="">Caption: All</option>
               <option value="yes">Has captions</option>
               <option value="no">No captions</option>
             </select>
+            )}
+            {hasAudio && (
             <select value={audioF} onChange={e => setAudioF(e.target.value)} style={selStyle}>
               <option value="">Audio: All</option>
               <option value="voiceover">Voice-over</option>
               <option value="music">Music</option>
               <option value="silent">Silent</option>
             </select>
+            )}
           </>}
           <select value={sortBy} onChange={e => setSortBy(e.target.value)} disabled={!!search} style={{ ...selStyle, opacity: search ? 0.5 : 1 }} title={search ? 'Sorted by relevance while searching' : ''}>
             <option value="recent">Sort: Recently added</option>
@@ -235,6 +251,13 @@ export default function AssetsPage() {
             <UploadCloud size={40} style={{ margin: '0 auto 12px', display: 'block', color: '#9ca3af' }} />
             <div style={{ fontSize: 16, fontWeight: 700, color: '#111', marginBottom: 4 }}>Upload your first asset</div>
             <div style={{ fontSize: 13.5 }}>Images, videos & audio. Drag files here or click to browse.</div>
+          </div>
+        ) : shown.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: '48px 20px', color: '#6b7280' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: '#111', marginBottom: 6 }}>No assets match these filters</div>
+            <div style={{ fontSize: 13.5, marginBottom: 14 }}>Try clearing a filter or your search.</div>
+            <button onClick={() => { setUploaderF(''); setTagFilter(''); setSceneF(''); setAudioF(''); setCapF(''); setRollF(''); }}
+              style={{ fontSize: 13, fontWeight: 700, color: '#fff', background: '#ef4a1e', border: 'none', borderRadius: 100, padding: '8px 18px', cursor: 'pointer' }}>Clear filters</button>
           </div>
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(190px,100%), 1fr))', gap: 14 }}>

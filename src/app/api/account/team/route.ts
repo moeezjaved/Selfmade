@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
   const html = `<div style="font-family:Inter,Arial,sans-serif;max-width:480px;margin:0 auto;color:#0e1b12">
     <h2 style="font-size:22px;margin:0 0 12px">You're invited to ${org.name} on Selfmade</h2>
     <p style="font-size:15px;line-height:1.6;color:#374151;margin:0 0 20px"><b>${inviter}</b> invited you to join their team on <b>Selfmade</b> — spy on 3M+ winning Meta ads, remake or generate your own with AI, and launch. One shared workspace.</p>
-    <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#0e1b12;color:#ff5a2c;padding:13px 26px;border-radius:100px;text-decoration:none;font-weight:800;font-size:15px">Join the team →</a></p>
+    <p style="margin:0 0 20px"><a href="${link}" style="display:inline-block;background:#ef4a1e;color:#ffffff;padding:13px 26px;border-radius:100px;text-decoration:none;font-weight:800;font-size:15px">Join the team →</a></p>
     <p style="color:#9ca3af;font-size:13px;margin:0">Or paste this link into your browser:<br>${link}</p>
   </div>`
   const emailed = await sendEmail(em, `You're invited to ${org.name} on Selfmade`, html).catch(() => false)
