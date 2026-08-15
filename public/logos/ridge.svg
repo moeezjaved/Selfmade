@@ -1,1 +1,40 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 110 24"><text x="0" y="20" font-family="Arial,Helvetica,sans-serif" font-size="23" font-weight="800" letter-spacing="1.5" fill="#fff">RIDGE</text></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW 2020 (64-Bit Evaluation Version) -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="3.24177in" height="1in" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 2799.84 863.68"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
+ <defs>
+  <font id="FontID0" horiz-adv-x="582" font-variant="normal" class="str1" style="fill-rule:nonzero" font-weight="500">
+	<font-face 
+		font-family="ModernaUnicase Condensed Medium">
+		<font-face-src>
+			<font-face-name name="ModernaUnicaseCondensed-Medium"/>
+		</font-face-src>
+	</font-face>
+   <missing-glyph><path d="M0 0z"/></missing-glyph>
+   <glyph unicode="D" horiz-adv-x="582" d="M60.9999 0l246 0c135.001,0 218.998,86.0012 218.998,221.999l0 256c0,136.001 -83.9978,221.999 -218.998,221.999l-246 0 0 -699.999zm97.9989 88.9992l0 521 148.001 0c77.999,0 121,-49.9997 121,-145.001l0 -229.999c0,-95.0009 -43.0006,-146.001 -121,-146.001l-148.001 0z"/>
+  </font>
+  <style type="text/css">
+   <![CDATA[
+    @font-face { font-family:"ModernaUnicase Condensed Medium";font-variant:normal;font-weight:500;src:url("#FontID0") format(svg)}
+    .str1 {stroke-width:2.18;stroke-miterlimit:2.61313}
+    .str0 {stroke:white;stroke-width:6;stroke-miterlimit:2.61313}
+    .str2 {stroke:white;stroke-width:2.59;stroke-miterlimit:2.61313}
+    .fil0 {fill:white}
+    .fnt0 {font-weight:500;font-size:1186.37px;font-family:'ModernaUnicase Condensed Medium'}
+   ]]>
+  </style>
+ </defs>
+ <g id="Layer_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <g id="_2466455678320">
+   <path class="fil0 str0" d="M116.27 123.38l175.58 0c93.72,0 143.55,48.64 143.55,160.16l0 16.61c0,118.63 -54.57,161.34 -153.04,161.34l-9.35 0 -36.92 49.72 0 20.28 205.25 315.58 137.61 0 -195.74 -298.96c109.14,-28.48 168.46,-105.59 168.46,-233.72l0 -46.27c0,-161.35 -99.65,-251.51 -259.82,-251.51l-291.85 0 0 830.46 116.27 0 0 -723.69z"/>
+   <polygon class="fil0 str0" points="686.92,847.07 803.18,847.07 803.18,315.13 758.27,317.6 803.18,241.27 803.18,16.61 686.92,16.61 "/>
+   <text x="873.18" y="847.06"  class="fil0 str2 fnt0">D</text>
+   <path class="fil0 str0" d="M2184.12 402.17l-282.35 0 0 9.35 54.69 95.06 111.4 0 0 77.11c0,113.89 -66.43,173.21 -160.15,173.21 -94.91,0 -161.35,-59.32 -161.35,-173.21l0 -303.71c0,-112.71 66.45,-173.22 161.35,-173.22 97.28,0 162.53,52.21 162.53,138.81l0 26.1 113.89 0 0 -42.71c0,-135.24 -115.08,-228.96 -276.42,-228.96 -161.35,0 -277.62,102.02 -277.62,263.37l0 336.93c0,162.53 118.64,263.37 277.62,263.37 157.79,0 276.42,-100.84 276.42,-263.37l0 -198.13z"/>
+   <polygon class="fil0 str0" points="2320.55,847.07 2799.84,847.07 2799.84,741.48 2436.81,741.48 2436.81,476.92 2676.74,476.92 2728.51,371.33 2436.81,371.33 2436.81,123.38 2791.54,123.38 2791.54,16.61 2320.55,16.61 "/>
+  </g>
+ </g>
+</svg>

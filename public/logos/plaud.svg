@@ -1,1 +1,52 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 118 24"><text x="0" y="19" font-family="Arial,Helvetica,sans-serif" font-size="21" font-weight="600" letter-spacing="3" fill="#fff">PLAUD</text></svg>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW 2020 (64-Bit Evaluation Version) -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="5.81194in" height="1.003in" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 3511.05 605.92"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
+ <defs>
+  <font id="FontID0" horiz-adv-x="912" font-variant="normal" class="str0" style="fill-rule:nonzero" font-style="normal" font-weight="400">
+	<font-face 
+		font-family="TT Autonomous Trl">
+		<font-face-src>
+			<font-face-name name="TT Autonomous Trl Regular"/>
+		</font-face-src>
+	</font-face>
+   <missing-glyph><path d="M0 0z"/></missing-glyph>
+   <glyph unicode="D" horiz-adv-x="1056" d="M121.999 0l0 679.999 482 0c104.002,0 181.168,-8.66635 231.501,-25.999 50.3335,-17.3327 85.1678,-49.4998 104.5,-96.5013 19.3324,-46.9988 28.9986,-119.498 28.9986,-217.498 0,-97.9997 -9.66621,-170.502 -28.9986,-217.501 -19.3324,-47.0015 -54.1667,-79.1659 -104.5,-96.5013 -50.3335,-17.3327 -127.5,-25.999 -231.501,-25.999l-482 0zm125.001 571.001l0 -462 584.999 0 0 462 -584.999 0z"/>
+   <glyph unicode="L" horiz-adv-x="796" d="M778.999 0l-657 0 0 679.999 125.001 0 0 -570.998 531.998 0 0 -109.001z"/>
+   <glyph unicode="P" horiz-adv-x="927" d="M121.999 0l0 679.999 507.002 0c62.6669,0 112.665,-7.33139 149.998,-21.9996 37.3353,-14.6655 64.5004,-38.0001 81.5007,-69.9983 17.0003,-32.0009 25.5005,-75.3354 25.5005,-130.001 0,-54.668 -8.50016,-98.1659 -25.5005,-130.499 -17.0003,-32.3333 -43.9992,-55.6679 -80.9994,-70.001 -37.0002,-14.3331 -86.5,-21.501 -148.499,-21.501l-384 0 0 -235.999 -125.001 0zm125.001 571.001l0 -227.001 501 0 0 227.001 -501 0z"/>
+   <glyph unicode="U" horiz-adv-x="1019" d="M510.001 -12.001c-112,0 -196.168,8.16778 -252.501,24.5006 -56.3326,16.3328 -95.5015,45.6666 -117.501,88.0012 -21.9996,42.3319 -32.998,105.5 -32.998,189.499l0 389.999 124.999 0 0 -559c88.0012,-13.3333 180.666,-19.9999 278.001,-19.9999 97.3323,0 189.998,6.66663 277.999,19.9999l0 559 124.999 0 0 -389.999c0,-83.999 -10.9984,-147.167 -32.998,-189.499 -21.9996,-42.3346 -60.9995,-71.6683 -117,-88.0012 -56.0002,-16.3328 -140.334,-24.5006 -253,-24.5006z"/>
+  </font>
+  <style type="text/css">
+   <![CDATA[
+    @font-face { font-family:"TT Autonomous Trl";font-variant:normal;font-style:normal;font-weight:normal;src:url("#FontID0") format(svg)}
+    .str0 {stroke-width:2.08;stroke-miterlimit:2.61313}
+    .str2 {stroke:white;stroke-width:4.2;stroke-miterlimit:2.61313}
+    .str1 {stroke:white;stroke-width:1.81;stroke-miterlimit:2.61313}
+    .fil0 {fill:white}
+    .fnt0 {font-weight:normal;font-size:872.99px;font-family:'TT Autonomous Trl'}
+   ]]>
+  </style>
+ </defs>
+ <g id="Layer_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <g id="_2466148094944">
+   <g transform="matrix(0.898275 0 0 1 -2705.12 208.794)">
+    <text x="2905.97" y="385.75"  class="fil0 str1 fnt0">P</text>
+   </g>
+   <g transform="matrix(0.898275 0 0 1 -1977.4 208.794)">
+    <text x="2905.97" y="385.75"  class="fil0 str1 fnt0">L</text>
+   </g>
+   <g transform="matrix(0.898275 0 0 1 -659.965 208.794)">
+    <text x="2905.97" y="385.75"  class="fil0 str1 fnt0">U</text>
+   </g>
+   <g transform="matrix(0.898275 0 0 1 139.906 208.794)">
+    <text x="2905.97" y="385.75"  class="fil0 str1 fnt0">D</text>
+   </g>
+   <path class="fil0 str2" d="M1272.66 594.54c45.29,-142.64 90.59,-285.3 135.88,-427.93 59.6,-187.94 338.19,-228.11 408.7,-10.37 47.4,146.09 94.8,292.2 142.2,438.31 -38.07,0 -76.12,0 -114.19,0 -46.22,-151.57 -92.45,-303.14 -138.67,-454.71 -60.9,0 -121.8,0 -182.7,0 -44.59,151.57 -89.18,303.14 -133.77,454.71 -39.15,0 -78.31,0 -117.46,0z"/>
+   <circle class="fil0 str2" cx="1618.52" cy="344.56" r="69.33"/>
+  </g>
+ </g>
+</svg>
