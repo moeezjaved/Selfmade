@@ -23,9 +23,27 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
   const [done, setDone] = useState(false)
   const [err, setErr] = useState<string | null>(null)
 
+  // Which brand these daily ads are FOR, and which competitor's winners to pull from ('all' = any watched).
+  const [brands, setBrands] = useState<{ id: string; name: string }[]>([])
+  const [brand, setBrand] = useState<string | null>(brandId)
+  const [comps, setComps] = useState<{ page_id: string; brand_name: string }[]>([])
+  const [comp, setComp] = useState<string>('all')
+
   useEffect(() => {
     fetch('/api/credits/balance').then(r => r.json()).then(j => { setBalance(typeof j.balance === 'number' ? j.balance : 0); setPricing(j.pricing || {}) }).catch(() => setBalance(0))
-  }, [])
+    fetch('/api/brands').then(r => r.json()).then(j => { const bs = (j.brands || []).map((b: any) => ({ id: b.id, name: b.name })); setBrands(bs); if (!brand && bs[0]) setBrand(bs[0].id) }).catch(() => {})
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Competitors are per-brand — reload the picker whenever the chosen brand changes.
+  useEffect(() => {
+    if (!brand) { setComps([]); return }
+    setComp('all')
+    fetch(`/api/follows?spied=1&brand=${encodeURIComponent(brand)}`).then(r => r.json())
+      .then(j => setComps(((j.brands || []) as any[]).filter(b => b.page_id).map(b => ({ page_id: String(b.page_id), brand_name: b.brand_name || 'A competitor' }))))
+      .catch(() => setComps([]))
+  }, [brand])
+
+  const brandName2 = brands.find(b => b.id === brand)?.name || brandName || null
 
   const unit = pricing[media === 'image' ? IMG_ACTION : VID_ACTION]?.credits ?? (media === 'image' ? 15 : 600)
   const perDay = unit * count
@@ -34,10 +52,11 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
 
   const confirm = async () => {
     if (!affordable || busy) return
-    if (!brandId) { router.push('/brands'); return }   // need a brand first
+    if (!brand) { router.push('/brands'); return }   // need a brand first
     setBusy(true); setErr(null)
     try {
-      const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brandId, mediaType: media, adsPerDay: count }) })
+      const settings = { competitorPageId: comp === 'all' ? null : comp, competitorName: comp === 'all' ? null : (comps.find(c => c.page_id === comp)?.brand_name || null) }
+      const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brandId: brand, mediaType: media, adsPerDay: count, settings }) })
       const j = await r.json().catch(() => ({}))
       if (!r.ok) throw new Error(j?.error || 'Could not turn on autopilot.')
       setDone(true)
@@ -56,13 +75,31 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
           <div style={{ padding: '30px 24px', textAlign: 'center' }}>
             <div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 6 }}>Done — I&rsquo;m on it.</div>
             <p style={{ fontSize: 13.5, color: MUTED, margin: '0 auto 18px', maxWidth: 320, lineHeight: 1.55 }}>
-              I&rsquo;ll make <b>{count} {media}</b> ad{count === 1 ? '' : 's'} a day{brandName ? ` for ${brandName}` : ''} from what&rsquo;s winning — and bring them to your morning brief for approval. Nothing charges until an ad is actually made.
+              I&rsquo;ll make <b>{count} {media}</b> ad{count === 1 ? '' : 's'} a day{brandName2 ? ` for ${brandName2}` : ''}{comp !== 'all' ? ` from ${comps.find(c => c.page_id === comp)?.brand_name || 'that competitor'}` : ' from what’s winning'} — and bring them to your morning brief for approval. Nothing charges until an ad is actually made.
             </p>
             <button onClick={onClose} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Got it</button>
           </div>
         ) : (
           <div style={{ padding: '20px 22px 22px' }}>
-            <p style={{ fontSize: 13.5, color: MUTED, margin: '0 0 18px', lineHeight: 1.55 }}>How many should I make each day? I&rsquo;ll pull from your competitors&rsquo; winners and have them ready in your brief.</p>
+            <p style={{ fontSize: 13.5, color: MUTED, margin: '0 0 16px', lineHeight: 1.55 }}>Pick the brand and whose winners to pull from, then how many I make each day — I&rsquo;ll have them ready in your brief.</p>
+
+            {/* brand + competitor pickers */}
+            <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+              <label style={{ flex: '1 1 160px', fontSize: 12, fontWeight: 700, color: MUTED }}>
+                Brand
+                <select value={brand || ''} onChange={e => setBrand(e.target.value || null)} style={selectS}>
+                  {brands.length === 0 && <option value="">No brands yet</option>}
+                  {brands.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+                </select>
+              </label>
+              <label style={{ flex: '1 1 160px', fontSize: 12, fontWeight: 700, color: MUTED }}>
+                Pull winners from
+                <select value={comp} onChange={e => setComp(e.target.value)} style={selectS}>
+                  <option value="all">All watched competitors</option>
+                  {comps.map(c => <option key={c.page_id} value={c.page_id}>{c.brand_name}</option>)}
+                </select>
+              </label>
+            </div>
 
             {/* format */}
             <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
@@ -120,3 +157,4 @@ export default function MakeAdsModal({ brandId, brandName, onClose }: { brandId:
 }
 
 const stepBtn: React.CSSProperties = { width: 30, height: 30, borderRadius: 8, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 18, fontWeight: 800, cursor: 'pointer', lineHeight: 1, fontFamily: 'inherit' }
+const selectS: React.CSSProperties = { display: 'block', width: '100%', marginTop: 5, padding: '9px 10px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', color: INK, fontSize: 13, fontWeight: 600, fontFamily: 'inherit', cursor: 'pointer' }
