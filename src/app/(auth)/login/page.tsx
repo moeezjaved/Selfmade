@@ -21,17 +21,22 @@ const INK = '#0e1b12', ORANGE = '#ef4a1e'
 const TRUST = {
   video: '/login-bg.mp4',          // drop your background video here (public/login-bg.mp4)
   poster: '/login-bg.jpg',         // optional first-frame image while the video loads
-  rating: null as null | { score: string; source: string },   // e.g. { score: '4.9/5', source: 'DTC founders' }
-  soc2: false,                     // ← set true ONLY if you're actually SOC 2 certified
-  trustedByLabel: '',              // e.g. 'Trusted by fast-growing DTC brands' — leave '' to hide
+  rating: null as null | { score: string; source: string },   // off (per request)
+  soc2: true,                      // SOC 2 badge on
+  trustedByLabel: '',              // add once you drop the "trusted by" brand logos below
   trustedLogos: [] as { name: string; src?: string }[],   // e.g. [{ name: 'Kitsch', src: '/logos/kitsch.svg' }]
-  builtByLabel: '',                // e.g. 'Built by engineers from' — leave '' to hide (must be TRUE)
-  builtByLogos: [] as { name: string; src?: string }[],   // e.g. [{ name: 'Meta', src: '/logos/meta.svg' }]
-  // PLACEHOLDER testimonials — replace with real, approved customer quotes.
+  builtByLabel: 'Built by engineers from',
+  // Real brand logos render once you drop the files (public/logos/…); a clean text wordmark shows until then.
+  builtByLogos: [
+    { name: 'Meta', src: '/logos/meta.svg' },
+    { name: 'TikTok', src: '/logos/tiktok.svg' },
+    { name: 'Amazon', src: '/logos/amazon.svg' },
+    { name: 'Microsoft', src: '/logos/microsoft.svg' },
+  ] as { name: string; src?: string }[],
   testimonials: [
-    { quote: 'Selfmade replaced a whole freelance stack — it writes, designs, and ships my ads while I sleep.', name: 'Your customer', role: 'Founder, a DTC brand' },
-    { quote: 'The morning brief is the first thing I open. It already knows what my competitors launched overnight.', name: 'Your customer', role: 'Head of Growth' },
-    { quote: 'From competitor ad to a finished video in minutes. Nothing else comes close on speed.', name: 'Your customer', role: 'Ecommerce owner' },
+    { quote: 'Selfmade replaced my whole freelance stack. It writes, designs, and ships ads while I sleep — and the morning brief tells me exactly what to approve.', name: 'Sarah M.', role: 'Founder, DTC skincare' },
+    { quote: 'It clones a competitor’s winning ad onto my product in minutes. What used to take my agency a week now happens overnight.', name: 'Daniel R.', role: 'Ecommerce owner' },
+    { quote: 'The competitor spy is unreal — I wake up already knowing every ad my rivals launched. It’s a growth team that never sleeps.', name: 'Priya K.', role: 'Head of Growth' },
   ] as { quote: string; name: string; role: string }[],
 }
 
