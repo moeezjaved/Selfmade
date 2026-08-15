@@ -91,11 +91,12 @@ export const TOOLS = [
     type: 'function' as const,
     function: {
       name: 'get_competitor_ads',
-      description: "Deep-dive a competitor brand (or a niche) using Selfmade's crawl corpus. Returns their ads with the problem they target, mechanism, offer, CTA style, creative style (UGC/Studio), visual, and longevity. Use for competitor analysis and offer comparison.",
+      description: "Deep-dive a competitor brand (or a niche) using Selfmade's crawl corpus. Returns their ads with the problem they target, mechanism, offer, CTA style, creative style (UGC/Studio), visual, and longevity. Use for competitor analysis and offer comparison. IMPORTANT: for a competitor the user watches, pass its page_id (shown next to each watched competitor in the business context) — matching by name misses on spelling/diacritics. Only fall back to `brand`/`niche` when you have no page_id.",
       parameters: {
         type: 'object',
         properties: {
-          brand: { type: 'string', description: 'Competitor brand / page name to match' },
+          page_id: { type: 'string', description: 'The competitor\'s page_id (from the watched-competitor list) — the reliable key. Prefer this over brand.' },
+          brand: { type: 'string', description: 'Competitor brand / page name to match (fallback only when no page_id is known)' },
           niche: { type: 'string', description: 'Niche filter, e.g. "Hair", "Supplements"' },
           active_only: { type: 'boolean', description: 'Only currently-running ads' },
           limit: { type: 'integer', description: 'Max ads (default 12, max 24)' },

@@ -7,6 +7,7 @@ import { listAdAccounts } from './meta-data'
 import { getMemories, recallMemories, renderMemories, type Memory } from './memory'
 import { createAdminClient } from '@/lib/supabase/server'
 import { intentNeedsCompetitorContext, type MelloIntent } from './intent'
+import { loadMelloContext } from './context'
 
 /** The user's live business state — their brands + who they watch — so Mello reasons over the whole
  *  picture, not just what a tool fetches. Scoped to the ACTIVE brand when we know it (so Aura never sees
@@ -16,21 +17,24 @@ async function buildBusinessBlock(userId: string, brandId?: string | null): Prom
     const admin = createAdminClient()
     let bq = admin.from('brands').select('id, name, website, industry, tone, usps, brand_type').eq('user_id', userId).order('created_at', { ascending: true }).limit(10)
     if (brandId) bq = bq.eq('id', brandId)
-    let fq = admin.from('followed_brands').select('brand_name, brand_id').eq('user_id', userId).limit(60)
+    // page_id is the RELIABLE competitor key — get_competitor_ads must query by it, not the display name
+    // (bug #2: matching "Füm - The Good Habit" by name returned 0 ads while the id had them).
+    let fq = admin.from('followed_brands').select('brand_name, brand_id, page_id').eq('user_id', userId).limit(60)
     if (brandId) fq = fq.eq('brand_id', brandId)   // only THIS brand's rivals
     const [{ data: brands }, { data: follows }] = await Promise.all([bq, fq])
     const bl = (brands || []) as any[]
     const fl = (follows || []) as any[]
     if (!bl.length && !fl.length) return '  (no brands set up yet — the user is brand-new; help them add their brand + a competitor to watch)'
     const arr = (v: any) => Array.isArray(v) ? v.filter(Boolean).join('/') : (v || '')
+    const fmtWatch = (f: any) => `${f.brand_name}${f.page_id ? ` (page_id ${f.page_id})` : ''}`
     const lines = bl.map((b) => {
       const meta = [arr(b.industry), b.brand_type, b.website].filter(Boolean).join(' · ')
       const voice = b.tone ? ` — voice: ${b.tone}` : ''
       const usps = arr(b.usps) ? ` — edge: ${arr(b.usps)}` : ''
-      const watched = fl.filter((f) => f.brand_id && String(f.brand_id) === String(b.id)).map((f) => f.brand_name).filter(Boolean)
-      return `  - ${b.name}${meta ? ` (${meta})` : ''}${voice}${usps}${watched.length ? `\n      · watching for this brand: ${watched.slice(0, 12).join(', ')}` : ''}`
+      const watched = fl.filter((f) => f.brand_id && String(f.brand_id) === String(b.id) && f.brand_name).map(fmtWatch)
+      return `  - ${b.name}${meta ? ` (${meta})` : ''}${voice}${usps}${watched.length ? `\n      · watching for this brand (call get_competitor_ads with the page_id): ${watched.slice(0, 12).join(', ')}` : ''}`
     })
-    const unassigned = fl.filter((f) => !f.brand_id).map((f) => f.brand_name).filter(Boolean)
+    const unassigned = fl.filter((f) => !f.brand_id && f.brand_name).map(fmtWatch)
     if (unassigned.length) lines.push(`  - Also watching (not yet tied to a brand): ${unassigned.slice(0, 15).join(', ')}`)
     return lines.join('\n')
   } catch { return '  (business context unavailable this turn)' }
@@ -64,11 +68,16 @@ export async function buildSystemPrompt(userId: string, query?: string, surface?
   const businessBlock = wantsBusiness ? await buildBusinessBlock(userId, opts?.brandId) : '  (not relevant to this question)'
   const today = new Date().toISOString().slice(0, 10)
 
+  // Phase 2.2 — authoritative account state (plan, integrations, brand, competitors) read from the DB.
+  // The model must treat this as FACT and never guess plan/connection/competitor state. Fail-soft.
+  let stateBlock = ''
+  try { const ctx = await loadMelloContext(createAdminClient(), userId, opts?.brandId); stateBlock = `\n${ctx.prompt}\n` } catch { /* state-blind fallback */ }
+
   return `You are Mello, an AI marketing analyst embedded in Selfmade. You help marketing teams diagnose ad performance, find patterns, generate creative, and get inspiration from top-performing ads. You are trained on insights from billions in ad spend across Selfmade's ad-intelligence library.
 
 ## Today's date
 ${today}
-
+${stateBlock}
 ## Connected data sources for this user
 ${accountsBlock}
 

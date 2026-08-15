@@ -60,22 +60,45 @@ function mapAd(a: any) {
 }
 
 // ── Competitor / brand deep-dive ─────────────────────────────
-export interface CompetitorParams { brand?: string; niche?: string; active_only?: boolean; limit?: number }
+// page_id is the RELIABLE way to fetch a watched competitor's ads. Matching by display name
+// (`page_name ILIKE '%name%'`) silently returned 0 for real competitors whenever the stored name didn't
+// substring-match the crawled page (diacritics "Füm"≠"Fum", suffixes " - The Good Habit") — bug #2.
+export interface CompetitorParams { page_id?: string; brand?: string; niche?: string; active_only?: boolean; limit?: number }
 
 export async function getCompetitorAds(params: CompetitorParams) {
   const admin = createAdminClient()
   const limit = Math.min(Math.max(params.limit || 12, 1), 24)
   let q = admin.from('discovery_ads_index').select(SELECT_COLS)
-    .or(HAS_CREATIVE)
     .order('performance_score', { ascending: false, nullsFirst: false })
     .limit(limit)
-  if (params.brand) { const b = params.brand.replace(/[%,()]/g, ' ').trim(); if (b) q = q.ilike('page_name', `%${b}%`) }
-  if (params.niche) q = q.ilike('niche', `%${params.niche}%`)
+  if (params.page_id) {
+    // Reliable path: match by page_id and gate on the has_creative BOOLEAN — the SAME gate the Competitor
+    // Feed uses — so Mello sees exactly what the product shows (not the stricter %r2.dev% URL subset).
+    q = q.eq('page_id', String(params.page_id)).eq('has_creative', true)
+  } else {
+    q = q.or(HAS_CREATIVE)
+    if (params.brand) { const b = params.brand.replace(/[%,()]/g, ' ').trim(); if (b) q = q.ilike('page_name', `%${b}%`) }
+    if (params.niche) q = q.ilike('niche', `%${params.niche}%`)
+  }
   if (params.active_only) q = q.eq('is_active', true)
 
   const { data, error } = await q
   if (error) throw new Error(`Ad library: ${error.message}`)
-  return { count: (data || []).length, ads: (data || []).map(mapAd) }
+  const ads = (data || []).map(mapAd)
+
+  // Useful "I don't know" (Phase 2.2): when a page_id lookup finds nothing, distinguish "not indexed yet"
+  // from "indexed but no hosted creative / all inactive" so Mello reports the real state and NEVER invents
+  // absence ("this competitor has no active ads").
+  let note: string | undefined
+  if (ads.length === 0 && params.page_id) {
+    try {
+      const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', String(params.page_id))
+      note = (count && count > 0)
+        ? `${count} ad(s) are indexed for this competitor but none has a fetched creative available right now (some may be inactive or awaiting media). Report what IS available and offer to re-check — do NOT tell the founder this competitor has no ads.`
+        : `This competitor is not in the crawl index yet — their crawl may not have completed. Say exactly that and offer to prioritize their crawl; do NOT claim they have no ads.`
+    } catch { /* leave note undefined */ }
+  }
+  return { count: ads.length, ads, ...(note ? { note } : {}) }
 }
 
 // ── Niche pattern analysis (aggregated in Node) ──────────────

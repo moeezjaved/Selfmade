@@ -14,6 +14,7 @@
  * identical data services, one place.
  */
 import { classifyIntent, productHowTo, type MelloIntent } from '@/lib/mello/intent'
+import { toStateLite, type MelloContext } from '@/lib/mello/context'
 
 const isBlankName = (b?: string) => { const t = String(b ?? '').trim(); return !t || /^\d+$/.test(t) }
 const TEACH = /^(never|always|from now on|don'?t|do not|only|we (?:never|always|only)|make sure|remember (?:to|that)|keep in mind|by default)\b/i
@@ -27,7 +28,7 @@ export async function answerGrounded(
   admin: any,
   userId: string,
   message: string,
-  opts?: { item?: any; brandId?: string | null },
+  opts?: { item?: any; brandId?: string | null; ctx?: MelloContext | null },
 ): Promise<Grounded> {
   const q = String(message || '').trim().slice(0, 800)
   const item = opts?.item
@@ -37,6 +38,12 @@ export async function answerGrounded(
   // all brands mashed together. Explicit (switcher) beats cookie beats null (Slack/WhatsApp = account-wide).
   let brandId: string | null = opts?.brandId || null
   if (!brandId) { try { const { resolveActiveBrandId } = await import('@/lib/brand/active'); brandId = await resolveActiveBrandId(admin, userId).catch(() => null) } catch { /* channel context */ } }
+
+  // Phase 2.2 — load the authoritative account-state snapshot once (plan, integrations, brand,
+  // competitors). Every deterministic answer below reads from THIS, never the LLM. Reuse a snapshot the
+  // caller already built (askMello) so we don't double-load.
+  let ctx: MelloContext | null = opts?.ctx || null
+  if (!ctx) { try { const { loadMelloContext } = await import('@/lib/mello/context'); ctx = await loadMelloContext(admin, userId, brandId) } catch { /* fail-soft: state-blind fallbacks below */ } }
 
   // 1 · TEACH a belief (company_memory intent, statement form)
   if (!item && intent === 'company_memory' && TEACH.test(q) && !q.includes('?')) {
@@ -93,8 +100,10 @@ export async function answerGrounded(
     // but with competitor context legitimately in scope. Fall through as GENERAL-with-context.
   }
 
-  // 3.5 · product how-to — deterministic in-app steps, BEFORE anything that could pull company data.
-  if (!item && intent === 'product_help') { const guide = productHowTo(q); if (guide) return { handled: true, intent, sources: ['Product help'], reply: guide } }
+  // 3.5 · product how-to — deterministic in-app steps, STATE-AWARE (plan + Meta connection), BEFORE
+  // anything that could pull company data. Passing ctx is what fixes bugs #1/#4 (a Creator no longer
+  // hears "Connecting Meta is a paid feature" / "you're on Free").
+  if (!item && intent === 'product_help') { const guide = productHowTo(q, toStateLite(ctx)); if (guide) return { handled: true, intent, sources: ctx ? ['Subscription', 'Integrations', 'Product help'] : ['Product help'], reply: guide } }
 
   // 4 · ads / metric question → the grounded audit (the SAME auditAccount the brief uses). Provenance +
   // no-guess handled inside answerAdsQuestion.
