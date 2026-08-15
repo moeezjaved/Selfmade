@@ -9,7 +9,7 @@
 import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 import { addMemory } from './memory'
-import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand } from './actions'
+import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand, requestCompetitorCrawl } from './actions'
 import { generateCompetitorReport } from './reports/competitor-report'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
@@ -187,6 +187,14 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'request_competitor_crawl',
+      description: "Prioritize crawling a competitor the user FOLLOWS but whose ads are NOT in the index yet (i.e. get_competitor_ads returned 0 with a 'not in the crawl index' note). Puts them at the front of the crawl queue so their ads start appearing within a few minutes — this is NEXT-CYCLE, not instant, so never claim you already have their ads after calling it. Pass the competitor's page_id. Respects the user's daily on-demand pull limit.",
+      parameters: { type: 'object', required: ['page_id'], properties: { page_id: { type: 'string', description: "The competitor's page_id (from the watched-competitor list)" }, brand_name: { type: 'string' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'search_my_assets',
       description: "Semantic search of the user's OWN uploaded Assets library (their creatives, b-roll, product shots) by meaning — e.g. 'my UGC unboxing clips', 'green product shots'.",
       parameters: { type: 'object', required: ['query'], properties: { query: { type: 'string' }, limit: { type: 'integer' } } },
@@ -290,6 +298,7 @@ export const TOOL_LABELS: Record<string, string> = {
   save_ad_to_board: 'Saving to a board…',
   watch_brand: 'Adding a competitor to watch…',
   unwatch_brand: 'Removing a competitor…',
+  request_competitor_crawl: 'Prioritizing their crawl…',
   search_my_assets: 'Searching your assets…',
   remember: 'Remembering that…',
   request_clarification: 'Asking for clarification…',
@@ -404,6 +413,8 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await watchBrand(ctx.userId, String(args.page_id || ''), args.brand_name)
     case 'unwatch_brand':
       return await unwatchBrand(ctx.userId, { pageId: args.page_id, brandName: args.brand_name })
+    case 'request_competitor_crawl':
+      return await requestCompetitorCrawl(ctx.userId, String(args.page_id || ''), args.brand_name)
     case 'search_my_assets':
       return await searchMyAssets(ctx.userId, String(args.query || ''), args.limit)
     case 'remember':
@@ -434,6 +445,13 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
   }
   if (name === 'get_competitor_ads') {
     return { icon: 'search', sub_item: { label: `Analyzed ${result?.count ?? 0} competitor ad(s)` } }
+  }
+  if (name === 'request_competitor_crawl') {
+    const label = result?.queued ? `Queued ${result?.brand || 'competitor'} for crawl`
+      : result?.already_fresh ? 'Already crawled recently'
+      : result?.rate_limited ? 'Daily crawl limit reached'
+      : 'Could not queue crawl'
+    return { icon: 'search', sub_item: { label } }
   }
   if (name === 'analyze_niche_patterns') {
     return { icon: 'chart', sub_item: { label: `Analyzed ${result?.sampled ?? 0} ad(s) in the niche` } }

@@ -95,7 +95,7 @@ export async function getCompetitorAds(params: CompetitorParams) {
       const { count } = await admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', String(params.page_id))
       note = (count && count > 0)
         ? `${count} ad(s) are indexed for this competitor but none has a fetched creative available right now (some may be inactive or awaiting media). Report what IS available and offer to re-check — do NOT tell the founder this competitor has no ads.`
-        : `This competitor is not in the crawl index yet — their crawl may not have completed. Say exactly that and offer to prioritize their crawl; do NOT claim they have no ads.`
+        : `This competitor is not in the crawl index yet — their crawl may not have completed. Say exactly that, then call request_competitor_crawl with their page_id to put them at the front of the queue (ads appear in a few minutes). Do NOT claim they have no ads.`
     } catch { /* leave note undefined */ }
   }
   return { count: ads.length, ads, ...(note ? { note } : {}) }

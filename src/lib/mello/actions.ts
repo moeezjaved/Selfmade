@@ -83,6 +83,71 @@ export async function watchBrand(userId: string, pageId: string, brandName?: str
   return { watching: true, brand: brandName || pageId }
 }
 
+// Default crawl markets — mirrors src/app/api/discovery/brand-spy/route.ts so a Mello-queued crawl
+// behaves identically to a UI spy.
+const CRAWL_COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'MX', 'BR', 'IN', 'JP', 'SG', 'AE', 'ZA']
+
+/**
+ * Prioritize crawling a competitor the user follows but that isn't in the ad index yet (Phase 2.2 —
+ * makes Mello's "I can prioritize their crawl" offer a REAL action, not a dead promise). Reuses the exact
+ * mechanism behind the app's on-demand pull (/api/discovery/brand-spy?crawlOnly): bump the crawl term to
+ * tier-0 (priority 9, last_crawled_at null) so the droplet crawler takes it next pass. Honest about
+ * timing — this is NEXT-CYCLE (minutes), never an instant fetch. Respects the per-plan expressPulls daily
+ * cap and logs BRAND_PULLED so accounting matches the rest of the app.
+ */
+export async function requestCompetitorCrawl(userId: string, pageId: string, brandName?: string) {
+  const admin = createAdminClient() as any
+  const pid = String(pageId || '').trim()
+  if (!pid || !/^\d+$/.test(pid)) return { error: 'A numeric competitor page_id is required (from the watched-competitor list).' }
+
+  // Resolve a display name (prefer the follow row) so the queue + activity log read as the brand, not a number.
+  let name = (brandName || '').trim()
+  try {
+    const { data: f } = await admin.from('followed_brands').select('brand_name').eq('user_id', userId).eq('page_id', pid).maybeSingle()
+    if (!name && f?.brand_name) name = String(f.brand_name)
+  } catch { /* best-effort */ }
+  if (!name) name = pid
+
+  // Freshness guard — don't burn a pull re-crawling a brand we refreshed in the last 12h.
+  try {
+    const { data: term } = await admin.from('discovery_crawl_terms').select('last_crawled_at, crawling_at').eq('page_id', pid).maybeSingle()
+    const freshCut = Date.now() - 12 * 3600 * 1000
+    const lastCrawled = term?.last_crawled_at ? Date.parse(term.last_crawled_at) : 0
+    const crawlingNow = term?.crawling_at ? Date.parse(term.crawling_at) > Date.now() - 30 * 60 * 1000 : false
+    if (lastCrawled > freshCut || crawlingNow) {
+      return { queued: false, already_fresh: true, brand: name, note: `${name} was crawled recently — their ads should already be available. Try get_competitor_ads with this page_id again; if still empty, the crawl may still be running.` }
+    }
+  } catch { /* if the guard read fails, fall through and queue anyway */ }
+
+  // Per-plan daily cap on on-demand pulls (expressPulls), counted against the billing owner.
+  try {
+    const { resolveBillingOwner } = await import('@/lib/org')
+    const { requireUnder } = await import('@/lib/entitlements')
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0)
+    const { count: pullsToday } = await admin.from('activity_logs')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('action_type', 'BRAND_PULLED').gte('created_at', startOfDay.toISOString())
+    const billingOwner = await resolveBillingOwner(admin, userId).catch(() => userId)
+    const gate = await requireUnder(admin, billingOwner, 'expressPulls', pullsToday || 0)
+    if (gate) return { queued: false, rate_limited: true, brand: name, note: gate.message || `You've hit today's on-demand crawl limit. It resets tomorrow, or upgrade for more.` }
+  } catch { /* if the gate check fails, don't block the queue */ }
+
+  // Enqueue at tier 0 (upsert the crawl term) — identical to ensureTracked(..., forceFresh=true).
+  try {
+    const { data: ex } = await admin.from('discovery_crawl_terms').select('page_id, is_active').eq('page_id', pid).maybeSingle()
+    if (ex) {
+      await admin.from('discovery_crawl_terms').update({ is_active: true, last_crawled_at: null, priority: 9 }).eq('page_id', pid)
+    } else {
+      await admin.from('discovery_crawl_terms').insert({ term: name, page_id: pid, term_type: 'brand', category: 'General', is_active: true, priority: 9, last_crawled_at: null, countries: CRAWL_COUNTRIES })
+    }
+  } catch (e: any) {
+    return { error: `Couldn't queue the crawl: ${e?.message || 'unknown error'}` }
+  }
+  try { const { logActivity } = await import('@/lib/activity'); await logActivity(admin, userId, 'BRAND_PULLED', `Pulled ads for ${name}`) } catch { /* non-fatal */ }
+
+  return { queued: true, brand: name, immediate: false, note: `Put ${name} at the front of the crawl queue. Their ads will start appearing within a few minutes as the crawler pulls them in — tell the user that and offer to re-check shortly. Do NOT claim you have their ads yet.` }
+}
+
 /** Stop watching a competitor — by page_id, or by (fuzzy) brand name if that's all Mello has. */
 export async function unwatchBrand(userId: string, opts: { pageId?: string; brandName?: string }) {
   const admin = createAdminClient() as any

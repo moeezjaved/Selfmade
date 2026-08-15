@@ -84,6 +84,61 @@ export async function answerGrounded(
     } catch { /* fall through */ }
   }
 
+  // 3b · CAMPAIGN STATUS — deterministic active-campaign truth from the Meta audit (active-only buckets),
+  // never the LLM. Excludes metric words so "which campaign has best ROAS" stays a metric question.
+  const CAMPAIGN_STATUS_Q = /\bcampaigns?\b/i.test(q)
+    && /\b(how many|which|any|are|is|running|active|live|paused|pause|status|on right now|turned? o[nf]f?)\b/i.test(q)
+    && !/\b(roas|cpa|cpc|cpm|ctr|spend|spent|revenue|budget|best|worst|top|worse|performing|performance|scal)\b/i.test(q)
+  if (ctx && !item && CAMPAIGN_STATUS_Q) {
+    if (!ctx.integrations.meta.connected) {
+      return { handled: true, intent: 'ads_metric', sources: ['Integrations'], reply: `You don't have a Meta ad account connected yet, so I can't see live campaigns. Connect one in Settings → Connect Meta and I'll track every campaign's status for you.` }
+    }
+    try {
+      const { auditAccount } = await import('@/lib/meta/audit')
+      const audit: any = await auditAccount(admin, userId, ctx.integrations.meta.accountId || undefined, 'last_30d')
+      if (audit) {
+        const n = (a: any) => Array.isArray(a) ? a.length : (typeof a === 'number' ? a : 0)
+        const scale = n(audit.scale) || n(audit.counts?.scale)
+        const watch = n(audit.watch) || n(audit.counts?.watch)
+        const pause = n(audit.pause) || n(audit.counts?.pause)
+        const active = scale + watch + pause
+        const acct = ctx.integrations.meta.accountName ? ` on ${ctx.integrations.meta.accountName}` : ''
+        const scope = ctx.brandName ? ` for ${ctx.brandName}` : ''
+        const reply = active > 0
+          ? `You've got ${active} active campaign${active === 1 ? '' : 's'}${acct}${scope} — ${scale} scaling well, ${watch} to keep an eye on, ${pause} I'd look at pausing. Want the detail on any of those?`
+          : `No active campaigns with delivery${acct}${scope} in the last 30 days. Want me to look at what to launch?`
+        return { handled: true, intent: 'ads_metric', sources: ['Meta Ads audit'], reply }
+      }
+    } catch { /* fall through to agent */ }
+  }
+
+  // 3c · CUSTOMER / INBOX — deterministic counts + themes from the inbox, never the LLM.
+  const CUSTOMER_THEME_Q = /\b(what are|what're|what do)\b[^?]*\bcustomers?\b/i.test(q) || /\bcustomers?\b[^?]*\b(ask|asking|saying|want|complain|confused|question)/i.test(q) || /\b(common|top)\b[^?]*\b(question|complaint|theme|ask)/i.test(q)
+  const CUSTOMER_COUNT_Q = /\b(open|unread|new)\b[^?]*\b(conversation|convo|thread|message|inbox|dm|reply|replies)s?\b/i.test(q) || /\b(how many|number of|any)\b[^?]*\b(conversation|convo|thread|message|dm|customer|reply|replies)s?\b/i.test(q)
+  if (ctx && !item && (CUSTOMER_THEME_Q || CUSTOMER_COUNT_Q)) {
+    if (CUSTOMER_THEME_Q) {
+      try {
+        const { generateCustomerInsights } = await import('@/lib/customer/insights')
+        const ins: any = await generateCustomerInsights(admin, userId, { days: 14 })
+        if (ins && (ins.totalMessages || 0) > 0) {
+          const themes = (ins.themes || []).map((t: any) => typeof t === 'string' ? t : (t.theme || t.label || t.name)).filter(Boolean).slice(0, 4)
+          const intents = (ins.intents || []).map((t: any) => `${t.intent || t.label}${t.count ? ` (${t.count})` : ''}`).filter(Boolean).slice(0, 4)
+          const body = ins.summary || (themes.length ? `Top themes: ${themes.join(', ')}.` : '') || (intents.length ? `Most common: ${intents.join(', ')}.` : 'a mix of questions.')
+          return { handled: true, intent: 'company_memory', sources: ['Customer inbox'], reply: `Across ${ins.totalMessages} customer message${ins.totalMessages === 1 ? '' : 's'} in the last 14 days: ${body}` }
+        }
+        return { handled: true, intent: 'company_memory', sources: ['Customer inbox'], reply: `No customer messages have come through yet. Connect a channel (Settings → Slack & WhatsApp) and I'll start summarizing what customers ask.` }
+      } catch { /* fall through */ }
+    }
+    try {
+      const { count: openCount } = await admin.from('customer_threads').select('id', { count: 'exact', head: true }).eq('user_id', userId).eq('status', 'open')
+      const c = openCount || 0
+      const noChannel = !ctx.integrations.whatsapp.connected && !ctx.integrations.slack.connected
+      return { handled: true, intent: 'company_memory', sources: ['Customer inbox'], reply: c > 0
+        ? `You have ${c} open conversation${c === 1 ? '' : 's'} in your inbox. Want me to summarize what they need?`
+        : `Your inbox is clear — no open conversations right now.${noChannel ? ' (Connect WhatsApp or Slack in Settings to route customer chats here.)' : ''}` }
+    } catch { /* fall through */ }
+  }
+
   // 3 · competitor identity / list — instant, straight from data
   if (intent === 'competitor') {
     const asksList = /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90

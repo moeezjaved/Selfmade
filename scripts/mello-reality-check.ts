@@ -111,6 +111,36 @@ function run(): number {
  * Requires SUPABASE_URL/SERVICE_ROLE + MELLO_TEST_USER (a real user id) in env.
  *   MELLO_TEST_USER=<uuid> npx tsx scripts/mello-reality-check.ts --live
  */
+// The full live matrix — every state class Mello must answer from truth, not the LLM. Each row lists the
+// expected SOURCE of truth and lightweight content checks on the real reply. Content checks are heuristic
+// (reply text, not internal path) but catch the reported failure shapes: wrong plan, false paid-gate,
+// invented competitor absence, upsell hijack, guessed campaign/order/customer counts.
+type LiveCheck = { cls: string; q: string; source: string; mustContainAny?: string[]; mustNotContain?: string[] }
+const LIVE_MATRIX: LiveCheck[] = [
+  // Plan / subscription
+  { cls: 'plan', q: 'what is my current plan', source: 'Subscription', mustContainAny: ['creator', 'free', 'agency', 'plan'], mustNotContain: [] },
+  { cls: 'plan', q: 'am I on a paid plan?', source: 'Subscription', mustContainAny: ['creator', 'free', 'paid', 'yes', 'no'] },
+  // Integrations
+  { cls: 'integration', q: 'is my meta account connected?', source: 'Integrations', mustContainAny: ['connect', 'already connected'] },
+  { cls: 'integration', q: 'how may i connect my meta ad account', source: 'Integrations+Subscription', mustNotContain: ['paid feature', 'upgrade to creator'] },
+  { cls: 'integration', q: 'is slack connected?', source: 'Integrations', mustContainAny: ['slack', 'connect'] },
+  // Competitors
+  { cls: 'competitor', q: 'who am I watching?', source: 'followed_brands', mustContainAny: ['watch'] },
+  { cls: 'competitor', q: 'Look at the messaging angles my competitors are running and tell me which ones I am not testing yet', source: 'discovery_ads_index (page_id)', mustNotContain: ['no active ads currently running', 'you have no competitors'] },
+  { cls: 'competitor', q: 'Compare my offer (pricing, guarantee, bundle, shipping) against competitors', source: 'competitor pipeline', mustNotContain: ['go full-time', '$49/mo and unlocks'] },
+  // Campaign status
+  { cls: 'campaign', q: 'how many active campaigns do I have?', source: 'Meta Ads audit / Integrations', mustContainAny: ['campaign', 'connect', 'no active'] },
+  { cls: 'campaign', q: 'which campaigns are running right now?', source: 'Meta Ads audit', mustContainAny: ['campaign', 'connect', 'no active', 'scaling', 'pause'] },
+  // Orders / revenue (Meta-attributed only; honest about Shopify)
+  { cls: 'orders', q: 'how many orders did I get this week?', source: 'Meta audit (attributed) — no store', mustContainAny: ['shopify', 'attribution', 'meta', 'purchase', 'order', 'connect'] },
+  { cls: 'revenue', q: "what's my revenue this month?", source: 'Meta audit revenue', mustContainAny: ['$', 'revenue', 'shopify', 'attribution', 'connect', 'no ad account'] },
+  // Spend
+  { cls: 'spend', q: 'how much did I spend in the last 7 days?', source: 'Meta Ads audit', mustContainAny: ['$', 'spend', 'spent', 'connect', 'no ad account'] },
+  // Customers / inbox
+  { cls: 'customer', q: 'how many open conversations do I have?', source: 'customer_threads', mustContainAny: ['conversation', 'inbox', 'clear', 'connect'] },
+  { cls: 'customer', q: 'what are my customers asking about?', source: 'generateCustomerInsights', mustContainAny: ['customer', 'message', 'connect a channel', 'ask', 'theme'] },
+]
+
 async function runLive() {
   const userId = process.env.MELLO_TEST_USER
   if (!userId) { console.error('LIVE mode needs MELLO_TEST_USER=<user-uuid>'); process.exit(2) }
@@ -119,21 +149,27 @@ async function runLive() {
   const { loadMelloContext } = await import('@/lib/mello/context')
   const admin = createAdminClient()
   const ctx = await loadMelloContext(admin, userId)
-  console.log('\n── MelloContext snapshot ───────────────────────────────────')
+  console.log('\n── MelloContext snapshot (what Mello reads before answering) ─')
   console.log(ctx.prompt)
   console.log('\nprovenance:', ctx.provenance.join(', '))
-  const qs = [
-    'what is my current plan',
-    'how may i connect my meta ad account',
-    'Compare my offer (pricing, guarantee, bundle, shipping) against competitors and tell me where I am weaker or stronger',
-    'Look at the messaging angles my competitors are running in their ads and tell me which ones I am not testing yet',
-  ]
-  console.log('\n── Live answers ────────────────────────────────────────────')
-  for (const q of qs) {
-    const { reply } = await askMello(admin, userId, q)
-    console.log(`\nQ: ${q}\nA: ${reply}`)
+
+  console.log('\n── Live reality matrix ─────────────────────────────────────')
+  let pass = 0, fail = 0
+  for (const c of LIVE_MATRIX) {
+    let reply = ''
+    try { reply = (await askMello(admin, userId, c.q)).reply || '' } catch (e: any) { reply = `[error: ${e?.message}]` }
+    const lc = reply.toLowerCase()
+    const problems: string[] = []
+    if (c.mustContainAny?.length && !c.mustContainAny.some(s => lc.includes(s.toLowerCase()))) problems.push(`none of [${c.mustContainAny.join(', ')}]`)
+    for (const s of (c.mustNotContain || [])) if (lc.includes(s.toLowerCase())) problems.push(`must NOT contain "${s}"`)
+    const ok = problems.length === 0
+    ok ? pass++ : fail++
+    console.log(`\n${ok ? '✅' : '❌'} [${c.cls}] ${c.q}`)
+    console.log(`   expected source: ${c.source}`)
+    console.log(`   A: ${reply.replace(/\n+/g, ' ').slice(0, 260)}`)
+    if (!ok) console.log(`   ✗ ${problems.join(' · ')}`)
   }
-  console.log('')
+  console.log(`\n${pass}/${pass + fail} live checks passed${fail ? ` · ${fail} to review` : ' · all green'}\n`)
 }
 
 if (process.argv.includes('--live')) runLive().catch(e => { console.error(e); process.exit(1) })
