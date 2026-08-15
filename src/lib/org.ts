@@ -104,6 +104,9 @@ export async function getSeatInfo(admin: SupabaseClient, orgId: string, ownerId:
   // (Stripe seat SKU); this app bills via PayPal so it's usually off → hide the broken add-seat flow.
   const planLabel = planEntitlements(planId).label
   const canUpgrade = nextPlan(planId) !== null
-  const purchasable = !!process.env.STRIPE_SECRET_KEY && !!process.env.STRIPE_PRICE_SEAT
+  // Paid extra seats aren't purchasable yet — billing runs on PayPal and the Stripe seat flow dead-ends
+  // ("Couldn't update seats"). Force OFF so the Team tab never shows a broken "+ Add seats" button; a
+  // single-seat plan (Creator) just says so. Flip this on when seat purchase is actually wired.
+  const purchasable = false
   return { used: (members || 0) + (pending || 0), limit: included + extra, planId, planLabel, included, extra, canUpgrade, purchasable }
 }

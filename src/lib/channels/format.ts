@@ -65,9 +65,11 @@ export function formatReport(brief: any, departments: DeptView[] = [], pending?:
   const live = departments.filter(d => d.live)
   const waitingCount = live.filter(d => d.status === 'waiting' || d.status === 'warning').length
 
+  // Time-aware greeting — was hardcoded "morning" (said "morning" at 5:52pm). Founder tz via BRIEF_TZ.
+  const greet = (() => { try { const hr = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: process.env.BRIEF_TZ || 'Asia/Karachi' }).format(new Date())); return hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : 'evening' } catch { return 'morning' } })()
   // ── Slack: the office board ──
   const blocks: any[] = [
-    { type: 'section', text: { type: 'mrkdwn', text: `🌙 *Overnight shift complete*${first ? ` — morning${first}` : ''}` } },
+    { type: 'section', text: { type: 'mrkdwn', text: `🌙 *Overnight shift complete*${first ? ` — good ${greet}${first}` : ''}` } },
     { type: 'divider' },
   ]
   // Status board — who's done, who's blocked, who's watching.
@@ -94,7 +96,7 @@ export function formatReport(brief: any, departments: DeptView[] = [], pending?:
 
   // ── WhatsApp: the urgent one-liner (office fits Slack, not a phone) ──
   const boardShort = live.map(d => `${d.emoji} ${STATUS[d.status]?.dot || ''}`).join('  ')
-  const waLines = [`🌙 Overnight shift done${first ? `, morning${first}` : ''}.`, boardShort]
+  const waLines = [`🌙 Overnight shift done${first ? `, good ${greet}${first}` : ''}.`, boardShort]
   if (pending) { const a = formatApproval(pending); waLines.push('', a.text) }
   else waLines.push('', waitingCount ? `${waitingCount} need you — open Selfmade.` : `All handled. Nothing needs you. 🌱`)
   const text = waLines.join('\n')

@@ -230,11 +230,15 @@ function LandingPages({ d }: { d: Spy }) {
       These fill in as the crawler captures each ad’s link. Re-spy or wait for the next crawl pass.
     </div>
   }
-  // thum.io renders the screenshot on demand (no stale WordPress "Generating Preview…" placeholder that
-  // mShots returns while it queues a job) AND honours a real mobile viewport — so Mobile actually shows
-  // the mobile layout instead of a scaled-down desktop shot.
-  const vp = device === 'desktop' ? { w: 1280, view: '1280x800' } : { w: 390, view: '390x844' }
-  const shot = sel ? `https://image.thum.io/get/width/${vp.w}/viewport/${vp.view}/${sel.fullUrl}` : ''
+  // microlink renders on demand AND actually emulates a mobile device (isMobile → mobile UA + viewport),
+  // so Mobile shows the real mobile layout, not a scaled-down desktop shot. (thum.io's viewport param is
+  // desktop-only unless on their paid tier, which is why Mobile looked identical to Desktop.)
+  const shot = sel ? (() => {
+    const vp = device === 'desktop'
+      ? 'viewport.width=1280&viewport.height=800'
+      : 'viewport.isMobile=true&viewport.width=390&viewport.height=844&viewport.deviceScaleFactor=2'
+    return `https://api.microlink.io/?url=${encodeURIComponent(sel.fullUrl)}&screenshot=true&meta=false&embed=screenshot.url&${vp}`
+  })() : ''
   useEffect(() => { setFailed(false) }, [shot])
   return (
     <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '380px 1fr', gap: 12 }}>
