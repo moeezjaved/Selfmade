@@ -13,7 +13,7 @@ interface Notif {
   ad_count: number; read_at: string | null; created_at: string
 }
 
-export function NotificationBell() {
+export function NotificationBell({ up = false }: { up?: boolean } = {}) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [items, setItems] = useState<Notif[]>([])
@@ -58,7 +58,7 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div style={{ position: 'absolute', top: 0, left: 'calc(100% + 12px)', width: 300, zIndex: 200, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 14px 36px rgba(0,0,0,0.20)', overflow: 'hidden' }}>
+        <div style={{ position: 'absolute', ...(up ? { bottom: 0 } : { top: 0 }), left: 'calc(100% + 12px)', width: 300, zIndex: 200, maxHeight: 'calc(100vh - 24px)', display: 'flex', flexDirection: 'column', background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 14px 36px rgba(0,0,0,0.20)', overflow: 'hidden' }}>
           <div style={{ padding: '12px 14px', borderBottom: '1px solid #f1f5f9', fontWeight: 700, fontSize: 14, color: '#111' }}>New ads from your brands</div>
           {items.length === 0 ? (
             <div style={{ padding: '26px 16px', textAlign: 'center', color: '#9ca3af', fontSize: 13, lineHeight: 1.5 }}>
