@@ -14,8 +14,15 @@ const TRUST = {
   poster: '/login-bg.jpg',
   rating: null as null | { score: string; source: string },
   soc2: true,
-  trustedByLabel: '',            // set once the "trusted by" brand logos are added below
-  trustedLogos: [] as { name: string; src?: string }[],
+  trustedByLabel: 'Trusted by 3,000+ teams',
+  trustedLogos: [
+    { name: 'Sevenly', src: '/logos/sevenly.svg' },
+    { name: 'Ridge', src: '/logos/ridge.svg' },
+    { name: 'Aura', src: '/logos/aura.svg' },
+    { name: 'PLAUD', src: '/logos/plaud.svg' },
+    { name: 'Virgin Teez', src: '/logos/virginteez.svg' },
+    { name: 'Ejad Labs', src: '/logos/ejadlabs.svg' },
+  ] as { name: string; src?: string }[],
   builtByLabel: 'Built by engineers from',
   builtByLogos: [
     { name: 'Meta', src: '/logos/meta.svg' },
