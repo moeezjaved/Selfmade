@@ -51,9 +51,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ...r, delivered: r.sent > 0 })
   }
 
-  // report — one founder line covers all brands, so label the section with the brand it's about.
+  // report — a SEPARATE brief per brand (each with its own brand header), matching the nightly cron.
+  // Sending one combined message for all brands was the bug; only an explicit ?brand= stays single.
   const meta = { email, full_name: user?.user_metadata?.full_name }
-  const brandId = body.brand || null
+  const explicitBrand = body.brand || null
+
+  if (!explicitBrand) {
+    const { data: brands } = await admin.from('brands').select('id, name').eq('user_id', userId).order('created_at', { ascending: true })
+    const list = (brands || []) as any[]
+    if (list.length > 1) {
+      let sent = 0
+      const results: any[] = []
+      for (const b of list) {
+        const brief = await assembleBrief(admin, userId, meta, { brandId: String(b.id) })
+        const r = await sendReportToChannels(admin, userId, brief, { brandId: String(b.id), brandLabel: b.name })
+        sent += r.sent || 0
+        results.push({ brand: b.name, sent: r.sent })
+      }
+      return NextResponse.json({ sent, delivered: sent > 0, perBrand: results })
+    }
+  }
+
+  // Single brand (explicit ?brand=) or a one-brand account → one message.
+  const brandId = explicitBrand
   let brandLabel: string | undefined
   if (brandId) {
     const { data: b } = await admin.from('brands').select('name').eq('id', String(brandId)).eq('user_id', userId).maybeSingle()

@@ -112,11 +112,11 @@ export default function CreatorsPage() {
             <label style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, color: MUTED, cursor: 'pointer' }}>
               <input type="checkbox" checked={emailOnly} onChange={e => setEmailOnly(e.target.checked)} /> Only with a public email
             </label>
-            <button onClick={find} disabled={finding} style={{ ...btnPrimary, opacity: finding ? 0.6 : 1 }}>{finding ? 'Searching…' : '🔍 Find creators'}</button>
+            <button onClick={find} disabled={finding || needsToken} style={{ ...btnPrimary, opacity: (finding || needsToken) ? 0.55 : 1, cursor: needsToken ? 'not-allowed' : 'pointer' }}>{needsToken ? '🔍 Find creators · Coming soon' : finding ? 'Searching…' : '🔍 Find creators'}</button>
           </div>
           {needsToken && (
-            <div style={{ marginTop: 12, fontSize: 12.5, color: '#9a6a12', background: '#fef6e7', border: '1px solid #f2e3c0', borderRadius: 10, padding: '9px 12px' }}>
-              Auto-discovery needs an <b>Apify</b> account. Add <code>APIFY_TOKEN</code> in Vercel and this turns on. Until then, add creators by hand below.
+            <div style={{ marginTop: 12, fontSize: 12.5, color: '#6b6a58', background: '#f7faf3', border: '1px solid #e6efdc', borderRadius: 10, padding: '9px 12px' }}>
+              🚧 <b>Auto-discovery is coming soon.</b> For now, paste creator handles below to add them by hand — Mello runs the whole outreach from there.
             </div>
           )}
           <div style={{ marginTop: 12, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
