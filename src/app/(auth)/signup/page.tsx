@@ -6,9 +6,10 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { isFreeEmail, emailDomain } from '@/lib/email-domains'
 import BusinessEmailModal from '@/components/BusinessEmailModal'
+import AuthShell from '@/components/AuthShell'
 import toast from 'react-hot-toast'
 
-const LIME = '#ff5a2c', INK = '#0e1b12'
+const INK = '#0e1b12'
 
 export default function SignupPage() {
   const router = useRouter()
@@ -16,10 +17,9 @@ export default function SignupPage() {
   const [form, setForm] = useState({ firstName: '', lastName: '', email: '', password: '' })
   const [show, setShow] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [bizModal, setBizModal] = useState<string | null>(null)   // email → show business-email popup
-  const [verifySent, setVerifySent] = useState(false)             // 'Confirm email' on → show check-inbox screen
+  const [bizModal, setBizModal] = useState<string | null>(null)
+  const [verifySent, setVerifySent] = useState(false)
 
-  // A blocked Google sign-in (personal email) bounces here with ?error=business_email — pop the modal.
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     if (p.get('error') === 'business_email') setBizModal(p.get('email') || '')
@@ -40,26 +40,17 @@ export default function SignupPage() {
       password: form.password,
       options: {
         data: { full_name: `${form.firstName} ${form.lastName}`.trim() },
-        // Where Supabase's verification link lands once 'Confirm email' is enabled (PKCE → our
-        // callback exchanges the code + sends the session cookie, then routes to onboarding).
         emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
       },
     })
     if (error) { toast.error(error.message); setLoading(false); return }
-    // Already-registered email: Supabase returns a "success" with an EMPTY identities array (email-
-    // enumeration protection) — no email is actually sent. Detect it and send them to log in instead
-    // of a fake "check your inbox" they'd wait on forever.
     if (data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0) {
       toast.error('That email is already registered — please log in instead.')
       setLoading(false)
       setTimeout(() => router.push(`/login?email=${encodeURIComponent(form.email.trim())}`), 1200)
       return
     }
-    // Fire the welcome email (best-effort, non-blocking).
     fetch('/api/auth/welcome', { method: 'POST' }).catch(() => {})
-    // If 'Confirm email' is ON in Supabase, signUp returns NO session → show a check-your-inbox
-    // screen instead of pushing into an app the user can't access yet. If OFF (current state),
-    // a session is returned → straight to onboarding (unchanged behaviour).
     if (!data.session) { setVerifySent(true); setLoading(false); return }
     router.push('/onboarding')
   }
@@ -67,64 +58,58 @@ export default function SignupPage() {
     await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } })
   }
 
-  if (verifySent) return (
-    <div style={S.page}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="Selfmade" style={{ height: 34, filter: 'brightness(0)', margin: '0 auto 24px', display: 'block' }} />
-      <div style={{ ...S.card, textAlign: 'center' }}>
-        <div style={{ fontSize: 40, marginBottom: 8 }}>📬</div>
-        <h1 style={S.h1}>Check your inbox</h1>
-        <p style={{ ...S.sub, marginBottom: 4 }}>We sent a verification link to</p>
-        <p style={{ fontWeight: 800, color: INK, marginBottom: 16 }}>{form.email.trim()}</p>
-        <p style={S.sub}>Click it to confirm your email and start remaking ads. Didn&apos;t get it? Check spam, or wait a minute and try again.</p>
-        <p style={{ ...S.legal, marginTop: 20 }}>Wrong email? <button onClick={() => setVerifySent(false)} style={{ ...S.link, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>Go back</button></p>
-      </div>
-    </div>
-  )
-
   return (
-    <div style={S.page}>
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src="/logo.png" alt="Selfmade" style={{ height: 34, filter: 'brightness(0)', margin: '0 auto 24px', display: 'block' }} />
-      <div style={S.card}>
-        <h1 style={S.h1}>Create your account</h1>
-        <p style={S.sub}>Free to start — 75 free credits, no card.</p>
+    <AuthShell maxWidth={460}>
+      {verifySent ? (
+        <div style={{ textAlign: 'center' }}>
+          <div style={{ fontSize: 40, marginBottom: 8 }}>📬</div>
+          <h1 style={S.h1}>Check your inbox</h1>
+          <p style={{ ...S.sub, marginBottom: 4 }}>We sent a verification link to</p>
+          <p style={{ fontWeight: 800, color: INK, marginBottom: 16 }}>{form.email.trim()}</p>
+          <p style={S.sub}>Click it to confirm your email and start remaking ads. Didn&apos;t get it? Check spam, or wait a minute and try again.</p>
+          <p style={{ ...S.legal, marginTop: 20 }}>Wrong email? <button onClick={() => setVerifySent(false)} style={{ ...S.link, background: 'none', border: 'none', cursor: 'pointer', padding: 0, font: 'inherit' }}>Go back</button></p>
+        </div>
+      ) : (
+        <>
+          <h1 style={S.h1}>Create your account</h1>
+          <p style={S.sub}>Free to start — 75 free credits, no card.</p>
 
-        <button onClick={handleGoogle} style={S.google}><GoogleIcon /> Continue with Google</button>
+          <button onClick={handleGoogle} style={S.google}><GoogleIcon /> Continue with Google</button>
+          <div style={S.divider}><span style={S.line} /><span style={S.or}>Or sign up with email</span><span style={S.line} /></div>
 
-        <div style={S.divider}><span style={S.line} /><span style={S.or}>Or sign up with email</span><span style={S.line} /></div>
-
-        <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <div>
-              <label style={S.label}>First name</label>
-              <input required value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} placeholder="Alex" style={S.input} />
+          <form onSubmit={handleSignup} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+              <div>
+                <label style={S.label}>First name</label>
+                <input required value={form.firstName} onChange={e => setForm({ ...form, firstName: e.target.value })} placeholder="Alex" style={S.input} />
+              </div>
+              <div>
+                <label style={S.label}>Last name</label>
+                <input required value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} placeholder="Johnson" style={S.input} />
+              </div>
             </div>
             <div>
-              <label style={S.label}>Last name</label>
-              <input required value={form.lastName} onChange={e => setForm({ ...form, lastName: e.target.value })} placeholder="Johnson" style={S.input} />
+              <label style={S.label}><span style={{ color: '#e11d48' }}>*</span> Business email</label>
+              <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@company.com"
+                style={{ ...S.input, borderColor: emailErr ? '#f0a3a3' : '#d7dbd7' }} />
+              {emailErr && <div style={S.err}>{emailErr}</div>}
             </div>
-          </div>
-          <div>
-            <label style={S.label}><span style={{ color: '#e11d48' }}>*</span> Business email</label>
-            <input type="email" required value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="you@company.com"
-              style={{ ...S.input, borderColor: emailErr ? '#f0a3a3' : '#d7dbd7' }} />
-            {emailErr && <div style={S.err}>{emailErr}</div>}
-          </div>
-          <div>
-            <label style={S.label}><span style={{ color: '#e11d48' }}>*</span> Password</label>
-            <div style={{ position: 'relative' }}>
-              <input type={show ? 'text' : 'password'} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min. 8 characters" style={S.input} />
-              <button type="button" onClick={() => setShow(s => !s)} style={S.eye} aria-label="Toggle password">{show ? '🙈' : '👁'}</button>
+            <div>
+              <label style={S.label}><span style={{ color: '#e11d48' }}>*</span> Password</label>
+              <div style={{ position: 'relative' }}>
+                <input type={show ? 'text' : 'password'} required value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="Min. 8 characters" style={S.input} />
+                <button type="button" onClick={() => setShow(s => !s)} style={S.eye} aria-label="Toggle password">{show ? '🙈' : '👁'}</button>
+              </div>
             </div>
-          </div>
-          <button type="submit" disabled={loading || !!emailErr} style={{ ...S.submit, opacity: (loading || !!emailErr) ? .6 : 1 }}>{loading ? 'Creating account…' : 'Create account'}</button>
-        </form>
-      </div>
-      <p style={S.legal}>Already have an account? <Link href="/login" style={S.link}>Log in</Link></p>
-      <p style={{ ...S.legal, marginTop: 6 }}>By signing up, you agree to our <Link href="/terms" style={S.link}>Terms</Link> &amp; <Link href="/privacy" style={S.link}>Privacy Policy</Link></p>
+            <button type="submit" disabled={loading || !!emailErr} style={{ ...S.submit, opacity: (loading || !!emailErr) ? .6 : 1 }}>{loading ? 'Creating account…' : 'Create account'}</button>
+          </form>
+
+          <p style={S.legal}>Already have an account? <Link href="/login" style={S.link}>Log in</Link></p>
+          <p style={{ ...S.legal, marginTop: 6 }}>By signing up, you agree to our <Link href="/terms" style={S.link}>Terms</Link> &amp; <Link href="/privacy" style={S.link}>Privacy Policy</Link></p>
+        </>
+      )}
       {bizModal !== null && <BusinessEmailModal email={bizModal} onClose={() => setBizModal(null)} />}
-    </div>
+    </AuthShell>
   )
 }
 
@@ -133,8 +118,6 @@ function GoogleIcon() {
 }
 
 const S: Record<string, React.CSSProperties> = {
-  page: { minHeight: '100vh', background: '#f6f7f5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 20px', fontFamily: "'Inter', -apple-system, sans-serif" },
-  card: { width: '100%', maxWidth: 460, background: '#fff', border: '1px solid #ececec', borderRadius: 20, boxShadow: '0 10px 40px rgba(14,27,18,.06)', padding: '34px 32px' },
   h1: { fontSize: 25, fontWeight: 800, color: '#111', textAlign: 'center', margin: '0 0 6px', letterSpacing: '-.02em' },
   sub: { fontSize: 13.5, color: '#6b7280', textAlign: 'center', margin: '0 0 22px' },
   google: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, background: '#fff', border: '1px solid #dcdfdc', borderRadius: 12, padding: '12px', fontSize: 15, fontWeight: 700, color: '#111', cursor: 'pointer', fontFamily: 'inherit' },
