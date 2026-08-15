@@ -69,7 +69,7 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
 
           <div style={{ position: 'relative', zIndex: 2, display: 'flex', flexDirection: 'column', gap: 18 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1) drop-shadow(0 2px 10px rgba(0,0,0,.55))' }} />
+            <img src="/selfmade-wordmark-cream.png" alt="Selfmade" style={{ height: 30, filter: 'drop-shadow(0 2px 10px rgba(0,0,0,.5))' }} />
             {(TRUST.rating || TRUST.soc2) && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
                 {TRUST.rating && (
@@ -88,17 +88,17 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
             )}
           </div>
 
-          <div style={{ position: 'relative', zIndex: 2, maxWidth: 520 }}>
+          <div style={{ position: 'relative', zIndex: 2, maxWidth: 540 }}>
             {t && (
-              <>
-                <p style={{ fontSize: 22, lineHeight: 1.4, fontWeight: 600, letterSpacing: '-.01em', margin: 0, textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>“{t.quote}”</p>
-                <div style={{ marginTop: 16, fontSize: 14 }}><b>{t.name}</b><span style={{ opacity: .82 }}> — {t.role}</span></div>
-                <div style={{ display: 'flex', gap: 6, marginTop: 16 }}>
+              <div style={{ background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.20)', backdropFilter: 'blur(10px)', WebkitBackdropFilter: 'blur(10px)', borderRadius: 18, padding: '22px 24px', textShadow: 'none' }}>
+                <p style={{ color: '#fff', fontSize: 20, lineHeight: 1.45, fontWeight: 600, letterSpacing: '-.01em', margin: 0 }}>“{t.quote}”</p>
+                <div style={{ marginTop: 14, fontSize: 14, color: '#fff' }}><b>{t.name}</b><span style={{ opacity: .85 }}> — {t.role}</span></div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 14 }}>
                   {TRUST.testimonials.map((_, i) => (
-                    <span key={i} onClick={() => setTi(i)} style={{ width: i === ti ? 22 : 7, height: 7, borderRadius: 6, background: i === ti ? '#fff' : 'rgba(255,255,255,.5)', cursor: 'pointer', transition: 'width .2s' }} />
+                    <span key={i} onClick={() => setTi(i)} style={{ width: i === ti ? 22 : 7, height: 7, borderRadius: 6, background: i === ti ? '#fff' : 'rgba(255,255,255,.45)', cursor: 'pointer', transition: 'width .2s' }} />
                   ))}
                 </div>
-              </>
+              </div>
             )}
           </div>
 
@@ -124,11 +124,15 @@ export default function AuthShell({ children, maxWidth = 400 }: { children: Reac
 function LogoRow({ label, logos }: { label: string; logos: { name: string; src?: string }[] }) {
   return (
     <div>
-      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', opacity: .7, marginBottom: 10 }}>{label}</div>
-      <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', alignItems: 'center' }}>
-        {logos.map(l => l.src
-          ? (/* eslint-disable-next-line @next/next/no-img-element */ <img key={l.name} src={l.src} alt={l.name} style={{ height: 22, opacity: .95, filter: 'brightness(0) invert(1) drop-shadow(0 1px 6px rgba(0,0,0,.6))' }} />)
-          : <span key={l.name} style={{ fontSize: 14, fontWeight: 800, opacity: .9 }}>{l.name}</span>)}
+      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', opacity: .75, marginBottom: 10 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        {logos.map(l => (
+          <div key={l.name} style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', height: 40, padding: '0 16px', background: 'rgba(255,255,255,0.10)', border: '1px solid rgba(255,255,255,0.22)', borderRadius: 12, backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+            {l.src
+              ? (/* eslint-disable-next-line @next/next/no-img-element */ <img src={l.src} alt={l.name} style={{ height: 17, filter: 'brightness(0) invert(1)' }} />)
+              : <span style={{ fontSize: 13.5, fontWeight: 800, color: '#fff' }}>{l.name}</span>}
+          </div>
+        ))}
       </div>
     </div>
   )
