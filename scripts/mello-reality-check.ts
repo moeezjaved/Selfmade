@@ -128,6 +128,7 @@ const LIVE_MATRIX: LiveCheck[] = [
   { cls: 'competitor', q: 'who am I watching?', source: 'followed_brands', mustContainAny: ['watch'] },
   { cls: 'competitor', q: 'Look at the messaging angles my competitors are running and tell me which ones I am not testing yet', source: 'discovery_ads_index (page_id)', mustNotContain: ['no active ads currently running', 'you have no competitors'] },
   { cls: 'competitor', q: 'Compare my offer (pricing, guarantee, bundle, shipping) against competitors', source: 'competitor pipeline', mustNotContain: ['go full-time', '$49/mo and unlocks'] },
+  { cls: 'competitor', q: 'can you give me fum winning ads video script', source: 'discovery_ads_index (competitor-name override, not own-account audit)', mustNotContain: ['no active campaigns', 'nothing to tune', 'roy 1', 'launch one'] },
   // Campaign status
   { cls: 'campaign', q: 'how many active campaigns do I have?', source: 'Meta Ads audit / Integrations', mustContainAny: ['campaign', 'connect', 'no active'] },
   { cls: 'campaign', q: 'which campaigns are running right now?', source: 'Meta Ads audit', mustContainAny: ['campaign', 'connect', 'no active', 'scaling', 'pause'] },

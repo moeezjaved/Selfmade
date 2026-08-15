@@ -45,6 +45,25 @@ export async function answerGrounded(
   let ctx: MelloContext | null = opts?.ctx || null
   if (!ctx) { try { const { loadMelloContext } = await import('@/lib/mello/context'); ctx = await loadMelloContext(admin, userId, brandId) } catch { /* fail-soft: state-blind fallbacks below */ } }
 
+  // State-aware competitor override: classifyIntent is regex-only and can't know the user's competitor
+  // NAMES, so "give me <competitor> winning ad scripts" was misrouted to ads_metric and audited the
+  // user's OWN account instead of the rival's ads. If the message names a competitor we actually track
+  // (diacritic-insensitive, matched on the name's first significant token so "fum" hits "Füm - The Good
+  // Habit"), treat it as a competitor question — unless it's explicitly about the user's own account.
+  let effIntent = intent
+  try {
+    if (ctx?.competitors?.length && effIntent !== 'product_help' && effIntent !== 'company_memory') {
+      const norm = (s: string) => s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '')
+      const qn = norm(q)
+      const ownAccount = /\b(my|our|mine)\b/.test(q.toLowerCase()) && /\b(account|campaign|spend|roas|cpa|cpc|cpm|ctr|revenue|budget|ads?)\b/.test(q.toLowerCase())
+      const named = ctx.competitors.some(c => {
+        const first = norm(c.name).split(/[\s\-–—:.,]+/).filter(Boolean)[0]
+        return first && first.length >= 3 && new RegExp(`\\b${first.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(qn)
+      })
+      if (named && !ownAccount) effIntent = 'competitor'
+    }
+  } catch { /* keep regex intent */ }
+
   // 1 · TEACH a belief (company_memory intent, statement form)
   if (!item && intent === 'company_memory' && TEACH.test(q) && !q.includes('?')) {
     try {
@@ -140,7 +159,7 @@ export async function answerGrounded(
   }
 
   // 3 · competitor identity / list — instant, straight from data
-  if (intent === 'competitor') {
+  if (effIntent === 'competitor') {
     const asksList = /\b(name|names|list|who|which|what)\b/i.test(q) && q.length < 90
     if (watchCount === 0 && (/\bwho\b/i.test(q) || asksList)) {
       return { handled: true, intent, sources: ['Watched brands'], reply: `You're not watching any competitors yet — add one from Discovery → Spy a brand, and I'll track every ad they launch and pull the patterns into your brief.` }
@@ -162,7 +181,7 @@ export async function answerGrounded(
 
   // 4 · ads / metric question → the grounded audit (the SAME auditAccount the brief uses). Provenance +
   // no-guess handled inside answerAdsQuestion.
-  if (intent === 'ads_metric') {
+  if (effIntent === 'ads_metric') {
     try {
       const { answerAdsQuestion } = await import('@/lib/meta/answer')
       const ads = await answerAdsQuestion(admin, userId, q, { brandId })   // pass the SAME brand the brief uses
@@ -180,6 +199,7 @@ export async function answerGrounded(
     } catch { /* fall through */ }
   }
 
-  // Not grounded here — escalate to the agent with brand-scoped context.
-  return { handled: false, intent, brandId, watchLine }
+  // Not grounded here — escalate to the agent with brand-scoped context. Use effIntent so a competitor
+  // named in the message (that regex-routing missed) carries competitor context into the agent prompt.
+  return { handled: false, intent: effIntent, brandId, watchLine }
 }
