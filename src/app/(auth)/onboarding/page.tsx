@@ -409,12 +409,20 @@ export default function InterviewPage() {
         product_images: (detect?.productImages?.length ? detect.productImages : detect?.images || []).slice(0, 4),
         brand_kit: detect?.brandKit || undefined,
       }
-      const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).then(x => x.json()).catch(() => null)
+      const resp = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null)
+      let r: any = null; try { r = resp ? await resp.json() : null } catch { /* non-json */ }
       if (r?.brand?.id) {
         brandIdRef.current = r.brand.id
         // Make the just-created brand the ACTIVE project so the brief + every surface scope to it. Essential
         // when onboarding an Nth brand (?new=1) — otherwise the app stays on the previous brand.
         try { document.cookie = `sf_brand=${r.brand.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax` } catch { /* ignore */ }
+      } else if (resp && !resp.ok) {
+        // The brand create FAILED (e.g. 402 brand_limit_reached). This used to be swallowed silently —
+        // onboarding finished and the user landed on /brief with NO brand created. Surface it instead so
+        // the failure is never invisible (the durable limit fix is server-side / plan-data).
+        const limitMsg = `You've reached your plan's brand limit${typeof r?.limit === 'number' ? ` (${r.limit})` : ''}. Upgrade in Billing to add another brand.`
+        const msg = r?.error === 'brand_limit_reached' ? (r?.message || limitMsg) : (r?.message || "We couldn't create that brand — please try again in a moment.")
+        try { alert(msg) } catch { /* ignore */ }
       }
     } catch { /* brand save is best-effort — the interview notes survive regardless */ }
     note('fact', `Hired on ${new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} — agreement signed by ${signName.trim()}.`)
