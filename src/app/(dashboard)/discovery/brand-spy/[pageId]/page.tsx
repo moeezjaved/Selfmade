@@ -315,11 +315,26 @@ function useBrandAds(pageId: string, opts: { days: number; format: string; statu
 }
 
 const fmtDate = (s: string | null) => (s ? new Date(s).toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' }) : '—')
-const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
+const FMT_BADGE: Record<string, string> = { Video: '#2075ff', Image: '#ef4a1e', 'Carousel/DCO': '#f59e0b' }
+
+// Meta catalog / Advantage+ (DCO) ads store template tokens like {{product.brand}} as their copy and
+// have NO single static image — the picture is picked from the product catalog per viewer, so the Ad
+// Library shows none. Detect these + clean the placeholder text so cards don't leak raw tokens.
+const DCO_RE = /\{\{\s*product\.[a-z_]+\s*\}\}/i
+const cleanCopy = (s: string | null, brand?: string | null): string | null => {
+  if (!s) return s
+  const c = s.replace(/\{\{\s*product\.brand\s*\}\}/gi, brand || '')
+             .replace(/\{\{\s*product\.[a-z_]+\s*\}\}/gi, '')
+             .replace(/\s{2,}/g, ' ').trim()
+  return c || null
+}
 
 function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; onClone?: (a: Card) => void }) {
   const isVideo = (a.format || '').toLowerCase().includes('video') || !!a.videoUrl
   const img = a.thumbnailUrl
+  const [imgFailed, setImgFailed] = useState(false)   // raw Meta CDN URL expired → degrade to placeholder
+  const dco = DCO_RE.test(a.body || '')               // dynamic catalog ad → no static image by design
+  const copy = cleanCopy(a.body, a.pageName)
   return (
     <div onClick={() => onOpen(a)} style={{ textAlign: 'left', background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', padding: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
@@ -328,16 +343,19 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
         <span style={{ fontSize: 11, fontWeight: 700, color: a.isActive ? '#ef4a1e' : '#9ca3af' }}>{a.isActive ? '● Live' : 'Off'}</span>
       </div>
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(a.startDate)}{a.isActive ? ' – Present' : a.stopDate ? ` – ${fmtDate(a.stopDate)}` : ''}</div>
-      {a.body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{a.body.slice(0, 120)}</div>}
+      {(copy || dco) && <div style={{ fontSize: 12, color: dco && !copy ? '#9ca3af' : '#374151', fontStyle: dco && !copy ? 'italic' : 'normal', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{copy ? copy.slice(0, 120) : 'Dynamic catalog ad — copy & image vary per shopper.'}</div>}
       <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
         {/* Video → Motion-style hover-scrub + lime play/progress ring (parity with Discovery). Loads
             the video lazily on hover, so nothing downloads until the user engages. Falls back to the
             poster if the source is dead/expired. Non-video (or missing src) → static poster. */}
         {a.videoUrl
           ? <HoverScrubVideo src={a.videoUrl} poster={img || undefined} initials={(a.pageName || '?').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)} />
-          : img
-            ? <img src={img} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
+          : img && !imgFailed
+            ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#b3b3b3', fontSize: 11.5, gap: 5, padding: 16, textAlign: 'center' }}>
+                <span style={{ fontSize: 20, opacity: .6 }}>{dco ? '🛍️' : '🖼️'}</span>
+                {dco ? 'Dynamic catalog ad' : 'Preview not captured yet'}
+              </div>}
         {isVideo && !a.videoUrl && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
         <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
         {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
