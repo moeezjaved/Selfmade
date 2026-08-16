@@ -498,13 +498,13 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
   const visible = showAll ? creatives : creatives.slice(0, 2)
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={{ ...CARD, overflow: 'hidden' }}>
+      <div style={{ padding: '15px 20px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#141d15' }}>🎯 Creative × Audience Intelligence</div>
-          <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 1 }}>Which audiences Meta serves each creative to — click any row to expand</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT }}>Creative × Audience Intelligence</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Which audiences Meta serves each creative to — click any row to expand</div>
         </div>
-        {!loading && creatives.length > 0 && <div style={{ fontSize: 10, fontWeight: 700, color: '#8b8a72', background: '#f4f0e6', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} creatives</div>}
+        {!loading && creatives.length > 0 && <div style={{ fontSize: 10.5, fontWeight: 750, color: FAINT, background: '#f5f8f2', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} creatives</div>}
       </div>
 
       {loading ? (
