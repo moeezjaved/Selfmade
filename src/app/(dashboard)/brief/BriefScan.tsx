@@ -149,6 +149,20 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
       .then(j => { if (Array.isArray(j?.connected)) setConnectedChannels(j.connected.filter((c: any) => c.kind === 'founder').map((c: any) => String(c.provider))) })
       .catch(() => {})
   }, [])
+  // Is Meta actually connected FOR THIS BRAND? The promo card below shows when there's no audit yet — but
+  // that's true both when nothing is connected AND when it's connected-but-not-audited. Read the real
+  // per-brand connection (source of truth) so a not-connected user sees "Connect Meta", not "Run ads".
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!canLaunch) { setMetaConnected(false); return }
+    let cancelled = false
+    fetch('/api/meta/accounts').then(r => r.ok ? r.json() : null).then(j => {
+      if (cancelled) return
+      const accts = Array.isArray(j?.accounts) ? j.accounts : (Array.isArray(j) ? j : [])
+      setMetaConnected(accts.length > 0)
+    }).catch(() => { if (!cancelled) setMetaConnected(null) })
+    return () => { cancelled = true }
+  }, [canLaunch, activeBrandId])
   const playbook = brief.items.find(i => i.kind === 'market_playbook' && i.playbook) || null
   const metaAds = brief.items.find(i => i.kind === 'meta_ads' && i.metaAudit) || null
   const hero = brief.headline || brief.items.find(i => i.kind !== 'market_playbook' && i.kind !== 'meta_ads') || null
@@ -240,11 +254,15 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
           ) : (
             <div className="bsx-e" style={{ ...card, background: FOREST, padding: '20px 24px', marginBottom: 24, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', animationDelay: '.34s' }}>
               <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>Run your ads on Meta</div>
-                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{canLaunch ? 'Launch, scale, and manage campaigns from here — Mello audits them every morning.' : 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'}</div>
+                <div style={{ fontSize: 16.5, fontWeight: 800, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3 }}>{canLaunch && metaConnected === false ? 'Connect Meta to run your ads' : 'Run your ads on Meta'}</div>
+                <div style={{ fontSize: 13.5, color: '#b8c4b4', lineHeight: 1.5, marginTop: 3 }}>{
+                  !canLaunch ? 'Connecting a Meta ad account is a Creator feature — upgrade to launch, scale and get the morning audit.'
+                  : metaConnected === false ? 'Connect your Meta ad account (60 seconds) — then Mello audits your campaigns every morning and tells you exactly what to scale or pause.'
+                  : 'Launch, scale, and manage campaigns from here — Mello audits them every morning.'
+                }</div>
               </div>
-              {/* Meta is a paid feature — Free users are sent to upgrade, not into an OAuth flow that dead-ends. */}
-              <Link href={canLaunch ? '/m4' : '/billing'} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{canLaunch ? 'Run ads →' : 'Upgrade to Creator →'}</Link>
+              {/* State-true CTA: Free → upgrade; Creator + not connected → connect; Creator + connected → run. */}
+              <Link href={!canLaunch ? '/billing' : metaConnected === false ? '/connect/meta' : '/m4'} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{!canLaunch ? 'Upgrade to Creator →' : metaConnected === false ? 'Connect Meta →' : 'Run ads →'}</Link>
             </div>
           )}
 
