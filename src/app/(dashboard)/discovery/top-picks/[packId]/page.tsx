@@ -117,7 +117,7 @@ export default function PackDetailPage({ params }: { params: Promise<{ packId: s
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{ad.pageName}</div>
                 {(ad.startDate) && <div style={{ fontSize: 11, color: '#9ca3af' }}>{fmtDate(ad.startDate)}{ad.stopDate ? ` – ${fmtDate(ad.stopDate)}` : ''}</div>}
               </div>
-              {ad.isActive && <span title="Active" style={{ width: 7, height: 7, borderRadius: '50%', background: '#22c55e', flexShrink: 0 }} />}
+              {ad.isActive && <span title="Active" style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4a1e', flexShrink: 0 }} />}
             </div>
             {/* Copy snippet */}
             {ad.body && <div style={{ fontSize: 12.5, color: '#374151', lineHeight: 1.45, padding: '0 12px 10px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ad.body}</div>}
@@ -195,7 +195,7 @@ function AdCopyModal({ packId, ad, onClose }: { packId: string; ad: Ad; onClose:
                 <div key={i} style={{ border: '1px solid #e5e7eb', borderRadius: 10, padding: 14 }}>
                   <div style={{ fontSize: 14, fontWeight: 800, color: '#111', marginBottom: 6 }}>{v.hook}</div>
                   <div style={{ fontSize: 13, color: '#374151', lineHeight: 1.5, marginBottom: 10 }}>{v.body}</div>
-                  <button onClick={() => copy(i, v)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: copied === i ? '#dcfce7' : DARK, color: copied === i ? '#166534' : LIME, border: 'none', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
+                  <button onClick={() => copy(i, v)} style={{ display: 'flex', alignItems: 'center', gap: 6, background: copied === i ? '#fdeee7' : DARK, color: copied === i ? '#9a3412' : LIME, border: 'none', borderRadius: 7, padding: '6px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>
                     {copied === i ? <><Check size={13} /> Copied</> : <><Copy size={13} /> Copy</>}
                   </button>
                 </div>

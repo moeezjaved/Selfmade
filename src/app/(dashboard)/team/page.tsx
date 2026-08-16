@@ -84,7 +84,7 @@ export default function TeamPage() {
         <div style={{ fontSize: 26, fontWeight: 800 }}>{d.seats.used}<span style={{ color: '#9ca3af', fontWeight: 600 }}>/{d.seats.limit}</span></div>
         <div style={{ flex: 1, fontSize: 13.5, color: '#6b7280' }}>
           seats used — your {d.seats.planLabel} plan includes {d.seats.included} seat{d.seats.included === 1 ? '' : 's'}
-          {d.seats.extra > 0 && <span style={{ color: '#166534' }}> · +{d.seats.extra} paid</span>}
+          {d.seats.extra > 0 && <span style={{ color: '#9a3412' }}> · +{d.seats.extra} paid</span>}
         </div>
         {canManage && d.seats.canUpgrade && (
           <a href="/pricing" style={{ background: INK, color: '#fff', padding: '8px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Upgrade plan</a>
@@ -120,7 +120,7 @@ export default function TeamPage() {
               )}
             </>
           )}
-          {msg && <div style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith('✓') ? '#16a34a' : '#dc2626', marginTop: 8 }}>{msg}</div>}
+          {msg && <div style={{ fontSize: 13, fontWeight: 600, color: msg.startsWith('✓') ? '#ef4a1e' : '#dc2626', marginTop: 8 }}>{msg}</div>}
         </div>
       )}
 
@@ -136,7 +136,7 @@ export default function TeamPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px' }}>
             <div style={{ flex: 1, fontSize: 14, fontWeight: 600 }}>{m.email}{m.isYou ? ' (you)' : ''}</div>
             {scopable && <span title="Ad accounts this member can see" style={{ fontSize: 11.5, fontWeight: 700, color: m.allAccounts ? '#6b7280' : '#1e40af', background: m.allAccounts ? '#f3f4f6' : '#dbeafe', padding: '2px 9px', borderRadius: 20 }}>📊 {acctLabel}</span>}
-            <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 9px', borderRadius: 20, background: m.role === 'owner' ? '#dcfce7' : m.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: m.role === 'owner' ? '#166534' : m.role === 'admin' ? '#1e40af' : '#374151', textTransform: 'capitalize' }}>{m.role}</span>
+            <span style={{ fontSize: 11.5, fontWeight: 800, padding: '2px 9px', borderRadius: 20, background: m.role === 'owner' ? '#fdeee7' : m.role === 'admin' ? '#dbeafe' : '#f3f4f6', color: m.role === 'owner' ? '#9a3412' : m.role === 'admin' ? '#1e40af' : '#374151', textTransform: 'capitalize' }}>{m.role}</span>
             {canManage && scopable && <button onClick={() => editing ? setAcctFor(null) : openAccts(m)} style={{ background: 'none', border: '1px solid #d1d5db', color: '#374151', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{editing ? 'Close' : 'Accounts'}</button>}
             {canManage && m.role !== 'owner' && !m.isYou && <button onClick={() => remove(m.id)} style={{ background: 'none', border: '1px solid #fecaca', color: '#dc2626', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Remove</button>}
           </div>
@@ -164,7 +164,7 @@ export default function TeamPage() {
           {d.invites.map(i => (
             <div key={i.id} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 14px', border: '1px dashed #e5e7eb', borderRadius: 10, marginBottom: 8, background: '#fcfdfb' }}>
               <div style={{ flex: 1, fontSize: 14 }}>{i.email} <span style={{ color: '#9ca3af', textTransform: 'capitalize' }}>· {i.role}</span></div>
-              <span onClick={() => copy(i.link, i.id)} style={{ fontSize: 12, fontWeight: 700, color: '#16a34a', cursor: 'pointer' }}>{copied === i.id ? 'copied ✓' : 'copy invite link'}</span>
+              <span onClick={() => copy(i.link, i.id)} style={{ fontSize: 12, fontWeight: 700, color: '#ef4a1e', cursor: 'pointer' }}>{copied === i.id ? 'copied ✓' : 'copy invite link'}</span>
               {canManage && <button onClick={() => revoke(i.id)} style={{ background: 'none', border: '1px solid #e5e7eb', color: '#6b7280', padding: '5px 11px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Revoke</button>}
             </div>
           ))}

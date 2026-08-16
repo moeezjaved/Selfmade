@@ -124,7 +124,7 @@ export default function McpPage() {
           <div style={{ background: '#fbfdfa', border: '1px solid #eef0ee', borderRadius: 14, padding: 16, marginBottom: 14 }}>
             <div style={{ fontSize: 12, fontWeight: 800, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6 }}>Server URL</div>
             <code style={{ fontSize: 14 }}>{url}</code>
-            <span onClick={() => copy(url, 'url')} style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: '#16a34a', cursor: 'pointer' }}>{copied === 'url' ? 'copied ✓' : 'copy'}</span>
+            <span onClick={() => copy(url, 'url')} style={{ marginLeft: 10, fontSize: 12, fontWeight: 700, color: '#ef4a1e', cursor: 'pointer' }}>{copied === 'url' ? 'copied ✓' : 'copy'}</span>
           </div>
 
           {/* Generate key */}
@@ -173,7 +173,7 @@ export default function McpPage() {
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontWeight: 700, fontSize: 14 }}>{k.label}</div>
                     <code style={{ fontSize: 12, color: '#6b7280' }}>{k.token.slice(0, 14)}…{k.token.slice(-4)}</code>
-                    <span onClick={() => copy(k.token, k.id)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#16a34a', cursor: 'pointer' }}>{copied === k.id ? 'copied ✓' : 'copy'}</span>
+                    <span onClick={() => copy(k.token, k.id)} style={{ marginLeft: 8, fontSize: 11, fontWeight: 700, color: '#ef4a1e', cursor: 'pointer' }}>{copied === k.id ? 'copied ✓' : 'copy'}</span>
                   </div>
                   <button onClick={() => revoke(k.id)} style={{ background: 'none', border: '1px solid #fecaca', color: '#dc2626', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Revoke</button>
                 </div>

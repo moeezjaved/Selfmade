@@ -226,7 +226,7 @@ function DashboardPage() {
   }
   const healthScore = calcHealthScore()
   const healthLabel = healthScore >= 80 ? 'Excellent' : healthScore >= 60 ? 'Good' : healthScore >= 40 ? 'Fair' : 'Needs work'
-  const healthColor = healthScore >= 80 ? '#2d7a2d' : healthScore >= 60 ? '#b8860b' : healthScore >= 40 ? '#d97706' : '#c0392b'
+  const healthColor = healthScore >= 80 ? '#ef4a1e' : healthScore >= 60 ? '#b8860b' : healthScore >= 40 ? '#d97706' : '#c0392b'
 
   // Deltas require a prior-period comparison we don't compute yet — show the KPI value only, never a
   // fabricated change. (Previously these were hardcoded +12% / +0.8× / -$2.10 / -0.2% / +34 fakes.)
@@ -415,7 +415,7 @@ function DashboardPage() {
                       <div style={{fontSize:11,color:"#8b8a72",marginTop:2}}>{w.campaignName}</div>
                     </div>
                     <div style={{display:"flex",alignItems:"center",gap:8}}>
-                      <span style={{background:"rgba(45,122,45,0.1)",border:"1px solid rgba(45,122,45,0.2)",color:"#2d7a2d",padding:"3px 10px",borderRadius:100,fontSize:11,fontWeight:700}}>
+                      <span style={{background:"rgba(45,122,45,0.1)",border:"1px solid rgba(45,122,45,0.2)",color:"#ef4a1e",padding:"3px 10px",borderRadius:100,fontSize:11,fontWeight:700}}>
                         🏆 {w.roas?.toFixed(2)}x ROAS
                       </span>
                       <Link href="/insights" style={{background:"#141d15",color:"#ff5a2c",padding:"5px 14px",borderRadius:100,fontSize:11,fontWeight:800,textDecoration:"none"}}>
@@ -423,7 +423,7 @@ function DashboardPage() {
                       </Link>
                     </div>
                   </div>
-                  <div style={{fontSize:12,color:"#6b8f6b",background:"#f4f0e6",borderLeft:"3px solid #2d7a2d",padding:"8px 12px",borderRadius:"0 8px 8px 0"}}>
+                  <div style={{fontSize:12,color:"#6b8f6b",background:"#f4f0e6",borderLeft:"3px solid #ef4a1e",padding:"8px 12px",borderRadius:"0 8px 8px 0"}}>
                     {w.recommendation}
                   </div>
                 </div>

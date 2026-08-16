@@ -103,7 +103,7 @@ export default function ConnectMetaByo() {
   const cardS: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 20px', marginBottom: 14 }
   const btnS: React.CSSProperties = { background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 8 }
   const pickRow = (a: Acct, on: boolean, toggle: (c: boolean) => void) => (
-    <label key={a.account_id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, border: `1px solid ${on ? '#a8cf6f' : LINE}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 10, padding: '9px 12px', cursor: 'pointer' }}>
+    <label key={a.account_id} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 13.5, border: `1px solid ${on ? '#f6b9a3' : LINE}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 10, padding: '9px 12px', cursor: 'pointer' }}>
       <input type="checkbox" checked={on} onChange={(e) => toggle(e.target.checked)} />
       <span style={{ fontWeight: 700 }}>{a.name}</span>
       <span style={{ color: MUTED, fontSize: 12 }}>act_{a.account_id} · {a.currency}{a.active ? '' : ' · inactive'}</span>

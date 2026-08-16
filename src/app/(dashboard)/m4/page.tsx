@@ -269,7 +269,7 @@ function M4Inner() {
   }
   const STEPS: Step[] = ['welcome','pixel','creatives','retargeting','interests','budget','review','grades']
   const gc: Record<string,{bg:string,border:string,color:string}> = {
-    GRADUATE:{bg:'rgba(134,239,172,.08)',border:'rgba(134,239,172,.25)',color:'#2d7a2d'},
+    GRADUATE:{bg:'rgba(239,74,30,.08)',border:'rgba(239,74,30,.25)',color:'#ef4a1e'},
     HOLD:{bg:'rgba(251,191,36,.08)',border:'rgba(251,191,36,.2)',color:'#fbbf24'},
     CATCHY_NOT_CONVERTING:{bg:'rgba(248,113,113,.08)',border:'rgba(248,113,113,.2)',color:'#c0392b'},
     PAUSE_POOR:{bg:'rgba(248,113,113,.06)',border:'rgba(248,113,113,.15)',color:'#c0392b'},
@@ -548,7 +548,7 @@ function M4Inner() {
             <div key={c.id} style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f5f9f3',border:'1px solid rgba(0,0,0,0.07)'}}>
               <div style={{width:26,height:26,borderRadius:7,background:'rgba(255,90,44,0.1)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,fontWeight:800,color:'#141d15',flexShrink:0}}>A{i+1}</div>
               <input value={c.name} onChange={e=>setter(prev=>prev.map(x=>x.id===c.id?{...x,name:e.target.value}:x))} style={{flex:1,background:'none',border:'none',color:'#141d15',fontSize:13,fontFamily:'inherit',outline:'none'}}/>
-              <span style={{fontSize:11,color:c.uploaded?'#2d7a2d':c.uploading?'#b8860b':'#8b8a72'}}>{c.uploading?'⏳ Uploading…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'Video':'Image'}</span>
+              <span style={{fontSize:11,color:c.uploaded?'#ef4a1e':c.uploading?'#b8860b':'#8b8a72'}}>{c.uploading?'⏳ Uploading…':c.uploaded?'✅ Uploaded to Meta':c.type==='video'?'Video':'Image'}</span>
               <button onClick={()=>setter(prev=>prev.filter(x=>x.id!==c.id))} style={{background:'none',border:'none',color:'#8b8a72',cursor:'pointer',fontSize:16,padding:0}}>x</button>
             </div>
           ))}
@@ -580,13 +580,13 @@ function M4Inner() {
           <div style={{position:'absolute',top:0,left:'20%',right:'20%',height:'1.5px',background:'linear-gradient(90deg,transparent,#ff5a2c,transparent)'}}/>
           {prefilled&&(
             <div style={{background:'rgba(45,122,45,0.08)',border:'1px solid rgba(45,122,45,0.25)',borderRadius:14,padding:'13px 18px',marginBottom:20,fontSize:13.5,color:'#141d15',lineHeight:1.6}}>
-              <strong style={{color:'#2d7a2d'}}>Your approved ad is loaded.</strong> It&rsquo;s already attached in the Creatives step — walk through setup, set your budget, and confirm to go live. Nothing spends until you do.
+              <strong style={{color:'#ef4a1e'}}>Your approved ad is loaded.</strong> It&rsquo;s already attached in the Creatives step — walk through setup, set your budget, and confirm to go live. Nothing spends until you do.
             </div>
           )}
           <h2 style={{fontSize:24,fontWeight:900,color:'#141d15',marginBottom:8}}>The complete M4 ad system.</h2>
           <p style={{fontSize:14,color:'#6b6a58',lineHeight:1.8,marginBottom:24}}>4 campaigns. Every customer lifecycle stage. Zero guesswork.</p>
           <div style={{display:'grid',gridTemplateColumns:isMobile?'1fr':'1fr 1fr',gap:12,marginBottom:28}}>
-            {[{color:'#2d7a2d',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#1a5c1a',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
+            {[{color:'#ef4a1e',label:'Campaign 1 — Broad',title:'Find winning creative',desc:'Advantage+ audience. One creative per ad set.'},{color:'#1a5c1a',label:'Campaign 2 — Interest',title:'Find winning audience',desc:'Manual interests from competitor data. One per ad set.'},{color:'#fbbf24',label:'Campaign 3 — Retargeting',title:'Convert warm visitors',desc:'Website visitors last 60 days. Different message.'},{color:'#f9a8d4',label:'Campaign 4 — Retainer',title:'Reward your buyers',desc:'Past purchasers. Loyalty offers. Maximize LTV.'}].map(c=>(
               <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}25`,borderRadius:16,padding:18}}>
                 <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.1em',marginBottom:6}}>{c.label}</div>
                 <div style={{fontSize:14,fontWeight:700,color:'#141d15',marginBottom:4}}>{c.title}</div>
@@ -745,8 +745,8 @@ function M4Inner() {
         <div style={S.card}>
           <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 2 — Prospecting Creatives and Ad Copy</div><div style={{fontSize:13,color:'#7a9a7a',marginTop:3}}>For Broad and Interest campaigns targeting new audiences only.</div></div>
           <div style={S.body}>
-            <div style={{background:'rgba(134,239,172,0.05)',border:'1px solid rgba(134,239,172,0.15)',borderRadius:12,padding:'12px 16px',marginBottom:16,display:'flex',gap:12}}>
-              <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:'#2d7a2d'}}>One creative per ad set.</strong> Each image gets its own ad set so you know exactly which creative wins.</div>
+            <div style={{background:'rgba(239,74,30,0.05)',border:'1px solid rgba(239,74,30,0.15)',borderRadius:12,padding:'12px 16px',marginBottom:16,display:'flex',gap:12}}>
+              <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:'#ef4a1e'}}>One creative per ad set.</strong> Each image gets its own ad set so you know exactly which creative wins.</div>
             </div>
             <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:'#141d15'}}>Prospecting Creatives</div>
             <UploadBox list={creatives} setter={setCreatives} label="Upload prospecting creatives"/>
@@ -759,11 +759,11 @@ function M4Inner() {
                     {pages.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}
                   </select>
                   {pages.find(p=>p.id===selectedPageId)?.instagram?(
-                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f9f5ec',border:'1px solid rgba(134,239,172,0.2)'}}>
-                      <span>Instagram Connected</span><span style={{color:'#2d7a2d',fontWeight:700}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</span>
+                    <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 14px',borderRadius:10,background:'#f9f5ec',border:'1px solid rgba(239,74,30,0.2)'}}>
+                      <span>Instagram Connected</span><span style={{color:'#ef4a1e',fontWeight:700}}>@{pages.find(p=>p.id===selectedPageId)?.instagram?.username}</span>
                     </div>
                   ):(
-                    <div style={{background:'#f9f5ec',border:'1px solid rgba(134,239,172,0.2)',borderRadius:10,padding:14,marginTop:4}}>
+                    <div style={{background:'#f9f5ec',border:'1px solid rgba(239,74,30,0.2)',borderRadius:10,padding:14,marginTop:4}}>
                       <div style={{fontSize:12,fontWeight:700,color:'#141d15',marginBottom:6}}>Instagram — optional</div>
                       <div style={{fontSize:12,color:'#6b8f6b',marginBottom:10,lineHeight:1.6}}>
                         Your ads will still run on Instagram automatically through this Facebook Page — you don’t need to do anything here to launch. To show them from a specific IG account instead, paste its ID below, or <a href="/connect-meta" target="_blank" rel="noopener" style={{color:'#141d15',fontWeight:700}}>reconnect in a new tab ↗</a> (opens separately so nothing you’ve filled here is lost).
@@ -918,7 +918,7 @@ function M4Inner() {
           <div style={S.head}><div style={{fontSize:15,fontWeight:800,color:'#141d15'}}>Step 6 — Review and Launch</div></div>
           <div style={S.body}>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:20}}>
-              {[{color:'#2d7a2d',label:'Broad',count:creatives.length,pct:30},{color:'#1a5c1a',label:'Interest',count:selectedInterests.length,pct:30},{color:'#fbbf24',label:'Retargeting',count:retargetingCreatives.length,pct:40},...(includeRetainer?[{color:'#f9a8d4',label:'Retainer',count:retainerCreatives.length,pct:20}]:[])].map(c=>(
+              {[{color:'#ef4a1e',label:'Broad',count:creatives.length,pct:30},{color:'#1a5c1a',label:'Interest',count:selectedInterests.length,pct:30},{color:'#fbbf24',label:'Retargeting',count:retargetingCreatives.length,pct:40},...(includeRetainer?[{color:'#f9a8d4',label:'Retainer',count:retainerCreatives.length,pct:20}]:[])].map(c=>(
                 <div key={c.label} style={{background:`${c.color}08`,border:`1px solid ${c.color}20`,borderRadius:14,padding:16}}>
                   <div style={{fontSize:11,fontWeight:800,color:c.color,textTransform:'uppercase',letterSpacing:'.08em',marginBottom:6}}>{c.label}</div>
                   <div style={{fontSize:22,fontWeight:900,color:'#141d15',marginBottom:4}}>{c.count} <span style={{fontSize:12,fontWeight:500,color:'#7a9a7a'}}>ad sets</span></div>
@@ -960,7 +960,7 @@ function M4Inner() {
                         <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:12}}>
                           <span style={{fontSize:24}}>{grade.emoji}</span>
                           <div><div style={{fontSize:13,fontWeight:800,color:cfg.color,textTransform:'uppercase'}}>{grade.label}</div><div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>{grade.campaign_name}</div></div>
-                          {grade.applied&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:100,background:'rgba(134,239,172,0.15)',color:'#2d7a2d'}}>Applied</span>}
+                          {grade.applied&&<span style={{fontSize:11,padding:'3px 10px',borderRadius:100,background:'rgba(239,74,30,0.15)',color:'#ef4a1e'}}>Applied</span>}
                         </div>
                         <div style={{background:'rgba(0,0,0,0.2)',borderRadius:10,padding:'12px 16px',marginBottom:10,fontSize:13,color:'rgba(255,255,255,0.75)',lineHeight:1.7}}>{grade.why}</div>
                         <div style={{background:'rgba(0,0,0,0.15)',borderLeft:`3px solid ${cfg.color}`,borderRadius:'0 10px 10px 0',padding:'12px 16px'}}>

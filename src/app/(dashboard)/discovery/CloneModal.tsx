@@ -807,7 +807,7 @@ function SourceCard({ ad, brandName }: { ad: { pageName: string; assetImageUrl?:
 
 // ── light-theme tokens + primitives ──
 const L_INK = '#161c17', L_MUTED = '#6f6d5a', L_FAINT = '#94a096', L_LINE = '#efece2', L_SIDE = '#f6f8f5'
-const FOREST = '#141d15', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f', SEL_TEXT = '#2c4a1f', GREEN = '#ef4a1e'
+const FOREST = '#141d15', SEL_BG = '#f4fbe6', SEL_BORDER = '#f6b9a3', SEL_TEXT = '#2c4a1f', GREEN = '#ef4a1e'
 const HEADER_BG = 'radial-gradient(90% 200% at 100% 0%, #fdf3cf 0%, transparent 50%),radial-gradient(80% 160% at 0% 30%, #e3f9d6 0%, transparent 55%),linear-gradient(120deg,#f6fceb,#f0fae2 45%,#edf8ee)'
 
 function Label({ children }: { children: React.ReactNode }) {

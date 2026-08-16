@@ -340,7 +340,7 @@ function FilterDropdown({ label, options, selected, onToggle, onClear, searchabl
           display: 'flex', alignItems: 'center', gap: 7,
           padding: '7px 13px',
           background: selected.length ? '#f4fbe6' : '#fff',
-          border: `1px solid ${selected.length ? '#a8cf6f' : '#efece2'}`,
+          border: `1px solid ${selected.length ? '#f6b9a3' : '#efece2'}`,
           borderRadius: 999, fontSize: 12.5, fontWeight: 600,
           color: selected.length ? '#2c4a1f' : '#333d35',
           cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit',
@@ -415,7 +415,7 @@ function SortDropdown({ value, onChange }: { value: string; onChange: (v: string
         <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, boxShadow: '0 8px 24px rgba(0,0,0,0.1)', zIndex: 100, minWidth: 180, padding: '6px 0' }}>
           {SORT_OPTS.map(o => (
             <button key={o.value} onClick={() => { onChange(o.value); setOpen(false) }}
-              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: o.value === value ? '#141d15' : '#374151', fontWeight: o.value === value ? 700 : 400, background: o.value === value ? '#f0fdf4' : 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
+              style={{ display: 'block', width: '100%', textAlign: 'left', padding: '9px 14px', fontSize: 13, color: o.value === value ? '#141d15' : '#374151', fontWeight: o.value === value ? 700 : 400, background: o.value === value ? '#fff7f3' : 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>
               {o.label}
             </button>
           ))}
@@ -471,7 +471,7 @@ function CountryDropdown({ value, onChange }: { value: string; onChange: (v: str
               <button key={c.code} onClick={() => { onChange(c.code); setOpen(false); setSearch('') }}
                 style={{
                   display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left',
-                  padding: '9px 14px', fontSize: 13, background: c.code === value ? '#f0fdf4' : 'none',
+                  padding: '9px 14px', fontSize: 13, background: c.code === value ? '#fff7f3' : 'none',
                   color: c.code === value ? '#141d15' : '#111', fontWeight: c.code === value ? 700 : 400,
                   border: 'none', cursor: 'pointer', fontFamily: 'inherit',
                 }}>
@@ -496,7 +496,7 @@ function NumberInput({ label, value, onChange, placeholder, suffix }: {
     <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
       <div style={{
         display: 'flex', alignItems: 'center', gap: 4,
-        border: `1px solid ${isActive ? '#a8cf6f' : 'transparent'}`,
+        border: `1px solid ${isActive ? '#f6b9a3' : 'transparent'}`,
         borderRadius: 999, background: isActive ? '#f4fbe6' : 'transparent',
         padding: '0 8px', height: 28,
       }}>
@@ -589,10 +589,10 @@ function SaveModal({ ad, onClose }: { ad: Ad; onClose: () => void }) {
               const isSaved = saved.includes(b.id)
               return (
                 <button key={b.id} onClick={() => saveToBoard(b.id)} disabled={isSaved || saving === b.id}
-                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isSaved ? '#f0fdf4' : '#f8fafc', border: `1px solid ${isSaved ? '#bbf7d0' : '#e2e8f0'}`, borderRadius: 10, cursor: isSaved ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                  style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', background: isSaved ? '#fff7f3' : '#f8fafc', border: `1px solid ${isSaved ? '#f6d8cc' : '#e2e8f0'}`, borderRadius: 10, cursor: isSaved ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
                   <span style={{ fontSize: 20 }}>{b.emoji}</span>
                   <span style={{ flex: 1, fontSize: 14, fontWeight: 600, color: '#111' }}>{b.name}</span>
-                  {isSaved ? <span style={{ color: '#22c55e', fontSize: 18 }}>✓</span> : saving === b.id ? <span style={{ fontSize: 12, color: '#9ca3af' }}>…</span> : null}
+                  {isSaved ? <span style={{ color: '#ef4a1e', fontSize: 18 }}>✓</span> : saving === b.id ? <span style={{ fontSize: 12, color: '#9ca3af' }}>…</span> : null}
                 </button>
               )
             })}
@@ -1156,9 +1156,9 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
         {(ad.performanceTier === 'winning' || ad.performanceTier === 'optimized') && (
           <span
             style={{ position: 'relative', flexShrink: 0, display: 'inline-flex', fontSize: 9, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase', cursor: 'help',
-              color: ad.performanceTier === 'winning' ? '#166534' : '#92600a',
-              background: ad.performanceTier === 'winning' ? '#dcfce7' : '#fef9c3',
-              border: `1px solid ${ad.performanceTier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}
+              color: ad.performanceTier === 'winning' ? '#9a3412' : '#92600a',
+              background: ad.performanceTier === 'winning' ? '#fdeee7' : '#fef9c3',
+              border: `1px solid ${ad.performanceTier === 'winning' ? '#f6d8cc' : '#fde68a'}` }}
             onMouseEnter={(e) => { const r = e.currentTarget.getBoundingClientRect(); setTipPos({ top: r.bottom + 4, left: Math.min(r.left, window.innerWidth - 230) }) }}
             onMouseLeave={() => setTipPos(null)}>
             {ad.performanceTier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
@@ -1194,7 +1194,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
 
       {/* ── Date range (compact) ── */}
       <div style={{ padding: '0 10px 6px', fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, rowGap: 4 }}>
-        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
+        <span style={{ width: 5, height: 5, borderRadius: '50%', flexShrink: 0, background: ad.isActive ? '#ef4a1e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
         <span style={{ whiteSpace: 'nowrap' }}>
           {ad.startDate ? new Date(ad.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
           {' - '}
@@ -1913,7 +1913,7 @@ export default function DiscoveryPage() {
               </div>
             )}
             <button onClick={() => toggleFollow(hoverBrand, hbName)}
-              style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: isFollowed ? '1px solid #141d15' : '1px solid #ef4444', background: isFollowed ? '#f0fdf4' : '#fff', color: isFollowed ? '#141d15' : '#ef4444' }}>
+              style={{ width: '100%', padding: '9px', marginBottom: 8, borderRadius: 9, cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, fontSize: 13, border: isFollowed ? '1px solid #141d15' : '1px solid #ef4444', background: isFollowed ? '#fff7f3' : '#fff', color: isFollowed ? '#141d15' : '#ef4444' }}>
               {isFollowed ? '✓ Following' : '♡ Follow'}
             </button>
             <div style={{ display: 'flex', gap: 8 }}>
@@ -2322,14 +2322,14 @@ export default function DiscoveryPage() {
                 {hasMore ? ' · scroll for more' : ''}
               </span>
               {/* Search mode badge */}
-              <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#f0fdf4' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#166534' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#bbf7d0' : '#e9d5ff'}` }}>
+              <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#fff7f3' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#9a3412' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#f6d8cc' : '#e9d5ff'}` }}>
                 {searchMode === 'brand' ? '🏷️ Brand' : searchMode === 'category' ? '📂 Category' : '📝 Ad copy'} · "{query}"
               </span>
               {/* Source badge */}
-              <span style={{ background: searchSource === 'indexed' ? '#f0fdf4' : '#fffbeb', color: searchSource === 'indexed' ? '#166534' : '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 100 }}>
+              <span style={{ background: searchSource === 'indexed' ? '#fff7f3' : '#fffbeb', color: searchSource === 'indexed' ? '#9a3412' : '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 100 }}>
                 {searchSource === 'indexed' ? `⚡ ${totalInDB.toLocaleString()} ads indexed` : '🔴 Live from Meta'}
               </span>
-              {activeFilterCount > 0 && <span style={{ background: '#f0fdf4', color: '#166534', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
+              {activeFilterCount > 0 && <span style={{ background: '#fff7f3', color: '#9a3412', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
               {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
             </div>
             {/* Virtualized masonry (masonic) — balanced Pinterest columns where only

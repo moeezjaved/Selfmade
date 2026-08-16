@@ -22,7 +22,7 @@ const fmtCPA = (n: number, cur: string) =>
 function ToggleSwitch({ active, onChange }: { active: boolean; onChange: () => void }) {
   return (
     <div onClick={e => { e.stopPropagation(); onChange() }}
-      style={{ width: 32, height: 18, borderRadius: 9, background: active ? '#4caf50' : '#ccc', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
+      style={{ width: 32, height: 18, borderRadius: 9, background: active ? '#ef4a1e' : '#ccc', cursor: 'pointer', position: 'relative', transition: 'background .2s', flexShrink: 0 }}>
       <div style={{ width: 14, height: 14, borderRadius: '50%', background: '#fff', position: 'absolute', top: 2, left: active ? 16 : 2, transition: 'left .2s', boxShadow: '0 1px 3px rgba(0,0,0,.2)' }} />
     </div>
   )
@@ -33,8 +33,8 @@ function DeliveryBadge({ status, effectiveStatus }: { status: string; effectiveS
   if (es === 'ACTIVE') {
     return (
       <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#4caf50' }} />
-        <span style={{ fontSize: 12, color: '#2e7d32', fontWeight: 600 }}>Active</span>
+        <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#ef4a1e' }} />
+        <span style={{ fontSize: 12, color: '#ef4a1e', fontWeight: 600 }}>Active</span>
       </div>
     )
   }
@@ -385,7 +385,7 @@ function CampaignsInner() {
                 {/* Delivery */}
                 <div><DeliveryBadge status={camp.status} effectiveStatus={camp.effective_status} /></div>
                 {/* Results */}
-                <div style={{ fontSize: 13, fontWeight: 700, color: camp.conversions > 0 ? '#2e7d32' : '#9e9e9e' }}>
+                <div style={{ fontSize: 13, fontWeight: 700, color: camp.conversions > 0 ? '#ef4a1e' : '#9e9e9e' }}>
                   {camp.conversions > 0 ? camp.conversions : '—'}
                   {camp.conversions > 0 && <div style={{ fontSize: 10, color: '#7a9a7a', fontWeight: 500 }}>purchases</div>}
                 </div>
@@ -399,7 +399,7 @@ function CampaignsInner() {
                 {/* Spent + ROAS — the return on that spend, right where it belongs. Green ≥ break-even. */}
                 <div style={{ fontSize: 13, fontWeight: 700, color: '#141d15' }}>
                   {camp.spend > 0 ? fmt(camp.spend, currency) : '—'}
-                  {camp.spend > 0 && camp.roas > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: camp.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{camp.roas.toFixed(2)}x ROAS</div>}
+                  {camp.spend > 0 && camp.roas > 0 && <div style={{ fontSize: 10.5, fontWeight: 800, color: camp.roas >= 1 ? '#ef4a1e' : '#c0392b', marginTop: 1 }}>{camp.roas.toFixed(2)}x ROAS</div>}
                 </div>
                 {/* Impressions */}
                 <div style={{ fontSize: 13, color: camp.impressions > 0 ? '#141d15' : '#9e9e9e' }}>
@@ -442,7 +442,7 @@ function CampaignsInner() {
                     {/* Delivery */}
                     <div><DeliveryBadge status={adset.status} /></div>
                     {/* Results */}
-                    <div style={{ fontSize: 12, fontWeight: 700, color: adset.conversions > 0 ? '#2e7d32' : '#9e9e9e' }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: adset.conversions > 0 ? '#ef4a1e' : '#9e9e9e' }}>
                       {adset.conversions > 0 ? adset.conversions : '—'}
                     </div>
                     {/* CPA */}
@@ -452,7 +452,7 @@ function CampaignsInner() {
                     {/* Spent + ROAS */}
                     <div>
                       <div style={{ fontSize: 12, fontWeight: 700, color: '#141d15' }}>{adset.spend > 0 ? fmt(adset.spend, currency) : '—'}</div>
-                      {adset.spend > 0 && adset.roas > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: adset.roas >= 1 ? '#2e7d32' : '#c0392b', marginTop: 1 }}>{adset.roas.toFixed(2)}x</div>}
+                      {adset.spend > 0 && adset.roas > 0 && <div style={{ fontSize: 10, fontWeight: 800, color: adset.roas >= 1 ? '#ef4a1e' : '#c0392b', marginTop: 1 }}>{adset.roas.toFixed(2)}x</div>}
                     </div>
                     {/* Impressions */}
                     <div>
@@ -649,7 +649,7 @@ function CampaignsInner() {
                       {uploadingCreative ? '⏳ Uploading...' : '📁 Choose File'}
                     </label>
                     {uploadingCreative && <div style={{ marginTop: 12, fontSize: 12, color: '#b8860b', fontWeight: 600 }}>⏳ Uploading to Meta...</div>}
-                    {uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#2d7a2d', fontWeight: 700 }}>✅ Uploaded to Meta — ready to save</div>}
+                    {uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#ef4a1e', fontWeight: 700 }}>✅ Uploaded to Meta — ready to save</div>}
                     {editModal.new_creative_name && !uploadingCreative && !uploadedCreativeHash && <div style={{ marginTop: 12, fontSize: 12, color: '#8b8a72' }}>{editModal.new_creative_name}</div>}
                   </div>
                   <div style={{ fontSize: 11, color: '#8b8a72' }}>⚠️ Changing creative resets learning phase and social proof</div>
@@ -722,7 +722,7 @@ function CampaignsInner() {
             <div style={{ padding: '10px 18px', background: '#f8fbf7', borderBottom: '1px solid #e8f0e8', display: 'flex', gap: 16 }}>
               <div style={{ fontSize: 11 }}>
                 <div style={{ color: '#8b8a72', marginBottom: 1 }}>Status</div>
-                <div style={{ fontWeight: 700, color: chatCampaign.status === 'ACTIVE' ? '#2e7d32' : '#757575' }}>{chatCampaign.status}</div>
+                <div style={{ fontWeight: 700, color: chatCampaign.status === 'ACTIVE' ? '#ef4a1e' : '#757575' }}>{chatCampaign.status}</div>
               </div>
               <div style={{ fontSize: 11 }}>
                 <div style={{ color: '#8b8a72', marginBottom: 1 }}>Budget/Day</div>
@@ -771,7 +771,7 @@ function CampaignsInner() {
               <div style={{ padding: '8px 16px', background: '#f4f0e6', borderTop: '1px solid #e8f0e8', display: 'flex', alignItems: 'center', gap: 8 }}>
                 <div style={{ fontSize: 18 }}>{chatIsVideo ? '🎬' : '🖼️'}</div>
                 <div style={{ flex: 1, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: chatCreativeHash ? '#2e7d32' : '#b8860b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: chatCreativeHash ? '#ef4a1e' : '#b8860b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {chatUploadingCreative ? '⏳ Uploading to Meta…' : chatCreativeHash ? '✅ Creative ready' : chatCreativeName}
                   </div>
                   {chatCreativeName && <div style={{ fontSize: 10, color: '#8b8a72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCreativeName}</div>}

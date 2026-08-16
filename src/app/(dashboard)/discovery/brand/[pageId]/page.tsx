@@ -42,7 +42,7 @@ function getFormat(mediaType: string): string {
 }
 
 // ── Tag Chip ─────────────────────────────────────────────────
-function Chip({ text, color = '#f0fdf4', textColor = '#166534', border = '#bbf7d0' }: {
+function Chip({ text, color = '#fff7f3', textColor = '#9a3412', border = '#f6d8cc' }: {
   text: string; color?: string; textColor?: string; border?: string
 }) {
   return (
@@ -69,7 +69,7 @@ function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
         <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2075ff', flexShrink: 0 }}>{(ad.pageName || '?')[0]?.toUpperCase()}</div>
         <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ad.pageName}</div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: ad.isActive ? '#16a34a' : '#9ca3af' }}>{ad.isActive ? '● Live' : 'Off'}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: ad.isActive ? '#ef4a1e' : '#9ca3af' }}>{ad.isActive ? '● Live' : 'Off'}</span>
       </div>
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(ad.startDate)}{ad.isActive ? ' – Present' : ad.stopDate ? ` – ${fmtDate(ad.stopDate)}` : ''}</div>
       {body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{body.slice(0, 120)}</div>}
@@ -91,7 +91,7 @@ function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
 function TextItem({ text, index }: { text: string; index: number }) {
   return (
     <div style={{ padding: '14px 18px', background: '#fff', borderRadius: 12, border: '1px solid #e2e8f0', marginBottom: 8, display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-      <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#f0fdf4', color: '#166534', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+      <span style={{ width: 28, height: 28, borderRadius: '50%', background: '#fff7f3', color: '#9a3412', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
         {index + 1}
       </span>
       <p style={{ margin: 0, fontSize: 14, color: '#111', lineHeight: 1.6 }}>{text}</p>
@@ -299,9 +299,9 @@ export default function BrandPage() {
               disabled={followLoading}
               style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6, padding: '9px 18px',
-                background: isFollowing ? '#f0fdf4' : '#141d15',
+                background: isFollowing ? '#fff7f3' : '#141d15',
                 color: isFollowing ? '#141d15' : '#ff5a2c',
-                border: `1px solid ${isFollowing ? '#bbf7d0' : '#141d15'}`,
+                border: `1px solid ${isFollowing ? '#f6d8cc' : '#141d15'}`,
                 borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
               }}>
               {isFollowing ? '✓ Following' : '+ Follow'}
@@ -369,8 +369,8 @@ export default function BrandPage() {
                 {/* Media mix */}
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(180px,100%), 1fr))', gap: 14, marginBottom: 28 }}>
                   {[
-                    { label: 'Total Ads', value: stats.total, icon: '📊', color: '#f0fdf4' },
-                    { label: 'Active Now', value: stats.active, icon: '🟢', color: '#f0fdf4' },
+                    { label: 'Total Ads', value: stats.total, icon: '📊', color: '#fff7f3' },
+                    { label: 'Active Now', value: stats.active, icon: '🟢', color: '#fff7f3' },
                     { label: 'Videos', value: stats.video, icon: '🎬', color: '#fef3c7' },
                     { label: 'Images', value: stats.image, icon: '🖼', color: '#ede9fe' },
                     { label: 'Carousels', value: stats.carousel, icon: '🔁', color: '#fce7f3' },
@@ -390,7 +390,7 @@ export default function BrandPage() {
                   <div style={{ background: '#fff', borderRadius: 14, border: '1px solid #e2e8f0', padding: '20px 24px', marginBottom: 20 }}>
                     <div style={{ fontSize: 14, fontWeight: 700, color: '#111', marginBottom: 14 }}>Media Mix</div>
                     <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', height: 12, marginBottom: 14 }}>
-                      {stats.video > 0 && <div style={{ flex: stats.video, background: '#22c55e' }} title={`Video: ${stats.video}`} />}
+                      {stats.video > 0 && <div style={{ flex: stats.video, background: '#ef4a1e' }} title={`Video: ${stats.video}`} />}
                       {stats.image > 0 && <div style={{ flex: stats.image, background: '#3b82f6' }} title={`Image: ${stats.image}`} />}
                       {stats.carousel > 0 && <div style={{ flex: stats.carousel, background: '#f59e0b' }} title={`Carousel: ${stats.carousel}`} />}
                     </div>

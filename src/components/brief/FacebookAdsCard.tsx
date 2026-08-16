@@ -319,7 +319,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
         {healing ? (
           <div style={{ fontSize: 14, color: MUTED }}>Loading the right account…</div>
         ) : (<>
-        <Bucket label="Scale" color="#2f7d3a" dot={GREEN} rows={d.scale} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} scalable />
+        <Bucket label="Scale" color="#ef4a1e" dot={GREEN} rows={d.scale} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} scalable />
         <Bucket label="Watch" color="#9a6a12" dot="#e0a72e" rows={d.watch} suffix={(c) => `${money(c.spend)} · ${c.roas}x`} />
         <Bucket label="Pause" color="#a5342c" dot="#d0453a" rows={d.pause} suffix={(c) => `${money(c.spend)} · ${c.conversions} conv`} />
         {!d.scale.length && !d.watch.length && !d.pause.length && (

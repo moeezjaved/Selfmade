@@ -221,7 +221,7 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
       <div style={{ padding: '10px 12px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
           {c.active_count > 0 && (
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#ef4a1e' }} />
           )}
           <span style={{ fontSize: 12, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
             {brandsLine || 'Unknown brand'}
@@ -250,7 +250,7 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
 function Stat({ label, tone = 'gray' }: { label: string; tone?: 'gray' | 'green' | 'blue' }) {
   const colors = {
     gray:  { bg: '#f1f5f9', color: '#374151', border: '#e2e8f0' },
-    green: { bg: '#f0fdf4', color: '#166534', border: '#bbf7d0' },
+    green: { bg: '#fff7f3', color: '#9a3412', border: '#f6d8cc' },
     blue:  { bg: '#eff6ff', color: '#1d4ed8', border: '#bfdbfe' },
   }[tone]
   return (

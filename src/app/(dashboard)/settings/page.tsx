@@ -359,7 +359,7 @@ export default function SettingsPage() {
       <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(255,90,44,0.08)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>Notifications</div>
-          <span style={{fontSize:12,color:prefsSaved?'#16a34a':'#9ca3af'}}>{prefsSaving ? 'Saving…' : prefsSaved ? '✓ Saved' : ''}</span>
+          <span style={{fontSize:12,color:prefsSaved?'#ef4a1e':'#9ca3af'}}>{prefsSaving ? 'Saving…' : prefsSaved ? '✓ Saved' : ''}</span>
         </div>
         <div style={{padding:22,display:'flex',flexDirection:'column',gap:4}}>
           <ToggleRow

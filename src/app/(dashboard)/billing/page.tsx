@@ -194,7 +194,7 @@ export default function BillingPage() {
             </button>
           </div>
           {inviteMsg && (
-            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: inviteMsg.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${inviteMsg.ok ? '#bbf7d0' : '#fecaca'}`, fontSize: 13, color: inviteMsg.ok ? '#15803d' : '#dc2626', fontWeight: 500 }}>
+            <div style={{ marginTop: 10, padding: '10px 14px', borderRadius: 8, background: inviteMsg.ok ? '#fff7f3' : '#fef2f2', border: `1px solid ${inviteMsg.ok ? '#f6d8cc' : '#fecaca'}`, fontSize: 13, color: inviteMsg.ok ? '#9a3412' : '#dc2626', fontWeight: 500 }}>
               {inviteMsg.ok ? '✓ ' : '✕ '}{inviteMsg.text}
             </div>
           )}

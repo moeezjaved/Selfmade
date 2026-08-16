@@ -201,7 +201,7 @@ export default function SavedAdsPage() {
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 8 }}>
                 {EMOJIS.map(e => (
                   <button key={e} onClick={() => setSelectedEmoji(e)}
-                    style={{ width: 28, height: 28, borderRadius: 6, border: `2px solid ${selectedEmoji === e ? '#141d15' : 'transparent'}`, background: selectedEmoji === e ? '#f0fdf4' : 'none', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    style={{ width: 28, height: 28, borderRadius: 6, border: `2px solid ${selectedEmoji === e ? '#141d15' : 'transparent'}`, background: selectedEmoji === e ? '#fff7f3' : 'none', cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {e}
                   </button>
                 ))}
@@ -240,7 +240,7 @@ export default function SavedAdsPage() {
               <button key={board.id} onClick={() => setSelectedBoard(board.id)}
                 style={{
                   width: '100%', display: 'flex', alignItems: 'center', gap: 8, padding: `9px 18px 9px ${18 + depth * 20}px`,
-                  background: selectedBoard === board.id ? '#f0fdf4' : 'none',
+                  background: selectedBoard === board.id ? '#fff7f3' : 'none',
                   border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit',
                   borderLeft: `3px solid ${selectedBoard === board.id ? '#141d15' : 'transparent'}`,
                 }}>
@@ -391,13 +391,13 @@ export default function SavedAdsPage() {
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{saved.page_name}</div>
                         <div style={{ fontSize: 10.5, color: '#9ca3af', display: 'flex', alignItems: 'center', gap: 4 }}>
-                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: ad.isActive ? '#ef4a1e' : '#d1d5db', animation: ad.isActive ? 'livepulse 2s infinite' : 'none' }} />
                           Saved {new Date(saved.saved_at).toLocaleDateString()}
                         </div>
                       </div>
                       {(tier === 'winning' || tier === 'optimized') && (
                         <span style={{ flexShrink: 0, fontSize: 8.5, fontWeight: 800, letterSpacing: '.02em', whiteSpace: 'nowrap', padding: '2px 6px', borderRadius: 100, textTransform: 'uppercase',
-                          color: tier === 'winning' ? '#166534' : '#92600a', background: tier === 'winning' ? '#dcfce7' : '#fef9c3', border: `1px solid ${tier === 'winning' ? '#bbf7d0' : '#fde68a'}` }}>
+                          color: tier === 'winning' ? '#9a3412' : '#92600a', background: tier === 'winning' ? '#fdeee7' : '#fef9c3', border: `1px solid ${tier === 'winning' ? '#f6d8cc' : '#fde68a'}` }}>
                           {tier === 'winning' ? '🏆 Winning' : '⚡ Optimized'}
                         </span>
                       )}

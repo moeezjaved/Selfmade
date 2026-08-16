@@ -151,7 +151,7 @@ export default function BrandSpyList() {
             <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ fontSize: 13, color: '#374151' }}>
               {b.active != null
-                ? <span><span style={{ color: '#16a34a', fontWeight: 700 }}>{b.active.toLocaleString()}</span> active · <span style={{ color: '#9ca3af' }}>{(b.inactive ?? 0).toLocaleString()} inactive</span></span>
+                ? <span><span style={{ color: '#ef4a1e', fontWeight: 700 }}>{b.active.toLocaleString()}</span> active · <span style={{ color: '#9ca3af' }}>{(b.inactive ?? 0).toLocaleString()} inactive</span></span>
                 : <span>{b.adCount.toLocaleString()} ads</span>}
             </div>
             <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', gap: 8 }}>
@@ -212,7 +212,7 @@ export default function BrandSpyList() {
                       <span style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
                         <span style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</span>
                         {b.crawled
-                          ? <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#16a34a', background: 'rgba(22,163,74,0.1)', padding: '2px 7px', borderRadius: 999 }}>CRAWLED · instant</span>
+                          ? <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#ef4a1e', background: 'rgba(22,163,74,0.1)', padding: '2px 7px', borderRadius: 999 }}>CRAWLED · instant</span>
                           : <span style={{ flexShrink: 0, fontSize: 10, fontWeight: 700, color: '#6b7280', background: '#f3f4f6', padding: '2px 7px', borderRadius: 999 }}>NEW · will crawl</span>}
                       </span>
                       <span style={{ flexShrink: 0, fontSize: 13, color: '#6b7280', marginLeft: 8 }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
