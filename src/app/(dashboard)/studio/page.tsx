@@ -316,7 +316,19 @@ function StudioInner() {
     } catch (e: any) { setErr(String(e?.message || e)) } finally { setEditing(false) }
   }
   const applyEdit = () => applyEditWith(editText)
-  const download = () => { if (result) { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.target = '_blank'; a.click() } }
+  // Download the actual file, not a new tab. The result is a cross-origin R2 URL, so the plain
+  // <a download> attribute is ignored by browsers (that's why it opened a new window) — fetch the
+  // bytes as a blob and download THAT. Falls back to opening the image only if the fetch is blocked.
+  const download = async () => {
+    if (!result) return
+    try {
+      const res = await fetch(result.url, { mode: 'cors' })
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = 'selfmade-ad.png'; a.click()
+      setTimeout(() => URL.revokeObjectURL(url), 4000)
+    } catch { const a = document.createElement('a'); a.href = result.url; a.download = 'selfmade-ad.png'; a.rel = 'noopener'; a.click() }
+  }
 
   // ── Mello drives the canvas ── she calls create_ad → the server emits a `creation` event →
   // this maps it onto the canvas and runs the SAME generate()/applyEditWith() the buttons use.
@@ -576,20 +588,27 @@ function StudioInner() {
               {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(20,29,21,.4)', display: 'block' }} />}
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{remake ? 'Your version is ready.' : 'Here’s your ad.'}</div>
-                <div style={{ fontSize: 13, color: MUTED, margin: '5px 0 16px', lineHeight: 1.55 }}>Love it? Approve and download. Want a change? Tell Mello and she’ll tweak this exact image.</div>
+                {/* Tell the founder it's already safe — the #1 confusion was "where did it go?". */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, fontSize: 12.5, fontWeight: 750, color: '#9a3412', background: '#fff7f3', border: '1px solid #f6d8cc', borderRadius: 100, padding: '4px 12px' }}>
+                  <Check size={13} strokeWidth={3} /> Saved to My Creatives
+                </div>
+                <div style={{ fontSize: 13, color: MUTED, margin: '10px 0 14px', lineHeight: 1.55, maxWidth: 460 }}>Not quite right? Describe any change below and Mello re-does this exact image — or approve &amp; run it.</div>
+
+                {/* TWEAK — promoted ABOVE the buttons (it was buried under Download and people missed it). */}
+                <div style={{ marginBottom: 16 }}>
+                  <div style={label}>Tweak this image</div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyEdit() }} placeholder="e.g. darker background, bigger logo, warmer tone" style={field} />
+                    <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: editing || !editText.trim() ? 'default' : 'pointer', opacity: editing || !editText.trim() ? .6 : 1, display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
+                  </div>
+                </div>
+
                 <div style={{ display: 'flex', gap: 9, flexWrap: 'wrap' }}>
                   {/* PRIMARY approve action: straight into launch. M4 opens with THIS image already
                       attached; the founder still sets + confirms the budget there (never auto-spends). */}
                   <a href={`/m4?img=${encodeURIComponent(result.url)}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 13.5, fontWeight: 800, textDecoration: 'none' }}>Approve &amp; run on Facebook →</a>
                   <button onClick={download} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><Download size={15} /> Download</button>
                   <button onClick={() => { setResult(null); setVersions([]); setErr(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '11px 18px', fontSize: 13.5, fontWeight: 800, cursor: 'pointer' }}><ImageIcon size={15} /> Another</button>
-                </div>
-                <div style={{ marginTop: 18 }}>
-                  <div style={label}>Tweak it</div>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input value={editText} onChange={e => setEditText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') applyEdit() }} placeholder="e.g. darker background, bigger logo" style={field} />
-                    <button onClick={applyEdit} disabled={editing || !editText.trim()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 10, padding: '0 16px', fontSize: 13, fontWeight: 800, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>{editing ? <Loader2 size={14} className="spin" /> : <Wand2 size={14} />}{editing ? '' : 'Tweak'}</button>
-                  </div>
                 </div>
 
                 {/* Versions — every tweak is a version you can revert to */}
