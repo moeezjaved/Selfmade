@@ -447,17 +447,17 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
           {/* Info */}
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-              <span style={{ fontSize: 11, color: '#8b8a72' }}>{i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `#${i+1}`}</span>
+              <span style={{ fontSize: 10.5, fontWeight: 750, color: '#9aa79a', fontVariantNumeric: 'tabular-nums' }}>{String(i + 1).padStart(2, '0')}</span>
               <span style={{ fontSize: 13, fontWeight: 700, color: '#141d15', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.name}</span>
             </div>
             <div style={{ display: 'flex', gap: 12 }}>
-              <span style={{ fontSize: 11, color: '#8b8a72' }}>Spent: {fmt(c.spend)}</span>
-              <span style={{ fontSize: 11, color: '#8b8a72' }}>Conv: {c.conversions}</span>
-              <span style={{ fontSize: 11, color: '#8b8a72' }}>CTR: {c.ctr.toFixed(2)}%</span>
+              <span style={{ fontSize: 11, color: '#6f7d70' }}>Spent {fmt(c.spend)}</span>
+              <span style={{ fontSize: 11, color: '#6f7d70' }}>Conv {c.conversions}</span>
+              <span style={{ fontSize: 11, color: '#6f7d70' }}>CTR {c.ctr.toFixed(2)}%</span>
             </div>
             {/* Progress bar */}
-            <div style={{ height: 3, background: 'rgba(0,0,0,0.06)', borderRadius: 100, marginTop: 6, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${Math.min(100, (c.roas / Math.max(...creatives.map((x:any)=>x.roas),1)) * 100)}%`, background: c.roas >= 2 ? '#2d7a2d' : c.roas >= 1 ? '#b8860b' : '#c0392b', borderRadius: 100 }} />
+            <div style={{ height: 5, background: '#eef1ec', borderRadius: 100, marginTop: 7, overflow: 'hidden' }}>
+              <div style={{ height: '100%', width: `${Math.min(100, (c.roas / Math.max(...creatives.map((x:any)=>x.roas),1)) * 100)}%`, background: roasColor(c.roas), opacity: .9, borderRadius: 100 }} />
             </div>
           </div>
 
@@ -638,9 +638,12 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   currency: string, sortKey: SortKey, items: ReportItem[], fullWidth?: boolean
 }) {
   const isExpanded = expanded[sectionKey]
-  const preview = items.slice(0, 3)
-  const rest = items.slice(3)
-  const shown = isExpanded ? items : preview
+  // Rows with ~no spend produce artifact ratios (€0 → "3562x ROAS") that dominate the top and blow out
+  // the bar scale. Keep real rows (in their sorted order) first; sink no-spend rows to the bottom.
+  const ordered = [...items].sort((a, b) => (a.spend < 1 ? 1 : 0) - (b.spend < 1 ? 1 : 0))
+  const preview = ordered.slice(0, 3)
+  const rest = ordered.slice(3)
+  const shown = isExpanded ? ordered : preview
 
   const metricVal = (item: ReportItem) => {
     switch (sortKey) {
@@ -660,7 +663,9 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
     return '#ff5a2c'
   }
 
-  const maxVal = Math.max(...items.map(i => {
+  // Scale bars to the REAL rows only (a €0 → 3562x artifact would otherwise squash every real bar).
+  const scaleRows = items.filter(i => i.spend >= 1)
+  const maxVal = Math.max(...(scaleRows.length ? scaleRows : items).map(i => {
     if (sortKey === 'roas') return i.roas
     if (sortKey === 'spend') return i.spend
     if (sortKey === 'revenue') return i.revenue
@@ -686,38 +691,35 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
         </div>
       </div>
 
-      {/* Items */}
-      <div style={{ padding: '8px 0' }}>
+      {/* Items — editorial rows matching the debrief: muted rank, serif metric, thin ROAS-tinted bar.
+          Zero-spend rows (whose ROAS is meaningless — €0 spent → "3562x") sink to the bottom, faded. */}
+      <div style={{ padding: '4px 0' }}>
         {shown.map((item, i) => {
           const val = sortKey === 'roas' ? item.roas : sortKey === 'spend' ? item.spend : sortKey === 'revenue' ? item.revenue : sortKey === 'conversions' ? item.conversions : sortKey === 'ctr' ? item.ctr : item.cpa
           const barWidth = Math.min(100, (val / maxVal) * 100)
+          const noise = item.spend < 1   // spent ~nothing → any ratio metric is an artifact
 
           return (
-            <div key={i} style={{ padding: '10px 20px', borderBottom: i < shown.length - 1 ? '1px solid rgba(255,255,255,0.03)' : 'none' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#141d15', flex: 1, marginRight: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {i === 0 && <span style={{ marginRight: 6 }}>🥇</span>}
-                  {i === 1 && <span style={{ marginRight: 6 }}>🥈</span>}
-                  {i === 2 && <span style={{ marginRight: 6 }}>🥉</span>}
-                  {item.label}
+            <div key={i} style={{ padding: '11px 20px', borderTop: i ? `1px solid ${LINE}` : 'none', opacity: noise ? 0.45 : 1 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flex: 1, minWidth: 0 }}>
+                  <span style={{ fontSize: 10.5, fontWeight: 750, color: FAINT, fontVariantNumeric: 'tabular-nums', width: 16, flexShrink: 0 }}>{String(i + 1).padStart(2, '0')}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
-                  <span style={{ fontSize: 11, color: '#7a9a7a' }}>{fmt(item.spend, currency)} spent</span>
-                  <span style={{ fontSize: 13, fontWeight: 900, color: metricColor(item), background: roasBg(item.roas), padding: '2px 10px', borderRadius: 100 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexShrink: 0 }}>
+                  <span style={{ fontSize: 11.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{fmt(item.spend, currency)} spent</span>
+                  <span style={{ fontFamily: SERIF, fontSize: 19, fontWeight: 400, letterSpacing: '-.01em', color: noise ? FAINT : metricColor(item), fontVariantNumeric: 'tabular-nums', minWidth: 58, textAlign: 'right' }}>
                     {metricVal(item)}
                   </span>
                 </div>
               </div>
-              {/* Progress bar */}
-              <div style={{ height: 4, background: '#f9f5ec', borderRadius: 100, overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: barWidth + '%', background: roasColor(item.roas), borderRadius: 100, transition: 'width .3s' }} />
+              {/* Thin ROAS-tinted bar, debrief-style */}
+              <div style={{ height: 5, background: '#eef1ec', borderRadius: 100, overflow: 'hidden', marginTop: 7 }}>
+                <div style={{ height: '100%', width: barWidth + '%', background: roasColor(item.roas), opacity: noise ? .35 : .9, borderRadius: 100, transition: 'width .3s' }} />
               </div>
-              {/* Sub metrics */}
-              <div style={{ display: 'flex', gap: 16, marginTop: 6 }}>
-                <span style={{ fontSize: 10, color: '#8b8a72' }}>Revenue: {fmt(item.revenue, currency)}</span>
-                <span style={{ fontSize: 10, color: '#8b8a72' }}>Conv: {item.conversions}</span>
-                <span style={{ fontSize: 10, color: '#8b8a72' }}>CTR: {item.ctr.toFixed(2)}%</span>
-                <span style={{ fontSize: 10, color: '#8b8a72' }}>CPA: {fmt(item.cpa, currency)}</span>
+              {/* One quiet metrics line */}
+              <div style={{ fontSize: 10.5, color: FAINT, marginTop: 6, fontVariantNumeric: 'tabular-nums' }}>
+                Revenue {fmt(item.revenue, currency)} · Conv {item.conversions} · CTR {item.ctr.toFixed(2)}% · CPA {fmt(item.cpa, currency)}
               </div>
             </div>
           )
@@ -726,8 +728,8 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
 
       {/* Show More */}
       {rest.length > 0 && (
-        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '12px', background: 'rgba(255,255,255,0.02)', border: 'none', borderTop: '1px solid rgba(255,255,255,0.04)', color: '#141d15', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer' }}>
-          {isExpanded ? '▲ Show Less' : `▼ Show ${rest.length} More`}
+        <button onClick={() => toggle(sectionKey)} style={{ width: '100%', padding: '11px', background: 'none', border: 'none', borderTop: `1px solid ${LINE}`, color: MUTED, fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer' }}>
+          {isExpanded ? 'Show less ↑' : `Show ${rest.length} more ↓`}
         </button>
       )}
     </div>
