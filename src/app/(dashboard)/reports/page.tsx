@@ -163,9 +163,10 @@ function ReportsPage() {
 
       <AdsTabs />
 
-      {/* Classic full-width detail report (what the founder expects). Saved reports sit in a slim strip
-          up top; each still deep-links to ?report=<id>. */}
-      <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', marginBottom: 20 }}><SavedReportsNav /></div>
+      {/* The full DETAIL report is the star (right); the saved-reports library is a SLIM left rail so it
+          never dominates the page. Each saved report still deep-links to ?report=<id>. */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '236px minmax(0,1fr)', gap: isMobile ? 12 : 28, alignItems: 'start' }}>
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}><SavedReportsNav /></div>
         <div style={{ minWidth: 0 }}>
 
       {/* Header — editorial serif title, quiet controls */}
@@ -371,6 +372,7 @@ function ReportsPage() {
         </div>
       )}
         </div>
+      </div>
     </div>
   )
 }
