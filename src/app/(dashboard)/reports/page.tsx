@@ -7,7 +7,7 @@ import { useSearchParams } from 'next/navigation'
 import AccountSelector from '@/components/AccountSelector'
 import CreateReportModal from '@/components/reports/CreateReportModal'
 import GeneratedReport from '@/components/reports/GeneratedReport'
-import SavedReportsNav from '@/components/reports/SavedReportsNav'
+import ReportsNarrative from '@/components/reports/ReportsNarrative'
 import LaunchReport from '@/components/reports/LaunchReport'
 import { TEMPLATES } from '@/lib/reports/templates'
 
@@ -167,11 +167,9 @@ function ReportsPage() {
 
       <AdsTabs />
 
-      {/* The full DETAIL report is the star (right); the saved-reports library is a SLIM left rail so it
-          never dominates the page. Each saved report still deep-links to ?report=<id>. */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '236px minmax(0,1fr)', gap: isMobile ? 12 : 28, alignItems: 'start' }}>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}><SavedReportsNav /></div>
-        <div style={{ minWidth: 0 }}>
+      {/* Full-width report (no sidebar) — Mello's debrief (headlines + suggestions) on top, then every
+          breakdown. This is the 'few days back' design (db1a59e), before the saved-reports sidebar. */}
+      <div style={{ minWidth: 0 }}>
 
       {/* Header — editorial serif title, quiet controls */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22, flexWrap: 'wrap', gap: 14 }}>
@@ -204,21 +202,9 @@ function ReportsPage() {
       ) : data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* Overview KPIs — the four numbers that matter, big and calm (classic full-detail view). */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px,100%), 1fr))', gap: 12 }}>
-            {[
-              { label: 'Total spend', value: fmt(data.overview?.spend || 0, data.currency), color: bad },
-              { label: 'Total revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: good },
-              { label: 'Blended ROAS', value: (data.overview?.roas || 0).toFixed(2) + 'x', color: roasColor(data.overview?.roas || 0) },
-              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: INK },
-            ].map(k => (
-              <div key={k.label} style={{ ...CARD, padding: '16px 20px', position: 'relative', overflow: 'hidden' }}>
-                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: k.color, opacity: .85 }} />
-                <div style={{ fontSize: 10.5, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 8 }}>{k.label}</div>
-                <div style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: k.color, letterSpacing: '-.01em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{k.value}</div>
-              </div>
-            ))}
-          </div>
+          {/* Mello's debrief — the headlines on top ('What happened', 'How your account is performing')
+              with Mello's read + suggestions. The 'few days back' design the founder asked for. */}
+          <ReportsNarrative data={data} ca={caData} currency={data.currency} days={parseInt(dateRange.replace(/\D/g, ''), 10) || 7} />
 
           {/* Build a report — the template library. */}
           <TemplateLibrary onOpen={(k) => setActiveReport({ templateKey: k })} onMore={() => setShowCreate(true)} />
@@ -377,7 +363,6 @@ function ReportsPage() {
         </div>
       )}
         </div>
-      </div>
     </div>
   )
 }
