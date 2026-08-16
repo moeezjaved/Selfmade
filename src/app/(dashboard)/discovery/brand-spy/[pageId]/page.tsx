@@ -60,7 +60,7 @@ function ChipRow({ icon, label, items }: { icon: string; label: string; items?: 
       <div style={{ width: isMobile ? 'auto' : 150, flexShrink: 0, fontSize: 13, fontWeight: 700, color: '#374151', display: 'flex', alignItems: 'center', gap: 6 }}><span>{icon}</span>{label}</div>
       <div style={{ flex: 1, minWidth: 0, maxWidth: '100%', display: 'flex', flexWrap: 'wrap', gap: 6 }}>
         {items.slice(0, 8).map((it) => (
-          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#141d15', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 100, padding: '3px 10px', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
+          <span key={it.label} title={`${it.count} ads`} style={{ fontSize: 12, fontWeight: 600, color: '#141d15', background: '#fff7f3', border: '1px solid #f6d8cc', borderRadius: 100, padding: '3px 10px', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>
             {it.label} <span style={{ opacity: 0.55, fontWeight: 700 }}>{it.count}</span>
           </span>
         ))}
@@ -208,7 +208,7 @@ function Hooks({ d }: { d: Spy }) {
               ? <img src={h.thumb} alt="" loading="lazy" style={{ width: 46, height: 46, objectFit: 'cover', borderRadius: 8, background: '#f3f4f6' }} />
               : <div style={{ width: 46, height: 46, borderRadius: 8, background: '#f3f4f6' }} />}
             <div style={{ fontSize: 14, color: '#111', lineHeight: 1.35 }}>“{h.text}”{h.count > 1 && <span style={{ color: '#9ca3af', fontWeight: 600 }}> · {h.count} ads</span>}</div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: h.active ? '#16a34a' : '#9ca3af' }}>{h.active ? '● ' : ''}{h.days}d</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: h.active ? '#ef4a1e' : '#9ca3af' }}>{h.active ? '● ' : ''}{h.days}d</div>
             <a href={h.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ fontSize: 13, fontWeight: 700, color: '#111', textAlign: 'center', background: '#f3f4f6', borderRadius: 8, padding: '7px 0', textDecoration: 'none' }}>Ad Details</a>
           </div>
         ))}
@@ -248,7 +248,7 @@ function LandingPages({ d }: { d: Spy }) {
           return (
             <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #cde87a' : '1px solid transparent', background: on ? 'rgba(255,90,44,0.25)' : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
               <div style={{ fontSize: 13, color: '#2075ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔗 {p.url}</div>
-              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}><span style={{ color: '#16a34a', fontWeight: 700 }}>● {p.active} Active</span> · {p.inactive} Inactive</div>
+              <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}><span style={{ color: '#ef4a1e', fontWeight: 700 }}>● {p.active} Active</span> · {p.inactive} Inactive</div>
             </button>
           )
         })}
@@ -325,7 +325,7 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 12px' }}>
         <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#eef2ff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, color: '#2075ff' }}>{(a.pageName || '?')[0]?.toUpperCase()}</div>
         <div style={{ flex: 1, fontSize: 13, fontWeight: 700, color: '#111', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.pageName}</div>
-        <span style={{ fontSize: 11, fontWeight: 700, color: a.isActive ? '#16a34a' : '#9ca3af' }}>{a.isActive ? '● Live' : 'Off'}</span>
+        <span style={{ fontSize: 11, fontWeight: 700, color: a.isActive ? '#ef4a1e' : '#9ca3af' }}>{a.isActive ? '● Live' : 'Off'}</span>
       </div>
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(a.startDate)}{a.isActive ? ' – Present' : a.stopDate ? ` – ${fmtDate(a.stopDate)}` : ''}</div>
       {a.body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{a.body.slice(0, 120)}</div>}
@@ -456,7 +456,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
             {cloning && ((a.format || '').toLowerCase().includes('video') || !!a.videoUrl
               ? <CloneVideoModal sourceAdId={a.id} sourcePoster={a.thumbnailUrl || undefined} onClose={() => setCloning(false)} />
               : <CloneModal ad={{ id: a.id, pageId, pageName: a.pageName, sourceThumb: a.thumbnailUrl || undefined }} onClose={() => setCloning(false)} />)}
-            <Row k="Status" v={a.isActive ? <span style={{ color: '#16a34a', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
+            <Row k="Status" v={a.isActive ? <span style={{ color: '#ef4a1e', fontWeight: 700 }}>● Still Running{a.startDate ? ` from ${fmtDate(a.startDate)}` : ''}</span> : <span style={{ color: '#9ca3af' }}>Inactive{a.stopDate ? ` (ended ${fmtDate(a.stopDate)})` : ''}</span>} />
             <Row k="Time Running" v={`${a.daysRunning || 0} day${(a.daysRunning || 0) === 1 ? '' : 's'}`} />
             <Row k="Format" v={a.format || '—'} />
             <Row k="Niche" v={a.niche || '—'} />
@@ -531,7 +531,7 @@ function AdLibrary({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a: 
           {d.hooks.slice(0, 6).map((h) => (
             <div key={h.text} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0', borderBottom: '1px solid #f3f4f6', fontSize: 13 }}>
               <span style={{ flex: 1, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>“{h.text}”</span>
-              <b style={{ color: h.active ? '#16a34a' : '#9ca3af' }}>{h.days}d</b>
+              <b style={{ color: h.active ? '#ef4a1e' : '#9ca3af' }}>{h.days}d</b>
             </div>
           ))}
           {d.hooks.length === 0 && <div style={{ color: '#9ca3af', fontSize: 13 }}>No hooks yet</div>}
@@ -583,7 +583,7 @@ function TimelineGantt({ pageId, onOpen }: { pageId: string; onOpen: (a: Card) =
                 <span style={{ fontSize: 11, color: '#6b7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.id}</span>
               </button>
               <div style={{ position: 'relative', height: 18, background: '#f8f9fa', borderRadius: 5 }}>
-                <button onClick={() => onOpen(a)} title={`${fmtDate(a.startDate)} → ${a.isActive ? 'Present' : fmtDate(a.stopDate)}`} style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 2, height: 14, borderRadius: 5, border: 'none', cursor: 'pointer', background: a.isActive ? '#bbf7d0' : '#e5e7eb' }} />
+                <button onClick={() => onOpen(a)} title={`${fmtDate(a.startDate)} → ${a.isActive ? 'Present' : fmtDate(a.stopDate)}`} style={{ position: 'absolute', left: `${left}%`, width: `${width}%`, top: 2, height: 14, borderRadius: 5, border: 'none', cursor: 'pointer', background: a.isActive ? '#f6d8cc' : '#e5e7eb' }} />
               </div>
             </div>
           )
@@ -665,7 +665,7 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
                 {a.thumb ? <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 11 }}>no preview</div>}
               </div>
               <div style={{ padding: '7px 9px', fontSize: 11, color: '#374151', lineHeight: 1.3, maxHeight: 46, overflow: 'hidden' }}>{a.hook}</div>
-              <div style={{ padding: '0 9px 8px', fontSize: 11, fontWeight: 700, color: a.active ? '#16a34a' : '#9ca3af' }}>{a.active ? '● ' : ''}{a.days}d</div>
+              <div style={{ padding: '0 9px 8px', fontSize: 11, fontWeight: 700, color: a.active ? '#ef4a1e' : '#9ca3af' }}>{a.active ? '● ' : ''}{a.days}d</div>
             </a>
           ))}
         </div>
@@ -764,7 +764,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
   const badge: React.CSSProperties = { fontSize: 11.5, fontWeight: 800, letterSpacing: '.02em', padding: '4px 10px', borderRadius: 100 }
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-      <span style={{ ...badge, background: spied ? '#dcfce7' : '#eef2f7', color: spied ? '#166534' : '#64748b', border: `1px solid ${spied ? '#bbf7d0' : '#e2e8f0'}` }}>
+      <span style={{ ...badge, background: spied ? '#fdeee7' : '#eef2f7', color: spied ? '#9a3412' : '#64748b', border: `1px solid ${spied ? '#f6d8cc' : '#e2e8f0'}` }}>
         {spied ? '✓ Spying' : '👁 Viewing'}
       </span>
       <button onClick={toggleSpy} disabled={busy}
@@ -891,7 +891,7 @@ export default function BrandSpyDetail() {
       </div>
       <div style={{ fontSize: 13, color: '#9ca3af', marginBottom: 18 }}>
         {s.firstSeen ? `Earliest ad ${new Date(s.firstSeen).toLocaleDateString()}` : 'Brand analytics'}
-        {s.dataAsOf ? <span> · <span style={{ color: '#16a34a', fontWeight: 600 }}>data as of {new Date(s.dataAsOf).toLocaleString()}</span></span> : null}
+        {s.dataAsOf ? <span> · <span style={{ color: '#ef4a1e', fontWeight: 600 }}>data as of {new Date(s.dataAsOf).toLocaleString()}</span></span> : null}
       </div>
 
       {/* Persistent summary panel */}

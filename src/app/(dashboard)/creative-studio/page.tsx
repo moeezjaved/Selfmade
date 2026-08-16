@@ -389,7 +389,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
               <button onClick={applyEdit} disabled={busy || !instr.trim()} style={{ ...btn, justifyContent: 'center', opacity: (busy || !instr.trim()) ? 0.6 : 1 }}><Sparkles size={15} /> Apply edit · ${(editCost / 100).toFixed(2)}</button>
               {/* Run it: this creative → M4 launch, image pre-attached. Budget is still set + confirmed
                   by the founder in M4 — nothing spends from here. The whole point of the product. */}
-              {img && <a href={`/m4?img=${encodeURIComponent(img)}`} style={{ ...btn, justifyContent: 'center', background: '#166534', textDecoration: 'none' }}>▶ Run on Facebook</a>}
+              {img && <a href={`/m4?img=${encodeURIComponent(img)}`} style={{ ...btn, justifyContent: 'center', background: '#9a3412', textDecoration: 'none' }}>▶ Run on Facebook</a>}
               <button onClick={() => downloadCreative(creativeFilename({ brand: gen.brand_name, ext: (img || '').match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1] || 'png', kind: gen.type, date: new Date(gen.created_at) }))} disabled={downloading} style={{ ...btnGhost, justifyContent: 'center' }}><Download size={15} /> {downloading ? 'Downloading…' : 'Download'}</button>
               <button onClick={copyUrl} style={{ ...btnGhost, justifyContent: 'center' }}><Link2 size={15} /> {copied ? 'Copied ✓' : 'Copy URL'}</button>
             </>

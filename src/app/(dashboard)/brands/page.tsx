@@ -173,7 +173,7 @@ export default function BrandsPage() {
                 const on = form.category === v
                 return (
                   <button key={v} type="button" onClick={() => { setForm({ ...form, category: v }); setDetected(null) }}
-                    style={{ flex: '1 1 180px', textAlign: 'left', border: `1.5px solid ${on ? '#a8cf6f' : '#e2e8f0'}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 12, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                    style={{ flex: '1 1 180px', textAlign: 'left', border: `1.5px solid ${on ? '#f6b9a3' : '#e2e8f0'}`, background: on ? '#f4fbe6' : '#fff', borderRadius: 12, padding: '10px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: on ? '#2c4a1f' : '#111' }}>{label}</div>
                     <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2, lineHeight: 1.4 }}>{sub}</div>
                   </button>
@@ -196,7 +196,7 @@ export default function BrandsPage() {
             <div style={{ margin: '4px 0 10px' }}>
               {detected.images.length ? (
                 <>
-                  <div style={{ fontSize: 12, color: '#15803d', fontWeight: 600, marginBottom: 6 }}>✓ Found {detected.images.length} {isService ? 'screenshot' : 'product photo'}{detected.images.length === 1 ? '' : 's'}{detected.name ? ` — ${detected.name}` : ''}</div>
+                  <div style={{ fontSize: 12, color: '#9a3412', fontWeight: 600, marginBottom: 6 }}>✓ Found {detected.images.length} {isService ? 'screenshot' : 'product photo'}{detected.images.length === 1 ? '' : 's'}{detected.name ? ` — ${detected.name}` : ''}</div>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(64px, 1fr))', gap: 6 }}>
                     {detected.images.map((u, i) => (
                       // eslint-disable-next-line @next/next/no-img-element
@@ -223,7 +223,7 @@ export default function BrandsPage() {
 
       {msg && (
         <div style={{ marginBottom: 16, padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600,
-          background: msg.ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${msg.ok ? '#bbf7d0' : '#fecaca'}`, color: msg.ok ? '#15803d' : '#dc2626' }}>
+          background: msg.ok ? '#fff7f3' : '#fef2f2', border: `1px solid ${msg.ok ? '#f6d8cc' : '#fecaca'}`, color: msg.ok ? '#9a3412' : '#dc2626' }}>
           {msg.text}
         </div>
       )}
@@ -279,7 +279,7 @@ function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, 
         <div style={{ display: 'flex', gap: 12, flexShrink: 0 }}>
           {editing ? (
             <>
-              <button onClick={() => { if (ef.name.trim()) { onEdit(brand.id, ef); setEditing(false) } }} style={{ background: 'none', border: 'none', color: '#16a34a', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Save</button>
+              <button onClick={() => { if (ef.name.trim()) { onEdit(brand.id, ef); setEditing(false) } }} style={{ background: 'none', border: 'none', color: '#ef4a1e', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Save</button>
               <button onClick={() => { resetEf(); setEditing(false) }} style={{ background: 'none', border: 'none', color: '#6b7280', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>Cancel</button>
             </>
           ) : (

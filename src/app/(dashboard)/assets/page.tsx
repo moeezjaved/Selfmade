@@ -176,7 +176,7 @@ export default function AssetsPage() {
         )}
       </div>
 
-      {msg && (() => { const ok = msg.startsWith('✓'); return <div style={{ fontSize: 13, fontWeight: 600, color: ok ? '#166534' : '#b91c1c', background: ok ? '#f0fdf4' : '#fef2f2', border: `1px solid ${ok ? '#bbf7d0' : '#fecaca'}`, borderRadius: 8, padding: '8px 12px', margin: '8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>{msg}<X size={13} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMsg('')} /></div> })()}
+      {msg && (() => { const ok = msg.startsWith('✓'); return <div style={{ fontSize: 13, fontWeight: 600, color: ok ? '#9a3412' : '#b91c1c', background: ok ? '#fff7f3' : '#fef2f2', border: `1px solid ${ok ? '#f6d8cc' : '#fecaca'}`, borderRadius: 8, padding: '8px 12px', margin: '8px 0', display: 'flex', alignItems: 'center', gap: 8 }}>{msg}<X size={13} style={{ cursor: 'pointer', marginLeft: 'auto' }} onClick={() => setMsg('')} /></div> })()}
 
       {/* search + filter */}
       <div style={{ display: 'flex', gap: 10, margin: '14px 0', alignItems: 'center', flexWrap: 'wrap' }}>

@@ -183,7 +183,7 @@ export default function AdDetailPage() {
             </button>
           </div>
           <div style={{ padding: '0 16px 8px', fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: ad.isActive ? '#ef4a1e' : '#d1d5db' }} />
             <span>{startFmt} – {ad.stopDate ? endFmt : 'Present'}</span>
           </div>
           {cleanCopy(ad.body) && (
@@ -210,7 +210,7 @@ export default function AdDetailPage() {
         {/* ── MIDDLE: ad info ── */}
         <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, padding: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 18 }}>
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: ad.isActive ? '#22c55e' : '#d1d5db' }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: ad.isActive ? '#ef4a1e' : '#d1d5db' }} />
             <span style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{ad.isActive ? 'Active' : 'Inactive'}</span>
             <span style={{ fontSize: 12, color: '#6b7280' }}>· Ad ID: {ad.id}</span>
             <a href={ad.snapshotUrl} target="_blank" rel="noopener noreferrer" style={{ color: '#6b7280' }}>
@@ -390,7 +390,7 @@ function AiPanel({ ad }: { ad: Ad }) {
                 <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 6, textAlign: 'center' }}>Mello rewrites the whole script around your product — free. You only pay when you turn it into a video.</div>
               </>
             )}
-            {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}
+            {gen && <div style={{ marginTop: 10, fontSize: 12, color: '#111', background: '#fff7f3', border: '1px solid #f6d8cc', borderRadius: 8, padding: 10, whiteSpace: 'pre-wrap' }}>{gen}</div>}
           </div>
         )}
         </div>

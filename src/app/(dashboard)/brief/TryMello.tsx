@@ -15,7 +15,7 @@ const CloneVideoModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneV
 const CloneModal = dynamic(() => import('@/app/(dashboard)/discovery/CloneModal'), { ssr: false })
 const MakeAdsModal = dynamic(() => import('@/components/MakeAdsModal'), { ssr: false })
 
-const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', GREEN = '#ef4a1e', SEL_BG = '#f4fbe6', SEL_BORDER = '#a8cf6f'
+const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', GREEN = '#ef4a1e', SEL_BG = '#f4fbe6', SEL_BORDER = '#f6b9a3'
 const DISMISS_KEY = 'brief_trymello_v1'
 
 type Tone = 'try' | 'opp'

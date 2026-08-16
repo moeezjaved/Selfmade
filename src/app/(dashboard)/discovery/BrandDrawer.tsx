@@ -84,7 +84,7 @@ function FreqBar({ label, count, max, color = '#141d15' }: { label: string; coun
 }
 
 // ── TagCloud ─────────────────────────────────────────────────────
-function TagCloud({ items, color = '#141d15', bg = '#f0fdf4', border = '#bbf7d0' }: {
+function TagCloud({ items, color = '#141d15', bg = '#fff7f3', border = '#f6d8cc' }: {
   items: { text: string; count: number }[]
   color?: string; bg?: string; border?: string
 }) {
@@ -146,7 +146,7 @@ function MiniCreativeCard({ ad }: { ad: any }) {
             </div>
           )}
           <div style={{ position: 'absolute', top: 6, left: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: '50%', background: ad.is_active ? '#22c55e' : '#9ca3af', display: 'inline-block', border: '1.5px solid #fff' }} />
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: ad.is_active ? '#ef4a1e' : '#9ca3af', display: 'inline-block', border: '1.5px solid #fff' }} />
           </div>
           {ad.days_running > 0 && (
             <div style={{ position: 'absolute', bottom: 6, right: 6, fontSize: 9, fontWeight: 700, padding: '2px 5px', background: 'rgba(0,0,0,0.6)', color: '#fff', borderRadius: 4 }}>
@@ -183,7 +183,7 @@ function OverviewTab({ data }: { data: BrandData }) {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(150px,100%), 1fr))', gap: 12 }}>
         {[
           { icon: '📦', label: 'Total Ads', value: brand.total_ads.toLocaleString(), color: '#141d15' },
-          { icon: '🟢', label: 'Active Now', value: brand.active_ads.toLocaleString(), color: '#16a34a' },
+          { icon: '🟢', label: 'Active Now', value: brand.active_ads.toLocaleString(), color: '#ef4a1e' },
           { icon: '📅', label: 'Avg Runtime', value: `${brand.avg_days_running}d`, color: '#7c3aed' },
           { icon: '🎬', label: 'Video Ads', value: brand.video_ads.toLocaleString(), color: '#0891b2' },
           { icon: '🖼', label: 'With Creative', value: brand.with_creative.toLocaleString(), color: '#b45309' },
@@ -221,7 +221,7 @@ function OverviewTab({ data }: { data: BrandData }) {
       {themes.length > 0 && (
         <div>
           <div style={{ fontSize: 13, fontWeight: 700, color: '#111', marginBottom: 10 }}>Themes Used</div>
-          <TagCloud items={themes.slice(0, 12)} color="#166534" bg="#f0fdf4" border="#bbf7d0" />
+          <TagCloud items={themes.slice(0, 12)} color="#9a3412" bg="#fff7f3" border="#f6d8cc" />
         </div>
       )}
 
@@ -295,7 +295,7 @@ function TextListTab({ items, emptyMsg }: {
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 13, color: '#1f2937', lineHeight: 1.6 }}>{item.text}</div>
                 <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.isActive ? '#22c55e' : '#d1d5db', display: 'inline-block' }} />
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: item.isActive ? '#ef4a1e' : '#d1d5db', display: 'inline-block' }} />
                   <span style={{ fontSize: 10, color: '#9ca3af' }}>
                     {item.isActive ? 'Active' : 'Ended'}
                     {item.date && ` · ${new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' })}`}
@@ -480,7 +480,7 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
               {brand && (
                 <div style={{ fontSize: 12, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 10 }}>
                   <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: brand.active_ads > 0 ? '#22c55e' : '#9ca3af', display: 'inline-block' }} />
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: brand.active_ads > 0 ? '#ef4a1e' : '#9ca3af', display: 'inline-block' }} />
                     {brand.active_ads > 0 ? `${brand.active_ads} active` : 'No active ads'}
                   </span>
                   {brand.first_seen && (
@@ -497,8 +497,8 @@ export default function BrandDrawer({ pageId, pageName, onClose }: BrandDrawerPr
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {pulling && (
                 <span title="We're pulling this brand's latest ads — refresh in a moment to see them"
-                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#15803d' }}>
-                  <span style={{ width: 12, height: 12, border: '2px solid #bbf7d0', borderTopColor: '#15803d', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '7px 12px', background: '#fff7f3', border: '1.5px solid #f6d8cc', borderRadius: 8, fontSize: 12, fontWeight: 700, color: '#9a3412' }}>
+                  <span style={{ width: 12, height: 12, border: '2px solid #f6d8cc', borderTopColor: '#9a3412', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
                   Fetching latest ads…
                 </span>
               )}

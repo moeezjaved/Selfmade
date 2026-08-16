@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { oppColor, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#141d15', LIME = '#ff5a2c', FAINT = '#9aa79a'
-const GOOD = '#2f7d3a', WARN = '#b7791f'
+const GOOD = '#ef4a1e', WARN = '#b7791f'
 const card: React.CSSProperties = { background: '#fff', borderRadius: 16, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 10px 30px -18px rgba(17,24,17,.10)' }
 
 function Confidence({ level }: { level: 1 | 2 | 3 }) {

@@ -163,7 +163,7 @@ export default function TrendingPage() {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', height: 44 }}>
                   <div style={{ width: 22, height: 22, borderRadius: '50%', background: '#141d15', color: '#ff5a2c', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 800, flexShrink: 0 }}>{initials(ad.pageName)}</div>
                   <span style={{ fontSize: 12.5, fontWeight: 600, color: '#374151', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', flex: 1 }}>{ad.pageName}</span>
-                  {ad.isActive && <span title="Currently running" style={{ width: 7, height: 7, borderRadius: '50%', background: '#16a34a', flexShrink: 0 }} />}
+                  {ad.isActive && <span title="Currently running" style={{ width: 7, height: 7, borderRadius: '50%', background: '#ef4a1e', flexShrink: 0 }} />}
                 </div>
               </article>
             ))}
