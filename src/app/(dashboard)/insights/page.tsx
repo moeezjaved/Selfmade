@@ -117,7 +117,7 @@ function InsightsPage() {
         </div>
         <div style={{display:'flex', gap:8, flexWrap:'wrap'}}>
           {['last_3d','last_7d','last_14d','last_30d'].map(d => (
-            <button key={d} onClick={() => setDateRange(d)} style={{background:dateRange===d?'#141d15':'#f4f0e6',border:dateRange===d?'1px solid #141d15':'1px solid rgba(0,0,0,0.1)',color:dateRange===d?'#ff5a2c':'#6b6a58',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
+            <button key={d} onClick={() => setDateRange(d)} style={{background:dateRange===d?'#ef4a1e':'#f4f0e6',border:dateRange===d?'1px solid #ef4a1e':'1px solid rgba(0,0,0,0.1)',color:dateRange===d?'#fff':'#6b6a58',padding:'7px 14px',borderRadius:100,fontSize:12,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>
               {d.replace('last_','').replace('d',' days')}
             </button>
           ))}

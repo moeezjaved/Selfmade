@@ -10,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { decryptToken } from '@/lib/meta/client'
 import { cacheGet, cacheSet } from '@/lib/meta/cache'
 import { num, emptyRow, accInsight, metricValue, inferFormat, type Row } from '@/lib/reports/engine'
@@ -30,8 +30,10 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams
   const spendThreshold = Number(sp.get('spendThreshold') || 0)
   const admin = createAdminClient()
+  // Scope to the ACTIVE BRAND (Aura → ROY 1), like the report/brief — an explicit ?account= wins.
+  const lbAcct = sp.get('account')
   let metaAccount: any
-  try { metaAccount = await resolveScopedAccount(admin, user.id) } catch { metaAccount = null }
+  try { metaAccount = lbAcct ? await resolveScopedAccount(admin, user.id, lbAcct.replace(/^act_/, '')) : await resolveBrandScopedAccount(admin, user.id) } catch { metaAccount = null }
   if (!metaAccount?.account_id) return NextResponse.json({ error: 'no_account', shifts: null, leaderboard: [] }, { status: 200 })
   const token = decryptToken(metaAccount.access_token)
   const currency = metaAccount.currency || 'USD'

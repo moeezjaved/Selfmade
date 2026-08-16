@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { NextRequest } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -16,8 +16,12 @@ export async function GET(request: NextRequest) {
     const days = parseInt(dateRange.replace('last_','').replace('d','')) || 7
 
     const admin = createAdminClient()
-    // Org-scoped: the primary account the user may use (their org's pool, bounded by assignment).
-    const metaAccount = await resolveScopedAccount(admin, user.id)
+    // Scope to the ACTIVE BRAND (Aura → ROY 1), like the report + brief — an explicit ?account= wins.
+    // Using the org primary showed Hair ResQ's PKR account (PKR 0) on an Aura page.
+    const acctParam = request.nextUrl.searchParams.get('account')
+    const metaAccount = acctParam
+      ? await resolveScopedAccount(admin, user.id, acctParam.replace(/^act_/, ''))
+      : await resolveBrandScopedAccount(admin, user.id)
 
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 

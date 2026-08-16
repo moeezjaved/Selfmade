@@ -153,15 +153,17 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     // dailyBudget is normalized to MAJOR units server-side (audit). Scale +20% off it.
     const currentMajor = Number(c.dailyBudget) || 0
     const newBudget = Math.max(1, Math.round(currentMajor * 1.2))
-    if (!(await confirmAction({ title: `Scale “${c.name}” +20%?`, body: `From ${money(currentMajor)}/day to ${money(newBudget)}/day. This raises spend on Meta right now.`, confirmLabel: 'Scale it' }))) return
+    // DUPLICATION scaling: instead of raising the live campaign's budget in place (which can reset the
+    // learning phase), we clone it into a new "— Scale" campaign at the higher budget and leave the
+    // ORIGINAL untouched. Safer, and the same thing the "What Mello would do" card does (/api/meta/scale).
+    if (!(await confirmAction({ title: `Scale “${c.name}” +20%?`, body: `Mello will duplicate it into a new campaign at ${money(newBudget)}/day and leave the original running untouched. This raises spend on Meta.`, confirmLabel: 'Scale it' }))) return
     setScaling(id)
     try {
-      // Send the account the card is CURRENTLY showing (sel) so the budget change
-      // runs against THAT ad account's token — not the org primary. Passing the
-      // wrong account was the "Object … does not exist / missing permissions" error.
-      const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget, account_id: sel || undefined }) })
+      // /api/meta/scale finds the campaign's OWN ad account by its id, so it always scales on the right
+      // token. It creates a fresh duplicate; the original keeps running.
+      const res = await fetch('/api/meta/scale', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: id, newDailyBudget: newBudget }) })
       const j = await res.json().catch(() => null)
-      if (res.ok && j?.success) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
+      if (res.ok && j?.ok) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
       else toast.error(j?.error || 'Could not scale — open Campaigns to do it manually.')
     } catch { toast.error('Could not scale — open Campaigns to do it manually.') }
     finally { setScaling(null) }
@@ -222,7 +224,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
               )}
               {canScale && (
                 done ? (
-                  <div style={{ marginTop: 8, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Scaled to {money(newBudget!)}/day</div>
+                  <div style={{ marginTop: 8, fontSize: 12, fontWeight: 750, color: GREEN }}>✓ Duplicated at {money(newBudget!)}/day — original still running</div>
                 ) : (
                   <button onClick={() => scaleCampaign(c)} disabled={busyRow}
                     style={{ marginTop: 8, border: 'none', borderRadius: 100, padding: '7px 16px', fontSize: 12.5, fontWeight: 800, fontFamily: 'inherit', cursor: busyRow ? 'default' : 'pointer', background: '#ef4a1e', color: '#fff', opacity: busyRow ? 0.6 : 1 }}>
