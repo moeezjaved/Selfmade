@@ -131,21 +131,35 @@ export async function runMetaAudit(admin: any, userId: string, opts: { syncFirst
   if (!accounts?.length) return null
 
   if (opts.syncFirst !== false) {
-    let anyTokenError = false
+    let tokenDead = false, accountDisabled = false
     for (const a of accounts) {
       try { await syncAccount(admin, a) } catch (e: any) {
-        // A dead token must SURFACE, not rot silently: mark + tell the founder in the brief.
-        if (/expired|invalid|OAuth/i.test(String(e?.message))) {
-          anyTokenError = true
+        const msg = String(e?.message || '')
+        // A dead TOKEN (expired/revoked) — reconnecting the same account fixes it.
+        const isToken = /expired|invalid|oauth|access token|revoked|session has been/i.test(msg)
+        // A DISABLED / BANNED / inaccessible ad account — Meta refuses the object entirely even with a
+        // valid token: code 100 subcode 33 ("does not exist, cannot be loaded due to missing permissions"),
+        // #200, #2635, "has been disabled", "not accessible", "deactivated". The ACCOUNT is dead → the
+        // founder must SWITCH to a working account, not just reconnect. (This is why a banned ROY-1-style
+        // account rotted as "active" for days: the old check only matched token errors.)
+        const isDisabled = /disabled|banned|deactivat|not accessible|cannot be loaded|does not exist|missing permission|#2635|#200|#10\b|no permission|restricted|account is closed|has been closed|unavailable/i.test(msg)
+        if (isToken || isDisabled) {
           await admin.from('meta_accounts').update({ status: 'error' }).eq('id', a.id)
+          if (isDisabled && !isToken) accountDisabled = true; else tokenDead = true
         }
       }
     }
-    // Keep exactly ONE health card in sync with reality: clear any existing "Meta lost access" card,
-    // then re-post only if a token is CURRENTLY dead. Without this the card rotted forever after the
-    // account was reconnected (the founder kept seeing "Meta lost access" on a healthy account).
+    // Keep exactly ONE health card in sync with reality: clear any existing card, then re-post only if a
+    // token/account is CURRENTLY dead (so it never rots after the account is fixed or switched).
     await admin.from('brief_events').delete().eq('user_id', userId).eq('kind', 'meta_health').then(() => {}, () => {})
-    if (anyTokenError) {
+    if (accountDisabled) {
+      await admin.from('brief_events').insert({
+        user_id: userId, kind: 'meta_health', importance: 92,
+        title: 'Your Meta ad account is disabled.',
+        body: 'Meta has disabled or banned this ad account, so I can’t read or run its campaigns. Connect a working ad account and I’ll pick right back up on the new one.',
+        cta_label: 'Switch / connect account', cta_href: '/connect/meta',
+      }).then(() => {}, () => {})
+    } else if (tokenDead) {
       await admin.from('brief_events').insert({
         user_id: userId, kind: 'meta_health', importance: 90,
         title: 'Meta lost access to your ad account.',
