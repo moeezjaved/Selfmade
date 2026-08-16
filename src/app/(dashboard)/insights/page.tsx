@@ -207,7 +207,7 @@ function InsightsPage() {
                           {recEmoji[adset.rec_type]} {recLabel[adset.rec_type]}
                         </div>
                         {adset.rec_type==='scale' && (
-                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+                          <button onClick={()=>{setScaleModal({campaign,adset});setScaleFactor('2');setIsBudgetIncrease(false)}} disabled={!!isActing} style={{background:'#ef4a1e',color:'#fff',border:'none',padding:'8px 20px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                             {isActing?'Scaling...':'Scale Now'}
                           </button>
                         )}
@@ -292,7 +292,7 @@ function InsightsPage() {
                   <div style={{fontSize:11,fontWeight:700,color:'#6b8f6b',marginBottom:8,textTransform:'uppercase',letterSpacing:'.06em'}}>Budget Multiplier for Duplicate</div>
                   <div style={{display:'grid',gridTemplateColumns:grid(4),gap:8,marginBottom:8}}>
                     {['1.5','2','3','5'].map(x=>(
-                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#141d15':'#e2e8f0'),background:scaleFactor===x?'#141d15':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#ff5a2c':'#374151'}}>
+                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#ef4a1e':'#e2e8f0'),background:scaleFactor===x?'#ef4a1e':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#fff':'#374151',transition:'all .12s'}}>
                         {x}x
                       </div>
                     ))}
@@ -309,7 +309,7 @@ function InsightsPage() {
                   </div>
                   <div style={{display:'grid',gridTemplateColumns:grid(3),gap:8}}>
                     {['5','10','15'].map(x=>(
-                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#b8860b':'rgba(255,255,255,0.1)'),background:scaleFactor===x?'rgba(251,191,36,0.1)':'rgba(255,255,255,0.02)',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#b8860b':'rgba(255,255,255,0.5)'}}>
+                      <div key={x} onClick={()=>setScaleFactor(x)} style={{padding:'10px 0',textAlign:'center',borderRadius:10,border:'2px solid '+(scaleFactor===x?'#f59e0b':'#e2e8f0'),background:scaleFactor===x?'#fef3c7':'#f8fafc',cursor:'pointer',fontSize:15,fontWeight:800,color:scaleFactor===x?'#92400e':'#6b7280',transition:'all .12s'}}>
                         +{x}%
                       </div>
                     ))}
@@ -321,8 +321,8 @@ function InsightsPage() {
 
             {/* Fixed Footer */}
             <div style={{padding:'14px 24px',borderTop:'1px solid rgba(0,0,0,0.07)',display:'flex',gap:10,flexShrink:0,background:'#ffffff',borderRadius:'0 0 20px 20px'}}>
-              <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid rgba(255,255,255,0.15)',color:'#6b8f6b',padding:'11px 0',borderRadius:100,fontSize:14,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
-              <button onClick={executeScale} style={{flex:2,background:'#ff5a2c',color:'#fff',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
+              <button onClick={()=>setScaleModal(null)} style={{flex:1,background:'none',border:'1.5px solid #e2e8f0',color:'#6b7280',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Cancel</button>
+              <button onClick={executeScale} style={{flex:2,background:'#ef4a1e',color:'#fff',border:'none',padding:'11px 0',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>
                 {isBudgetIncrease ? 'Increase Budget +'+scaleFactor+'%' : 'Scale '+scaleFactor+'x — Duplicate Now'}
               </button>
             </div>
