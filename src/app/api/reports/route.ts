@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { cacheGet, cacheSet } from '@/lib/meta/cache'
 
 const V = process.env.META_API_VERSION || 'v20.0'
@@ -26,7 +26,11 @@ export async function GET(request: NextRequest) {
         .eq('user_id', user.id).eq('account_id', wantAccount).eq('status', 'active').maybeSingle()
       metaAccount = data || null
     }
-    if (!metaAccount) metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
+    // No explicit account → resolve by the ACTIVE BRAND (Aura → ROY 1), like the brief does. This
+    // respects meta_accounts.brand_id instead of an arbitrary is_primary row (the founder has several
+    // is_primary=true accounts; the org-primary picked Hair ResQ's PKR account for an Aura report).
+    // Falls back to the org primary only when the active brand has nothing linked.
+    if (!metaAccount) metaAccount = await resolveBrandScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     // Cache the whole report (many Graph calls) per (user, account, range) — the Reports page + its

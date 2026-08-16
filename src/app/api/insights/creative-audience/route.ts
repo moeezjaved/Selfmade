@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { llm } from '@/lib/llm'
 
 export const maxDuration = 60
@@ -19,7 +19,10 @@ export async function GET(request: NextRequest) {
   // Honor the account the report is scoped to (?account=), so the Creative×Audience
   // block shows the SAME account+currency as the rest of the report — not the primary.
   const acctParam = request.nextUrl.searchParams.get('account')
-  const ma = await resolveScopedAccount(admin, user.id, acctParam ? acctParam.replace(/^act_/, '') : null)
+  // Explicit ?account= wins; otherwise scope to the ACTIVE BRAND (Aura → ROY 1), matching the report.
+  const ma = acctParam
+    ? await resolveScopedAccount(admin, user.id, acctParam.replace(/^act_/, ''))
+    : await resolveBrandScopedAccount(admin, user.id)
   if (!ma) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
   const token = decryptToken(ma.access_token)
