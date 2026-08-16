@@ -230,6 +230,22 @@ export default function InterviewPage() {
   const [plan, setPlan] = useState<string | null>(null)
   const trackCap = (() => { const c = planEntitlements(plan).brandSpy; return c === Infinity ? 999 : Math.max(1, c) })()
   useEffect(() => { fetch('/api/credits/balance').then(r => r.ok ? r.json() : null).then(j => { if (j?.plan) setPlan(String(j.plan)) }).catch(() => {}) }, [])
+  // FRONT-GATE for the "add a brand" flow (?new=1): if the user is already at their plan's brand cap,
+  // show the upgrade prompt UP FRONT (before the whole interview) instead of 402'ing silently at the end.
+  const [blocked, setBlocked] = useState<{ used: number; limit: number } | null>(null)
+  useEffect(() => {
+    let cancelled = false
+    let isNew = false
+    try { isNew = new URLSearchParams(window.location.search).get('new') === '1' } catch { /* ignore */ }
+    if (isNew) {
+      fetch('/api/brands').then(r => r.ok ? r.json() : null).then(j => {
+        if (cancelled || !j?.quota) return
+        const used = Number(j.quota.used ?? 0), limit = Number(j.quota.limit ?? -1)
+        if (limit >= 0 && used >= limit) setBlocked({ used, limit })
+      }).catch(() => {})
+    }
+    return () => { cancelled = true }
+  }, [])
   const brandIdRef = useRef<string | null>(null)
   const homeworkFired = useRef(false)
   const nightFired = useRef(false)
@@ -497,6 +513,27 @@ export default function InterviewPage() {
 
   // WhatsApp founder-connect removed from onboarding — founder briefs/approvals are Slack-only for now
   // (see project_whatsapp_founder_disabled). Customer WhatsApp is handled in the Inbox, not onboarding.
+
+  // At the brand cap (any plan) → don't run the interview, show the upgrade card immediately.
+  if (blocked) {
+    const atTopTier = blocked.limit >= 15
+    return (
+      <div style={{ minHeight: '100dvh', display: 'grid', placeItems: 'center', background: PAPER, padding: 24, fontFamily: "'Inter', -apple-system, sans-serif" }}>
+        <div style={{ maxWidth: 460, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '34px 30px', textAlign: 'center', boxShadow: '0 12px 44px rgba(20,29,21,.09)' }}>
+          <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 14 }}><Mello size={56} state="awake" /></div>
+          <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: INK }}>You&rsquo;ve used all your brands</h1>
+          <p style={{ margin: '0 0 22px', fontSize: 15, lineHeight: 1.6, color: MUTED }}>
+            You&rsquo;re using <b style={{ color: INK }}>{blocked.used}</b> of <b style={{ color: INK }}>{blocked.limit}</b> brand{blocked.limit === 1 ? '' : 's'} on your current plan.{' '}
+            {atTopTier ? 'Reach out and we&rsquo;ll lift the cap for you.' : 'Upgrade to Creator to run up to 15 brands from one login.'}
+          </p>
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => router.push('/billing')} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 100, padding: '12px 26px', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>{atTopTier ? 'Contact us →' : 'Upgrade →'}</button>
+            <button onClick={() => router.push('/brief')} style={{ background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Back to dashboard</button>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={{ minHeight: '100vh', background: night ? '#0b100c' : '#f6f8f5', fontFamily: "'Inter', -apple-system, sans-serif", transition: 'background .8s ease', display: 'flex', flexDirection: 'column' }}>
