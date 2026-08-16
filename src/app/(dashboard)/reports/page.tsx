@@ -44,7 +44,7 @@ function ReportsPage() {
   const [caExpanded, setCaExpanded] = useState<Record<string, boolean>>({})
   const [showCreate, setShowCreate] = useState(false)
   const [activeReport, setActiveReport] = useState<{ templateKey: string; savedId?: string; name?: string; config?: any } | null>(null)
-  const [deepDive, setDeepDive] = useState(false)   // the raw breakdowns live below the fold now
+  const [deepDive, setDeepDive] = useState(true)   // full detail (creatives, placement, age, gender, C×A) OPEN by default — the report the founder expects
 
   // Deep-links (reactive — fires on every URL change, so sidebar shortcuts work while already on /reports):
   // ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a template/shared one.
