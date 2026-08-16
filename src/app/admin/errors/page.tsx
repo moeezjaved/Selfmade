@@ -80,7 +80,7 @@ export default function ErrorsPage() {
   const [errors, setErrors] = useState<ErrorLog[]>([])
   const [expanded, setExpanded] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [hideIgnorable, setHideIgnorable] = useState(true)
+  const [sevFilter, setSevFilter] = useState<Sev | null>(null)
   const router = useRouter()
 
   useEffect(() => {
@@ -93,10 +93,12 @@ export default function ErrorsPage() {
     rows.forEach(r => { c[r.c.sev]++ })
     return c
   }, [rows])
+  // Default view hides the grey "safe to ignore" noise. Clicking a chip filters to ONLY that severity
+  // (including grey when you click "Safe to ignore"). Clicking the active chip again clears back to default.
   const shown = useMemo(() => rows
-    .filter(r => !(hideIgnorable && r.c.sev === 'ignore'))
+    .filter(r => sevFilter ? r.c.sev === sevFilter : r.c.sev !== 'ignore')
     .sort((a, b) => SEV[a.c.sev].rank - SEV[b.c.sev].rank || +new Date(b.e.created_at) - +new Date(a.e.created_at)),
-    [rows, hideIgnorable])
+    [rows, sevFilter])
 
   return (
     <div>
@@ -105,19 +107,25 @@ export default function ErrorsPage() {
         {errors.length} recorded · plain-English so you can tell real bugs from browser noise.
       </p>
 
-      {/* Summary — how many of each severity */}
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-        {(['serious', 'watch', 'info', 'ignore'] as Sev[]).map(sev => (
-          <div key={sev} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#fff', border: '1px solid #e8e8e8', borderRadius: 100, padding: '6px 14px' }}>
-            <span style={{ width: 9, height: 9, borderRadius: '50%', background: SEV[sev].dot }} />
-            <span style={{ fontSize: 13, fontWeight: 700, color: SEV[sev].color }}>{counts[sev]}</span>
-            <span style={{ fontSize: 12.5, color: '#6b7280' }}>{SEV[sev].label}</span>
-          </div>
-        ))}
-        <button onClick={() => setHideIgnorable(v => !v)}
-          style={{ marginLeft: 'auto', fontSize: 12.5, fontWeight: 700, color: '#374151', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 100, padding: '6px 14px', cursor: 'pointer' }}>
-          {hideIgnorable ? `Show safe-to-ignore (${counts.ignore})` : 'Hide safe-to-ignore'}
-        </button>
+      {/* Summary — click a bucket to filter to only those; click again to clear */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center' }}>
+        {(['serious', 'watch', 'info', 'ignore'] as Sev[]).map(sev => {
+          const active = sevFilter === sev
+          return (
+            <button key={sev} onClick={() => setSevFilter(active ? null : sev)} title={`Show only ${SEV[sev].label.toLowerCase()}`}
+              style={{ display: 'flex', alignItems: 'center', gap: 8, background: active ? `${SEV[sev].color}12` : '#fff', border: `1.5px solid ${active ? SEV[sev].color : '#e8e8e8'}`, borderRadius: 100, padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: SEV[sev].dot }} />
+              <span style={{ fontSize: 13, fontWeight: 700, color: SEV[sev].color }}>{counts[sev]}</span>
+              <span style={{ fontSize: 12.5, color: active ? SEV[sev].color : '#6b7280', fontWeight: active ? 700 : 400 }}>{SEV[sev].label}</span>
+            </button>
+          )
+        })}
+        {sevFilter && (
+          <button onClick={() => setSevFilter(null)}
+            style={{ marginLeft: 'auto', fontSize: 12.5, fontWeight: 700, color: '#374151', background: '#fff', border: '1px solid #e5e7eb', borderRadius: 100, padding: '6px 14px', cursor: 'pointer' }}>
+            Clear filter · show all
+          </button>
+        )}
       </div>
 
       {loading ? (
