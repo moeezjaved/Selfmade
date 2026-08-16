@@ -70,6 +70,14 @@ export async function POST(req: NextRequest) {
   // Enforce the plan's brand-slot cap before inserting.
   const { used, limit } = await brandQuota(admin, user.id)
   if (limit >= 0 && used >= limit) {
+    // Record this as a product event so it's VISIBLE in admin → Error Logs (a user hitting a wall is an
+    // upsell signal, and this handled 402 used to be swallowed silently — never logged anywhere).
+    try {
+      const { logError } = await import('@/lib/admin/logError')
+      await logError({ user_id: user.id, user_email: user.email || null,
+        error_message: `Brand limit reached — tried to add brand #${used + 1} on a ${limit}-brand plan`,
+        page_url: '/api/brands', extra: { kind: 'plan_limit', used, limit } })
+    } catch { /* logging never blocks the response */ }
     return NextResponse.json(
       { error: 'brand_limit_reached', used, limit, message: `Your plan includes ${limit} brand${limit === 1 ? '' : 's'}. Upgrade to add more.` },
       { status: 402 },
