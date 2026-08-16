@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface UserDetail {
-  id: string; email: string; full_name: string; subscription_status: string;
+  id: string; email: string; full_name: string; subscription_status: string; plan?: string; plan_label?: string;
   created_at: string; last_sign_in_at: string | null; business_type: string;
   niche: string; experience_level: string; trial_ends_at: string | null;
   ad_plan_clicked: boolean; campaign_launched: boolean; scale_clicked: boolean;
@@ -199,7 +199,9 @@ export default function UserProfile({ params }: { params: { id: string } }) {
         {/* Account Info */}
         <Section title="Account Info">
           <Row label="Email" value={user.email} />
-          <Row label="Plan" value={<span style={{ textTransform: 'capitalize' }}>{user.subscription_status}</span>} />
+          {/* The TRUE plan (entitlement), not the raw subscription status. Status is the badge up top. */}
+          <Row label="Plan" value={<span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{user.plan_label || user.subscription_status}</span>} />
+          <Row label="Billing status" value={<span style={{ textTransform: 'capitalize' }}>{user.subscription_status}</span>} />
           <Row label="Signup Date" value={fmt(user.created_at)} />
           <Row label="Last Login" value={fmt(user.last_sign_in_at)} />
           <Row label="Trial Ends" value={fmt(user.trial_ends_at)} />

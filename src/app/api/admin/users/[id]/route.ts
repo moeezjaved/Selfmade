@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { verifyAdminRequest } from '@/lib/admin/auth'
+import { getPlanId } from '@/lib/entitlements'
+import { PLANS } from '@/lib/plans'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,6 +30,12 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const authUser = authRes.data?.user
   const profile = profileRes.data
 
+  // The REAL plan the app grants (subscriptions.plan / user_profiles.plan_id, most-generous) — NOT the
+  // raw `subscription_status` string, which is a status (trialing/active), not a plan. A user comped to
+  // Creator kept showing "Trialing" because the admin read the status field instead of the entitlement.
+  const planId = await getPlanId(admin, userId).catch(() => 'free' as const)
+  const planLabel = PLANS[planId]?.label || 'Free'
+
   const campaigns = campaignsRes.data || []
   const launched = campaigns.some((c: any) => c.status === 'ACTIVE' || c.status === 'PAUSED')
   const scaleClicked = (scaleRes.data?.length || 0) > 0
@@ -51,6 +59,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     email: authUser?.email || '',
     full_name: profile?.full_name || '',
     subscription_status: profile?.subscription_status || 'trialing',
+    plan: planId,            // resolved entitlement id (e.g. 'starter')
+    plan_label: planLabel,   // human label (e.g. 'Creator') — the true plan, for the admin "Plan" row
     created_at: profile?.created_at || authUser?.created_at,
     last_sign_in_at: authUser?.last_sign_in_at || null,
     business_type: profile?.business_type || '',
