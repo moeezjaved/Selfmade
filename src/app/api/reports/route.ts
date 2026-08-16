@@ -37,7 +37,21 @@ export async function GET(request: NextRequest) {
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = "act_" + metaAccount.account_id
-    const currency = metaAccount.currency || 'PKR'
+    // Currency must come from META, not the stored column — a reconnected account
+    // (e.g. ROY 1) can carry a stale currency (PKR) while Meta actually bills in
+    // EUR, which showed the report in the wrong currency vs the live brief. Read
+    // it live and self-heal the stored value so every surface agrees next time.
+    let currency = metaAccount.currency || 'PKR'
+    try {
+      const accRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}?fields=currency&access_token=${token}`)
+      const accJson = await accRes.json()
+      if (accJson?.currency && accJson.currency !== currency) {
+        currency = accJson.currency
+        admin.from('meta_accounts').update({ currency }).eq('id', metaAccount.id).then(() => {}, () => {})
+      } else if (accJson?.currency) {
+        currency = accJson.currency
+      }
+    } catch { /* keep stored currency on any Graph hiccup */ }
 
     const since = new Date(Date.now() - days * 86400000).toISOString().split('T')[0]
     const until = new Date().toISOString().split('T')[0]
