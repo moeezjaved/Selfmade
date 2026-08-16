@@ -11,7 +11,11 @@
  */
 const KEY = process.env.GEMINI_API_KEY
 const MODEL_DEFAULT = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
-const MODEL_PRO = process.env.GEMINI_IMAGE_MODEL_PRO || 'gemini-2.5-flash-image'
+// Pro MUST default to the real Nano Banana Pro model — NOT flash. Defaulting to flash meant that when
+// GEMINI_IMAGE_MODEL_PRO was unset, every "Pro" render (clone/remake — billed at Pro) silently ran on
+// flash, which is exactly the "product/copy comes out wrong" regression (e.g. a wooden vape pen drawn
+// as a 'duck call'). Env still overrides; the default is now the correct premium id.
+const MODEL_PRO = process.env.GEMINI_IMAGE_MODEL_PRO || 'gemini-3-pro-image'
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
 export const geminiEnabled = !!KEY
