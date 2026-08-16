@@ -156,14 +156,17 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
   // (auditAccount — brand-scoped, 10-min cached, last_30d), so the number the founder reads on the card
   // and the number Mello quotes in chat are IDENTICAL. Fail-soft to the frozen nightly payload if the
   // live read is slow or unavailable (never blocks the brief). Fetched once (at most one Meta card).
-  let liveMeta: any = null
-  if ((spine as any[]).some((e: any) => e.kind === 'meta_audit')) {
-    liveMeta = await soft((async () => {
-      const [{ resolveBrandScopedAccount }, { auditAccount }] = await Promise.all([import('@/lib/meta/scope'), import('@/lib/meta/audit')])
-      const acct = (await resolveBrandScopedAccount(admin, userId, opts.brandId ?? undefined))?.account_id
-      return await auditAccount(admin, userId, acct, 'last_30d')
-    })(), null, 4000)
-  }
+  // Fetch a fresh LIVE audit (the SAME source as chat) for the brand's connected account whenever the
+  // brand HAS a connected account — not only when a nightly Meta event exists — so a just-(re)connected
+  // account shows its live campaigns on the brief IMMEDIATELY, instead of waiting for the nightly cron.
+  let liveMeta: any = null, liveMetaAcctName: string | null = null
+  liveMeta = await soft((async () => {
+    const [{ resolveBrandScopedAccount }, { auditAccount }] = await Promise.all([import('@/lib/meta/scope'), import('@/lib/meta/audit')])
+    const acct = await resolveBrandScopedAccount(admin, userId, opts.brandId ?? undefined)
+    if (!acct) return null   // no connected/healthy account for this brand → no Meta card
+    liveMetaAcctName = acct.account_name || null
+    return await auditAccount(admin, userId, acct.account_id, 'last_30d')
+  })(), null, 5000)
 
   for (const e of spine) {
     // The Meta audit carries structured numbers in payload → render as the dedicated Facebook Ads card
@@ -188,6 +191,24 @@ export async function assembleBrief(admin: SupabaseClient, userId: string, userM
     }
     items.push({ id: e.id, kind: e.kind, importance: e.importance ?? 50, title: e.title, body: e.body || undefined, cta_label: e.cta_label || undefined, cta_href: e.cta_href || undefined, at: e.created_at })
   }
+  // If the brand has a connected account with live data but NO nightly Meta event yet (e.g. just
+  // reconnected — the event lags a cycle), synthesize the live Facebook Ads card here so campaigns show
+  // right away instead of the "run ads" promo. Fail-soft: no live data → no card (promo stays).
+  if (liveMeta && liveMeta.spend != null && !items.some((it: any) => it.kind === 'meta_ads')) {
+    const m: any = liveMeta
+    items.push({
+      id: 'meta_live', kind: 'meta_ads', importance: 96, title: 'Your Meta ads',
+      cta_label: 'See the full report', cta_href: '/reports', at: new Date().toISOString(),
+      metaAudit: {
+        total: Number(m.total || 0), spend: Number(m.spend || 0), avgRoas: Number(m.avgRoas || 0),
+        currency: typeof m.currency === 'string' ? m.currency : 'USD', accountName: m.accountName || liveMetaAcctName || null,
+        scale: Array.isArray(m.scale) ? m.scale : [], watch: Array.isArray(m.watch) ? m.watch : [], pause: Array.isArray(m.pause) ? m.pause : [],
+        opportunities: Array.isArray(m.opportunities) ? m.opportunities : [],
+        ...(m.selected ? { selected: m.selected } : {}),
+      } as any,
+    })
+  }
+
   if (spine.length) admin.from('brief_events').update({ surfaced_at: new Date().toISOString() }).in('id', spine.map((e: any) => e.id)).is('surfaced_at', null).then(() => {}, () => {})
 
   const needIds = notifs.filter((n: any) => isBlankName(n.brand_name)).map((n: any) => n.page_id).filter(Boolean)
