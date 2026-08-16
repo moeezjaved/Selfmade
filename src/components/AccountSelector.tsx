@@ -32,8 +32,14 @@ export default function AccountSelector({ onAccountChange, initialAccountId }: P
         const want = initialAccountId ? String(initialAccountId).replace(/^act_/, '') : ''
         const wanted = want && accs.find((a: MetaAccount) => a.account_id === want)
         const primary = wanted || accs.find((a: MetaAccount) => a.is_primary) || accs[0]
-        if (primary) setSelected(primary.account_id)
+        if (primary) {
+          setSelected(primary.account_id)
+          // Broadcast the RESOLVED account on mount so the page fetches for exactly the account shown
+          // here (a healthy connected one) — never the server's ambiguous org-primary.
+          onAccountChange(primary.account_id)
+        }
       })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAccountId])
 
   const handleSelect = async (accountId: string) => {
