@@ -11,9 +11,13 @@ interface MetaAccount {
 
 interface Props {
   onAccountChange: (accountId: string) => void
+  // When the page arrives scoped to a specific account (e.g. /reports?account=…
+  // from the brief card), show THAT account — not the org primary — so the
+  // header currency matches the figures on screen.
+  initialAccountId?: string | null
 }
 
-export default function AccountSelector({ onAccountChange }: Props) {
+export default function AccountSelector({ onAccountChange, initialAccountId }: Props) {
   const [accounts, setAccounts] = useState<MetaAccount[]>([])
   const [selected, setSelected] = useState<string>('')
   const [open, setOpen] = useState(false)
@@ -25,10 +29,12 @@ export default function AccountSelector({ onAccountChange }: Props) {
       .then(d => {
         const accs = d.accounts || []
         setAccounts(accs)
-        const primary = accs.find((a: MetaAccount) => a.is_primary) || accs[0]
+        const want = initialAccountId ? String(initialAccountId).replace(/^act_/, '') : ''
+        const wanted = want && accs.find((a: MetaAccount) => a.account_id === want)
+        const primary = wanted || accs.find((a: MetaAccount) => a.is_primary) || accs[0]
         if (primary) setSelected(primary.account_id)
       })
-  }, [])
+  }, [initialAccountId])
 
   const handleSelect = async (accountId: string) => {
     if (accountId === selected) { setOpen(false); return }

@@ -156,7 +156,10 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     if (!(await confirmAction({ title: `Scale “${c.name}” +20%?`, body: `From ${money(currentMajor)}/day to ${money(newBudget)}/day. This raises spend on Meta right now.`, confirmLabel: 'Scale it' }))) return
     setScaling(id)
     try {
-      const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget }) })
+      // Send the account the card is CURRENTLY showing (sel) so the budget change
+      // runs against THAT ad account's token — not the org primary. Passing the
+      // wrong account was the "Object … does not exist / missing permissions" error.
+      const res = await fetch('/api/campaigns/manage', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'update_budget', id, budget: newBudget, account_id: sel || undefined }) })
       const j = await res.json().catch(() => null)
       if (res.ok && j?.success) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
       else toast.error(j?.error || 'Could not scale — open Campaigns to do it manually.')

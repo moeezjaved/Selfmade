@@ -16,7 +16,10 @@ export async function GET(request: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  const ma = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
+  // Honor the account the report is scoped to (?account=), so the Creative×Audience
+  // block shows the SAME account+currency as the rest of the report — not the primary.
+  const acctParam = request.nextUrl.searchParams.get('account')
+  const ma = await resolveScopedAccount(admin, user.id, acctParam ? acctParam.replace(/^act_/, '') : null)
   if (!ma) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
   const token = decryptToken(ma.access_token)
