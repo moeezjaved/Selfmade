@@ -2,8 +2,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { resolveScopedAccount } from '@/lib/meta/scope'
+import { logError } from '@/lib/admin/logError'
 
 const V = process.env.META_API_VERSION || 'v20.0'
+
+// Turn a raw Graph error into something the founder can act on. Meta's
+// "Object with ID '…' does not exist, cannot be loaded due to missing
+// permissions" almost always means the write hit the WRONG ad account's
+// token (or the account was reconnected and the campaign id is stale) —
+// say that plainly instead of dumping the API sentence.
+function humanMetaError(raw: string): string {
+  const s = String(raw || '')
+  if (/does not exist|missing permission|cannot be loaded|unsupported (get|post) request/i.test(s))
+    return 'That campaign isn’t on the ad account this card is showing — switch to the right Facebook account (top of the card) and try again, or open Campaigns to do it there.'
+  if (/expired|invalid|OAuth|session/i.test(s))
+    return 'Meta needs you to reconnect this ad account before changes can be made. Reconnect from the brief, then try again.'
+  if (/disabled|banned|deactivat/i.test(s))
+    return 'This Meta ad account is disabled, so changes can’t be pushed. Switch to a working account.'
+  return 'Could not apply the change on Meta — open Campaigns to do it manually.'
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -150,17 +167,25 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  let user: any = null
+  let body: any = {}
   try {
     const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+    ;({ data: { user } } = await supabase.auth.getUser())
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
-    const metaAccount = await resolveScopedAccount(admin, user.id)   // org-scoped primary account
+    body = await request.json()
+    // Scale/edit MUST run against the SAME account the founder is looking at.
+    // The brief card sends account_id (the account in its switcher); using the
+    // org primary instead was pushing ROY-1 campaign ids through another
+    // account's token → Meta "Object … does not exist / missing permissions".
+    // Fall back to primary only when no account_id is given (legacy callers).
+    const bodyAccountId = body.account_id ? String(body.account_id).replace(/^act_/, '') : null
+    const metaAccount = await resolveScopedAccount(admin, user.id, bodyAccountId)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
-    const body = await request.json()
 
     const post = async (path: string, data: Record<string, unknown>) => {
       const url = `https://graph.facebook.com/${V}/${path}`
@@ -265,6 +290,18 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: 'Unknown action' }, { status: 400 })
   } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    const raw = String(err?.message || err)
+    // This was the silent one — a failed Scale/edit threw the raw Graph text to
+    // the founder but never landed in the admin error log. Record it (plain
+    // kind so /admin/errors buckets it) so we can see write failures.
+    await logError({
+      user_id: user?.id || null,
+      user_email: user?.email || null,
+      error_message: `Meta campaign ${body?.action || 'action'} failed: ${raw}`,
+      error_stack: err?.stack || null,
+      page_url: '/api/campaigns/manage',
+      extra: { kind: 'meta_write_failed', action: body?.action || null, target_id: body?.id || null, account_id: body?.account_id || null },
+    })
+    return NextResponse.json({ error: humanMetaError(raw), raw }, { status: 500 })
   }
 }

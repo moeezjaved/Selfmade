@@ -104,7 +104,10 @@ function ReportsPage() {
   const loadCreativeAudience = async () => {
     setCaLoading(true)
     try {
-      const res = await fetch(`/api/insights/creative-audience?dateRange=${dateRange}`)
+      // Scope Creative×Audience to the SAME account as the rest of the report
+      // (?account=) so its currency/figures match — not the org primary.
+      const acct = new URLSearchParams(searchParams?.toString() || '').get('account')
+      const res = await fetch(`/api/insights/creative-audience?dateRange=${dateRange}${acct ? `&account=${encodeURIComponent(acct)}` : ''}`)
       const json = await res.json()
       setCaData(json.creatives || [])
       if (json.currency) setCaCurrency(json.currency)
@@ -175,8 +178,9 @@ function ReportsPage() {
           <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4 }}>Deep insights from your Meta ads.</div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          {/* Which ad account this report is for — switch to re-scope (sets the org primary account). */}
-          <AccountSelector onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
+          {/* Which ad account this report is for — switch to re-scope (sets the org primary account).
+              Initialize to the ?account= the brief handed us so the header matches the figures shown. */}
+          <AccountSelector initialAccountId={new URLSearchParams(searchParams?.toString() || '').get('account')} onAccountChange={() => setTimeout(() => { loadReports(); loadCreativeAudience() }, 600)} />
           <div style={{ display: 'flex', gap: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: 3 }}>
             {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
               <button key={r} onClick={() => setDateRange(r)} style={{ padding: '6px 14px', borderRadius: 100, border: 'none', fontFamily: 'inherit', fontWeight: 750, fontSize: 12.5, cursor: 'pointer', background: dateRange === r ? '#ef4a1e' : 'transparent', color: dateRange === r ? '#fff' : MUTED, transition: 'all .12s' }}>
