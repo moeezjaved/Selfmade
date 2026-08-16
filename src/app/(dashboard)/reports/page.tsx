@@ -10,7 +10,6 @@ import GeneratedReport from '@/components/reports/GeneratedReport'
 import SavedReportsNav from '@/components/reports/SavedReportsNav'
 import LaunchReport from '@/components/reports/LaunchReport'
 import { TEMPLATES } from '@/lib/reports/templates'
-import ReportsNarrative from '@/components/reports/ReportsNarrative'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +43,6 @@ function ReportsPage() {
   const [caExpanded, setCaExpanded] = useState<Record<string, boolean>>({})
   const [showCreate, setShowCreate] = useState(false)
   const [activeReport, setActiveReport] = useState<{ templateKey: string; savedId?: string; name?: string; config?: any } | null>(null)
-  const [deepDive, setDeepDive] = useState(true)   // full detail (creatives, placement, age, gender, C×A) OPEN by default — the report the founder expects
 
   // Deep-links (reactive — fires on every URL change, so sidebar shortcuts work while already on /reports):
   // ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a template/shared one.
@@ -165,10 +163,9 @@ function ReportsPage() {
 
       <AdsTabs />
 
-      {/* Two-column: the saved-reports list is a left SIDEBAR (it was a full-width column dominating the
-          page), report content on the right. Each saved report deep-links to ?report=<id>. */}
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '236px minmax(0,1fr)', gap: isMobile ? 12 : 28, alignItems: 'start' }}>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}><SavedReportsNav /></div>
+      {/* Classic full-width detail report (what the founder expects). Saved reports sit in a slim strip
+          up top; each still deep-links to ?report=<id>. */}
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', marginBottom: 20 }}><SavedReportsNav /></div>
         <div style={{ minWidth: 0 }}>
 
       {/* Header — editorial serif title, quiet controls */}
@@ -201,23 +198,27 @@ function ReportsPage() {
       ) : data && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
-          {/* ── Mello's overnight debrief — insight-first, one question per section. ── */}
-          <ReportsNarrative data={data} ca={caData} currency={data.currency} days={parseInt(dateRange.replace(/\D/g, ''), 10) || 7} />
+          {/* Overview KPIs — the four numbers that matter, big and calm (classic full-detail view). */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(170px,100%), 1fr))', gap: 12 }}>
+            {[
+              { label: 'Total spend', value: fmt(data.overview?.spend || 0, data.currency), color: bad },
+              { label: 'Total revenue', value: fmt(data.overview?.revenue || 0, data.currency), color: good },
+              { label: 'Blended ROAS', value: (data.overview?.roas || 0).toFixed(2) + 'x', color: roasColor(data.overview?.roas || 0) },
+              { label: 'Conversions', value: String(data.overview?.conversions || 0), color: INK },
+            ].map(k => (
+              <div key={k.label} style={{ ...CARD, padding: '16px 20px', position: 'relative', overflow: 'hidden' }}>
+                <div style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 3, background: k.color, opacity: .85 }} />
+                <div style={{ fontSize: 10.5, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.09em', marginBottom: 8 }}>{k.label}</div>
+                <div style={{ fontFamily: SERIF, fontSize: 32, fontWeight: 400, color: k.color, letterSpacing: '-.01em', lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{k.value}</div>
+              </div>
+            ))}
+          </div>
 
-          {/* ── Build a report — the template library, visible, after the story. ── */}
+          {/* Build a report — the template library. */}
           <TemplateLibrary onOpen={(k) => setActiveReport({ templateKey: k })} onMore={() => setShowCreate(true)} />
 
-          {/* ── Deep dive — every raw breakdown, tucked below the fold (the story above is the point). ── */}
-          <button onClick={() => setDeepDive(d => !d)}
-            style={{ ...CARD, border: 'none', cursor: 'pointer', fontFamily: 'inherit', padding: '14px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', textAlign: 'left' }}>
-            <span>
-              <span style={{ display: 'block', fontSize: 14.5, fontWeight: 750, color: INK }}>Deep dive</span>
-              <span style={{ display: 'block', fontSize: 12, color: MUTED, marginTop: 2 }}>Every raw breakdown — creatives, placements, ages, devices, regions, hours.</span>
-            </span>
-            <span style={{ fontSize: 13, color: FAINT, fontWeight: 800 }}>{deepDive ? '▲' : '▼'}</span>
-          </button>
-
-          {deepDive && (<>
+          {/* Full detail — every breakdown, always open (the classic report). */}
+          <>
           {/* Sort Filter Bar (drill-downs only) */}
           <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.07em', marginRight: 4 }}>Sort by</span>
@@ -365,12 +366,11 @@ function ReportsPage() {
               conversions: r.conversions, ctr: r.ctr, cpa: r.cpa,
             }))}
           />
-          </>)}
+          </>
 
         </div>
       )}
         </div>
-      </div>
     </div>
   )
 }
