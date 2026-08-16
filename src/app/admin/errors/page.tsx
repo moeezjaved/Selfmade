@@ -55,6 +55,12 @@ function classify(err: ErrorLog): { sev: Sev; tag: string; title: string; meanin
   if (/timeout|timed out|\b504\b|gateway|statement timeout/i.test(s))
     return { sev: 'watch', tag: 'Slow / timeout', title: 'Something took too long', meaning: 'A request timed out. Worth a look if it repeats — usually a slow database query or a busy server.' }
 
+  // React streaming / DOM-mutation errors — a browser extension (or the page being altered) removed a
+  // node React was tracking. "$RC" is React's Suspense stream-completion script; parentNode/removeChild/
+  // insertBefore-of-null is the classic extension signature. Almost never your code.
+  if (/\$rc\b/i.test(m) || /reading '(parentnode|removechild|insertbefore|appendchild|childnodes|firstchild)'/i.test(s) || /(removechild|insertbefore|appendchild).*not a child|failed to execute '(removechild|insertbefore)'/i.test(s))
+    return { sev: 'ignore', tag: 'Browser extension', title: 'The page DOM was changed under React', meaning: 'A browser extension (translator, ad-blocker, Grammarly…) or the streamed page being modified removed a node React was tracking ("$RC" is React’s streaming script). Almost always the visitor’s browser, not your code — safe to ignore unless it suddenly spikes across many users.' }
+
   // Genuine JS bugs
   if (/typeerror|referenceerror|is not a function|cannot read propert|undefined is not|null is not an object|syntaxerror|unexpected token/i.test(s))
     return { sev: 'serious', tag: 'App bug', title: 'A real code error for this user', meaning: 'This looks like an actual bug in the app. Open the details for the stack trace and the page it happened on.' }
