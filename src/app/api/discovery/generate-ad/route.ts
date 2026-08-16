@@ -60,6 +60,7 @@ async function handle(req: NextRequest) {
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user.id, user_email: user.email || null, error_message: insufficient ? `Insufficient credits — studio ad (${action})` : `Credit reserve failed — studio ad`, page_url: '/studio', extra: { kind: insufficient ? 'insufficient_credits' : 'render_failed', action } }) } catch { /* never block */ }
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id

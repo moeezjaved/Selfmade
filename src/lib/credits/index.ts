@@ -45,7 +45,11 @@ export async function reserveCredits(
     const msg = error.message || ''
     if (msg.includes('insufficient_credits')) {
       const m = msg.match(/need=(\d+),have=(\d+)/)
-      throw new InsufficientCreditsError(m ? +m[1] : 0, m ? +m[2] : 0)
+      const need = m ? +m[1] : 0, have = m ? +m[2] : 0
+      // Product telemetry: a user hit an out-of-credits wall → visible in admin Error Logs (Info, not a
+      // crash). Covers every reserveCredits() caller (reports, brand-spy, asset tagging, Mello tools).
+      try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: userId, error_message: `Insufficient credits — "${action}" needs ${need}, has ${have}`, page_url: '/credits', extra: { kind: 'insufficient_credits', action, need, have } }) } catch { /* never block */ }
+      throw new InsufficientCreditsError(need, have)
     }
     throw new Error(msg || 'reserve_credits failed')
   }

@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ orderId: id, basket: basketId })
   } catch (e: any) {
     await admin.from('paypal_orders').update({ status: 'failed', err_code: 'CREATE' }).eq('basket_id', basketId)
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user?.id || null, user_email: user?.email || null, error_message: `Card order create failed — ${String(e?.message || e)}`, page_url: '/billing', extra: { kind: 'payment_failed', stage: 'card_create' } }) } catch { /* never block */ }
     return NextResponse.json({ error: 'paypal_failed', message: String(e?.message || e) }, { status: 502 })
   }
 }

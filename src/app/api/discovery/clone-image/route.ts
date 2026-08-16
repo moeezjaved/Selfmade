@@ -86,6 +86,7 @@ async function enqueue(req: NextRequest) {
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: actorId, p_action: action })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: actorId, user_email: actorEmail || null, error_message: insufficient ? `Insufficient credits — image remake (${action})` : `Credit reserve failed — image remake`, page_url: '/studio', extra: { kind: insufficient ? 'insufficient_credits' : 'render_failed', action } }) } catch { /* never block */ }
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id

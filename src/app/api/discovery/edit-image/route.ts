@@ -95,6 +95,7 @@ export async function POST(req: NextRequest) {
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user.id, user_email: user.email || null, error_message: insufficient ? `Insufficient credits — image edit (${action})` : `Credit reserve failed — image edit`, page_url: '/studio', extra: { kind: insufficient ? 'insufficient_credits' : 'render_failed', action } }) } catch { /* never block */ }
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id
@@ -105,7 +106,7 @@ export async function POST(req: NextRequest) {
     if (!cur) { await refund(); return NextResponse.json({ error: 'could not read the current image' }, { status: 422 }) }
 
     const gen = await generateImage(buildEditPrompt(String(instruction).trim()), [cur], useTier)
-    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : gen.error }, { status: 502 }) }
+    if (!gen.ok) { await refund(); try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user.id, user_email: user.email || null, error_message: `Image edit render failed — ${gen.error || 'model error'}`, page_url: '/studio', extra: { kind: 'render_failed', stage: 'edit-image' } }) } catch { /* never block */ } ; return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The Pro image model is busy right now — please try again in a minute. You weren’t charged.' : gen.error }, { status: 502 }) }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
@@ -116,6 +117,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null, tier: useTier })
   } catch (e: any) {
     await refund()
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user.id, user_email: user.email || null, error_message: `Image edit render failed — ${String(e?.message || e)}`, page_url: '/studio', extra: { kind: 'render_failed', stage: 'edit-image' } }) } catch { /* never block */ }
     return NextResponse.json({ error: String(e?.message || e) }, { status: 500 })
   }
 }
