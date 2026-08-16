@@ -225,6 +225,18 @@ async function runGeneration(input: {
 
     // Service brands have no product to describe; physical brands ground the scene/copy on it.
     let productDesc = (!isService && products[0]) ? await describeProduct(products[0]).catch(() => null) : null
+    // PHYSICAL grounding backstop — vision alone once misread a wooden vape-pen product as a
+    // "wooden duck call" and the whole ad drifted to hunting copy. So anchor physical brands on their
+    // OWN written description/USPs/category too (authoritative), with the photo reading as secondary —
+    // the model must never invent a different product from an ambiguous-looking photo.
+    if (!isService) {
+      const bText = [
+        (brandRow as any)?.description && String((brandRow as any).description).trim(),
+        Array.isArray((brandRow as any)?.usps) && (brandRow as any).usps.length ? `Key points: ${(brandRow as any).usps.slice(0, 4).join(', ')}` : null,
+        Array.isArray((brandRow as any)?.industry) && (brandRow as any).industry.length ? `Category: ${(brandRow as any).industry.slice(0, 2).join(', ')}` : null,
+      ].filter(Boolean).join('. ')
+      if (bText) productDesc = productDesc ? `${bText}. (The product photo shows: ${productDesc})` : bText
+    }
     // SERVICE grounding — without this the model guesses what the brand does from its NAME alone
     // (e.g. "Selfmade" → invented self-improvement copy for an AI-ads platform). Source of truth:
     // the user-written brand description/USPs first, the website's own meta description as fallback.
