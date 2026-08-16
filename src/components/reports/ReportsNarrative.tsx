@@ -27,7 +27,8 @@ import { computeOpportunities, oppColor } from '@/lib/meta/opportunities'
 const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#141d15', LIME = '#ff5a2c'
 const SERIF = "'Instrument Serif', Georgia, serif"
 const CARD: React.CSSProperties = { background: '#fff', borderRadius: 18, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 12px 32px -20px rgba(17,24,17,.14)' }
-const good = '#2f7d3a', warn = '#b7791f', bad = '#c0392b'
+// Brand-orange for "good/positive" (the app's accent) instead of green; amber stays "okay", red stays "bad".
+const good = '#ef4a1e', warn = '#b7791f', bad = '#c0392b'
 const roasColor = (r: number) => (r >= 2 ? good : r >= 1 ? warn : bad)
 
 type Row = { label?: string; name?: string; roas: number; spend: number; revenue: number; conversions: number; ctr: number; cpa: number; thumbnail_url?: string; preview_url?: string; placement?: string; age_range?: string; gender?: string; device?: string; region?: string; hour?: string; day?: string }
@@ -128,7 +129,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
   const maxHourRev = Math.max(...m.hours.map(h => h.revenue), 1)
   const maxDayRev = Math.max(...m.dailies.map(d => d.revenue), 1)
   // Cap the tint so dark text ALWAYS reads on top (was going to ~0.93 → green-on-dark-green, unreadable).
-  const heat = (v: number, max: number) => `rgba(63,143,79,${(0.05 + clamp(v / max) * 0.40).toFixed(2)})`
+  const heat = (v: number, max: number) => `rgba(239,74,30,${(0.05 + clamp(v / max) * 0.40).toFixed(2)})`
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
@@ -194,7 +195,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%), 1fr))', gap: 14 }}>
           {[{ rows: m.winners, tone: good, tag: 'KEEP FEEDING' }, { rows: m.losers, tone: bad, tag: 'STOP THE BLEED' }].map((col, ci) => col.rows.length > 0 && (
             <div key={ci} style={{ border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden' }}>
-              <div style={{ padding: '8px 14px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: col.tone, background: ci === 0 ? 'rgba(47,125,58,.06)' : 'rgba(192,57,43,.05)' }}>{col.tag}</div>
+              <div style={{ padding: '8px 14px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: col.tone, background: ci === 0 ? 'rgba(239,74,30,.06)' : 'rgba(192,57,43,.05)' }}>{col.tag}</div>
               {col.rows.map((c, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderTop: `1px solid ${LINE}` }}>
                   <Thumb src={c.thumbnail_url} ring={col.tone} />
@@ -235,7 +236,7 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
       {m.byRoas.length >= 2 && (
         <Section n={5} question="The creative battlefield"
           answer={<>Each ad, placed by <B>spend</B> (→) and <B>return</B> (↑). Top-left = hidden gems worth feeding; bottom-right = expensive mistakes.</>}>
-          <div style={{ position: 'relative', height: 240, background: 'linear-gradient(to top right, rgba(192,57,43,.04), rgba(47,125,58,.05))', borderRadius: 14, border: `1px solid ${LINE}` }}>
+          <div style={{ position: 'relative', height: 240, background: 'linear-gradient(to top right, rgba(192,57,43,.04), rgba(239,74,30,.05))', borderRadius: 14, border: `1px solid ${LINE}` }}>
             {/* quadrant labels */}
             <span style={{ position: 'absolute', top: 8, left: 12, fontSize: 10, fontWeight: 800, letterSpacing: '.06em', color: good, opacity: .75 }}>HIDDEN GEMS</span>
             <span style={{ position: 'absolute', top: 8, right: 12, fontSize: 10, fontWeight: 800, letterSpacing: '.06em', color: good }}>SCALE THESE</span>
