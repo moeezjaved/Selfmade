@@ -30,6 +30,7 @@ const R2_PUBLIC = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '')
 async function getJSON(path) { const r = await fetch(`${U}/rest/v1/${path}`, { headers: H }); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json() }
 async function patch(path, body) { const r = await fetch(`${U}/rest/v1/${path}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(body) }); if (!r.ok) console.warn('patch', path, r.status, (await r.text()).slice(0, 120)) }
 async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, { method: 'POST', headers: H, body: JSON.stringify(body) }); if (!r.ok) console.warn('rpc', fn, r.status, (await r.text()).slice(0, 120)) }
+async function logErr(userId, message, extra) { try { await fetch(`${U}/rest/v1/error_logs`, { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: userId || null, error_message: String(message || '').slice(0, 2000), page_url: '/studio', extra: extra || null }) }) } catch { /* never block */ } }
 
 function ff(args) {
   return new Promise((resolve, reject) => {
@@ -82,6 +83,7 @@ async function processJob(job) {
   } catch (e) {
     console.warn(`animate ${job.id} failed:`, e.message)
     await patch(`creative_generations?id=eq.${job.id}`, { status: 'failed' })
+    await logErr(job.user_id, `Animation render failed — ${e.message}`, { kind: 'render_failed', stage: 'animate', job: job.id })
     if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
   } finally {
     await rm(inFile, { force: true }).catch(() => {})

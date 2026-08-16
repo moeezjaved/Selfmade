@@ -57,6 +57,8 @@ const R2_PUBLIC = (process.env.R2_PUBLIC_URL || '').replace(/\/$/, '')
 async function getJSON(path) { const r = await fetch(`${U}/rest/v1/${path}`, { headers: H }); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json() }
 async function patch(path, body) { const r = await fetch(`${U}/rest/v1/${path}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify(body) }); if (!r.ok) console.warn('patch', path, r.status, (await r.text()).slice(0, 160)) }
 async function rpc(fn, body) { const r = await fetch(`${U}/rest/v1/rpc/${fn}`, { method: 'POST', headers: H, body: JSON.stringify(body) }); if (!r.ok) console.warn('rpc', fn, r.status, (await r.text()).slice(0, 160)) }
+// Surface a handled failure to the admin Error Logs dashboard (same error_logs table the app uses).
+async function logErr(userId, message, extra) { try { await fetch(`${U}/rest/v1/error_logs`, { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: userId || null, error_message: String(message || '').slice(0, 2000), page_url: '/studio', extra: extra || null }) }) } catch { /* logging never blocks the worker */ } }
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
@@ -1394,6 +1396,7 @@ async function captionJob(job) {
   } catch (e) {
     console.warn(`caption ${job.id} failed:`, e.message)
     await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
+    await logErr(job.user_id, `Video captions render failed — ${e.message}`, { kind: 'render_failed', stage: 'captions', job: job.id })
     if (job.credit_tx) await rpc('refund_credits', { p_tx: job.credit_tx })
   }
 }
@@ -1842,6 +1845,7 @@ async function analyzeJob(job) {
   } catch (e) {
     console.warn(`analyze ${job.id} failed:`, e.message)
     await stamp({ status: 'failed', clone_meta: { ...meta, error: e.message } })
+    await logErr(job.user_id, `Video analyze/draft failed — ${e.message}`, { kind: 'render_failed', stage: 'analyze', job: job.id })
   }
 }
 
@@ -2604,6 +2608,7 @@ async function generateJob(job) {
     try {
       await fetch(`${U}/rest/v1/activity_logs`, { method: 'POST', headers: { ...H, 'Content-Type': 'application/json' }, body: JSON.stringify({ user_id: job.user_id, action_type: 'VIDEO_RENDER_FAILED', entity_type: 'video_clone', description: `${meta.mode || 'video'} render failed after ${tries} auto-retries: ${msg.slice(0, 200)}`, performed_by: 'video-clone-worker' }) })
     } catch { /* best-effort */ }
+    await logErr(job.user_id, `Video render failed after ${tries} retries — ${msg.slice(0, 200)}`, { kind: 'render_failed', stage: 'generate', mode: meta.mode || 'video', job: job.id })
     try {
       const { sendEmail, emailShell } = await import('./email.mjs')
       const to = process.env.ADMIN_ALERT_EMAIL || 'moeez@virginteez.com'
@@ -2640,6 +2645,7 @@ async function tweakJob(job) {
     if (t.tx) await rpc('refund_credits', { p_tx: t.tx }).catch(() => {})
     const { tweak, progress, ...rest } = meta
     await stamp({ status: 'done', clone_meta: { ...rest, tweak_error: String(why).slice(0, 200) } })
+    await logErr(job.user_id, `Video tweak failed — ${String(why).slice(0, 200)}`, { kind: 'render_failed', stage: 'tweak', job: job.id })
   }
   try {
     const base = join(tmpdir(), `tw-${job.id}`)

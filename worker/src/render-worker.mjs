@@ -30,6 +30,7 @@ const r2 = new S3Client({
 })
 
 async function getJSON(path) { const r = await fetch(`${U}/rest/v1/${path}`, { headers: H }); if (!r.ok) throw new Error(`${r.status} ${await r.text()}`); return r.json() }
+async function logErr(userId, message, extra) { try { await fetch(`${U}/rest/v1/error_logs`, { method: 'POST', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ user_id: userId || null, error_message: String(message || '').slice(0, 2000), page_url: '/studio', extra: extra || null }) }) } catch { /* never block */ } }
 async function patchMeta(id, meta, extra) {
   const r = await fetch(`${U}/rest/v1/creative_generations?id=eq.${id}`, { method: 'PATCH', headers: { ...H, Prefer: 'return=minimal' }, body: JSON.stringify({ clone_meta: meta, ...(extra || {}) }) })
   if (!r.ok) console.warn('patch', id, r.status, (await r.text()).slice(0, 140))
@@ -49,7 +50,7 @@ async function processJob(job) {
   const meta = job.clone_meta || {}
   const timeline = meta.timeline
   const aspects = meta.render?.aspects?.length ? meta.render.aspects : ['9:16']
-  if (!timeline) { await patchMeta(job.id, { ...meta, render: { ...meta.render, status: 'failed', error: 'no timeline' } }); return }
+  if (!timeline) { await patchMeta(job.id, { ...meta, render: { ...meta.render, status: 'failed', error: 'no timeline' } }); await logErr(job.user_id, 'Video export failed — no timeline to render', { kind: 'render_failed', stage: 'export', job: job.id }); return }
 
   // Mark rendering so a second worker doesn't grab it.
   await patchMeta(job.id, { ...meta, render: { ...meta.render, status: 'rendering' } })
@@ -78,11 +79,12 @@ async function processJob(job) {
   } catch (e) {
     console.warn(`render ${job.id} failed:`, String(e).slice(0, 200))
     await patchMeta(job.id, { ...meta, exports, render: { ...meta.render, status: 'failed', error: String(e).slice(0, 200) } })
+    await logErr(job.user_id, `Video export render failed — ${String(e).slice(0, 200)}`, { kind: 'render_failed', stage: 'export', job: job.id })
   }
 }
 
 async function tick() {
-  const jobs = await getJSON(`creative_generations?select=id,clone_meta&clone_meta->render->>status=eq.requested&order=created_at.asc&limit=1`).catch(() => [])
+  const jobs = await getJSON(`creative_generations?select=id,user_id,clone_meta&clone_meta->render->>status=eq.requested&order=created_at.asc&limit=1`).catch(() => [])
   for (const j of jobs) await processJob(j)
 }
 
