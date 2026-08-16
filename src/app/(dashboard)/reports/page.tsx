@@ -18,14 +18,14 @@ const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', F
 const SERIF = "'Instrument Serif', Georgia, serif"
 // One card look everywhere — white on the cream page, separated by elevation, not a hairline border.
 const CARD: React.CSSProperties = { background: '#fff', borderRadius: 18, boxShadow: '0 1px 2px rgba(17,24,17,.04), 0 12px 32px -20px rgba(17,24,17,.14)' }
-// Semantic performance colors (deeper, less neon than before — reads premium on white).
-const good = '#2f7d3a', warn = '#b7791f', bad = '#c0392b'
+// Semantic performance colors — brand orange for "good" (matches the app accent), amber okay, red bad.
+const good = '#ef4a1e', warn = '#b7791f', bad = '#c0392b'
 
 const fmt = (n: number, currency = 'PKR') =>
   new Intl.NumberFormat('en-PK', { style: 'currency', currency, maximumFractionDigits: 0 }).format(n)
 
 const roasColor = (r: number) => r >= 2 ? good : r >= 1 ? warn : bad
-const roasBg = (r: number) => r >= 2 ? 'rgba(47,125,58,0.09)' : r >= 1 ? 'rgba(183,121,31,0.10)' : 'rgba(192,57,43,0.08)'
+const roasBg = (r: number) => r >= 2 ? 'rgba(239,74,30,0.09)' : r >= 1 ? 'rgba(183,121,31,0.10)' : 'rgba(192,57,43,0.08)'
 
 type SortKey = 'roas' | 'spend' | 'revenue' | 'conversions' | 'ctr' | 'cpa' | 'cpm'
 
@@ -463,7 +463,7 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
 
           {/* ROAS + Preview */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, flexShrink: 0 }}>
-            <span style={{ fontSize: 15, fontWeight: 900, color: c.roas >= 2 ? '#2d7a2d' : c.roas >= 1 ? '#b8860b' : '#c0392b', background: c.roas >= 2 ? 'rgba(45,122,45,0.08)' : 'rgba(184,134,11,0.08)', padding: '3px 10px', borderRadius: 100 }}>
+            <span style={{ fontSize: 15, fontWeight: 900, color: roasColor(c.roas), background: roasBg(c.roas), padding: '3px 10px', borderRadius: 100 }}>
               {c.roas.toFixed(2)}x
             </span>
             {c.preview_url ? (
@@ -520,7 +520,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                 onMouseEnter={e => (e.currentTarget.style.background = '#fafcfa')}
                 onMouseLeave={e => (e.currentTarget.style.background = '')}
                 onClick={() => toggle(c.creative_id)}>
-                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#f4f0e6', border: '1px solid #e8f0e8', flexShrink: 0 }}>
+                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#eef2ec', border: `1px solid ${LINE}`, flexShrink: 0 }}>
                   {c.thumbnail_url
                     ? <img src={c.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
                     : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🎨</div>}
@@ -533,7 +533,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                       </span>
                     )}
                     {c.topPlacements[0] && (
-                      <span style={{ fontSize: 10, background: '#f0fdf4', color: '#15803d', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
+                      <span style={{ fontSize: 10, background: '#f1f5f9', color: '#475569', padding: '1px 6px', borderRadius: 4, fontWeight: 700 }}>
                         {PLATFORM_EMOJI[c.topPlacements[0].platform] || '📱'} {c.topPlacements[0].platform} · {c.topPlacements[0].pct}%
                       </span>
                     )}
@@ -548,7 +548,7 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                     <div style={{ fontSize: 10, color: '#8b8a72' }}>spent</div>
                   </div>
                   <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontSize: 12, fontWeight: 800, color: c.conversions > 0 ? '#2e7d32' : '#9ca3af' }}>{c.conversions > 0 ? c.conversions : '—'}</div>
+                    <div style={{ fontSize: 12, fontWeight: 800, color: c.conversions > 0 ? good : '#9ca3af' }}>{c.conversions > 0 ? c.conversions : '—'}</div>
                     <div style={{ fontSize: 10, color: '#8b8a72' }}>conv</div>
                   </div>
                   {c.preview_url && (
@@ -559,18 +559,18 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                 </div>
               </div>
 
-              {/* Expanded detail */}
+              {/* Expanded detail — spacious, legible, editorial (redesigned). */}
               {expanded[c.creative_id] && (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', borderTop: '1px solid #f0f5f0' }}>
-                  {/* Left: Who */}
-                  <div style={{ padding: '14px 20px', borderRight: '1px solid #f0f5f0' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: '#141d15', marginBottom: 10 }}>👤 Audience breakdown</div>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', borderTop: `1px solid ${LINE}`, background: '#fcfdfc' }}>
+                  {/* Left: who it reached */}
+                  <div style={{ padding: '20px 24px', borderRight: isMobile ? 'none' : `1px solid ${LINE}`, borderBottom: isMobile ? `1px solid ${LINE}` : 'none' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, marginBottom: 14 }}>Who it reached</div>
                     {c.genderSplit.length > 0 && (
-                      <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
                         {c.genderSplit.map((g: any) => (
-                          <div key={g.gender} style={{ flex: 1, background: (GENDER_COLOR[g.gender] || '#9ca3af') + '18', border: `1px solid ${(GENDER_COLOR[g.gender] || '#9ca3af')}28`, borderRadius: 7, padding: '6px 8px', textAlign: 'center' }}>
-                            <div style={{ fontSize: 14, fontWeight: 900, color: GENDER_COLOR[g.gender] || '#6b7280' }}>{g.pct}%</div>
-                            <div style={{ fontSize: 10, color: '#6b7280' }}>{g.gender}</div>
+                          <div key={g.gender} style={{ flex: 1, background: (GENDER_COLOR[g.gender] || '#9ca3af') + '10', border: `1px solid ${(GENDER_COLOR[g.gender] || '#9ca3af')}22`, borderRadius: 12, padding: '13px 8px', textAlign: 'center' }}>
+                            <div style={{ fontFamily: SERIF, fontSize: 27, fontWeight: 400, color: GENDER_COLOR[g.gender] || '#6b7280', lineHeight: 1, letterSpacing: '-.01em' }}>{g.pct}%</div>
+                            <div style={{ fontSize: 11.5, color: MUTED, marginTop: 5, fontWeight: 600 }}>{g.gender}</div>
                           </div>
                         ))}
                       </div>
@@ -578,40 +578,45 @@ function CreativeAudienceSection({ creatives, currency, loading, expanded, toggl
                     {c.topAgeGender.length > 0 ? c.topAgeGender.map((seg: any, i: number) => {
                       const col = seg.gender === 'male' ? '#3b82f6' : seg.gender === 'female' ? '#ec4899' : '#9ca3af'
                       return (
-                        <div key={i} style={{ marginBottom: 7 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 2 }}>
-                            <span style={{ fontSize: 11, color: '#374151', fontWeight: 600 }}>
+                        <div key={i} style={{ marginBottom: 13 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                            <span style={{ fontSize: 12.5, color: INK, fontWeight: 650 }}>
                               {seg.age} · <span style={{ color: col }}>{seg.gender === 'male' ? 'Male' : seg.gender === 'female' ? 'Female' : 'Other'}</span>
                             </span>
-                            <span style={{ fontSize: 10, color: '#6b7280' }}>{seg.pct}% · {fmtN(seg.spend)}</span>
+                            <span style={{ fontSize: 11.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{seg.pct}% · {fmtN(seg.spend)}</span>
                           </div>
-                          <div style={{ height: 5, background: '#f3f4f6', borderRadius: 3, overflow: 'hidden' }}>
-                            <div style={{ height: '100%', width: `${seg.pct}%`, background: col, borderRadius: 3 }} />
+                          <div style={{ height: 7, background: '#eef1ec', borderRadius: 100, overflow: 'hidden' }}>
+                            <div style={{ height: '100%', width: `${seg.pct}%`, background: col, opacity: .9, borderRadius: 100 }} />
                           </div>
                         </div>
                       )
-                    }) : <div style={{ fontSize: 11, color: '#9ca3af', fontStyle: 'italic' }}>Needs more spend</div>}
+                    }) : <div style={{ fontSize: 12, color: FAINT, fontStyle: 'italic' }}>Needs more spend to break down.</div>}
                   </div>
 
-                  {/* Right: Placements + Why */}
-                  <div style={{ padding: '14px 20px' }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: '#141d15', marginBottom: 10 }}>📍 Placements</div>
+                  {/* Right: where it ran + why */}
+                  <div style={{ padding: '20px 24px' }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, marginBottom: 14 }}>Where it ran</div>
                     {c.topPlacements.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 12 }}>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: c.why ? 18 : 0 }}>
                         {c.topPlacements.map((p: any, i: number) => (
-                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '4px 8px', background: '#f8fbf7', border: '1px solid #e8f0e8', borderRadius: 7 }}>
-                            <span style={{ fontSize: 12 }}>{PLATFORM_EMOJI[p.platform] || '📱'}</span>
-                            <span style={{ fontSize: 11, fontWeight: 600, color: '#141d15' }}>{p.platform}</span>
-                            <span style={{ fontSize: 10, color: '#6b7280' }}>{p.position}</span>
-                            <span style={{ fontSize: 11, fontWeight: 800, color: '#4caf50', marginLeft: 2 }}>{p.pct}%</span>
+                          <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                            <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{PLATFORM_EMOJI[p.platform] || '📱'}</span>
+                            <span style={{ fontSize: 12.5, fontWeight: 650, color: INK, flexShrink: 0 }}>{p.platform}</span>
+                            <span style={{ fontSize: 11.5, color: FAINT, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.position}</span>
+                            <span style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0, minWidth: 96 }}>
+                              <span style={{ flex: 1, height: 6, background: '#eef1ec', borderRadius: 100, overflow: 'hidden' }}>
+                                <span style={{ display: 'block', height: '100%', width: `${p.pct}%`, background: LIME, borderRadius: 100 }} />
+                              </span>
+                              <span style={{ fontSize: 12, fontWeight: 800, color: LIME, fontVariantNumeric: 'tabular-nums', minWidth: 32, textAlign: 'right' }}>{p.pct}%</span>
+                            </span>
                           </div>
                         ))}
                       </div>
                     )}
                     {c.why && (
-                      <div style={{ background: '#f4f0e6', border: '1px solid #c8e6c0', borderRadius: 9, padding: '9px 12px' }}>
-                        <div style={{ fontSize: 10, fontWeight: 800, color: '#2e7d32', marginBottom: 3 }}>✨ Why this audience</div>
-                        <div style={{ fontSize: 12, color: '#141d15', lineHeight: 1.55 }}>{c.why}</div>
+                      <div style={{ background: '#fff7f3', border: '1px solid #f6d8cc', borderRadius: 12, padding: '13px 15px' }}>
+                        <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: LIME, marginBottom: 5 }}>✨ Why this audience</div>
+                        <div style={{ fontSize: 13, color: INK, lineHeight: 1.6 }}>{c.why}</div>
                       </div>
                     )}
                   </div>
