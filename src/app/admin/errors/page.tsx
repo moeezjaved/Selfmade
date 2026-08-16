@@ -32,6 +32,12 @@ function classify(err: ErrorLog): { sev: Sev; tag: string; title: string; meanin
   // Things we log ON PURPOSE (product events, not crashes)
   if (kind === 'plan_limit' || /\b(brand|plan) limit reached\b/i.test(m))
     return { sev: 'info', tag: 'Plan limit', title: 'A user hit their plan limit', meaning: 'They tried to do something beyond their plan (e.g. add another brand). Not a bug — an upgrade signal. Consider reaching out or comping them.' }
+  if (kind === 'insufficient_credits' || /\binsufficient credits\b|\bran out of credits\b/i.test(m))
+    return { sev: 'info', tag: 'Out of credits', title: 'A user ran out of credits', meaning: 'They tried to generate something but didn’t have enough credits. Not a bug — a top-up / upgrade signal.' }
+  if (kind === 'render_failed' || /\brender failed\b|\bgeneration failed\b/i.test(m))
+    return { sev: 'serious', tag: 'Render', title: 'A video/image render failed', meaning: 'A generation the user paid credits for failed. Check the credits were refunded; repeated failures point to a provider or pipeline issue.' }
+  if (kind === 'payment_failed' || /\bpayment failed\b|\bcapture failed\b|\bcharge (?:failed|declined)\b/i.test(m))
+    return { sev: 'serious', tag: 'Payment', title: 'A payment failed', meaning: 'A charge or checkout didn’t go through — the user may have tried to pay and couldn’t. Worth a quick follow-up so you don’t lose the sale.' }
 
   // React hydration errors = a browser extension changed the page on the VISITOR'S side
   if (/react error #(418|421|422|423|425)\b/i.test(m) || /hydrat|did not match|text content does not match/i.test(s))
