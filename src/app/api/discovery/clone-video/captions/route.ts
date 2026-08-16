@@ -33,6 +33,7 @@ export async function POST(req: NextRequest) {
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'video_captions' })
   if (rErr) {
     const insufficient = String(rErr.message || '').includes('insufficient_credits')
+    try { const { logError } = await import('@/lib/admin/logError'); void logError({ user_id: user.id, user_email: user.email || null, error_message: insufficient ? `Insufficient credits — video captions` : `Credit reserve failed — video captions`, page_url: '/studio', extra: { kind: insufficient ? 'insufficient_credits' : 'render_failed', stage: 'captions' } }) } catch { /* never block */ }
     return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed' }, { status: insufficient ? 402 : 500 })
   }
   const txId = Array.isArray(tx) ? tx[0]?.id : (tx as any)?.id
