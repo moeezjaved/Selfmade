@@ -211,6 +211,11 @@ function ReportsPage() {
 
           {/* Full detail — every breakdown, always open (the classic report). */}
           <>
+          {/* Editorial section header so the breakdowns read as a continuation of Mello's debrief. */}
+          <div style={{ marginTop: 6 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: LIME }}>The full breakdown</div>
+            <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 400, color: INK, letterSpacing: '-.01em', lineHeight: 1.15, marginTop: 2 }}>Every number, sliced the way you want.</div>
+          </div>
           {/* Sort Filter Bar (drill-downs only) */}
           <div style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 7, padding: '10px 16px', flexWrap: 'wrap' }}>
             <span style={{ fontSize: 11, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.07em', marginRight: 4 }}>Sort by</span>
@@ -413,13 +418,13 @@ function CreativesCard({ creatives, currency, sortKey, expanded, toggle }: {
   const shown = expanded ? creatives : creatives.slice(0, 3)
 
   return (
-    <div style={{ background: '#ffffff', border: '1px solid rgba(0,0,0,0.07)', borderRadius: 20, overflow: 'hidden', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-      <div style={{ padding: '14px 20px', borderBottom: '1px solid rgba(0,0,0,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+    <div style={{ ...CARD, overflow: 'hidden' }}>
+      <div style={{ padding: '15px 20px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#141d15' }}>🎨 Best Creatives</div>
-          <div style={{ fontSize: 11, color: '#8b8a72', marginTop: 1 }}>Top ads by performance</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT }}>Best Creatives</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>Top ads by performance</div>
         </div>
-        <div style={{ fontSize: 10, fontWeight: 700, color: '#8b8a72', background: '#f4f0e6', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} ads</div>
+        <div style={{ fontSize: 10.5, fontWeight: 750, color: FAINT, background: '#f5f8f2', padding: '3px 10px', borderRadius: 100 }}>{creatives.length} ads</div>
       </div>
 
       {shown.map((c: any, i: number) => (
@@ -672,8 +677,9 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
       {/* Header */}
       <div style={{ padding: '15px 20px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div>
-          <div style={{ fontSize: 14.5, fontWeight: 750, color: INK, letterSpacing: '-.01em' }}>{title}</div>
-          <div style={{ fontSize: 11.5, color: MUTED, marginTop: 2 }}>{subtitle}</div>
+          {/* Uppercase eyebrow to match Mello's debrief sections (no emoji clutter). */}
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT }}>{title.replace(/^[^A-Za-z0-9]+/, '')}</div>
+          <div style={{ fontSize: 12, color: MUTED, marginTop: 3 }}>{subtitle}</div>
         </div>
         <div style={{ fontSize: 10.5, fontWeight: 750, color: FAINT, background: '#f5f8f2', padding: '3px 10px', borderRadius: 100 }}>
           {items.length} items
