@@ -43,7 +43,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   for (const k of ['industry', 'usps', 'preferred_words', 'avoid_words'])
     if (b[k] !== undefined) update[k] = ARR(b[k])
   if (b.brand_kit !== undefined && typeof b.brand_kit === 'object') update.brand_kit = b.brand_kit
-  if (b.brand_type === 'physical' || b.brand_type === 'service') update.brand_type = b.brand_type
+  if (b.brand_type === 'physical' || b.brand_type === 'service' || b.brand_type === 'app') update.brand_type = b.brand_type
   await admin.from('brands').update(update).eq('id', params.id)
   return NextResponse.json({ success: true })
 }

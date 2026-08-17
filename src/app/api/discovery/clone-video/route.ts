@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
     tts_overlay: body.ttsOverlay === true,
     // 'service' = app/site/service brand → the worker's SERVICE prompt path (creator talks about it,
     // never renders a physical product). Absent/'physical' = today's product-hero flow.
-    product_type: body.productType === 'service' ? 'service' : 'physical',
+    product_type: ['physical', 'service', 'app'].includes(body.productType) ? body.productType : 'physical',
     // Optional user-uploaded screen recording (R2 key from the presigned Assets upload) → shown in the
     // split-screen top half as MOVING UI. Resolved server-side to a public URL; ignored for physical.
     screencast_url: (body.productType === 'service' && typeof body.screencastKey === 'string' && body.screencastKey.trim())

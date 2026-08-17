@@ -1754,7 +1754,7 @@ Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]}.`
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
 async function analyzeJob(job) {
   const meta = job.clone_meta || {}
-  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
+  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   try {
     let beat = null
@@ -1930,7 +1930,7 @@ async function analyzeJob(job) {
 // ── PHASE B: user approved → generate the video with the APPROVED script → status='done' ──
 async function generateJob(job) {
   const meta = job.clone_meta || {}
-  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
+  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
   const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
@@ -2765,7 +2765,7 @@ const CHIP_FIX = {
 async function tweakJob(job) {
   const meta = job.clone_meta || {}
   const t = meta.tweak || {}
-  const isService = meta.product_type === 'service'   // service/app brand → no physical product path
+  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0), at: Date.now() } } }).catch(() => {})   // `at` = heartbeat, lets a watchdog spot stalls
   // Restore the row to its previous DONE state (original video intact) + refund the tweak tx.

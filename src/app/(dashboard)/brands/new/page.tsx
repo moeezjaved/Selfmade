@@ -48,7 +48,7 @@ export default function NewBrandPage() {
     try {
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ name: form.name.trim(), website: form.website.trim() || null, brand_type: form.category === 'physical' ? 'physical' : 'service' }),
+        body: JSON.stringify({ name: form.name.trim(), website: form.website.trim() || null, brand_type: form.category, brand_kit: { category: form.category } }),
       })
       const j = await r.json().catch(() => ({}))
       if (r.status === 402) { setErr(j?.message || 'Your plan’s brand limit is reached — upgrade to add another.'); setBusy(false); return }
@@ -93,10 +93,10 @@ export default function NewBrandPage() {
           <input style={{ ...input, margin: '6px 0 14px' }} value={form.website} onChange={e => setForm(f => ({ ...f, website: e.target.value }))} placeholder="https://…" />
 
           <label style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>What is it?</label>
-          <div style={{ display: 'flex', gap: 8, margin: '8px 0 6px' }}>
-            {[{ k: 'physical', l: 'Physical product', d: 'Something you ship' }, { k: 'service', l: 'App / service', d: 'No physical product' }].map(o => (
+          <div style={{ display: 'flex', gap: 8, margin: '8px 0 6px', flexWrap: 'wrap' }}>
+            {[{ k: 'physical', l: '🧴 Physical product', d: 'Something you ship' }, { k: 'app', l: '📱 App / website', d: 'Software or SaaS' }, { k: 'service', l: '🛠️ A service', d: 'You do it for people' }].map(o => (
               <button key={o.k} onClick={() => setForm(f => ({ ...f, category: o.k }))}
-                style={{ flex: 1, textAlign: 'left', border: `1.5px solid ${form.category === o.k ? '#cfe6b8' : LINE}`, background: form.category === o.k ? '#f6fbef' : '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                style={{ flex: '1 1 150px', textAlign: 'left', border: `1.5px solid ${form.category === o.k ? '#cfe6b8' : LINE}`, background: form.category === o.k ? '#f6fbef' : '#fff', borderRadius: 12, padding: '11px 13px', cursor: 'pointer', fontFamily: 'inherit' }}>
                 <div style={{ fontSize: 13.5, fontWeight: 750, color: INK }}>{o.l}</div>
                 <div style={{ fontSize: 12, color: SUB }}>{o.d}</div>
               </button>

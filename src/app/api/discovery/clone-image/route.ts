@@ -69,7 +69,7 @@ async function enqueue(req: NextRequest) {
   if (!isAutopilot && await isRateLimited(actorId)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
 
   const { adId, refImageUrl, productImageB64, productImages } = body || {}
-  const isService = body?.productType === 'service'   // service/app brand → no physical product; photos optional
+  const isService = body?.productType === 'service' || body?.productType === 'app'   // service OR app brand → no physical product; photos optional
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
@@ -220,7 +220,7 @@ async function runGeneration(input: {
       })).then((xs) => xs.filter(Boolean) as { mimeType: string; dataB64: string }[]),
     ])
     if (!refImg) return await fail('could not load reference image')
-    const isService = body?.productType === 'service'   // no physical product to render
+    const isService = body?.productType === 'service' || body?.productType === 'app'   // no physical product to render
     if (products.length === 0 && !isService) return await fail('could not load product image(s)')
 
     // Service brands have no product to describe; physical brands ground the scene/copy on it.
