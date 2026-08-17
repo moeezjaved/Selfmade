@@ -140,6 +140,16 @@ export async function POST(req: NextRequest) {
   // Single-take UGC analyzes with no beats; the storyboard synthesizes scene cards, so a preview can
   // target an index that has no beat row yet. Pad the array so the preview always has a slot to persist.
   while (beats.length <= sceneIndex) beats.push({ action: '' })
+
+  // SET WHAT A SCENE SHOWS (storyboard 🚫/✅ toggle): flip a beat between 'hero' (your product) and
+  // 'rejected' (the rival/bad item, e.g. a vape) — so the user can say "show the vape here, not Aura".
+  // Clears the scene's AI preview so it redraws with the new intent. No image generated in this call.
+  if (typeof b?.setShows === 'string') {
+    const val = b.setShows === 'hero' ? 'hero' : b.setShows === 'rejected' ? 'rejected' : null
+    beats[sceneIndex] = { ...(beats[sceneIndex] || {}), shows: val, ...(beats[sceneIndex]?.preview_source !== 'user' ? { preview: null, preview_source: null } : {}) }
+    await admin.from('creative_generations').update({ clone_meta: { ...meta, beat_sheet: { ...beat, beats } } }).eq('id', jobId).eq('user_id', user.id)
+    return NextResponse.json({ ok: true, sceneIndex, shows: val })
+  }
   const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
   // Never let an implicit AI regeneration overwrite a frame the founder UPLOADED. Only an explicit
   // action (a new upload, or a deliberate regenerate with force:true) may replace it. Guards the
@@ -285,12 +295,22 @@ export async function POST(req: NextRequest) {
     : avatar
       ? `If a person is on camera, they MUST match the reference creator exactly — ${avatar} — copying gender, age, ethnicity, hair (colour + style) and wardrobe; the SAME person appears in every scene.`
       : 'Cast whatever people the scene naturally needs (or none), kept consistent across scenes.'
-  const productClause = isService || !productImgs.length
-    ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
-    : `Render the user's product${productName ? ` ("${productName}")` : ''} 1:1 — exact silhouette, label, materials — at its TRUE real-world size relative to the hand/body (a small handheld item stays small in the hand, NEVER enlarged, stretched or out of proportion). Do NOT reshape or invent a different product.`
+  // REJECTED-PRODUCT SCENE: the storyboard tags each beat 'hero' (your product) or 'rejected' (the
+  // rival/bad thing the ad argues against — e.g. a vape). A rejected beat must KEEP that rival item and
+  // NOT swap in the user's product (that breaks the story). Read the tag off the beat.
+  const sceneShows = beats[sceneIndex]?.shows === 'rejected' ? 'rejected' : (beats[sceneIndex]?.shows === 'hero' ? 'hero' : null)
+  const rejectedItem = String(meta.beat_sheet?.rejected_product || 'a generic disposable vape').slice(0, 60)
+  const showRejected = sceneShows === 'rejected'
+  const productClause = showRejected
+    ? `This scene shows the RIVAL / rejected item — a generic ${rejectedItem} — NOT the user's product. Render a plain, unbranded ${rejectedItem} (no logos). Do NOT show or brand the user's product anywhere in this shot.`
+    : (isService || !productImgs.length)
+      ? 'This is a service/brand — do NOT invent a physical product; lead with the person, setting, or an on-phone app view.'
+      : `Render the user's product${productName ? ` ("${productName}")` : ''} 1:1 — exact silhouette, label, materials — at its TRUE real-world size relative to the hand/body (a small handheld item stays small in the hand, NEVER enlarged, stretched or out of proportion). Do NOT reshape or invent a different product.`
   // The analysis may name the COMPETITOR's product in the shot text (e.g. "FÜM device") — that always
-  // means the USER's product here. Never render a competitor's product, name or logo.
-  const brandNeutral = productName ? `Any product named in the shot refers to "${productName}" (the user's product) — never a competitor's product, brand name or logo.` : 'Any product named in the shot is the user\'s product — never a competitor\'s brand or logo.'
+  // means the USER's product here (UNLESS this is a rejected-product beat, where the rival item stays).
+  const brandNeutral = showRejected
+    ? `The item in this shot is the rejected ${rejectedItem} — keep it as that generic item, never the user's product or any real brand's logo.`
+    : productName ? `Any product named in the shot refers to "${productName}" (the user's product) — never a competitor's product, brand name or logo.` : 'Any product named in the shot is the user\'s product — never a competitor\'s brand or logo.'
   // When a same-creator lock exists it OVERRIDES the descriptive clause — keep that exact person.
   // For a labelled non-lead scene with no drawn sheet, describe THAT person (not the lead) so the
   // keyframe shows e.g. Woman D, and honour any recast (ethnicity overrides the reference's).
@@ -314,7 +334,7 @@ export async function POST(req: NextRequest) {
   const legend: string[] = []
   if (refFrame) { genImages.push(refFrame); legend.push(`Image ${genImages.length} = COMPOSITION reference (match its framing/angle/layout ONLY; replace the person + product, never copy its pixels or a real face).`) }
   if (charLock) { genImages.push(charLock); legend.push(`Image ${genImages.length} = the SAME CREATOR to keep — match this person's face, hair, skin tone and wardrobe exactly.`) }
-  if (!isService && productImgs.length) {
+  if (!isService && !showRejected && productImgs.length) {
     const first = genImages.length + 1
     for (const p of productImgs) genImages.push(p)
     legend.push(`Image${productImgs.length > 1 ? 's' : ''} ${first}${productImgs.length > 1 ? `–${genImages.length}` : ''} = the user's product (render 1:1, true real-world size).`)

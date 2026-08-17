@@ -169,6 +169,17 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     setScenes((prev) => prev.map((s) => affected.some((a) => a.index === s.index) ? { ...s, preview: null, preview_source: null } : s))
     affected.forEach((s) => { genKeyframe({ ...s, preview: null }) })
   }
+  // Toggle whether a scene shows YOUR product (✅ hero) or the RIVAL/bad item (🚫 rejected, e.g. a vape),
+  // then redraw it — so the user can say "show the vape here, not Aura." Persists the intent on the beat.
+  const toggleShows = async (s: Scene) => {
+    if (!board?.editable) return
+    const next = s.shows === 'rejected' ? 'hero' : 'rejected'
+    setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, shows: next, preview: null, preview_source: null } : x))
+    try {
+      await fetch('/api/discovery/clone-video/keyframe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, setShows: next }) })
+    } catch { /* best-effort — the redraw below still uses the new local intent */ }
+    genKeyframe({ ...s, preview: null })
+  }
   const drawCastMember = async (id: string, look: string, opts: { relock?: boolean } = {}) => {
     if (!board?.editable || castBusyMap[id]) return
     setCastBusyMap((m) => ({ ...m, [id]: true })); setCastErrMap((e) => ({ ...e, [id]: '' }))
@@ -414,9 +425,12 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
               {/* SHOT — what's SHOWN. For UGC (no keyframes) this is just the beat description; for Cinematic, editing + Regenerate redraws the image. */}
               {showKeyframes && <><div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
                 <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</span>
-                {/* STORY TAG — 🚫 rejected (the rival/bad thing, kept as-is) vs ✅ hero (swapped to your product). */}
-                {s.shows === 'hero' && <span title={`Your product${board.heroProduct ? ` (was ${board.heroProduct})` : ''} — swapped in`} style={{ fontSize: 10, fontWeight: 800, color: '#1f6b2e', background: '#e8f4ea', border: '1px solid #bfe0c6', borderRadius: 999, padding: '1px 7px' }}>✅ Your product</span>}
-                {s.shows === 'rejected' && <span title={`The rival/bad thing${board.rejectedProduct ? ` (${board.rejectedProduct})` : ''} — kept as-is, NOT your product`} style={{ fontSize: 10, fontWeight: 800, color: '#9a3412', background: '#fbe7e1', border: '1px solid #f0cbba', borderRadius: 999, padding: '1px 7px' }}>🚫 {board.rejectedProduct || 'Rejected item'}</span>}
+                {/* STORY TAG — click to toggle: ✅ your product ⇄ 🚫 the rival/bad item (e.g. a vape). */}
+                {board.editable
+                  ? <button onClick={() => toggleShows(s)} title="Click to switch what this scene shows (your product ⇄ the rival/vape)" style={{ fontSize: 10, fontWeight: 800, cursor: 'pointer', borderRadius: 999, padding: '2px 8px', fontFamily: 'inherit', ...(s.shows === 'rejected' ? { color: '#9a3412', background: '#fbe7e1', border: '1px solid #f0cbba' } : { color: '#1f6b2e', background: '#e8f4ea', border: '1px solid #bfe0c6' }) }}>{s.shows === 'rejected' ? `🚫 ${board.rejectedProduct || 'rival item'}` : '✅ Your product'} ⇄</button>
+                  : (s.shows === 'rejected'
+                      ? <span style={{ fontSize: 10, fontWeight: 800, color: '#9a3412', background: '#fbe7e1', border: '1px solid #f0cbba', borderRadius: 999, padding: '1px 7px' }}>🚫 {board.rejectedProduct || 'rival item'}</span>
+                      : s.shows === 'hero' ? <span style={{ fontSize: 10, fontWeight: 800, color: '#1f6b2e', background: '#e8f4ea', border: '1px solid #bfe0c6', borderRadius: 999, padding: '1px 7px' }}>✅ Your product</span> : null)}
               </div>
               <input
                 value={s.action}
