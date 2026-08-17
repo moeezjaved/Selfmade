@@ -461,7 +461,7 @@ async function transcreateAdScript(transcript, product, lang) {
 }
 
 async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang, isService) {
-  const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
+  const refList = Array.from({ length: nImages }, (_, i) => `[Image${i + 1}]`).join(', ')
   const recast = look && look !== 'match'
   const L = langName(lang)
   const nonEn = lang && lang !== 'en'
@@ -542,7 +542,7 @@ function clampScenes(count, secs) {
 // its own clip prompt (b-roll / lifestyle / product shots allowed — NO forced talking head); clips are
 // stitched afterwards, mirroring the source's edit structure. ──
 async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover, isService) {
-  const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
+  const refList = Array.from({ length: nImages }, (_, i) => `[Image${i + 1}]`).join(', ')
   const recast = look && look !== 'match'
   // Physical vs service framing for the product beats.
   const productBlock = isService
@@ -617,7 +617,7 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
 // Returns ONE reusable character paragraph + ONE voice description — pasted VERBATIM into every
 // segment prompt so the person/voice can't drift between clips — plus per-segment script + action. ──
 async function buildSegmentPlan(beat, product, nImages, script, nSegments, look, isService) {
-  const refList = Array.from({ length: nImages }, (_, i) => `@Image${i + 1}`).join(', ')
+  const refList = Array.from({ length: nImages }, (_, i) => `[Image${i + 1}]`).join(', ')
   const recast = look && look !== 'match'
   const sys = `You direct a ${nSegments}-segment TALKING-HEAD UGC ad (segments are stitched into one continuous video). Rules:
 - Split the user's voiceover script into EXACTLY ${nSegments} contiguous chunks at natural sentence boundaries — in order, no overlap, no rewriting; together they must be the full script word-for-word.
@@ -656,13 +656,13 @@ function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang, opts = {})
     return pf.filter(Boolean).join(' ')
   }
   const productRef = hasAnchor
-    ? (nImages ? `@Image2${nImages > 1 ? `–@Image${nImages + 1}` : ''}` : 'the product')
-    : (nImages ? `@Image1${nImages > 1 ? `–@Image${nImages}` : ''}` : 'the product')
+    ? (nImages ? `[Image2]${nImages > 1 ? `–[Image${nImages + 1}]` : ''}` : 'the product')
+    : (nImages ? `[Image1]${nImages > 1 ? `–[Image${nImages}]` : ''}` : 'the product')
   const parts = [plan.character]
   // CREATOR LOCK (segment re-shoot): an exact appearance captured from a KEPT part of THIS video, so
   // a re-rolled segment keeps the SAME person instead of a new random face. Overrides drift.
   if (creatorLock) parts.push(`CRITICAL — SAME PERSON: the on-camera creator MUST look EXACTLY like this (they already appear in the rest of this video): ${creatorLock}. Match the face, age, skin tone, hair and outfit precisely — do NOT change the person.`)
-  if (hasAnchor) parts.push(`This is segment ${i + 1} of ${total} of ONE continuous selfie take. @Image1 shows this exact creator one moment ago — treat it as ground truth: the SAME face, hair, outfit, room and lighting, continuing seamlessly. The user's product is ${productRef} and must match it exactly.`)
+  if (hasAnchor) parts.push(`This is segment ${i + 1} of ${total} of ONE continuous selfie take. [Image1] shows this exact creator one moment ago — treat it as ground truth: the SAME face, hair, outfit, room and lighting, continuing seamlessly. The user's product is ${productRef} and must match it exactly.`)
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
   parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
@@ -2088,10 +2088,10 @@ async function generateJob(job) {
           const compIdx = baseImgs.length + anchorRefs.length + 1     // …and of the composition still
           const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : [])].slice(0, 9)
           let scenePrompt = keyframe
-            ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY @Image1 — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
+            ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY [Image1] — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
-          if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: @Image${anchorIdx}${anchorRefs.length > 1 ? ` and @Image${anchorIdx + 1}` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
-          if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of @Image${compIdx} (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
+          if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: [Image${anchorIdx}]${anchorRefs.length > 1 ? ` and [Image${anchorIdx + 1}]` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
+          if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of [Image${compIdx}] (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
           scenePrompt += STYLE_LOCK
           if (process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += DIRECTOR_STYLE
 
@@ -3004,7 +3004,7 @@ async function tweakJob(job) {
         ? [...new Set((Array.isArray(scenes[i].cast) && scenes[i].cast.length ? scenes[i].cast : ['A']).map((c) => (meta.scene_char_anchors || {})[c]).filter(Boolean))].slice(0, 2)
         : []
       const tweakImgs = [...productImages, ...castAnchors].slice(0, 9)
-      if (castAnchors.length) prompt += ` CHARACTER LOCK: @Image${productImages.length + 1}${castAnchors.length > 1 ? ` and @Image${productImages.length + 2}` : ''} show this ad's cast — the person${castAnchors.length > 1 ? 's' : ''} in this scene must be EXACTLY the same: same face, hair, outfit and styling.`
+      if (castAnchors.length) prompt += ` CHARACTER LOCK: [Image${productImages.length + 1}]${castAnchors.length > 1 ? ` and [Image${productImages.length + 2}]` : ''} show this ad's cast — the person${castAnchors.length > 1 ? 's' : ''} in this scene must be EXACTLY the same: same face, hair, outfit and styling.`
       prompt += STYLE_LOCK
       scenes[i] = { ...scenes[i], prompt: `${basePrompt}${fix}` }
       await prog(`Redoing scene ${i + 1}…`, 15, 90)
