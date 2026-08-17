@@ -412,8 +412,10 @@ function CampaignsInner() {
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)} className="mello-manage"
-                    style={{ background: '#ef4a1e', color: '#fff', border: 'none', padding: '8px 15px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 8px 20px -10px rgba(239,74,30,.35)', transition: 'transform .12s, box-shadow .12s' }}>
-                    <span style={{ width: 17, height: 17, borderRadius: '50%', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 10, fontWeight: 900, flexShrink: 0 }}>✦</span>
+                    style={{ background: 'linear-gradient(180deg,#ff5a2c 0%,#ef4a1e 100%)', color: '#fff', border: 'none', padding: '8px 16px 8px 12px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 10px 22px -12px rgba(239,74,30,.55)', transition: 'transform .12s, box-shadow .12s' }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(255,255,255,.20)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.6 1.7L21.3 17.3l-1.7.6L19 19.6l-.6-1.7L16.7 17.3l1.7-.6z"/></svg>
+                    </span>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
@@ -708,14 +710,21 @@ function CampaignsInner() {
 
           {/* Drawer panel */}
           <div style={{ width: 400, background: '#fff', display: 'flex', flexDirection: 'column', boxShadow: '-4px 0 32px rgba(0,0,0,0.18)', pointerEvents: 'auto' }}>
-            {/* Header */}
-            <div style={{ padding: '16px 18px', borderBottom: '1px solid #e8f0e8', background: '#141d15', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Header — white + clean, matches the app; orange Mello mark, quiet grey close. */}
+            <div style={{ padding: '16px 18px', borderBottom: '1px solid #eef1ec', background: '#fff', display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ width: 30, height: 30, borderRadius: 9, background: '#fff1ec', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4a1e" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.7 1.9L21.6 17.6l-1.9.7L19 20l-.7-1.9L16.4 17.6l1.9-.7z"/></svg>
+              </span>
               <div style={{ flex: 1, overflow: 'hidden' }}>
-                <div style={{ fontSize: 13, fontWeight: 900, color: '#ff5a2c' }}>✨ Campaign Assistant</div>
-                <div style={{ fontSize: 11, color: '#7a9a7a', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCampaign.name}</div>
+                <div style={{ fontSize: 13.5, fontWeight: 800, color: '#141d15', letterSpacing: '-.01em' }}>Campaign Assistant</div>
+                <div style={{ fontSize: 11.5, color: '#6f7d70', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{chatCampaign.name}</div>
               </div>
-              <button onClick={() => setChatCampaign(null)}
-                style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#ff5a2c', width: 28, height: 28, borderRadius: 8, cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
+              <button onClick={() => setChatCampaign(null)} aria-label="Close"
+                onMouseEnter={e => (e.currentTarget.style.background = '#ececea')}
+                onMouseLeave={e => (e.currentTarget.style.background = '#f4f4f2')}
+                style={{ background: '#f4f4f2', border: 'none', color: '#6b6b6b', width: 30, height: 30, borderRadius: 8, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'background .12s' }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+              </button>
             </div>
 
             {/* Campaign quick stats */}
