@@ -1818,6 +1818,11 @@ async function analyzeJob(job) {
     // script. (Relying on beat.transcript surviving into the dense Seedance-prompt builder was flaky;
     // the words were transcribed but the clone still came out as a generic product pitch.)
     let srcTranscript = String((beat && beat.transcript) || '').trim()
+    // NEVER trust a CACHED transcript as the script seed. The analysis cache matches on source_video_url,
+    // and a stale/cross-contaminated cache row (a prior clone of a DIFFERENT product that shared the URL)
+    // would seed the script from the wrong ad — the "Füm clone came out as Real Crunch Bars" bug. When we
+    // reused a cached analysis, always re-transcribe THIS source so the words are the ad we're cloning.
+    if (cachedA) srcTranscript = ''
     if (srcTranscript.split(/\s+/).filter(Boolean).length < 4 && OPENAI_KEY && job.source_video_url) {
       try {
         const tr = await transcribeSegments(job.source_video_url)
