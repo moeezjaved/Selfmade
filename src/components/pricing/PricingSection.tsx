@@ -22,7 +22,7 @@ interface Card { id: CardId; tier: string; price: string; per: string; note: str
 // credits. Agency/business tier retired from display; the $49 plan uses internal `starter` checkout.
 const CARDS: Card[] = [
   { id: 'free', tier: 'Free', price: '$0', per: '', note: 'No card needed',
-    feats: ['75 credits to start (~5 image ads)', '1 brand · 1 competitor to spy on', 'Browse Discovery + Brand Spy + remake ads', 'Daily brief + customer inbox', 'Solo workspace — 1 seat'], cta: 'Start free' },
+    feats: ['500 welcome credits + 75/month', '1 brand · 1 competitor to spy on', 'Browse Discovery + Brand Spy + remake ads', 'Daily brief + customer inbox', 'Solo workspace — 1 seat'], cta: 'Start free' },
   { id: 'starter', tier: 'Creator', price: '$49', per: '/ month', note: 'Mello, full-time — everything, every morning',
     feats: [`6,000 credits / month · $${IMG_USD} image · $${VID_USD} video`, '15 brands · 15 competitors to spy on', 'Connect Meta & run ads', 'Invite your team — 3 seats', 'Customer inbox + fresh creatives every morning'], cta: 'Go full-time', popular: true },
   // Pay-as-you-go card retired (2026-07-29) — one plan: Free + $49. Credit top-ups still available
