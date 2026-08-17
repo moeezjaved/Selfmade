@@ -44,9 +44,12 @@ export async function GET(req: NextRequest) {
   // script across them, so the storyboard always matches the count and every scene is editable.
   const wantN = Math.max(1, Math.min(10, Number(meta.scene_count) || beats.length || 1))
   const n = Math.max(beats.length, wantN)
-  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string; preview_source?: string; shows?: string }[] =
+  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string; preview_source?: string; shows?: string; script?: string }[] =
     Array.from({ length: n }, (_, i) => beats[i] || { action: i === 0 ? (beat.avatar || 'Opening shot') : '' })
-  const lines = splitScript(script, srcBeats.length)
+  // Interview ads carry a per-beat ATTRIBUTED line (beats[i].script) — a coherent spoken turn on the
+  // right person. Use those verbatim; otherwise split the flat narration evenly across the beats.
+  const hasBeatScripts = beat.is_interview === true && srcBeats.some((b) => typeof b.script === 'string')
+  const lines = hasBeatScripts ? srcBeats.map((b) => String(b.script || '')) : splitScript(script, srcBeats.length)
   const scenes = srcBeats.map((b, i) => ({
     index: i,
     role: i === 0 ? 'hook' : i === srcBeats.length - 1 ? 'cta' : 'body',

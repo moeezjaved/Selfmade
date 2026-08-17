@@ -151,6 +151,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sceneIndex, shows: val })
   }
   const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
+  // PEOPLE-FREE BEAT: a pure product/packaging/b-roll shot ("animated product shots of the cores") has
+  // NO person — don't lock a creator into it (that's how scene 14 got a man). Detect from the shot text.
+  const noPeopleScene = !/\b(woman|man|men|person|people|she|he|him|her|guy|girl|lady|creator|customer|hand|hands|holds?|holding|tries|reacts?|talks?|speak|speaks|face|smil|walk)\b/i.test(action)
+    && /\b(product shot|animated|packaging|b-?roll|flat ?lay|\bcores?\b|\bbox\b|pouch|sachet|carton|label|the product|logo|end ?card|title card|close-?up of the)\b/i.test(action)
   // Never let an implicit AI regeneration overwrite a frame the founder UPLOADED. Only an explicit
   // action (a new upload, or a deliberate regenerate with force:true) may replace it. Guards the
   // auto-gen loop + any stale client from silently trashing an approved user frame.
@@ -281,7 +285,8 @@ export async function POST(req: NextRequest) {
   const scenePersonSheetUrl = (sceneLetter && sceneLetter !== 'A') ? castSheetsMap[sceneLetter] : (castSheetsMap.A || meta.cast_sheet)
   const isNonLeadScene = !!sceneLetter && sceneLetter !== 'A'
   let charLock: { mimeType: string; dataB64: string } | null = null
-  if (scenePersonSheetUrl) charLock = await fetchImageB64(scenePersonSheetUrl)   // this scene's exact person, already drawn
+  if (noPeopleScene) charLock = null                                             // product/packaging b-roll → no person
+  else if (scenePersonSheetUrl) charLock = await fetchImageB64(scenePersonSheetUrl)   // this scene's exact person, already drawn
   else if (!isNonLeadScene) charLock = castImg                                    // lead scene → the cast_sheet A we minted above
   // Chain-off-previous-frame fallback is only safe for the SAME person — never for a labelled non-lead scene.
   if (!charLock && !isNonLeadScene && sceneIndex > 0) {
@@ -316,7 +321,9 @@ export async function POST(req: NextRequest) {
   // keyframe shows e.g. Woman D, and honour any recast (ethnicity overrides the reference's).
   const recastOn = !!look && look.toLowerCase() !== 'match'
   const scenePersonDesc = String((scenePerson as any)?.look || '').trim()
-  const personClause = charLock
+  const personClause = noPeopleScene
+    ? 'NO people in this shot — it is a product / packaging / b-roll frame. Do NOT add any person, face, or hands unless the shot text explicitly asks for hands. Show only the product/packaging on a clean, on-brand background.'
+    : charLock
     ? 'The on-camera person MUST be the EXACT SAME creator shown in the same-creator reference image — match their face, hair, skin tone and wardrobe precisely; it is the same person whenever they appear.'
     : (isNonLeadScene && scenePersonDesc)
       ? (recastOn
