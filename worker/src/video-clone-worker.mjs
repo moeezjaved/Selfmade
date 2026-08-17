@@ -1150,6 +1150,26 @@ async function falQueueRun(model, input, iters = 200) {
   return rr.json()
 }
 
+// ── Seedance 2.5 SURGICAL EDIT: fix ONE already-rendered ~5s segment clip IN PLACE (e.g. swap a
+// mis-rendered product) instead of re-rolling the whole segment. We feed the clip + the real product
+// photo + a scoped instruction; 2.5 re-renders only what's asked and leaves the rest of the clip
+// (person, motion, camera, audio) untouched. We only pay for THIS segment's seconds, not the full ad.
+// Gated by VIDEO_FIX_ENGINE=seedance25; the endpoint is env-configurable (SEEDANCE_EDIT_MODEL) so a
+// wrong model id is a config fix, never a code deploy. Returns the fixed clip URL, or null. ──
+async function seedanceEditSegment({ clipUrl, instruction, productImg, aspect }) {
+  const model = process.env.SEEDANCE_EDIT_MODEL || 'fal-ai/bytedance/seedance-2.5/edit'
+  const input = {
+    prompt: instruction,
+    video_url: clipUrl,
+    ...(productImg ? { image_urls: [productImg] } : {}),
+    aspect_ratio: aspect || '9:16',
+    resolution: '720p',
+    generate_audio: false,
+  }
+  const out = await falQueueRun(model, input)
+  return out?.video?.url || out?.video_url || out?.url || (Array.isArray(out?.videos) ? out.videos[0]?.url : null) || null
+}
+
 // ── Pose-guided people-scene restyle (Wan VACE): copies the source's MOVEMENT SKELETON — blocking,
 // gesture, camera — while generating entirely NEW people (no faces copied → no likeness issue).
 // preprocess:true makes VACE derive the pose control from the raw footage itself. ──
@@ -2309,6 +2329,28 @@ async function generateJob(job) {
             // and forbid inventing/removing parts across ALL container types — not just pouches/caps.
             const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
             let verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
+            // SELF-HEAL (flagged): before spending a full segment re-roll, try a SURGICAL Seedance 2.5
+            // edit on this exact clip — fix the product in place, keep the good motion/voice/framing, and
+            // pay for only these ~5s. Download to a SEPARATE file and verify; only adopt it if it clears
+            // (else discard and fall through to the existing re-roll ladder — original clip untouched).
+            if (verdict === 'mismatch' && process.env.VIDEO_FIX_ENGINE === 'seedance25' && falCost < MAX_FAL_USD) {
+              try {
+                console.warn(`✎ ${job.id} seg ${i + 1}: Seedance 2.5-Edit fixing product in place (no full re-roll)`)
+                const editUrl = await seedanceEditSegment({ clipUrl: videoUrl, productImg: prodRef, aspect: meta.aspect,
+                  instruction: `Within this clip, replace the product the person holds/shows with the EXACT product in the reference image${prodDesc ? ` (${prodDesc})` : ''} — same container type, closure, colour and label. Change NOTHING else: keep the same person, motion, camera, lighting and audio.` })
+                if (editUrl) {
+                  falCost += clipCost(meta.tier, segDur, false)
+                  // Overwrite f's file with the edit and verify it. If it clears, we keep it; if not,
+                  // verdict stays 'mismatch' → the existing re-roll below regenerates f from scratch,
+                  // so overwriting here is safe either way (const f is fine — we write the file, not the var).
+                  await rm(f, { force: true }).catch(() => {})
+                  await downloadToFile(editUrl, f)
+                  const ev = await verifySegmentProduct(f, prodRef, prodDesc, `${job.id}-e`, i)
+                  if (ev === 'match') { videoUrl = editUrl; verdict = 'match'; console.log(`✓ ${job.id} seg ${i + 1} fixed by 2.5-Edit — skipped the re-roll`) }
+                  else console.warn(`2.5-Edit didn't clear seg ${i + 1} — falling to re-roll`)
+                }
+              } catch (e) { console.warn(`2.5-Edit seg ${i + 1} failed (${e.message}) — falling to re-roll`) }
+            }
             if (verdict === 'mismatch') {
               // HARD SPEND CAP: never re-roll if this job's fal spend is already at the ceiling — the
               // persistent mismatch gets the FREE real-photo cover instead of burning another generation.
