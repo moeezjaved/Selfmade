@@ -11,6 +11,7 @@ type Scene = { index: number; role: string; time: string | null; action: string;
 type Board = {
   jobId: string; status: string; editable: boolean; hookType: string | null; suggestedMode: string
   sceneCount: number; durationSeconds: number | null; script: string; scenes: Scene[]
+  castSheet?: string | null; characterLook?: string | null
 }
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
@@ -33,7 +34,11 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
   onScript?: (joinedScript: string) => void
   onSceneCount?: (n: number) => void
 }) {
-  const showKeyframes = mode !== 'ugc'   // UGC = script-only plan (keyframes are preview-only + wasteful there)
+  // Keyframes now show for BOTH modes. They USED to be hidden for UGC ("preview-only + wasteful") — but
+  // since Seedance 2.5 the worker feeds each scene's APPROVED keyframe into the UGC segment path too, so
+  // the storyboard is what the user is buying: approve/regenerate/upload frames BEFORE paying, whatever
+  // the mode. Script-only UGC left the founder with "just a script and a Generate button" (no visibility).
+  const showKeyframes = true
   const [board, setBoard] = useState<Board | null>(null)
   const [err, setErr] = useState<string | null>(null)
   const [scenes, setScenes] = useState<Scene[]>([])
@@ -113,12 +118,41 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     finally { setBusy((b) => ({ ...b, [s.index]: false })) }
   }
 
+  const autoRan = useRef(false)   // hoisted: regenerateCast resets it so the storyboard redraws with the new creator
+
+  // HERO CHARACTER SHEET — the locked creator (incl. any recast look, e.g. "Pakistani" when the source
+  // was American). Shown at the top so the founder SEES who'll be on camera and can regenerate them BEFORE
+  // paying for a single second of video. Minted lazily by the first scene keyframe; regenerable here.
+  const [cast, setCast] = useState<string | null>(null)
+  const [castBusy, setCastBusy] = useState(false)
+  const [castErr, setCastErr] = useState('')
+  useEffect(() => { if (board?.castSheet) setCast(board.castSheet) }, [board?.castSheet])
+  const refreshCast = async () => {
+    if (!board?.jobId) return
+    try { const j = await fetch(`/api/discovery/clone-video/storyboard?jobId=${board.jobId}`, { cache: 'no-store' }).then((r) => r.json()); if (j?.castSheet) setCast(j.castSheet) } catch { /* ok */ }
+  }
+  const regenerateCast = async () => {
+    if (!board?.editable || castBusy) return
+    setCastBusy(true); setCastErr('')
+    try {
+      const r = await fetch('/api/discovery/clone-video/keyframe', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: board.jobId, sceneIndex: 0, regenerateCast: true }),
+      }).then((x) => x.json()).catch(() => ({ error: 'network' }))
+      if (r?.castSheet) {
+        setCast(r.castSheet)
+        // The scenes were drawn against the OLD person — clear the AI ones so they redraw with the new creator.
+        setScenes((prev) => prev.map((s) => s.preview_source === 'user' ? s : { ...s, preview: null, preview_source: null }))
+        autoRan.current = false
+      } else setCastErr(r?.error || 'Could not redraw the creator — try again')
+    } catch { setCastErr('Could not redraw the creator — try again') } finally { setCastBusy(false) }
+  }
+
   // Auto-generate a keyframe for every scene that has none — the storyboard should show its visual plan
   // on load, not wait for per-scene clicks. Sequential (gentle on the image quota), runs once per job;
   // persisted previews mean a reload skips already-generated scenes and never re-charges the model.
-  const autoRan = useRef(false)
   useEffect(() => {
-    if (autoRan.current || !board?.editable || !scenes.length || !showKeyframes) return   // UGC: no keyframes
+    if (autoRan.current || !board?.editable || !scenes.length || !showKeyframes) return
     autoRan.current = true
     // Regenerate a scene if it has NO preview, OR a STALE one — a keyframe URL that belongs to a
     // different job (the beats can carry a previous analysis's previews, which is how old-run women
@@ -133,10 +167,11 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
       if (!todo.length) return
       const [first, ...rest] = todo
       await genKeyframe(first)
+      refreshCast()   // the first keyframe mints the hero sheet — surface the creator right away
       const CONC = 2
       for (let i = 0; i < rest.length; i += CONC) await Promise.all(rest.slice(i, i + CONC).map((s) => genKeyframe(s)))
     })()
-  }, [board, scenes.length])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [board, scenes.length, cast])   // eslint-disable-line react-hooks/exhaustive-deps
 
   // Parent re-paced the script (length picker) → re-split it evenly across the current scenes so the
   // storyboard voiceover shows the NEW length's script, matching what will render.
@@ -207,6 +242,32 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
           </span>
         )}
       </div>
+
+      {/* YOUR CREATOR — the locked hero character sheet. This is who'll be on camera in EVERY scene
+          (incl. a recast look, e.g. Pakistani when the source was American). Approve or redraw them
+          BEFORE spending a credit on video — the whole point of storyboard-first. */}
+      {showKeyframes && board.editable && (
+        <div style={{ display: 'flex', gap: 14, alignItems: 'center', border: '1px solid #e6ece2', borderRadius: 12, padding: '12px 14px', background: '#fbfcfa', marginBottom: 12 }}>
+          <div style={{ width: 72, aspectRatio: '9/16', borderRadius: 8, overflow: 'hidden', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
+            {cast
+              ? <img src={cast} alt="" onClick={() => setZoom(cast)} title="Click to enlarge" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }} />
+              : <span style={{ fontSize: 10, color: '#a7b09e', textAlign: 'center', padding: 4 }}>{castBusy ? '…' : 'drawing…'}</span>}
+            {castBusy && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#3a7d2c' }}>…</div>}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 3 }}>Your creator · on camera in every scene</div>
+            <div style={{ fontSize: 13, color: '#20321c', lineHeight: 1.45 }}>
+              {board.characterLook && board.characterLook.toLowerCase() !== 'match'
+                ? <>Recast as <b>{board.characterLook}</b>. This exact person is locked across the whole video — check they look right before you generate.</>
+                : <>Matched to the reference creator. This exact person is locked across the whole video — check they look right before you generate.</>}
+            </div>
+            {castErr && <div style={{ fontSize: 11, color: '#a15a25', marginTop: 4 }}>{castErr}</div>}
+          </div>
+          <button onClick={regenerateCast} disabled={castBusy} style={{ fontSize: 11.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 8, padding: '7px 12px', cursor: castBusy ? 'default' : 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
+            {castBusy ? 'Redrawing…' : cast ? '↻ Redraw creator' : 'Draw creator'}
+          </button>
+        </div>
+      )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         {scenes.map((s, i) => (
