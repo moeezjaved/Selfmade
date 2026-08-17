@@ -118,6 +118,35 @@ export async function POST(request: NextRequest) {
       }
     } catch { /* check failed → don't block; ad creation will still surface any real error */ }
 
+    // CUSTOM AUDIENCES ToS PRE-FLIGHT (Meta error 2663): website-visitor retargeting/retainer audiences
+    // CANNOT be created until the ad-account admin accepts Meta's Custom Audiences Terms of Service ONCE,
+    // by hand, in Meta's UI. If the plan includes retargeting/retainer and the ToS isn't accepted, stop
+    // BEFORE spending and point the user at the exact accept link — so once they accept, broad + retargeting
+    // launch together instead of the retargeting silently skipping after the money's already committed.
+    const wantsAudiences = !!pixelId && (
+      (Array.isArray(retargetingCreatives) && (retargetingCreatives as any[]).length > 0) ||
+      (includeRetainer && Array.isArray(retainerCreatives) && (retainerCreatives as any[]).length > 0)
+    )
+    if (wantsAudiences) {
+      try {
+        const tosRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}?fields=tos_accepted&access_token=${encodeURIComponent(token)}`)
+        const tos = await tosRes.json()
+        const map = tos?.tos_accepted
+        // Only act when Meta actually returns the map (older API versions omit it → don't false-block).
+        if (map && typeof map === 'object') {
+          const accepted = [map.custom_audience_tos, map.web_custom_audience_tos, map.customaudiencetos]
+            .some((v) => v === 1 || v === '1' || v === true)
+          if (!accepted) {
+            return NextResponse.json({
+              needsCustomAudienceTos: true,
+              tosUrl: `https://www.facebook.com/customaudiences/app/tos/?act=${metaAccount.account_id}`,
+              error: 'One quick step before retargeting can launch: accept Meta’s Custom Audiences Terms of Service once for this ad account, then launch again — broad and retargeting will go out together.',
+            }, { status: 400 })
+          }
+        }
+      } catch { /* check failed → don't block; audience creation still surfaces the real reason */ }
+    }
+
     const budgetAmount = parseFloat(budget) || 500
     const budgetCents = Math.round(budgetAmount * 100)
     const currencyMinimums: Record<string,number> = { USD:100, PKR:28100, GBP:100, EUR:100, AED:400, SAR:400, INR:8000 }
