@@ -466,6 +466,42 @@ async function transcreateAdScript(transcript, product, lang) {
   return s.length >= 8 ? s : null
 }
 
+// ── INTERVIEW / VOX-POP DIALOGUE (interview ads only) ───────────────────────────────────────────────
+// A street-interview ad is a CONVERSATION: a host asks, people answer. The flat transcript, split evenly,
+// reads as garbled fragments on the wrong people ("...Is it" | "hot or is it not"). This rebuilds it as a
+// clean, PUNCTUATED, speaker-ATTRIBUTED dialogue adapted to the user's product — one coherent spoken turn
+// per beat, matched to who is on camera in that beat. Returns an array aligned to `beats` (one line each),
+// or null on failure (caller falls back to the flat split). ONLY called for interview-format ads.
+async function buildInterviewDialogue(transcript, beats, product, brandName, lang) {
+  if (!OPENAI_KEY || !Array.isArray(beats) || !beats.length) return null
+  const L = langName(lang)
+  const nonEn = lang && lang !== 'en'
+  const beatList = beats.map((b, i) => ({ i, action: String((b && b.action) || '').slice(0, 160) }))
+  const sys = `You script a STREET-INTERVIEW / vox-pop ad clone. The reference is a real conversation: a HOST walks up and asks people about a rival/old thing, and INTERVIEWEES react and try the user's product. You get the raw (unpunctuated) transcript of the original + the per-beat shot list. Produce ONE coherent spoken line PER BEAT, attributed to whoever is on camera in that beat.
+Rules:
+- Use the shot list to decide WHO speaks each beat: a beat about the host asking → the HOST's question; a beat showing an interviewee reacting/answering → THAT person's answer.
+- Rebuild real sentences with punctuation — NEVER cut a sentence across beats, never leave fragments like "Is it".
+- Adapt it to the USER'S product (${brandName || (product && product.name) || 'the product'}) — keep the same Q&A arc and claims as the original, but it's now about the user's product, not the original brand. Keep the rival/bad thing (e.g. vaping) as the thing being rejected.
+- Natural spoken ${L}${nonEn ? " in that language's native script" : ''}, real conversational tone. Short, punchy turns — one breath each. No stage directions, no on-screen-text.
+- EXACTLY one line per beat, in order. A beat with no speech (pure product/packaging b-roll) → empty string "".
+Return ONLY JSON: {"lines":["", ...]} with exactly ${beats.length} strings.`
+  const usr = `ORIGINAL TRANSCRIPT (raw):\n"${String(transcript).replace(/"/g, "'").slice(0, 1600)}"\n\nUSER PRODUCT:\n${JSON.stringify(product).slice(0, 400)}\n\nBEATS (index → what's shown):\n${JSON.stringify(beatList).slice(0, 1600)}`
+  try {
+    const r = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model: 'gpt-4o', temperature: 0.6, max_tokens: 900, response_format: { type: 'json_object' }, messages: [{ role: 'system', content: sys }, { role: 'user', content: usr }] }),
+    })
+    if (!r.ok) return null
+    const j = await r.json()
+    const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
+    const lines = Array.isArray(out.lines) ? out.lines.map((x) => String(x || '').trim()) : null
+    if (!lines || !lines.length) return null
+    // Pad/trim to exactly beats.length so the index alignment holds.
+    while (lines.length < beats.length) lines.push('')
+    return lines.slice(0, beats.length)
+  } catch { return null }
+}
+
 async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, lang, isService) {
   const refList = Array.from({ length: nImages }, (_, i) => `[Image${i + 1}]`).join(', ')
   const recast = look && look !== 'match'
@@ -1978,6 +2014,24 @@ async function analyzeJob(job) {
     // words, a slow one fewer. The user still sees + can edit this before approving.
     const srcSecs = Number(beat && beat.duration_seconds) || 15
     script = capScriptToSeconds(script, Math.max(8, srcSecs), srcRate || 2.8)
+    // ── INTERVIEW DIALOGUE (interview ads ONLY) ─────────────────────────────────────────────────────
+    // A vox-pop is a conversation, not a monologue. When the analysis found 2+ on-camera people and it's
+    // NOT a single talking-head, rebuild the transcript into a punctuated, speaker-attributed, product-
+    // adapted dialogue — one coherent line per beat, on the right person. Store per-beat (beats[i].script)
+    // so the storyboard shows it and dialogue-mode renders each turn in the right voice. Non-interview ads
+    // (single creator, b-roll+VO montage) are untouched — they keep the normal transcreated narration.
+    const isInterview = Array.isArray(beat.people) && beat.people.length >= 2 && beat.is_talking_head !== true
+    if (isInterview && srcTranscript.split(/\s+/).filter(Boolean).length >= 8 && Array.isArray(beat.beats) && beat.beats.length) {
+      try {
+        const lines = await buildInterviewDialogue(srcTranscript, beat.beats, productDetails, meta.brand_name || productDetails?.name, meta.language)
+        if (lines && lines.some((l) => l && l.length > 1)) {
+          for (let bi = 0; bi < beat.beats.length; bi++) beat.beats[bi].script = lines[bi] || ''
+          beat.is_interview = true
+          script = lines.filter((l) => l && l.trim()).join(' ')   // coherent joined dialogue for the review + VO fallback
+          console.log(`🎤 ${job.id} interview dialogue built — ${lines.filter((l) => l && l.trim()).length} attributed turns`)
+        }
+      } catch (e) { console.warn(`interview dialogue ${job.id}:`, e.message) }
+    }
     // Suggest faithful (scene-by-scene) cloning when the source is a multi-scene / B-roll ad —
     // collapsing those into a talking head isn't a clone. The user picks the mode at approve time.
     const cinematic = cachedA ? cachedA.suggested_mode === 'faithful' : detectCinematic(beat)
@@ -2116,6 +2170,16 @@ async function generateJob(job) {
       // Per-character look profiles (A/B…) come off a FRESH plan as a non-enumerable prop — stamp them
       // into meta.cast_profiles so they survive a resume (the scene_plan checkpoint is a plain array).
       if (scenes.castProfiles && !meta.cast_profiles) { meta.cast_profiles = scenes.castProfiles; await stamp({ clone_meta: { ...meta, cast_profiles: scenes.castProfiles } }) }
+      // INTERVIEW: use the ATTRIBUTED per-beat dialogue (host asks / person answers) as each scene's
+      // spoken line, honouring any founder edits on the beats — instead of buildScenePlan's even split.
+      // Aligned 1:1 when the scene count matches the beat count (the faithful case).
+      if (meta.beat_sheet?.is_interview === true && Array.isArray(meta.beat_sheet.beats) && meta.beat_sheet.beats.length === scenes.length) {
+        for (let si = 0; si < scenes.length; si++) {
+          const bl = meta.beat_sheet.beats[si]?.script
+          if (typeof bl === 'string') scenes[si].script = bl
+        }
+        console.log(`🎤 ${job.id} render using attributed interview dialogue (${scenes.filter((s) => s.script && s.script.trim()).length} turns)`)
+      }
       // USER-CHOSEN LENGTH drives the cut, but KEEP THE SOURCE'S RHYTHM: distribute the target time
       // PROPORTIONALLY to each scene's real source-cut length (src_end-src_start) — a 1s flash stays
       // short, a 5s hold stays long — scaled so the total ≈ target. This fixes the "every scene the same
