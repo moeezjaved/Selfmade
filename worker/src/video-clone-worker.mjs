@@ -62,7 +62,7 @@ async function logErr(userId, message, extra) { try { await fetch(`${U}/rest/v1/
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","optics":"","film_look":"","people":[{"id":"A","look":""}],"hook_type":"","beats":[{"t":"0-2s","action":"","lens":"","shows":"none"}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"product_role":"","hero_product":"","rejected_product":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+{"setting":"","avatar":"","camera":"","optics":"","film_look":"","people":[{"id":"A","look":""}],"hook_type":"","beats":[{"t":"0-2s","action":"","lens":"","shows":"none","has_people":true}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"product_role":"","hero_product":"","rejected_product":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
 - app_demo: time ranges where the ad shows a SOFTWARE UI / app screen / website / dashboard / phone-or-laptop screen recording (NOT a physical product, NOT a person). region: "split_top" if the screen fills only the TOP portion while a person stays on screen below; "full" if the screen fills the whole frame (a cut to the app). Empty array if the ad never shows a screen/app UI.
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
 - optics: the LENS / OPTICAL signature you can read off the footage — name it like a cinematographer: focal-length feel (wide 24mm / normal 35-50mm / tele 85mm+), macro or a Laowa probe-lens look on product close-ups, anamorphic squeeze + oval bokeh, shallow vs deep depth of field, lens flares, distortion. If different beats use different lenses, say so. This drives how each shot is generated, so be specific.
@@ -70,6 +70,7 @@ const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and r
 - people: ONE entry per DISTINCT on-camera person (id "A" = main character, "B","C","D","E"… for the rest). "look" = a DENSE description of that exact person — apparent age, gender, ethnicity, hair, build, wardrobe, distinguishing features — enough to redraw them consistently. List EVERY distinct person you see (an ad can have 4–5). Empty array if nobody is on camera.
 - beats[].lens: for THAT beat, the specific shot optics (e.g. "extreme macro probe-lens push across the glaze", "35mm handheld medium of the chef", "85mm shallow product hero"). Pull it from what the footage actually shows.
 - beats[].shows: what product (if any) is on screen in THAT beat — "hero" (the promoted product), "rejected" (the rival/bad thing being argued against), or "none" (no product). This lets a clone keep the rejected thing as-is and only swap the hero.
+- beats[].has_people: true ONLY if a PERSON/face is actually visible in that beat. Set FALSE for pure b-roll — product close-ups, packaging, hands-only shots, scenery, text/logo cards. Be accurate: a good ad is NOT a person in every shot; mark the b-roll beats false so the clone varies its shots instead of forcing a person into everything.
 - on_screen_text: the BIG designed text CALLOUTS/graphics burned on screen (headlines, stats like "25g PROTEIN", prices, offers, CTAs) with the time range each is visible — NOT the spoken words, NOT tiny legal text. Empty array if the ad has no on-screen text.
 - hero_product: the product this ad is PROMOTING (the good one you're meant to buy). rejected_product: the RIVAL / bad thing the ad argues AGAINST or compares to (e.g. "disposable vapes", "sugary drinks", "the old way") — "" if the ad promotes one product with no villain. Many ads contrast a bad option vs the hero; naming both matters so a clone swaps ONLY the hero and never turns the rejected thing into the new product.
 - hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
@@ -2057,6 +2058,11 @@ async function analyzeJob(job) {
           const talkingHead = beat && beat.is_talking_head === true || !cinematic
           const target = talkingHead ? cuts : Math.max(cuts, geminiScenes)
           scenes = clampScenes(target, realSecs || Number(beat && beat.duration_seconds) || 15)
+          // LENGTH FLOOR (cinematic only): a long ad shouldn't collapse to a handful of 12s+ shots — that's
+          // sluggish and monotonous. Ensure roughly one cut per ~9s of source so a 60s clone gets ~7 scenes,
+          // not 5. Talking-head/UGC is left alone (it's genuinely one continuous take). Capped at 16.
+          const dur = realSecs || Number(beat && beat.duration_seconds) || 15
+          if (cinematic && !talkingHead) scenes = Math.max(scenes, Math.min(16, Math.ceil(dur / 9)))
           console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} (${talkingHead ? 'talking-head→ffmpeg' : 'cinematic→max'}) → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
         }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }

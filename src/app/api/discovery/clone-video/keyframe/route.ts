@@ -176,10 +176,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sceneIndex, shows: val })
   }
   const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
-  // PEOPLE-FREE BEAT: a pure product/packaging/b-roll shot ("animated product shots of the cores") has
-  // NO person — don't lock a creator into it (that's how scene 14 got a man). Detect from the shot text.
-  const noPeopleScene = !/\b(woman|man|men|person|people|she|he|him|her|guy|girl|lady|creator|customer|hand|hands|holds?|holding|tries|reacts?|talks?|speak|speaks|face|smil|walk)\b/i.test(action)
-    && /\b(product shot|animated|packaging|b-?roll|flat ?lay|\bcores?\b|\bbox\b|pouch|sachet|carton|label|the product|logo|end ?card|title card|close-?up of the)\b/i.test(action)
+  // PEOPLE-FREE BEAT: a pure product/packaging/b-roll shot has NO person — don't lock a creator into it
+  // (that's how scene 14 got a man, and why a testimonial had a person in EVERY shot). Prefer the beat's
+  // analysed has_people flag; fall back to a shot-text heuristic when the flag is absent.
+  const beatHasPeople = beats[sceneIndex]?.has_people
+  const noPeopleScene = beatHasPeople === false
+    || (beatHasPeople == null
+        && !/\b(woman|man|men|person|people|she|he|him|her|guy|girl|lady|creator|customer|hand|hands|holds?|holding|tries|reacts?|talks?|speak|speaks|face|smil|walk)\b/i.test(action)
+        && /\b(product shot|animated|packaging|b-?roll|flat ?lay|\bcores?\b|\bbox\b|pouch|sachet|carton|label|the product|logo|end ?card|title card|close-?up of the)\b/i.test(action))
   // Never let an implicit AI regeneration overwrite a frame the founder UPLOADED. Only an explicit
   // action (a new upload, or a deliberate regenerate with force:true) may replace it. Guards the
   // auto-gen loop + any stale client from silently trashing an approved user frame.
