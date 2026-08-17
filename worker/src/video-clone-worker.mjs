@@ -1772,9 +1772,17 @@ async function analyzeJob(job) {
     // recent analysis of this exact source video — ad-intrinsic fields only (beat sheet, scene count,
     // suggested mode, speaking rate); brand-specific outputs (script, overlays) are rebuilt fresh.
     let cachedA = null
-    if (job.source_video_url) {
+    // BRAND+USER SCOPED (2026-08-17): the cache exists to make the SAME ad deterministic for the SAME
+    // brand — never to share analysis across brands. Matching on source_video_url alone let a DIFFERENT
+    // brand's job leak in (a 15s "FlavorBoost" seasoning ad's analysis landed on a 71s Füm→Aura clone →
+    // wrong length, wrong scene count, wrong script). Require same user AND same brand, and require a
+    // real (non-trivial) source URL so an empty/placeholder URL can't broad-match. If brand_id is null,
+    // fall back to user-scope only (still never crosses users).
+    const cacheable = typeof job.source_video_url === 'string' && job.source_video_url.length > 12
+    if (cacheable) {
       try {
-        const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=20`, { headers: H })
+        const brandFilter = job.brand_id ? `&brand_id=eq.${job.brand_id}` : ''
+        const q = await fetch(`${U}/rest/v1/creative_generations?select=clone_meta&source_video_url=eq.${encodeURIComponent(job.source_video_url)}&user_id=eq.${job.user_id}${brandFilter}&id=neq.${job.id}&type=eq.video_clone&order=created_at.desc&limit=20`, { headers: H })
         const rows = q.ok ? await q.json() : []
         // Reuse a prior analysis that carries real STRUCTURE — beats with source frames (thumbs),
         // timestamps or actions, OR a transcript/avatar. This is what grounds the storyboard in the
@@ -3184,7 +3192,7 @@ let genActive = 0
 async function pump() {
   // image_url is REQUIRED by the tweak branch — patch_broll downloads the finished video from it; without
   // it, job.image_url was undefined and every patch bailed "no finished video to patch".
-  const sel = 'select=id,user_id,tier,source_video_url,image_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=6'
+  const sel = 'select=id,user_id,brand_id,tier,source_video_url,image_url,clone_meta,credit_tx&type=eq.video_clone&order=created_at.asc&limit=6'
   if (anActive < MAX_ANALYZE) {
     const analyzing = await getJSON(`creative_generations?${sel}&status=eq.analyzing`).catch(() => [])
     for (const j of analyzing || []) {

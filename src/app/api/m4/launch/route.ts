@@ -195,13 +195,14 @@ export async function POST(request: NextRequest) {
           console.log(`Reusing existing audience "${name}":`, existing.id)
           return existing.id
         }
-        // Not found — create it. `subtype: 'WEBSITE'` is REQUIRED for a pixel-rule audience: without it
-        // Meta rejects the rule (or makes a generic CUSTOM audience that can't take a pixel rule) → the
-        // create failed → null → the retargeting ad set silently shipped BROAD. An EMPTY website audience
-        // is still valid (a fresh pixel with 0 PageViews creates fine, it just says "too small" until it
-        // fills) — so lack of traffic was never the reason; the missing subtype was.
+        // Not found — create it. On the CURRENT Graph API version a pixel-rule website audience is created
+        // with just name + rule — the pixel `event_sources` inside the rule IS what makes it a website
+        // audience. Do NOT send `subtype`: this API version rejects it outright
+        // ("[1870053] The parameter subtype is not supported in the current API version") — that rejection
+        // was the actual reason the audience returned null and retargeting got refused. An EMPTY website
+        // audience is still valid (a fresh pixel with 0 PageViews creates fine, fills over time).
         const created = await post(`${adAccountId}/customaudiences`, {
-          name, subtype: 'WEBSITE', rule: JSON.stringify(rule), prefill: true,
+          name, rule: JSON.stringify(rule), prefill: true,
         })
         console.log(`Created new audience "${name}":`, created.id)
         return created.id
