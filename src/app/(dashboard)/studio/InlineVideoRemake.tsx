@@ -160,7 +160,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [err, setErr] = useState<string | null>(null)
   const [rescripting, setRescripting] = useState(false)
 
-  const isService = brandType === 'service'
+  // Product type is inherited from the selected brand, but a per-video override chip lets the founder
+  // correct a mis-typed brand without leaving the flow (physical / app / service).
+  const [typeOverride, setTypeOverride] = useState<string | undefined>(undefined)
+  const effType = typeOverride || brandType || 'physical'
+  const isService = effType !== 'physical'   // app OR service = no physical product to render
   const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
   // Cinematic is priced per scene (video_clone_xN); UGC per 15s clip. Actual charge is server-side.
@@ -214,7 +218,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
     try {
       const start = await fetch('/api/discovery/clone-video', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages, tier: 'premium', productType: brandType || 'physical', language, voice,
+        body: JSON.stringify({ sourceAdId, sourceVideoUrl: sourceVideoUrl || undefined, brandId: brandId || undefined, productImages, tier: 'premium', productType: effType, language, voice,
           characterLook: look !== 'match' ? look : undefined,
           productDetails: { name: productName.trim() || undefined, benefit: benefit.trim() || undefined } }),
       }).then(r => r.json())
@@ -274,6 +278,21 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* SETUP — style, language + voice, then the free script */}
       {phase === 'setup' && (
         <div>
+          {/* Product-type chip — shows what this brand is (drives whether we render a physical product,
+              an app screen-demo, or a service talking-head). Inherited from the brand; overridable here
+              per-video if the brand was mis-typed. */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={label}>This brand is</div>
+            <div style={pillRow}>
+              {([['physical', '🧴 Physical product'], ['app', '📱 App / website'], ['service', '🛠️ Service']] as const).map(([k, l]) => (
+                <button key={k} onClick={() => setTypeOverride(k)} style={pill(effType === k)}>{l}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>
+              {effType === 'physical' ? 'We composite your real product photos into the ad.' : effType === 'app' ? 'No physical product — we show the app/screen demo instead.' : 'No physical product — the creator talks about the service.'}
+              {typeOverride && typeOverride !== brandType ? ' (overridden for this video)' : ''}
+            </div>
+          </div>
           <div style={{ marginBottom: 16 }}>
             <div style={label}>Style</div>
             <div style={pillRow}>

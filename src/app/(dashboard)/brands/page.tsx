@@ -112,7 +112,7 @@ export default function BrandsPage() {
       }
       const r = await fetch('/api/brands', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...form, brand_type: isService ? 'service' : 'physical', brand_kit: { ...(kit || {}), category: form.category }, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
+        body: JSON.stringify({ ...form, brand_type: form.category, brand_kit: { ...(kit || {}), category: form.category }, industry: csv(form.industry), usps: csv(form.usps), product_images: images, product_name: detectedName || undefined }),
       })
       const d = await r.json().catch(() => ({}))
       if (!r.ok) {
@@ -248,7 +248,7 @@ function BrandCard({ brand, onDelete, onWatch, onEdit, onSetType, onAddProduct, 
   onAddProduct: (b: string, n: string, p: string, i: string) => void
   onDelProduct: (b: string, p: string) => void
 }) {
-  const isSvc = brand.brand_type === 'service'
+  const isSvc = brand.brand_type !== 'physical'   // service OR app = no physical product to manage
   const [p, setP] = useState({ name: '', price: '', image: '' })
   const [editing, setEditing] = useState(false)
   const [ef, setEf] = useState({ name: brand.name, website: brand.website || '', tone: brand.tone || '' })

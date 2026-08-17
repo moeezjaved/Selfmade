@@ -91,7 +91,7 @@ export async function POST(req: NextRequest) {
     target_audience: b.target_audience || null, tone: b.tone || null,
     preferred_words: ARR(b.preferred_words), avoid_words: ARR(b.avoid_words),
     brand_kit: (b.brand_kit && typeof b.brand_kit === 'object') ? b.brand_kit : {},
-    brand_type: b.brand_type === 'service' ? 'service' : 'physical',   // service = app/site/service (no physical product rendered)
+    brand_type: ['physical', 'service', 'app'].includes(b.brand_type) ? b.brand_type : 'physical',   // physical | service | app(software/site — no physical product rendered)
   }).select().single()
   if (error) return NextResponse.json({ error: error.message }, { status: 400 })
 

@@ -204,6 +204,10 @@ export default function InterviewPage() {
   const [analysis, setAnalysis] = useState<any>(null)
   // smart-guess editable fields
   const [gName, setGName] = useState(''), [gSells, setGSells] = useState(''), [gBuyer, setGBuyer] = useState(''), [gVoice, setGVoice] = useState(''), [gDiff, setGDiff] = useState('')
+  // What KIND of brand — physical product / app-website / service. Drives every remake afterward (do
+  // we composite a real product, show an app screen-demo, or have the creator talk about a service).
+  // Was never asked in onboarding → every first brand silently defaulted to 'physical'.
+  const [gType, setGType] = useState<'physical' | 'app' | 'service'>('physical')
   const [editing, setEditing] = useState<string | null>(null)
   // markets + competitors
   const [markets, setMarkets] = useState<string[]>([])
@@ -261,6 +265,7 @@ export default function InterviewPage() {
       if (!s || !RESUMABLE.includes(s.phase)) return
       if (s.url) setUrl(s.url); if (s.detect) setDetect(s.detect); if (s.analysis) setAnalysis(s.analysis)
       if (s.gName != null) setGName(s.gName); if (s.gSells != null) setGSells(s.gSells); if (s.gBuyer != null) setGBuyer(s.gBuyer)
+      if (s.gType === 'physical' || s.gType === 'app' || s.gType === 'service') setGType(s.gType)
       if (s.gVoice != null) setGVoice(s.gVoice); if (s.gDiff != null) setGDiff(s.gDiff)
       if (Array.isArray(s.markets)) setMarkets(s.markets); if (Array.isArray(s.suggested)) setSuggested(s.suggested)
       if (Array.isArray(s.picks)) setPicks(s.picks); if (s.culture) setCulture(s.culture); if (Array.isArray(s.notes)) setNotes(s.notes)
@@ -271,8 +276,8 @@ export default function InterviewPage() {
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (phase === 'welcome' || phase === 'night' || phase === 'plan') return   // don't snapshot entry/terminal steps
-    try { sessionStorage.setItem(RESTORE_KEY, JSON.stringify({ phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, markets, suggested, picks, culture, notes, brandId: brandIdRef.current })) } catch { /* quota/private mode */ }
-  }, [phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, markets, suggested, picks, culture, notes])
+    try { sessionStorage.setItem(RESTORE_KEY, JSON.stringify({ phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, gType, markets, suggested, picks, culture, notes, brandId: brandIdRef.current })) } catch { /* quota/private mode */ }
+  }, [phase, url, detect, analysis, gName, gSells, gBuyer, gVoice, gDiff, gType, markets, suggested, picks, culture, notes])
 
   const addLog = (t: string, done = false) => setLog(l => [...l.map(x => ({ ...x, done: true })), { t, done }])
   const note = (kind: string, content: string) => {
@@ -423,7 +428,8 @@ export default function InterviewPage() {
         tone: gVoice || undefined, target_audience: gBuyer || undefined,
         usps: gDiff ? [gDiff] : undefined, avoid_words: redline ? [redline] : undefined,
         product_images: (detect?.productImages?.length ? detect.productImages : detect?.images || []).slice(0, 4),
-        brand_kit: detect?.brandKit || undefined,
+        brand_kit: { ...(detect?.brandKit || {}), category: gType },
+        brand_type: gType,
       }
       const resp = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null)
       let r: any = null; try { r = resp ? await resp.json() : null } catch { /* non-json */ }
@@ -605,6 +611,20 @@ export default function InterviewPage() {
                   <div style={{ ...sub, marginTop: 4 }}>Give me one line on what you sell — I’ll take it from there tonight.
                     <input value={gSells} onChange={e => setGSells(e.target.value)} style={{ ...inputCss, marginTop: 10 }} placeholder="e.g. farm-fresh dairy, delivered — Lahore" /></div>
                 )}
+                {/* WHAT KIND of brand — sets brand_type for every remake afterward. Physical = we composite
+                    real product photos; app = we show the app/screen demo; service = the creator talks. */}
+                <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: '12px 16px', marginTop: 9 }}>
+                  <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.08em', color: MUTED, textTransform: 'uppercase', marginBottom: 9 }}>What you’re promoting</div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {([['physical', '🧴 A physical product', 'Something you ship'], ['app', '📱 An app or website', 'Software or SaaS'], ['service', '🛠️ A service', 'You do it for people']] as const).map(([k, l, d]) => (
+                      <button key={k} onClick={() => setGType(k)} type="button"
+                        style={{ flex: '1 1 150px', textAlign: 'left', border: `1.5px solid ${gType === k ? GREEN : LINE}`, background: gType === k ? '#f6fbef' : '#fff', borderRadius: 11, padding: '9px 12px', cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <div style={{ fontSize: 13, fontWeight: 750, color: INK }}>{l}</div>
+                        <div style={{ fontSize: 11.5, color: MUTED }}>{d}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
               <div style={{ textAlign: 'center', marginTop: 18 }}>
                 <button style={btnMain} onClick={confirmGuesses}>✓ That’s us</button>
