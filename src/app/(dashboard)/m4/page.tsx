@@ -238,13 +238,20 @@ function M4Inner() {
         if (Array.isArray(d.retargetingCreatives)) setRetargetingCreatives(d.retargetingCreatives.filter((c: any) => c.hash))
         if (Array.isArray(d.retainerCreatives)) setRetainerCreatives(d.retainerCreatives.filter((c: any) => c.hash))
         if (Array.isArray(d.interests)) setInterests(d.interests)
-        if (d.step) setStep(d.step)
+        // Restore the step so a refresh mid-wizard resumes — but NEVER into 'grades' (or 'review', which
+        // holds a launched campaign). After a launch the autosave re-saved step:'grades', so every later
+        // visit to /m4 reopened on the grades screen and the campaign creator was permanently hidden.
+        // A terminal step means the wizard is done: start the next campaign fresh from 'welcome'.
+        if (d.step && d.step !== 'grades' && d.step !== 'review') setStep(d.step)
       }
     } catch { /* corrupt draft — ignore */ }
     restored.current = true
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
   React.useEffect(() => {
     if (!restored.current) return   // don't overwrite the saved draft before we've restored it
+    // A launched campaign is finished — don't re-save it as a draft. Persisting step:'grades' after the
+    // launch cleared the draft is exactly what pinned /m4 to the grades screen on every later visit.
+    if (step === 'grades') return
     try {
       sessionStorage.setItem(DRAFT_KEY, JSON.stringify({
         step, form, adCopy, retargetingCopy, retainerCopy, includeRetainer, selectedPageId, selectedInstagramId,
