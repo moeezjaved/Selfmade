@@ -969,6 +969,39 @@ async function composeCleanProduct({ productImageUrls, jobId }) {
   return `${R2_PUBLIC}/${key}`
 }
 
+// ── ASSET-LOCK (Higgsfield method): lock reusable reference sheets ONCE up front, then every scene
+// references the SAME locked assets. This is the fix for cross-scene drift — the product/character/
+// location stop morphing between cuts because they're anchored to one canonical sheet, not re-invented
+// per scene. All are SINGLE composite images (multi-angle in one frame) so the ref count stays at 2 and
+// Seedance doesn't inflate the product's size. Cached on clone_meta, ~1-2¢ each, once per job. ──
+
+// PRODUCT SHEET — front + 3/4 views of the exact product in one clean frame, so the video model knows
+// the product from every side (a flat single-angle photo drifts when the camera moves around it).
+async function composeProductSheet({ productImageUrls, jobId }) {
+  if (!GEMINI_KEY || !productImageUrls?.length) return null
+  const imgs = []
+  for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
+  if (!imgs.length) return null
+  const prompt = 'Clean studio PRODUCT SHEET of the EXACT product from the attached photos: two views of the SAME product side by side in one frame — a front view on the left and a 3/4 perspective view on the right, both at matched scale and lighting. Identical container, cap/applicator, colours and label text — sharp and readable. Plain seamless neutral-grey background. NO hands, NO people, NO other objects, NO text overlays — only the product, shown from these two angles.'
+  const inline = await geminiImage(prompt, imgs)
+  const key = `creatives/tmp/${jobId}-product-sheet.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
+// LOCATION PLATE — an empty photoreal still of the scene's setting at a 3/4 angle (depth for the camera
+// to move through — a flat head-on room drifts). One plate per distinct setting, reused across the
+// scenes that share it, so backgrounds stay consistent cut to cut.
+async function composeLocationPlate({ setting, jobId, aspect }) {
+  if (!GEMINI_KEY || !setting) return null
+  const prompt = `Photorealistic ${aspect || '9:16'} establishing STILL of this location, empty (no people): ${String(setting).slice(0, 400)}. Shot at a 3/4 angle to give the room real depth, high-end commercial look, natural cinematic lighting, no on-screen text or watermarks.`
+  let inline
+  try { inline = await geminiImage(prompt, []) } catch { return null }
+  const key = `creatives/tmp/${jobId}-loc-${Math.abs([...String(setting)].reduce((a, c) => (a * 31 + c.charCodeAt(0)) | 0, 7)).toString(36)}.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
 // ── Voice mapping: our 4 UI voices (OpenAI names) → an ElevenLabs preset of the same gender/energy,
 // so a user's pick stays consistent across languages. Overridable per-voice via env. ──
 const ELEVEN_VOICE_MAP = {
@@ -1911,12 +1944,22 @@ async function generateJob(job) {
         if (cleanProduct) { console.log(`🧴 ${job.id} clean product ref composed`); await stamp({ clone_meta: { ...meta, clean_product: cleanProduct } }); meta.clean_product = cleanProduct }
       } catch (e) { console.warn(`clean-product ${job.id}:`, e.message) }
     }
+    // ASSET-LOCK · PRODUCT SHEET (Higgsfield method) — one composite of the product from front + 3/4 so
+    // Seedance 2.5 knows it from every side and holds it as the camera moves. It's a SINGLE image, so it
+    // replaces the clean re-shoot as the lead ref (ref count stays 2 → no size inflation). Cached once.
+    let productSheet = meta.product_sheet || null
+    if (!isService && !productSheet && productImages.length) {
+      try {
+        productSheet = await composeProductSheet({ productImageUrls: productImages, jobId: job.id })
+        if (productSheet) { console.log(`🗂 ${job.id} product sheet composed`); await stamp({ clone_meta: { ...meta, product_sheet: productSheet } }); meta.product_sheet = productSheet }
+      } catch (e) { console.warn(`product-sheet ${job.id}:`, e.message) }
+    }
     // PRODUCT REFS (2026-07-16): extra reference images add "visual weight" and Seedance inflates the
-    // product's size — so refs are capped at TWO: the clean re-shoot (or first photo) + the user's
-    // second selected photo when they picked one (box + product together looked great on HAIRRESQ).
-    // The size guardrails (vision-measured anchor in every prompt + the post-render scale verifier
-    // with auto re-roll) are what make the second ref safe to allow.
-    const falProductImages = [cleanProduct || productImages[0], productImages[1]].filter(Boolean).slice(0, 2)
+    // product's size — so refs are capped at TWO: the product sheet / clean re-shoot (or first photo) +
+    // the user's second selected photo when they picked one (box + product together looked great on
+    // HAIRRESQ). The size guardrails (vision-measured anchor in every prompt + the post-render scale
+    // verifier with auto re-roll) are what make the second ref safe to allow.
+    const falProductImages = [productSheet || cleanProduct || productImages[0], productImages[1]].filter(Boolean).slice(0, 2)
 
     // ── FAITHFUL mode: clone the source's edit structure scene-by-scene, then stitch. Each scene is
     // its own Seedance clip with a scene-appropriate prompt (b-roll/lifestyle/product allowed — no
@@ -2343,11 +2386,14 @@ async function generateJob(job) {
             // and forbid inventing/removing parts across ALL container types — not just pouches/caps.
             const fixLine = `\n\nCRITICAL PRODUCT ACCURACY: render the product EXACTLY as the attached photo${prodDesc ? ` (it is: ${prodDesc})` : ''} — same container type, silhouette, closure and parts. The photo shows the COMPLETE product; every edge and closure is exactly as pictured. Do NOT add, remove, invent or change ANY part (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper, sleeve): if the real product doesn't have it, it must not appear; if it does, keep it. Keep the exact form factor shown (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`
             let verdict = await verifySegmentProduct(f, prodRef, prodDesc, job.id, i)
-            // SELF-HEAL (flagged): before spending a full segment re-roll, try a SURGICAL Seedance 2.5
+            // SELF-HEAL (default ON): before spending a full segment re-roll, try a SURGICAL Seedance 2.5
             // edit on this exact clip — fix the product in place, keep the good motion/voice/framing, and
             // pay for only these ~5s. Download to a SEPARATE file and verify; only adopt it if it clears
             // (else discard and fall through to the existing re-roll ladder — original clip untouched).
-            if (verdict === 'mismatch' && process.env.VIDEO_FIX_ENGINE === 'seedance25' && falCost < MAX_FAL_USD) {
+            // This is our vision-check-and-auto-fix pass — it runs server-side BEFORE status=done, so the
+            // user only ever sees a video whose product already passed the check. Set VIDEO_FIX_ENGINE=off
+            // to disable and go straight to the re-roll ladder.
+            if (verdict === 'mismatch' && process.env.VIDEO_FIX_ENGINE !== 'off' && falCost < MAX_FAL_USD) {
               try {
                 console.warn(`✎ ${job.id} seg ${i + 1}: Seedance 2.5-Edit fixing product in place (no full re-roll)`)
                 const editUrl = await seedanceEditSegment({ clipUrl: videoUrl, productImg: prodRef, aspect: meta.aspect,
