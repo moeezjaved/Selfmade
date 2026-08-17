@@ -3,6 +3,8 @@ import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { logError } from '@/lib/admin/logError'
+import { resolveBillingOwner } from '@/lib/org'
+import { requireFeature } from '@/lib/entitlements'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 export const maxDuration = 300
@@ -13,6 +15,14 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    // Launching real ads is a Creator feature — gate on the billing owner's plan (teammates inherit it).
+    {
+      const gateAdmin = createAdminClient()
+      const owner = await resolveBillingOwner(gateAdmin, user.id)
+      const gate = await requireFeature(gateAdmin, owner, 'launch')
+      if (gate) return NextResponse.json(gate, { status: 402 })
+    }
 
     // Record that this user reached M4 and tried to launch — even if it fails validation below. The
     // admin funnel ("Clicked Ad Plan (M4)") reads this, so a user who engaged M4 counts as engaged,

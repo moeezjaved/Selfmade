@@ -16,6 +16,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { encryptToken } from '@/lib/meta/client'
 import { runMetaAudit } from '@/lib/meta/audit'
+import { resolveBillingOwner } from '@/lib/org'
+import { requireFeature } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -34,6 +36,15 @@ export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  // Meta connect + running ads is a Creator feature. Gate on the BILLING OWNER's plan so a Creator's
+  // teammate is allowed, and a Free user gets a clean upgrade prompt instead of connecting.
+  {
+    const gateAdmin = createAdminClient()
+    const owner = await resolveBillingOwner(gateAdmin, user.id)
+    const gate = await requireFeature(gateAdmin, owner, 'launch')
+    if (gate) return NextResponse.json(gate, { status: 402 })
+  }
 
   const body = await req.json().catch(() => ({}))
   const token = String(body.token || '').trim()

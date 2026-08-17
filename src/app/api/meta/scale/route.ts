@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { resolveBillingOwner } from '@/lib/org'
+import { requireFeature } from '@/lib/entitlements'
 
 /**
  * POST /api/meta/scale { metaCampaignId, newDailyBudget }  — founder-confirmed "Scale it" from the brief.
@@ -33,6 +35,13 @@ export async function POST(req: NextRequest) {
   if (budgetMajor > 100000) return NextResponse.json({ error: 'That budget looks too high — double-check the amount.' }, { status: 400 })
 
   const admin = createAdminClient()
+
+  // Scaling ad budgets is a Creator feature — gate on the billing owner's plan (teammates inherit it).
+  {
+    const owner = await resolveBillingOwner(admin, user.id)
+    const gate = await requireFeature(admin, owner, 'campaigns')
+    if (gate) return NextResponse.json(gate, { status: 402 })
+  }
 
   // The campaign must belong to THIS user — grab its account so we scale on the right token, even when
   // the campaign lives in a non-primary account.
