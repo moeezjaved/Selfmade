@@ -195,9 +195,13 @@ export async function POST(request: NextRequest) {
           console.log(`Reusing existing audience "${name}":`, existing.id)
           return existing.id
         }
-        // Not found — create it
+        // Not found — create it. `subtype: 'WEBSITE'` is REQUIRED for a pixel-rule audience: without it
+        // Meta rejects the rule (or makes a generic CUSTOM audience that can't take a pixel rule) → the
+        // create failed → null → the retargeting ad set silently shipped BROAD. An EMPTY website audience
+        // is still valid (a fresh pixel with 0 PageViews creates fine, it just says "too small" until it
+        // fills) — so lack of traffic was never the reason; the missing subtype was.
         const created = await post(`${adAccountId}/customaudiences`, {
-          name, rule: JSON.stringify(rule), prefill: true,
+          name, subtype: 'WEBSITE', rule: JSON.stringify(rule), prefill: true,
         })
         console.log(`Created new audience "${name}":`, created.id)
         return created.id
@@ -393,7 +397,7 @@ export async function POST(request: NextRequest) {
         // the retargeting budget on everyone. Refuse to create it and say exactly why the audience failed.
         if (!rtAud) {
           const why = audienceErrors['M4 — Website Visitors 180d (Retargeting)'] || 'Meta did not return an audience id'
-          throw new Error(`Couldn't build the website-visitor audience for the Pixel (${why}). Retargeting was skipped so it wouldn't run as a broad ad set. Common causes: the Pixel has no traffic yet, or Custom Audience terms haven't been accepted for this ad account in Meta Audiences.`)
+          throw new Error(`Couldn't build the website-visitor audience for the Pixel (${why}). Retargeting was skipped so it wouldn't run as a broad ad set. An empty audience is fine (a new Pixel fills over time) — if Meta refused it, it's usually the Custom Audience terms not yet accepted for this ad account (Ads Manager → Audiences), or the Pixel isn't shared with this ad account.`)
         }
 
         const rtPct = includeRetainer ? 0.2 : 0.4
