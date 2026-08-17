@@ -12,6 +12,7 @@ import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { ChannelLogo } from '@/components/brand/logos'
 import { prettyInbound } from '@/lib/customer/pretty'
+import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#141d15', LIME = '#ff5a2c', MUTED = '#6b6b6b'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
@@ -56,6 +57,7 @@ export default function InboxPage() {
   const [rollup, setRollup] = useState<Record<string, number>>({})
   const [stats, setStats] = useState<{ handled: number; sales: number; revenue: number } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [locked, setLocked] = useState(false)   // Free plan → inbox is Creator-only; show an upgrade panel
   const [drafts, setDrafts] = useState<Record<string, string>>({})   // keyed by message id
   const [busy, setBusy] = useState<string>('')
   const [simText, setSimText] = useState('')
@@ -93,6 +95,7 @@ export default function InboxPage() {
   // The inbox scopes to the app-wide project (the sidebar switcher's `sf_brand` cookie) — the API reads it,
   // so there's no per-page brand picker here.
   const load = () => fetch('/api/customer/inbox', { cache: 'no-store' }).then(r => r.json()).then(j => {
+    if (j?.error === 'plan_limit') { setLocked(true); return }   // Creator-only — render the upgrade panel
     if (Array.isArray(j.threads)) setThreads(j.threads)
     if (Array.isArray(j.outbound)) setOutbound(j.outbound)
     if (j.rollup) setRollup(j.rollup)
@@ -197,6 +200,19 @@ export default function InboxPage() {
       </div>
     )
   }
+
+  if (locked) return (
+    <div style={{ padding: '32px 28px', maxWidth: 560, margin: '0 auto' }}>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, padding: '40px 32px', textAlign: 'center', background: '#fff' }}>
+        <div style={{ width: 60, height: 60, borderRadius: 16, background: '#fff1ec', display: 'grid', placeItems: 'center', margin: '0 auto 18px', fontSize: 28 }}>💬</div>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: INK, margin: '0 0 8px' }}>Customer Inbox is a Creator feature</h1>
+        <p style={{ fontSize: 14.5, color: SUB, lineHeight: 1.6, margin: '0 0 22px' }}>
+          Every customer DM and WhatsApp lands here — triaged, prioritized, reply-ready — and Mello drafts the response for you to approve. Upgrade to Creator to switch it on.
+        </p>
+        <Link href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', textDecoration: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800 }}>Upgrade to Creator →</Link>
+      </div>
+    </div>
+  )
 
   return (
     <div style={{ padding: '32px 28px', maxWidth: 820, margin: '0 auto' }}>

@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { oppColor, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
+import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#141d15', LIME = '#ff5a2c', FAINT = '#9aa79a'
 const GOOD = '#ef4a1e', WARN = '#b7791f'
@@ -55,7 +56,7 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
     setState('busy'); setMsg('')
     fetch('/api/meta/scale', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: camp.metaCampaignId, newDailyBudget: budget }) })
       .then(r => r.json())
-      .then(j => { if (j?.ok) { setState('done') } else { setState('err'); setMsg(j?.error || 'Scaling failed — try again.') } })
+      .then(j => { if (j?.ok) { setState('done') } else if (showUpsell(j)) { setState('idle') } else { setState('err'); setMsg(j?.error || 'Scaling failed — try again.') } })
       .catch(() => { setState('err'); setMsg('Scaling failed — try again.') })
   }
 
@@ -104,7 +105,7 @@ function TuneConfirm({ apply, camp, currency, cta, onDone }: { apply: ApplyPlan;
     setState('busy'); setMsg('')
     fetch('/api/meta/tune', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: camp.metaCampaignId, apply, newDailyBudget: budget }) })
       .then(r => r.json())
-      .then(j => { if (j?.ok) { setNewName(j.newCampaign || `Focus: ${apply.label}`); setState('done'); onDone?.() } else { setState('err'); setMsg(j?.error || 'Couldn’t apply it — try again.') } })
+      .then(j => { if (j?.ok) { setNewName(j.newCampaign || `Focus: ${apply.label}`); setState('done'); onDone?.() } else if (showUpsell(j)) { setState('idle') } else { setState('err'); setMsg(j?.error || 'Couldn’t apply it — try again.') } })
       .catch(() => { setState('err'); setMsg('Couldn’t apply it — try again.') })
   }
 

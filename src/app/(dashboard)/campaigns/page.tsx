@@ -2,6 +2,7 @@
 import MetaGate from '@/components/MetaGate'
 import toast from 'react-hot-toast'
 import { useState, useEffect, useRef } from 'react'
+import { showUpsell } from '@/components/UpsellModal'
 import UpgradeGate from '@/components/UpgradeGate'
 
 const DATE_RANGES = [
@@ -124,7 +125,8 @@ function CampaignsInner() {
         body: JSON.stringify(editModal),
       })
       const data = await res.json()
-      if (data.error) toast.error('Error: ' + data.error)
+      if (showUpsell(data)) { setEditModal(null) }   // Free plan → upgrade modal
+      else if (data.error) toast.error('Error: ' + data.error)
       else { setEditModal(null); setUploadedCreativeHash(null); setUploadingCreative(false); await loadCampaigns() }
     } catch (e: any) { toast.error(e.message) }
     setSaving(false)
@@ -132,11 +134,13 @@ function CampaignsInner() {
 
   const toggleStatus = async (id: string, type: string, currentStatus: string) => {
     const newStatus = currentStatus === 'ACTIVE' ? 'PAUSED' : 'ACTIVE'
-    await fetch('/api/campaigns/manage', {
+    const tRes = await fetch('/api/campaigns/manage', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'toggle_status', id, type, status: newStatus }),
     })
+    const tData = await tRes.json().catch(() => ({}))
+    if (showUpsell(tData)) return   // Free plan → upgrade modal, don't reload
     await loadCampaigns()
   }
 

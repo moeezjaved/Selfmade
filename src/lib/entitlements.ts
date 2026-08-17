@@ -41,12 +41,12 @@ export function upsell(planId: PlanId, limit: string, opts: { current?: number; 
 
 /** Gate a boolean feature (aiInsights, launch, campaigns, api, exports, canBuyCredits). Returns null
  *  if allowed, or a structured upsell to return as 402. */
-export async function requireFeature(admin: SupabaseClient, ownerId: string, feature: 'aiInsights' | 'launch' | 'campaigns' | 'api' | 'exports' | 'canBuyCredits'): Promise<UpsellResponse | null> {
+export async function requireFeature(admin: SupabaseClient, ownerId: string, feature: 'aiInsights' | 'launch' | 'campaigns' | 'inbox' | 'api' | 'exports' | 'canBuyCredits'): Promise<UpsellResponse | null> {
   const ent = await getEntitlements(admin, ownerId)
   if (ent[feature]) return null
   const names: Record<string, string> = {
     aiInsights: 'AI Insights (Patterns)', launch: 'Launch Ads', campaigns: 'Campaigns & Reports',
-    api: 'API / MCP access', exports: 'Exports', canBuyCredits: 'Credit top-ups',
+    inbox: 'Customer Inbox', api: 'API / MCP access', exports: 'Exports', canBuyCredits: 'Credit top-ups',
   }
   return upsell(ent.planId, feature, { feature, message: `${names[feature] || feature} is available on the ${firstPlanWith(feature)} plan and up.` })
 }
