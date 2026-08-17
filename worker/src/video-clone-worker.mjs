@@ -1049,7 +1049,13 @@ async function muxVoiceover(videoIn, voMp3, out) {
 // the others). Kept to one sentence on purpose — prompt bloat degrades these models ([[project_clone_prompt_lesson]]).
 const REALISM = 'Natural real-time motion at normal human speed — lively, lifelike movement, absolutely NOT slow motion; photorealistic, sharp focus, real skin and eyes.'
 async function falGenerate({ prompt, imageUrls, videoUrl, resolution, duration, aspect, tier, generateAudio }) {
-  const model = tier === 'fast' ? 'bytedance/seedance-2.0/fast/reference-to-video' : 'bytedance/seedance-2.0/reference-to-video'
+  // Initial generation now runs on Seedance 2.5 (reference-to-video) — dramatically better adherence to
+  // the approved storyboard keyframes than 2.0. Kept env-overridable (mirrors SEEDANCE_EDIT_MODEL) so the
+  // exact fal slug can be corrected without a redeploy. Fast tier stays on the cheaper 2.0 fast model
+  // unless SEEDANCE_GEN_MODEL_FAST is set.
+  const model = tier === 'fast'
+    ? (process.env.SEEDANCE_GEN_MODEL_FAST || 'bytedance/seedance-2.0/fast/reference-to-video')
+    : (process.env.SEEDANCE_GEN_MODEL || 'bytedance/seedance-2.5/reference-to-video')
   const fullPrompt = /slow motion|real-time motion/i.test(prompt) ? prompt : `${prompt} ${REALISM}`
   // generate_audio defaults true (UGC/segments need Seedance's baked lip-synced speech), but FAITHFUL
   // scenes pass false: they're silent b-roll with a TTS voiceover added in post, and asking Seedance
@@ -2295,7 +2301,15 @@ async function generateJob(job) {
           // the identical character description repeated in every segment prompt. (Set meta.try_anchor=true
           // to restore the old anchored attempt.)
           const useAnchor = !productFree && anchor && meta.try_anchor === true
-          const imgs = productFree ? [] : (useAnchor ? [anchor, ...falProductImages].slice(0, 9) : falProductImages)
+          // STORYBOARD-FIRST: if the founder approved a keyframe for this scene (Storyboard step wrote it to
+          // beat_sheet.beats[i].preview — AI-generated OR their own uploaded asset), lead the reference set
+          // with it so Seedance 2.5 renders the video the user already signed off on. Falls back to product
+          // photos via the moderation ladder below, so a blocked/absent keyframe never kills the segment.
+          const approvedKf = !productFree && meta.beat_sheet?.beats?.[i]?.preview ? meta.beat_sheet.beats[i].preview : null
+          const imgs = productFree ? []
+            : approvedKf ? [approvedKf, ...falProductImages].slice(0, 9)
+            : useAnchor ? [anchor, ...falProductImages].slice(0, 9)
+            : falProductImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${productFree ? ' (product-free)' : useAnchor ? ' (anchored)' : ''}`)
           const segDur = segDurs[i]
           // Default (native voice): generateAudio TRUE → Seedance speaks + lip-syncs the segment itself.
@@ -2305,7 +2319,7 @@ async function generateJob(job) {
           const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
           // Ladder: (anchor+products if enabled →) products only → PURE PROMPT. A segment must never kill
           // the whole long-form render on a moderation block (same contract as faithful mode).
-          const rungs = productFree ? [[]] : [imgs, ...(useAnchor ? [falProductImages] : []), []]
+          const rungs = productFree ? [[]] : [imgs, ...((approvedKf || useAnchor) ? [falProductImages] : []), []]
           for (let ri = 0; ri < rungs.length; ri++) {
             try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })); break }
             catch (e) {

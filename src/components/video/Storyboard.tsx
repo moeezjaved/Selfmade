@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 
-type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null; preview?: string | null }
+type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null; preview?: string | null; preview_source?: string | null }
 type Board = {
   jobId: string; status: string; editable: boolean; hookType: string | null; suggestedMode: string
   sceneCount: number; durationSeconds: number | null; script: string; scenes: Scene[]
@@ -87,9 +87,30 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     try {
       let r = await once()
       if (!r?.preview && /busy|network|429|503/i.test(String(r?.error || ''))) { await new Promise((res) => setTimeout(res, 3500)); r = await once() }
-      if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview } : x))
+      if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview, preview_source: 'ai' } : x))
       else setGenErr((e) => ({ ...e, [s.index]: /busy/i.test(String(r?.error || '')) ? 'Image model busy — tap to retry' : (r?.error || 'Could not generate') }))
     } catch { setGenErr((e) => ({ ...e, [s.index]: 'Could not generate — try again' })) } finally { setBusy((b) => ({ ...b, [s.index]: false })) }
+  }
+
+  // UPLOAD-YOUR-OWN: the founder drops in their own image for this scene (a real product shot, brand
+  // photo, or a specific model). Presign → PUT to R2 → tell the keyframe route the KEY; it becomes the
+  // approved keyframe the worker builds the video from. This is the "I know exactly what I'll get" path.
+  const uploadKeyframe = async (s: Scene, file: File | null) => {
+    if (!board?.editable || !file || busy[s.index]) return
+    setBusy((b) => ({ ...b, [s.index]: true })); setGenErr((e) => ({ ...e, [s.index]: '' }))
+    try {
+      const pre = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) }).then((x) => x.json()).catch(() => ({}))
+      if (!pre?.uploadUrl || !pre?.key) throw new Error(pre?.message || 'Could not start the upload')
+      const put = await fetch(pre.uploadUrl, { method: 'PUT', headers: { 'content-type': pre.fileType || file.type }, body: file })
+      if (!put.ok) throw new Error('Upload failed')
+      const r = await fetch('/api/discovery/clone-video/keyframe', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, uploadedKey: pre.key }),
+      }).then((x) => x.json()).catch(() => ({ error: 'network' }))
+      if (r?.preview) setScenes((prev) => prev.map((x) => x.index === s.index ? { ...x, preview: r.preview, preview_source: 'user' } : x))
+      else throw new Error(r?.error || 'Could not save the image')
+    } catch (e: any) { setGenErr((er) => ({ ...er, [s.index]: /image|jp|png|type/i.test(String(e?.message)) ? 'Use a JPG or PNG image' : (e?.message || 'Upload failed — try again') })) }
+    finally { setBusy((b) => ({ ...b, [s.index]: false })) }
   }
 
   // Auto-generate a keyframe for every scene that has none — the storyboard should show its visual plan
@@ -207,13 +228,19 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
                 {(s.preview || s.thumb)
                   ? <img src={s.preview || s.thumb || ''} alt="" onClick={() => s.preview && setZoom(s.preview)} title={s.preview ? 'Click to enlarge' : ''} style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: s.preview ? 'zoom-in' : 'default' }} />
                   : <span style={{ fontSize: 20, color: '#b4bdad' }}>▦</span>}
-                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#fff', background: '#ff5a2c', borderRadius: 4, padding: '1px 4px' }}>YOURS</span>}
+                {s.preview && <span style={{ position: 'absolute', top: 4, left: 4, fontSize: 8.5, fontWeight: 800, letterSpacing: '.04em', color: '#fff', background: s.preview_source === 'user' ? '#141d15' : '#ff5a2c', borderRadius: 4, padding: '1px 4px' }}>{s.preview_source === 'user' ? 'YOURS' : 'AI'}</span>}
                 {busy[s.index] && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3a7d2c', fontWeight: 700 }}>…</div>}
               </div>
               {board.editable && (
                 <button onClick={() => genKeyframe(s)} disabled={busy[s.index]} style={{ width: 96, marginTop: 5, fontSize: 10.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 6, padding: '4px 0', cursor: busy[s.index] ? 'default' : 'pointer' }}>
                   {busy[s.index] ? 'Generating…' : s.preview ? 'Regenerate' : 'Preview scene'}
                 </button>
+              )}
+              {board.editable && (
+                <label style={{ display: 'block', width: 96, marginTop: 4, fontSize: 10.5, fontWeight: 700, textAlign: 'center', color: '#66755d', background: '#f7f9f4', border: '1px dashed #cdd6c6', borderRadius: 6, padding: '4px 0', cursor: busy[s.index] ? 'default' : 'pointer' }}>
+                  ⬆ Upload yours
+                  <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy[s.index]} onChange={(e) => { uploadKeyframe(s, e.target.files?.[0] || null); e.currentTarget.value = '' }} style={{ display: 'none' }} />
+                </label>
               )}
               {genErr[s.index] && <div style={{ width: 96, marginTop: 4, fontSize: 9.5, color: '#a15a25', lineHeight: 1.3 }}>{genErr[s.index]}</div>}
             </div>}
