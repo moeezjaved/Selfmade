@@ -169,7 +169,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     setScenes((prev) => prev.map((s) => affected.some((a) => a.index === s.index) ? { ...s, preview: null, preview_source: null } : s))
     affected.forEach((s) => { genKeyframe({ ...s, preview: null }) })
   }
-  const drawCastMember = async (id: string, look: string) => {
+  const drawCastMember = async (id: string, look: string, opts: { relock?: boolean } = {}) => {
     if (!board?.editable || castBusyMap[id]) return
     setCastBusyMap((m) => ({ ...m, [id]: true })); setCastErrMap((e) => ({ ...e, [id]: '' }))
     try {
@@ -177,7 +177,9 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jobId: board.jobId, castOp: true, castLetter: id, look }),
       }).then((x) => x.json()).catch(() => ({ error: 'network' }))
-      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet); relockScenesFor(id) }
+      // relock defaults TRUE — a manual redraw re-locks existing scenes. The initial auto-pass passes
+      // relock:false: it draws the cast FIRST, then the scenes, so there's nothing yet to re-lock.
+      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet); if (opts.relock !== false) relockScenesFor(id) }
       else setCastErrMap((e) => ({ ...e, [id]: r?.error || 'Could not draw — try again' }))
     } catch { setCastErrMap((e) => ({ ...e, [id]: 'Could not draw — try again' })) }
     finally { setCastBusyMap((m) => ({ ...m, [id]: false })) }
@@ -218,11 +220,17 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     // time) so a 5-scene storyboard appears in ~two waves instead of five slow serial renders. Previews
     // persist, so a reload never re-charges an already-drawn scene.
     ;(async () => {
+      // CAST FIRST: draw every detected person's locked sheet BEFORE any scene, so each scene keyframe
+      // locks to a real approved face (cast_sheets[letter]) instead of inventing its own — no post-hoc
+      // re-lock, the storyboard is consistent from the first render. Sequential: the Pro image model
+      // 503s under parallel load. (relock:false — there are no scenes drawn yet to re-lock.)
+      for (const m of castList.filter((x) => !x.sheet)) await drawCastMember(m.id, m.look, { relock: false })
+      // THEN the scenes — they now reference the cast sheets just minted.
       const todo = scenes.filter(stale)
       if (!todo.length) return
       const [first, ...rest] = todo
       await genKeyframe(first)
-      refreshCast()   // the first keyframe mints the hero sheet — surface the creator right away
+      refreshCast()   // surface the lead creator right away
       const CONC = 2
       for (let i = 0; i < rest.length; i += CONC) await Promise.all(rest.slice(i, i + CONC).map((s) => genKeyframe(s)))
     })()
