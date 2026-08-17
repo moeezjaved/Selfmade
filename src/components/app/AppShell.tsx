@@ -139,7 +139,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const { plan: effectivePlan } = useCredits()
+  const { plan: effectivePlan, canceled: planCanceled, isOwner: planIsOwner } = useCredits()
   const isMobile = useIsMobile()
   const [navOpen, setNavOpen] = useState(false)
   const [acctOpen, setAcctOpen] = useState(false)
@@ -212,11 +212,14 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
           <AcctItem href="/team" icon={Users} label="Team & members" />
           <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
-          {/* Only offer "Upgrade" on Free — a paid member has nothing to upgrade to (one paid plan);
-              manage/cancel lives under Billing & plan. Avoids "Upgrade" showing while already full-time. */}
+          {/* Billing actions reflect the OWNER-resolved plan + subscription status (a member never sees
+              Cancel/Reactivate — only the owner manages billing). Free → Upgrade. Paid+active → Cancel.
+              Paid+canceled (still in the paid period) → Reactivate. */}
           {normalizePlan(effectivePlan) === 'free' && <AcctItem href="/billing" icon={Zap} label="Upgrade plan" accent />}
-          {/* Cancel plan — paid users only. One tap; keeps access until period end, then downgrades to Free. */}
-          {normalizePlan(effectivePlan) !== 'free' && (
+          {normalizePlan(effectivePlan) !== 'free' && planIsOwner !== false && planCanceled && (
+            <AcctItem href="/billing" icon={Zap} label="Reactivate plan" accent />
+          )}
+          {normalizePlan(effectivePlan) !== 'free' && planIsOwner !== false && !planCanceled && (
             <button onClick={cancelPlan} className="sm-acct-item"
               style={{ ...ACCT_ITEM, width: '100%', border: 'none', background: 'none', cursor: 'pointer', color: '#b91c1c', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', textAlign: 'left' }}>
               <X size={16} style={{ flexShrink: 0 }} /><span>Cancel plan</span>
