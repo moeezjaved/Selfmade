@@ -3,6 +3,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { logError } from '@/lib/admin/logError'
+import { resolveBillingOwner } from '@/lib/org'
+import { requireFeature } from '@/lib/entitlements'
 
 const V = process.env.META_API_VERSION || 'v20.0'
 
@@ -180,6 +182,13 @@ export async function POST(request: NextRequest) {
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
+    // Managing live campaigns (budget/pause/activate/scale) is a Creator feature — gate on the billing
+    // owner's plan (teammates inherit it). GET stays open so Free users can still view their campaigns.
+    {
+      const owner = await resolveBillingOwner(admin, user.id)
+      const gate = await requireFeature(admin, owner, 'campaigns')
+      if (gate) return NextResponse.json(gate, { status: 402 })
+    }
     body = await request.json()
     // Scale/edit MUST run against the SAME account the founder is looking at.
     // The brief card sends account_id (the account in its switcher); using the
