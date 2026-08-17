@@ -12,6 +12,7 @@ type Board = {
   jobId: string; status: string; editable: boolean; hookType: string | null; suggestedMode: string
   sceneCount: number; durationSeconds: number | null; script: string; scenes: Scene[]
   castSheet?: string | null; characterLook?: string | null
+  cast?: { id: string; look: string; sheet: string | null }[]
 }
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
@@ -150,6 +151,44 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     } catch { setCastErr('Could not redraw the creator — try again') } finally { setCastBusy(false) }
   }
 
+  // ── FULL CAST (A/B/C…): every distinct on-camera person, each redrawable/uploadable BEFORE video spend.
+  // Falls back to the single-creator panel above when the analysis found no people[] list (older jobs).
+  const [castList, setCastList] = useState<{ id: string; look: string; sheet: string | null }[]>([])
+  const [castBusyMap, setCastBusyMap] = useState<Record<string, boolean>>({})
+  const [castErrMap, setCastErrMap] = useState<Record<string, string>>({})
+  useEffect(() => { if (Array.isArray(board?.cast)) setCastList(board!.cast!) }, [board?.cast])
+  const setMemberSheet = (id: string, sheet: string | null) => setCastList((prev) => prev.map((m) => m.id === id ? { ...m, sheet } : m))
+  const drawCastMember = async (id: string, look: string) => {
+    if (!board?.editable || castBusyMap[id]) return
+    setCastBusyMap((m) => ({ ...m, [id]: true })); setCastErrMap((e) => ({ ...e, [id]: '' }))
+    try {
+      const r = await fetch('/api/discovery/clone-video/keyframe', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: board.jobId, castOp: true, castLetter: id, look }),
+      }).then((x) => x.json()).catch(() => ({ error: 'network' }))
+      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet) }
+      else setCastErrMap((e) => ({ ...e, [id]: r?.error || 'Could not draw — try again' }))
+    } catch { setCastErrMap((e) => ({ ...e, [id]: 'Could not draw — try again' })) }
+    finally { setCastBusyMap((m) => ({ ...m, [id]: false })) }
+  }
+  const uploadCastMember = async (id: string, file: File | null) => {
+    if (!board?.editable || !file || castBusyMap[id]) return
+    setCastBusyMap((m) => ({ ...m, [id]: true })); setCastErrMap((e) => ({ ...e, [id]: '' }))
+    try {
+      const pre = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) }).then((x) => x.json()).catch(() => ({}))
+      if (!pre?.uploadUrl || !pre?.key) throw new Error(pre?.message || 'Could not start the upload')
+      const put = await fetch(pre.uploadUrl, { method: 'PUT', headers: { 'content-type': pre.fileType || file.type }, body: file })
+      if (!put.ok) throw new Error('Upload failed')
+      const r = await fetch('/api/discovery/clone-video/keyframe', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jobId: board.jobId, castOp: true, castLetter: id, uploadedKey: pre.key }),
+      }).then((x) => x.json()).catch(() => ({ error: 'network' }))
+      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet) }
+      else throw new Error(r?.error || 'Could not save the image')
+    } catch (e: any) { setCastErrMap((er) => ({ ...er, [id]: /image|jp|png|type/i.test(String(e?.message)) ? 'Use a JPG or PNG image' : (e?.message || 'Upload failed') })) }
+    finally { setCastBusyMap((m) => ({ ...m, [id]: false })) }
+  }
+
   // Auto-generate a keyframe for every scene that has none — the storyboard should show its visual plan
   // on load, not wait for per-scene clicks. Sequential (gentle on the image quota), runs once per job;
   // persisted previews mean a reload skips already-generated scenes and never re-charges the model.
@@ -251,7 +290,46 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
       {/* YOUR CREATOR — the locked hero character sheet. This is who'll be on camera in EVERY scene
           (incl. a recast look, e.g. Pakistani when the source was American). Approve or redraw them
           BEFORE spending a credit on video — the whole point of storyboard-first. */}
-      {showKeyframes && board.editable && (
+      {/* FULL CAST — every distinct person the analysis found (A/B/C…), each locked to a sheet the founder
+          can redraw or upload BEFORE any video spend. Shown when the analysis returned a people[] list. */}
+      {showKeyframes && board.editable && castList.length > 0 && (
+        <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '12px 14px', background: '#fbfcfa', marginBottom: 12 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 8 }}>
+            Your cast · {castList.length} {castList.length === 1 ? 'person' : 'people'} locked across the video
+            {board.characterLook && board.characterLook.toLowerCase() !== 'match' ? <> · recast as <b>{board.characterLook}</b></> : null}
+          </div>
+          <div style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 2 }}>
+            {castList.map((m) => {
+              const busy = !!castBusyMap[m.id]
+              return (
+                <div key={m.id} style={{ width: 128, flexShrink: 0, border: '1px solid #e6ece2', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+                  <div style={{ width: '100%', aspectRatio: '9/16', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    {m.sheet
+                      ? <img src={m.sheet} alt="" onClick={() => setZoom(m.sheet!)} title="Click to enlarge" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }} />
+                      : <span style={{ fontSize: 10, color: '#a7b09e', textAlign: 'center', padding: 6 }}>Not drawn yet</span>}
+                    {busy && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.65)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, color: '#3a7d2c' }}>…</div>}
+                  </div>
+                  <div style={{ padding: '7px 8px' }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, color: '#20321c' }}>Person {m.id}{m.id === 'A' ? ' · main' : ''}</div>
+                    <div style={{ fontSize: 10.5, color: '#66755d', lineHeight: 1.35, marginTop: 2, maxHeight: 42, overflow: 'hidden' }}>{m.look || 'On-camera person'}</div>
+                    {castErrMap[m.id] && <div style={{ fontSize: 10, color: '#a15a25', marginTop: 3 }}>{castErrMap[m.id]}</div>}
+                    <div style={{ display: 'flex', gap: 6, marginTop: 7 }}>
+                      <button onClick={() => drawCastMember(m.id, m.look)} disabled={busy} style={{ flex: 1, fontSize: 10.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 7, padding: '5px 6px', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit' }}>{busy ? '…' : m.sheet ? '↻ Redraw' : 'Draw'}</button>
+                      <label style={{ fontSize: 10.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 7, padding: '5px 7px', cursor: busy ? 'default' : 'pointer' }} title="Upload your own person">
+                        ↑
+                        <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { uploadCastMember(m.id, e.target.files?.[0] || null); e.currentTarget.value = '' }} style={{ display: 'none' }} />
+                      </label>
+                    </div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Legacy single-creator panel — only for older jobs whose analysis has no people[] list. */}
+      {showKeyframes && board.editable && castList.length === 0 && (
         <div style={{ display: 'flex', gap: 14, alignItems: 'center', border: '1px solid #e6ece2', borderRadius: 12, padding: '12px 14px', background: '#fbfcfa', marginBottom: 12 }}>
           <div style={{ width: 72, aspectRatio: '9/16', borderRadius: 8, overflow: 'hidden', background: '#eef2ec', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, position: 'relative' }}>
             {cast

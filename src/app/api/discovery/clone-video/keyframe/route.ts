@@ -66,7 +66,7 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const jobId = b?.jobId ? String(b.jobId) : null
   const sceneIndex = Number.isInteger(b?.sceneIndex) ? b.sceneIndex : null
-  if (!jobId || sceneIndex == null || sceneIndex < 0) return NextResponse.json({ error: 'jobId and sceneIndex required' }, { status: 400 })
+  if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
   const { data: row } = await admin.from('creative_generations').select('id, clone_meta').eq('id', jobId).eq('user_id', user.id).maybeSingle()
@@ -74,6 +74,51 @@ export async function POST(req: NextRequest) {
   const meta = (row as any).clone_meta || {}
   const beat = meta.beat_sheet || {}
   const beats: any[] = Array.isArray(beat.beats) ? beat.beats : []
+
+  // ── CAST OP (storyboard Cast panel): draw or upload a locked sheet for ONE specific person (A/B/C…).
+  // No sceneIndex needed — this manages the cast, not a scene keyframe. Stored in meta.cast_sheets[letter]
+  // (and mirrored to meta.cast_sheet for "A" so the legacy single-creator path keeps working). ──────────
+  if (b?.castOp === true && typeof b?.castLetter === 'string' && b.castLetter) {
+    const letter = String(b.castLetter).toUpperCase().slice(0, 1)
+    const sheets = { ...(meta.cast_sheets || {}) }
+    // Upload-your-own person for this letter.
+    const upKey = typeof b?.uploadedKey === 'string' ? b.uploadedKey.replace(/^\/+/, '') : ''
+    if (upKey) {
+      const publicUrl = r2PublicUrl(upKey)
+      if (!publicUrl) return NextResponse.json({ error: 'could not resolve the uploaded image' }, { status: 500 })
+      sheets[letter] = publicUrl
+      const patch: any = { cast_sheets: sheets }
+      if (letter === 'A') patch.cast_sheet = publicUrl
+      await admin.from('creative_generations').update({ clone_meta: { ...meta, ...patch } }).eq('id', jobId).eq('user_id', user.id)
+      return NextResponse.json({ ok: true, castLetter: letter, sheet: publicUrl, source: 'user' })
+    }
+    // Draw / redraw this person from their look description (from the analysis people[] list).
+    const isServiceC = meta.product_type === 'service' || meta.product_type === 'app'
+    if (isServiceC) return NextResponse.json({ error: 'This is a service/app ad — no on-camera person to draw.' }, { status: 400 })
+    const person = (Array.isArray(beat.people) ? beat.people.find((p: any) => String(p?.id).toUpperCase() === letter) : null) || null
+    const desc = String(b?.look || person?.look || (letter === 'A' ? beat.avatar : '') || '').trim()
+    if (!desc) return NextResponse.json({ error: `No look description for person ${letter}.` }, { status: 400 })
+    const recastLook = String(meta.character_look || '').trim()
+    const castPrompt = [
+      'Create ONE photorealistic vertical 9:16 CHARACTER REFERENCE SHEET of a SINGLE original person — a fictional everyday creator for a UGC/social ad, NOT any real individual or celebrity.',
+      recastLook && recastLook.toLowerCase() !== 'match' ? `The person is ${recastLook} in appearance.` : '',
+      `They match this person from the reference ad — GENDER first, then age range, ethnicity, hair, wardrobe and build: ${desc}. Give them a brand-new fictional face (never a real person).`,
+      'Compose split-frame: LEFT panel — a tight facial close-up, whole head in frame, calm neutral expression, looking into the lens, real skin texture. RIGHT panel — the SAME person, full-body front view, head-to-toe, relaxed pose, same wardrobe.',
+      'Both panels are the identical person: same face, hair, skin tone, build and outfit. Plain neutral-grey seamless background, a thin vertical divider. EXACTLY ONE visible face (the close-up) — remove/soften the full-body face so there is only one face to lock onto. NO text, NO logos, NO product, NO borders.',
+    ].filter(Boolean).join(' ')
+    const gen = await generateImage(castPrompt, [], 'pro', { aspectRatio: '9:16', imageSize: '1K' })
+    if (!gen.ok) return NextResponse.json({ error: gen.error === 'pro_model_busy' ? 'The image model is busy — try again in a moment.' : (gen.error || 'Could not draw the person') }, { status: 502 })
+    const key = `creatives/cast/${jobId}-${letter}-${Date.now()}.jpg`
+    const uploaded = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), key, gen.mimeType)
+    if (!uploaded) return NextResponse.json({ error: 'upload failed' }, { status: 500 })
+    sheets[letter] = uploaded
+    const patch: any = { cast_sheets: sheets }
+    if (letter === 'A') patch.cast_sheet = uploaded
+    await admin.from('creative_generations').update({ clone_meta: { ...meta, ...patch } }).eq('id', jobId).eq('user_id', user.id)
+    return NextResponse.json({ ok: true, castLetter: letter, sheet: uploaded, regenerated: true })
+  }
+
+  if (sceneIndex == null || sceneIndex < 0) return NextResponse.json({ error: 'sceneIndex required' }, { status: 400 })
   // Single-take UGC analyzes with no beats; the storyboard synthesizes scene cards, so a preview can
   // target an index that has no beat row yet. Pad the array so the preview always has a slot to persist.
   while (beats.length <= sceneIndex) beats.push({ action: '' })
