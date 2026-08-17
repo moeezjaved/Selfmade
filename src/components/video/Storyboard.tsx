@@ -224,7 +224,10 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
       // locks to a real approved face (cast_sheets[letter]) instead of inventing its own — no post-hoc
       // re-lock, the storyboard is consistent from the first render. Sequential: the Pro image model
       // 503s under parallel load. (relock:false — there are no scenes drawn yet to re-lock.)
-      for (const m of castList.filter((x) => !x.sheet)) await drawCastMember(m.id, m.look, { relock: false })
+      // Read board.cast directly (not the castList STATE, which may not have committed yet when this
+      // one-shot effect fires — that race let scenes draw before the cast on a fresh open).
+      const roster = Array.isArray(board?.cast) ? board.cast : []
+      for (const m of roster.filter((x) => !x.sheet)) await drawCastMember(m.id, m.look, { relock: false })
       // THEN the scenes — they now reference the cast sheets just minted.
       const todo = scenes.filter(stale)
       if (!todo.length) return
