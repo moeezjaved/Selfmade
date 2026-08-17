@@ -810,6 +810,12 @@ async function lastFrameAnchor(file, id, idx) {
 // One consistent grade across every Cinematic scene — kills the random black-and-white / moody drift
 // that made stitched scenes read as three different ads.
 const STYLE_LOCK = ' STYLE LOCK: full colour, bright natural lighting, one consistent realistic colour grade across the whole ad — never black-and-white, never a different mood or film look from the other scenes.'
+// Director-grade realism layer (adapted from the Seedance shotlist-director method). The cues that
+// actually move Seedance toward cinema — photoreal (no CGI look), motivated camera, physical light,
+// pore-level skin, Hollywood micro-acting, real physics, 24fps. Deliberately ONE tight block, not the
+// full 12-line prefix, because prompt bloat degrades Seedance ([[project_clone_prompt_lesson]]). Applied
+// to CINEMATIC scenes only (UGC's tuned prompt is untouched); toggle with SEEDANCE_DIRECTOR=off.
+const DIRECTOR_STYLE = ' CINEMATIC DIRECTION: photorealistic, shot on a physical cine lens with natural motion blur — no 3D/CGI/game-engine look. A motivated camera move (a real reason to push or track). Natural motivated lighting with gentle atmospheric depth. Pore-level skin realism, catch-lights in living eyes, Hollywood micro-acting — micro-pauses, real breathing, precise eye-line, always reacting, never a static pose. Real gravity and weight, correct contact shadows. Smooth 24fps, sharp detail.'
 
 // Composition still for people-free b-roll: the middle frame of the trimmed source beat, hosted on R2,
 // passed as an @Image so the shot matches the source's framing/subject placement even when the motion
@@ -2087,6 +2093,7 @@ async function generateJob(job) {
           if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: @Image${anchorIdx}${anchorRefs.length > 1 ? ` and @Image${anchorIdx + 1}` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
           if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of @Image${compIdx} (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
           scenePrompt += STYLE_LOCK
+          if (process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += DIRECTOR_STYLE
 
           let videoUrl = null
           // GENERATOR ROUTING BY CONTENT — the general fidelity rule (any product, not one vial):
