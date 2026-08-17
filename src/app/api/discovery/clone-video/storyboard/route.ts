@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
 
   const meta = (row as any).clone_meta || {}
   const beat = meta.beat_sheet || {}
-  const beats: { t?: string; action?: string; thumb?: string; preview?: string }[] = Array.isArray(beat.beats) ? beat.beats : []
+  const beats: { t?: string; action?: string; thumb?: string; preview?: string; shows?: string }[] = Array.isArray(beat.beats) ? beat.beats : []
   const script = meta.final_script || meta.script || beat.transcript || ''
 
   // How many scene cards to SHOW = the analyzed scene_count (what the badge promises), never fewer than
@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   // script across them, so the storyboard always matches the count and every scene is editable.
   const wantN = Math.max(1, Math.min(10, Number(meta.scene_count) || beats.length || 1))
   const n = Math.max(beats.length, wantN)
-  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string; preview_source?: string }[] =
+  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string; preview_source?: string; shows?: string }[] =
     Array.from({ length: n }, (_, i) => beats[i] || { action: i === 0 ? (beat.avatar || 'Opening shot') : '' })
   const lines = splitScript(script, srcBeats.length)
   const scenes = srcBeats.map((b, i) => ({
@@ -56,6 +56,8 @@ export async function GET(req: NextRequest) {
     thumb: b.thumb || null,       // reference frame from the source ad at this beat (worker-grabbed)
     preview: b.preview || null,   // GENERATED keyframe for THIS brand (your product/creator) — the model reference
     preview_source: b.preview_source || null,   // 'ai' | 'user' — a user-uploaded frame must survive reload + never be auto-overwritten
+    // What product this beat shows: 'hero' (swapped to yours), 'rejected' (kept as the rival/bad thing), else null.
+    shows: b.shows === 'hero' || b.shows === 'rejected' ? b.shows : null,
   }))
 
   return NextResponse.json({
@@ -71,6 +73,10 @@ export async function GET(req: NextRequest) {
     script,
     scenes,
     onScreenText: Array.isArray(beat.on_screen_text) ? beat.on_screen_text : [],
+    // Story contrast: the hero (swapped to the user's product) vs the rejected/rival thing (kept as-is).
+    // Surfaced so the storyboard can tag each scene 🚫/✅ and the founder sees the narrative before spend.
+    heroProduct: beat.hero_product || null,
+    rejectedProduct: beat.rejected_product || null,
     sourcePoster: meta.source_poster || null,
     // The locked HERO CHARACTER SHEET (the recast creator, e.g. "Pakistani" when the source was American)
     // — surfaced so the founder SEES who will be on camera and approves/regenerates BEFORE any video spend.

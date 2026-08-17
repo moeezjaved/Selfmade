@@ -7,12 +7,13 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 
-type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null; preview?: string | null; preview_source?: string | null }
+type Scene = { index: number; role: string; time: string | null; action: string; scriptLine: string; thumb?: string | null; preview?: string | null; preview_source?: string | null; shows?: string | null }
 type Board = {
   jobId: string; status: string; editable: boolean; hookType: string | null; suggestedMode: string
   sceneCount: number; durationSeconds: number | null; script: string; scenes: Scene[]
   castSheet?: string | null; characterLook?: string | null
   cast?: { id: string; look: string; sheet: string | null }[]
+  heroProduct?: string | null; rejectedProduct?: string | null
 }
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
@@ -390,7 +391,12 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
             </div>}
             <div style={{ minWidth: 0 }}>
               {/* SHOT — what's SHOWN. For UGC (no keyframes) this is just the beat description; for Cinematic, editing + Regenerate redraws the image. */}
-              {showKeyframes && <><div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 4 }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</div>
+              {showKeyframes && <><div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>Shot — what’s shown{board.editable && <span style={{ textTransform: 'none', letterSpacing: 0, color: '#a7b09e', fontWeight: 400 }}> · edit, then Regenerate</span>}</span>
+                {/* STORY TAG — 🚫 rejected (the rival/bad thing, kept as-is) vs ✅ hero (swapped to your product). */}
+                {s.shows === 'hero' && <span title={`Your product${board.heroProduct ? ` (was ${board.heroProduct})` : ''} — swapped in`} style={{ fontSize: 10, fontWeight: 800, color: '#1f6b2e', background: '#e8f4ea', border: '1px solid #bfe0c6', borderRadius: 999, padding: '1px 7px' }}>✅ Your product</span>}
+                {s.shows === 'rejected' && <span title={`The rival/bad thing${board.rejectedProduct ? ` (${board.rejectedProduct})` : ''} — kept as-is, NOT your product`} style={{ fontSize: 10, fontWeight: 800, color: '#9a3412', background: '#fbe7e1', border: '1px solid #f0cbba', borderRadius: 999, padding: '1px 7px' }}>🚫 {board.rejectedProduct || 'Rejected item'}</span>}
+              </div>
               <input
                 value={s.action}
                 disabled={!board.editable}
