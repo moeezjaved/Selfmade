@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, geminiEnabled, geminiImageMime } from '@/lib/gemini/image'
-import { uploadBufferToR2 } from '@/lib/r2'
+import { uploadBufferToR2, r2PublicUrl } from '@/lib/r2'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -80,6 +80,20 @@ export async function POST(req: NextRequest) {
   const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
   const look = String(b?.look || meta.character_look || '').trim()
   const productName = meta.product_details?.name || meta.brand_name || ''
+
+  // UPLOAD-YOUR-OWN: the founder supplied their own image for this scene (a real product shot, a brand
+  // photo, a specific model/face) via the presigned assets upload. We take the R2 KEY and resolve the
+  // public URL server-side (never trust a raw client URL), then persist it exactly where the worker reads
+  // the keyframe (beat.preview) — no AI generation, no credit. This is what makes the result 100%
+  // predictable: they picked the frame, and the video is built from it.
+  const uploadedKey = typeof b?.uploadedKey === 'string' ? b.uploadedKey.replace(/^\/+/, '') : ''
+  if (uploadedKey) {
+    const publicUrl = r2PublicUrl(uploadedKey)
+    if (!publicUrl) return NextResponse.json({ error: 'could not resolve the uploaded image' }, { status: 500 })
+    beats[sceneIndex] = { ...(beats[sceneIndex] || {}), preview: publicUrl, preview_source: 'user', approved: true }
+    await admin.from('creative_generations').update({ clone_meta: { ...meta, beat_sheet: { ...beat, beats } } }).eq('id', jobId).eq('user_id', user.id)
+    return NextResponse.json({ ok: true, sceneIndex, preview: publicUrl, source: 'user' })
+  }
 
   // Product photos ground the render (pixel-perfect product). Cap 3.
   const rawImgs: string[] = Array.isArray(meta.product_image_urls) ? meta.product_image_urls.slice(0, 3) : []
@@ -211,6 +225,7 @@ export async function POST(req: NextRequest) {
   // the image and the cinematic render animates exactly the shot the user described here.
   if (beats[sceneIndex]) {
     beats[sceneIndex].preview = url
+    beats[sceneIndex].preview_source = 'ai'                                     // for the Storyboard "AI / yours" badge
     if (b?.action) beats[sceneIndex].action = String(b.action).slice(0, 300)   // keep the user's raw text in the field
     beats[sceneIndex].shot_prompt = shot                                        // the enhanced direction (for the render)
   }
