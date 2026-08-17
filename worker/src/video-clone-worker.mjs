@@ -585,8 +585,8 @@ function clampScenes(count, secs) {
   // the voiceover is split across scenes — so too many scenes on a short ad = high fal cost AND a script
   // chopped into 1-2-word fragments. Cap at ~1 scene per 3s (a 15s ad → ~5 scenes = ~3s of VO each,
   // full sentences, half the clips). Hard ceiling 8 for cost/render sanity. (Was /1.5 → up to 10.)
-  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 3))
-  return Math.max(2, Math.min(count, durCap, 16))   // ceiling 16 so longer ads get more scenes (was 8)
+  const durCap = Math.max(2, Math.floor((Number(secs) || 15) / 2.5))   // allow up to ~1 cut per 2.5s (fast montages)
+  return Math.max(2, Math.min(count, durCap, 20))   // ceiling 20 so a ~20-cut montage clones faithfully (was 16)
 }
 
 // ── gpt-4o: beat sheet → per-scene Seedance prompts for FAITHFUL mode. Each reference scene becomes
@@ -2055,15 +2055,15 @@ async function analyzeJob(job) {
           // per gesture/sentence (9+). Taking the max there OVERcounts (a talking head became 9 scenes).
           // So only trust ffmpeg's real hard cuts for talking heads — no Gemini inflation.
           const geminiScenes = Math.round(Number(beat && beat.scene_count) || 0)
-          const talkingHead = beat && beat.is_talking_head === true || !cinematic
-          const target = talkingHead ? cuts : Math.max(cuts, geminiScenes)
+          // MONTAGE OVERRIDE: a heavily-cut ad is NOT a single-take talking head, even if a person talks
+          // through it. ffmpeg's 0.6 threshold UNDERCOUNTS fast cuts between similar frames — so trust
+          // Gemini's watched scene_count too: if EITHER ffmpeg or Gemini sees many cuts, treat it as a
+          // montage and match the SOURCE's real shot count (that's why a ~20-cut ad was collapsing to 5).
+          const manyCuts = cuts >= 6 || geminiScenes >= 6
+          const talkingHead = (beat && beat.is_talking_head === true || !cinematic) && !manyCuts
+          const target = talkingHead ? cuts : Math.max(cuts, geminiScenes)   // faithful to the source's real cut count
           scenes = clampScenes(target, realSecs || Number(beat && beat.duration_seconds) || 15)
-          // LENGTH FLOOR (cinematic only): a long ad shouldn't collapse to a handful of 12s+ shots — that's
-          // sluggish and monotonous. Ensure roughly one cut per ~9s of source so a 60s clone gets ~7 scenes,
-          // not 5. Talking-head/UGC is left alone (it's genuinely one continuous take). Capped at 16.
-          const dur = realSecs || Number(beat && beat.duration_seconds) || 15
-          if (cinematic && !talkingHead) scenes = Math.max(scenes, Math.min(16, Math.ceil(dur / 9)))
-          console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} (${talkingHead ? 'talking-head→ffmpeg' : 'cinematic→max'}) → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
+          console.log(`✂️ ${job.id} ffmpeg ${cuts} + gemini ${geminiScenes} (${talkingHead ? 'talking-head→ffmpeg' : 'montage→match source'}) → ${scenes} scenes · ${(realSecs || 0).toFixed(1)}s`)
         }
       } catch (e) { console.warn(`cut-detect ${job.id}:`, e.message) }
     }
