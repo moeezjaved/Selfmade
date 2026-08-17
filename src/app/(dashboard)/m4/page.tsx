@@ -513,6 +513,13 @@ function M4Inner() {
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
       if(showUpsell(data)){ setLoading(false); return }   // Free plan → upgrade modal
+      // Custom Audiences ToS not accepted (Meta 2663) — caught PRE-FLIGHT (nothing spent). Send them
+      // straight to Meta's acceptance page; after they accept, one more Launch sends broad + retargeting.
+      if(data.needsCustomAudienceTos){
+        await alertMessage({ title: 'One step before retargeting', body: data.error+'\n\nClick below to open Meta’s acceptance page, hit Accept, then launch again — nothing was charged.', confirmLabel: 'Open Meta to accept' })
+        try { window.open(data.tosUrl, '_blank', 'noopener') } catch {}
+        setLoading(false); return
+      }
       const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
       const errMsg=data.errors?.length?'\n\nWhy:\n'+data.errors.join('\n'):''
       // Launch failures shown as a CENTERED, on-brand modal that STAYS until dismissed (a toast in the
