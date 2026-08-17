@@ -12,6 +12,8 @@ interface Profile {
   trial_ends_at: string | null
   stripe_customer_id: string | null
   plan_id?: string | null
+  _isOwner?: boolean   // owner-resolved: only the billing owner may cancel/reactivate
+  _canceled?: boolean  // soft-cancel: paid access continues to period end
 }
 
 const FEATURES = [
@@ -39,12 +41,20 @@ export default function BillingPage() {
 
   useEffect(() => {
     const supabase = createClient()
-    supabase.auth.getUser().then(({ data: { user } }) => {
+    supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return
-      supabase.from('user_profiles')
+      const { data } = await supabase.from('user_profiles')
         .select('subscription_status, trial_ends_at, stripe_customer_id, plan_id')
         .eq('user_id', user.id).single()
-        .then(({ data }) => setProfile(data))
+      // OWNER-RESOLVE the plan/status: a TEAM MEMBER's own profile is Free, but they're on the org
+      // owner's plan. /api/credits/balance resolves the billing owner, so use its plan/status here —
+      // otherwise a member lands on Billing showing "Free" + upgrade prompts for a plan they already have.
+      let merged: any = data
+      try {
+        const bal = await fetch('/api/credits/balance').then(r => r.json())
+        if (bal && bal.plan) merged = { ...(data || {}), plan_id: bal.plan, subscription_status: bal.subscription_status || data?.subscription_status || null, _isOwner: bal.is_owner !== false, _canceled: !!bal.canceled }
+      } catch { /* fall back to own profile */ }
+      setProfile(merged)
     })
   }, [])
 
@@ -150,6 +160,8 @@ export default function BillingPage() {
               portal, so that button dead-ended on an empty Stripe page. The plan cards above + Cancel
               here ARE the management. */}
           <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
+            {/* Only the org OWNER manages billing — a team member sees the plan but not the cancel control. */}
+            {profile?._isOwner !== false && (
             <button
               onClick={() => setShowCancel(true)}
               disabled={loading}
@@ -157,6 +169,7 @@ export default function BillingPage() {
             >
               {loading ? 'Working…' : 'Cancel subscription'}
             </button>
+            )}
           </div>
           <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.2)', marginTop: 10, marginBottom: 0 }}>
             Cancelling stops future renewals — your plan stays active until the end of the current period.

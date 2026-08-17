@@ -25,6 +25,10 @@ export interface CreditState {
   trial_ends_at: string | null
   pricing: Record<string, { label: string; credits: number }>
   loading: boolean
+  // Subscription lifecycle (owner-resolved) — drives Cancel vs Reactivate in the profile menu.
+  subscriptionStatus?: string | null
+  canceled?: boolean          // soft-cancel: paid access continues to period end
+  isOwner?: boolean           // only the billing owner may cancel/reactivate
 }
 
 const BAL_CACHE = 'credits:lastBalance'
@@ -45,7 +49,7 @@ export function useCredits(): CreditState & { refetch: () => void } {
       const d = await r.json()
       const balance = d.balance ?? 0
       if (typeof window !== 'undefined') localStorage.setItem(BAL_CACHE, String(balance))
-      const next: CreditState = { balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, trialing: !!d.trialing, trial_ends_at: d.trial_ends_at ?? null, pricing: d.pricing ?? {}, loading: false }
+      const next: CreditState = { balance, plan: d.plan ?? 'trial', reset_at: d.reset_at ?? null, trialing: !!d.trialing, trial_ends_at: d.trial_ends_at ?? null, pricing: d.pricing ?? {}, loading: false, subscriptionStatus: d.subscription_status ?? null, canceled: !!d.canceled, isOwner: d.is_owner !== false }
       LAST = next
       setS(next)
     } catch { setS(p => ({ ...p, loading: false })) }

@@ -11,6 +11,7 @@
  * carries brandId, so a rival is watched FOR this brand, not just pooled on the account.
  */
 import { useEffect, useRef, useState } from 'react'
+import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#e3e2da', GREEN = '#ef4a1e', FOREST = '#141d15', LIME = '#ff5a2c'
 const SELBG = '#f4fbe6', SELBORDER = '#a8cf6f'
@@ -148,7 +149,14 @@ export default function AddCompetitors({ brandId, brandName, website, industry, 
       } else {
         // Paid spy: charges 50cr (free if the org already paid for this brand before), crawls, marks spied.
         const r = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, name: p.name }) }).catch(() => null)
-        if (r && r.status === 402) { setLowCredits(true); setBusy(false); return }   // out of credits → stop, tell them
+        if (r && r.status === 402) {
+          // A Free-plan user hitting the tracked-brand CAP gets a plan_limit upsell (same as the Spy page) —
+          // show the clean "Upgrade to Creator" modal, NOT the misleading "out of credits" message. Only a
+          // genuine credits shortfall (paid plan, no credits) falls through to setLowCredits.
+          const j = await r.json().catch(() => ({}))
+          if (showUpsell(j)) { setBusy(false); return }
+          setLowCredits(true); setBusy(false); return
+        }
         // Attach it to THIS brand so it's watched for the right product (brand-spy doesn't carry brandId).
         if (brandId) await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: p.pageId, brandName: p.name, action: 'follow', brandId, spied: true }) }).catch(() => {})
       }

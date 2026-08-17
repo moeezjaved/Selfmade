@@ -118,6 +118,11 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
     // Trial state — powers the "full credits unlock at trial end / pay now" messaging.
     trialing: realTrial,
     trial_ends_at: realTrial ? ((prof as any)?.trial_ends_at ?? null) : null,
+    // Subscription lifecycle (owner-resolved) — so the profile menu shows Cancel vs Reactivate, and a
+    // MEMBER never sees "Free"/"Cancel plan" for the org owner's plan.
+    subscription_status: String((sub as any)?.status || (prof as any)?.subscription_status || '') || null,
+    canceled: String((sub as any)?.status || '') === 'canceled',   // soft-cancel: still in the paid period
+    is_owner: owner === userId,   // only the owner can cancel/reactivate/change the plan
   }
 }
 
