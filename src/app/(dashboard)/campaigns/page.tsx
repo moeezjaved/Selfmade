@@ -795,18 +795,25 @@ function CampaignsInner() {
               <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 8 }}>Quick actions</div>
               <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
                 {[
-                  { label: '📈 Scale +20%', cmd: "Increase this campaign's daily budget by 20%" },
-                  { label: '💰 Set budget', cmd: 'Set the daily budget to €' },
-                  { label: '⏸️ Pause', cmd: 'Pause this campaign' },
-                  { label: '▶️ Activate', cmd: 'Activate this campaign' },
-                  { label: '🎨 New creative', cmd: 'Add this creative to a new ad set' },
-                  { label: '🧬 Duplicate winner', cmd: 'Duplicate the best-performing ad set at a higher budget' },
+                  { label: 'Scale +20%', cmd: "Increase this campaign's daily budget by 20%",
+                    icon: <path d="M3 17l6-6 4 4 8-8M21 7v5M21 7h-5" /> },
+                  { label: 'Set budget', cmd: 'Set the daily budget to €',
+                    icon: <><circle cx="12" cy="12" r="9" /><path d="M14.5 9.2A2.6 2.6 0 0 0 12 8c-1.4 0-2.5.8-2.5 2s1.1 2 2.5 2 2.5.8 2.5 2-1.1 2-2.5 2a2.6 2.6 0 0 1-2.5-1.2M12 6.5v11" /></> },
+                  { label: 'Pause', cmd: 'Pause this campaign',
+                    icon: <><rect x="8" y="6" width="3" height="12" rx="1" /><rect x="14" y="6" width="3" height="12" rx="1" /></> },
+                  { label: 'Activate', cmd: 'Activate this campaign',
+                    icon: <path d="M7 5.5v13a.5.5 0 0 0 .77.42l10-6.5a.5.5 0 0 0 0-.84l-10-6.5A.5.5 0 0 0 7 5.5z" /> },
+                  { label: 'New creative', cmd: 'Add this creative to a new ad set',
+                    icon: <><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 16l-5-5L5 20" /></> },
+                  { label: 'Duplicate winner', cmd: 'Duplicate the best-performing ad set at a higher budget',
+                    icon: <><rect x="9" y="9" width="11" height="11" rx="2" /><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" /></> },
                 ].map(q => (
                   <button key={q.label} onClick={() => setChatInput(q.cmd)} type="button"
                     onMouseEnter={e => (e.currentTarget.style.background = '#d63e16')}
                     onMouseLeave={e => (e.currentTarget.style.background = '#ef4a1e')}
-                    style={{ background: '#ef4a1e', border: 'none', color: '#fff', borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(239,74,30,.25)', transition: 'background .12s' }}>
-                    {q.label}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ef4a1e', border: 'none', color: '#fff', borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(239,74,30,.25)', transition: 'background .12s' }}>
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>{q.icon}</svg>
+                    <span>{q.label}</span>
                   </button>
                 ))}
               </div>
