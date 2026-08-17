@@ -164,7 +164,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   // correct a mis-typed brand without leaving the flow (physical / app / service).
   const [typeOverride, setTypeOverride] = useState<string | undefined>(undefined)
   const effType = typeOverride || brandType || 'physical'
-  const isService = effType !== 'physical'   // app OR service = no physical product to render
+  const isService = effType === 'service' || effType === 'app'   // app OR service = no physical product to render
   const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
   // Cinematic is priced per scene (video_clone_xN); UGC per 15s clip. Actual charge is server-side.

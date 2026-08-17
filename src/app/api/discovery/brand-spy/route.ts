@@ -287,9 +287,13 @@ export async function POST(req: NextRequest) {
 
     // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
     // ❤️ follow (spied=false) is NOT "already spying" — it falls through so the spy upgrades it.
+    // ORG-scoped (like the spied list, the plan count and DELETE): a teammate re-opening a brand the org
+    // is STILL actively crawling must be free — the crawl is shared, so charging again would bill the
+    // org's credits twice for one brand. (Was user-scoped, so teammate B paid 50cr for A's live spy.)
+    const orgIdsForPrior = await orgMemberIds(admin, user.id)
     const { data: prior } = await admin
       .from('followed_brands').select('id')
-      .eq('user_id', user.id).eq('page_id', pageId).eq('spied', true).limit(1).maybeSingle()
+      .in('user_id', orgIdsForPrior).eq('page_id', pageId).eq('spied', true).limit(1).maybeSingle()
     if (prior) {
       await ensureTracked(admin, pageId, name, false)
       return NextResponse.json({ pageId, charged: false, alreadySpied: true })

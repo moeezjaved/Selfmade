@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
   // script across them, so the storyboard always matches the count and every scene is editable.
   const wantN = Math.max(1, Math.min(10, Number(meta.scene_count) || beats.length || 1))
   const n = Math.max(beats.length, wantN)
-  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string }[] =
+  const srcBeats: { t?: string; action?: string; thumb?: string; preview?: string; preview_source?: string }[] =
     Array.from({ length: n }, (_, i) => beats[i] || { action: i === 0 ? (beat.avatar || 'Opening shot') : '' })
   const lines = splitScript(script, srcBeats.length)
   const scenes = srcBeats.map((b, i) => ({
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
     scriptLine: lines[i] || '',
     thumb: b.thumb || null,       // reference frame from the source ad at this beat (worker-grabbed)
     preview: b.preview || null,   // GENERATED keyframe for THIS brand (your product/creator) — the model reference
+    preview_source: b.preview_source || null,   // 'ai' | 'user' — a user-uploaded frame must survive reload + never be auto-overwritten
   }))
 
   return NextResponse.json({

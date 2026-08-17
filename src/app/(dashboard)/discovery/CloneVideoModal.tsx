@@ -215,7 +215,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const pickBrand = (b: Brand) => {
-    setBrandId(b.id); setBrandType(b.brand_type === 'service' ? 'service' : 'physical'); if (!productName) setProductName(b.name)
+    // 'app' is a real brand type now (mig 153) — it's a no-physical-product brand like 'service', NOT physical.
+    setBrandId(b.id); setBrandType(b.brand_type === 'service' || b.brand_type === 'app' ? 'service' : 'physical'); if (!productName) setProductName(b.name)
     const imgs = (b.products || []).flatMap((p) => p.image_urls || []).slice(0, 8)
     const ph = imgs.map((u) => ({ id: uid(), src: u }))
     setPhotos(ph); setSelected(ph.slice(0, 3).map((p) => p.id))

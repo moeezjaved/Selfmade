@@ -78,6 +78,14 @@ export async function POST(req: NextRequest) {
   // target an index that has no beat row yet. Pad the array so the preview always has a slot to persist.
   while (beats.length <= sceneIndex) beats.push({ action: '' })
   const action = String(b?.action || b?.scriptLine || beats[sceneIndex]?.action || beats[sceneIndex]?.scriptLine || 'Opening shot').slice(0, 300)
+  // Never let an implicit AI regeneration overwrite a frame the founder UPLOADED. Only an explicit
+  // action (a new upload, or a deliberate regenerate with force:true) may replace it. Guards the
+  // auto-gen loop + any stale client from silently trashing an approved user frame.
+  const isCastRegen = b?.regenerateCast === true
+  const hasUploadedKey = typeof b?.uploadedKey === 'string' && !!b.uploadedKey
+  if (!isCastRegen && !hasUploadedKey && beats[sceneIndex]?.preview_source === 'user' && b?.force !== true) {
+    return NextResponse.json({ ok: true, sceneIndex, preview: beats[sceneIndex].preview, source: 'user', kept: true })
+  }
   const look = String(b?.look || meta.character_look || '').trim()
   const productName = meta.product_details?.name || meta.brand_name || ''
 
@@ -124,6 +132,10 @@ export async function POST(req: NextRequest) {
   // regenerateCast: the founder didn't like the locked creator (or changed the recast look) → mint a
   // fresh hero sheet. Every later scene keyframe then re-locks to the new person.
   const regenCast = b?.regenerateCast === true
+  // A cast regen for a job with NO person (service/app brand, or a no-avatar b-roll ad) has nothing to
+  // draw — say so instead of falling through to a scene-0 keyframe generation that would overwrite
+  // beats[0] and return no castSheet.
+  if (regenCast && !wantsPerson) return NextResponse.json({ error: 'This ad has no on-camera creator to redraw.' }, { status: 400 })
   let castUrl: string | null = regenCast ? null : (meta.cast_sheet || null)
   if (wantsPerson) {
     if (!castUrl) {
@@ -151,7 +163,11 @@ export async function POST(req: NextRequest) {
       ].filter(Boolean).join(' ')
       const castGen = await generateImage(castPrompt, castRefs, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
       if (castGen.ok) {
-        const uploaded = await uploadBufferToR2(Buffer.from(castGen.dataB64, 'base64'), `creatives/cast/${jobId}.jpg`, castGen.mimeType)
+        // A regen MUST land on a NEW key: the old key is served with an immutable cache header, so
+        // rewriting it returned the byte-identical URL → the client's `cast` state never changed, the
+        // auto-redraw never re-fired, and the CDN kept showing the OLD person.
+        const castKey = regenCast ? `creatives/cast/${jobId}-${Date.now()}.jpg` : `creatives/cast/${jobId}.jpg`
+        const uploaded = await uploadBufferToR2(Buffer.from(castGen.dataB64, 'base64'), castKey, castGen.mimeType)
         if (uploaded) {
           if (regenCast) {
             // Explicit regenerate: the NEW sheet wins. Persist it and clear every scene's stale keyframe
