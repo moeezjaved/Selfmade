@@ -125,7 +125,18 @@ export async function POST(request: NextRequest) {
     const safeBudget = Math.max(minBudget, budgetCents)
 
     const validObjectives = ['OUTCOME_SALES','OUTCOME_LEADS','OUTCOME_TRAFFIC','OUTCOME_AWARENESS','OUTCOME_ENGAGEMENT','OUTCOME_APP_PROMOTION']
-    const apiObjective = validObjectives.includes(objective) ? objective : 'OUTCOME_TRAFFIC'
+    let apiObjective = validObjectives.includes(objective) ? objective : 'OUTCOME_TRAFFIC'
+
+    // Meta rejects any ad set that optimizes for an OBJECT it can't see (error 1885154 "create a new ad
+    // set with a selected object"). A Sales campaign optimizes PURCHASES, which REQUIRES a Meta Pixel as
+    // the promoted object. If the account has no Pixel we cannot run Sales — fall back to a Traffic
+    // campaign (optimizes link clicks; the ad's website URL is the object) so the launch still goes live
+    // instead of dying. This is the exact failure the founder hit: Sales objective + no Pixel selected.
+    let downgradeNote = ''
+    if (apiObjective === 'OUTCOME_SALES' && !pixelId) {
+      apiObjective = 'OUTCOME_TRAFFIC'
+      downgradeNote = 'No Meta Pixel found on this ad account, so we launched a Traffic campaign (drives clicks to your site). Add a Pixel in Meta Events Manager, then relaunch to optimize for Purchases.'
+    }
 
     const optimizationMap: Record<string,{optimization_goal:string,billing_event:string}> = {
       OUTCOME_SALES: { optimization_goal: 'OFFSITE_CONVERSIONS', billing_event: 'IMPRESSIONS' },
@@ -133,10 +144,13 @@ export async function POST(request: NextRequest) {
       OUTCOME_TRAFFIC: { optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS' },
       OUTCOME_AWARENESS: { optimization_goal: 'REACH', billing_event: 'IMPRESSIONS' },
     }
-    const optSettings = optimizationMap[objective] || optimizationMap.OUTCOME_TRAFFIC
+    const optSettings = optimizationMap[apiObjective] || optimizationMap.OUTCOME_TRAFFIC
 
-    const promotedObject = (pixelId && objective === 'OUTCOME_SALES')
-      ? { promoted_object: { pixel_id: pixelId, custom_event_type: 'PURCHASE' } }
+    // promoted_object = what Meta optimizes toward. Sales→Pixel+Purchase, Leads→Page. Traffic/Awareness
+    // need none (the ad's link / Page is the object). Missing this is what triggers 1885154.
+    const promotedObject =
+      (apiObjective === 'OUTCOME_SALES' && pixelId) ? { promoted_object: { pixel_id: pixelId, custom_event_type: 'PURCHASE' } }
+      : (apiObjective === 'OUTCOME_LEADS' && pageId) ? { promoted_object: { page_id: pageId } }
       : {}
 
     const post = async (path: string, params: Record<string,unknown>) => {
@@ -533,6 +547,7 @@ export async function POST(request: NextRequest) {
       retargeting_adsets: retargetingCount,
       retainer_adsets: retainerCount,
       exclusion_audiences: 0,
+      note: downgradeNote || undefined,
       errors: errors.length > 0 ? errors : undefined,
     })
 

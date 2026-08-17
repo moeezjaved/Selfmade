@@ -516,6 +516,7 @@ function M4Inner() {
         await alertMessage({ title: 'No ads were created', body: 'The campaign didn’t go live.'+(errMsg||' Usually the Meta ad account still needs setup (payment method + confirm details in Meta’s “Account overview”), or the creative failed to upload. Fix that and launch again.'), confirmLabel: 'OK' })
       } else{
         toast.success('LAUNCHED in '+data.account+'! Broad '+data.broad_adsets+' · Interest '+data.interest_adsets+' · Retargeting '+(data.retargeting_adsets||0)+(includeRetainer?' · Retainer '+(data.retainer_adsets||0):'')+'. All PAUSED — activate in Meta Ads Manager.',{duration:9000})
+        if(data.note) await alertMessage({ title: 'Launched as a Traffic campaign', body: data.note, confirmLabel: 'Got it' })
         try { sessionStorage.removeItem(DRAFT_KEY) } catch {}   // launched → clear the draft so the next campaign starts fresh
         goTo('grades')
       }
