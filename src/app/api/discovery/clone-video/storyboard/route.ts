@@ -80,6 +80,9 @@ export async function GET(req: NextRequest) {
     // Surfaced so the storyboard can tag each scene 🚫/✅ and the founder sees the narrative before spend.
     heroProduct: beat.hero_product || null,
     rejectedProduct: beat.rejected_product || null,
+    // Reusable asset shelf the founder uploads (real location photos, props) — used as references so the
+    // clone looks like THEIR world, not an AI guess. Additive: empty = auto-generated plates as before.
+    userAssets: { locations: [], props: [], ...(meta.user_assets || {}) },
     sourcePoster: meta.source_poster || null,
     // The locked HERO CHARACTER SHEET (the recast creator, e.g. "Pakistani" when the source was American)
     // — surfaced so the founder SEES who will be on camera and approves/regenerates BEFORE any video spend.

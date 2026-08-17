@@ -136,6 +136,31 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, castLetter: letter, sheet: uploaded, regenerated: true, clearedScenes: true })
   }
 
+  // ── ASSET SHELF (locations / props): reusable references the founder uploads once and the generator
+  // uses across scenes — a real location photo locks that setting, a prop photo is passed as a reference.
+  // Stored on clone_meta.user_assets. No image generated here; add (uploadedKey) or remove (assetId). ──
+  if (b?.assetOp === true) {
+    const kind = b.assetKind === 'prop' ? 'props' : 'locations'
+    const assets: any = { locations: [], props: [], ...(meta.user_assets || {}) }
+    const list: any[] = Array.isArray(assets[kind]) ? [...assets[kind]] : []
+    if (b.remove && typeof b.assetId === 'string') {
+      assets[kind] = list.filter((a) => a && a.id !== b.assetId)
+    } else if (typeof b.uploadedKey === 'string' && b.uploadedKey) {
+      const url = r2PublicUrl(b.uploadedKey.replace(/^\/+/, ''))
+      if (!url) return NextResponse.json({ error: 'could not resolve the uploaded image' }, { status: 500 })
+      if (list.length >= 12) return NextResponse.json({ error: `You can upload up to 12 ${kind}.` }, { status: 400 })
+      list.push({ id: `${kind}-${Date.now()}`, label: String(b.label || '').slice(0, 60), url })
+      assets[kind] = list
+    } else if (typeof b.assetId === 'string' && typeof b.label === 'string') {
+      // Relabel an existing asset (used to name a location so scenes can match it).
+      assets[kind] = list.map((a) => a && a.id === b.assetId ? { ...a, label: String(b.label).slice(0, 60) } : a)
+    } else {
+      return NextResponse.json({ error: 'assetOp needs uploadedKey (add), assetId+remove (delete), or assetId+label (rename)' }, { status: 400 })
+    }
+    await admin.from('creative_generations').update({ clone_meta: { ...meta, user_assets: assets } }).eq('id', jobId).eq('user_id', user.id)
+    return NextResponse.json({ ok: true, userAssets: assets })
+  }
+
   if (sceneIndex == null || sceneIndex < 0) return NextResponse.json({ error: 'sceneIndex required' }, { status: 400 })
   // Single-take UGC analyzes with no beats; the storyboard synthesizes scene cards, so a preview can
   // target an index that has no beat row yet. Pad the array so the preview always has a slot to persist.
