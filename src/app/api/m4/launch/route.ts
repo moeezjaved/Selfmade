@@ -178,6 +178,10 @@ export async function POST(request: NextRequest) {
     const errors: string[] = []
 
     // Reuse existing custom audience by name — only create if not found
+    // Remember WHY an audience couldn't be built, so a retargeting/retainer campaign can report the real
+    // Meta reason instead of silently shipping a BROAD ad set (which is what used to happen — the
+    // retargeting ad set was created with no custom audience = "everyone in Pakistan", 60M+ people).
+    const audienceErrors: Record<string, string> = {}
     const getOrCreateAudience = async (name: string, rule: object): Promise<string | null> => {
       try {
         // Search existing audiences for this account by name
@@ -199,6 +203,7 @@ export async function POST(request: NextRequest) {
         return created.id
       } catch(e: any) {
         console.log(`Audience "${name}" error:`, e.message)
+        audienceErrors[name] = String(e?.message || 'unknown error')
         return null
       }
     }
@@ -384,6 +389,12 @@ export async function POST(request: NextRequest) {
           { inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'PageView' }] } }] } }
         )
         const rtAud = rtAudId ? { id: rtAudId } : null
+        // A retargeting ad set WITHOUT its audience is not retargeting — it's a broad ad set that would spend
+        // the retargeting budget on everyone. Refuse to create it and say exactly why the audience failed.
+        if (!rtAud) {
+          const why = audienceErrors['M4 — Website Visitors 180d (Retargeting)'] || 'Meta did not return an audience id'
+          throw new Error(`Couldn't build the website-visitor audience for the Pixel (${why}). Retargeting was skipped so it wouldn't run as a broad ad set. Common causes: the Pixel has no traffic yet, or Custom Audience terms haven't been accepted for this ad account in Meta Audiences.`)
+        }
 
         const rtPct = includeRetainer ? 0.2 : 0.4
         const rtBudget = Math.max(minBudget, Math.round(safeBudget * rtPct))
@@ -441,6 +452,11 @@ export async function POST(request: NextRequest) {
           { inclusions: { operator: 'or', rules: [{ event_sources: [{ id: pixelId, type: 'pixel' }], retention_seconds: 15552000, filter: { operator: 'and', filters: [{ field: 'event', operator: 'eq', value: 'Purchase' }] } }] } }
         )
         const rnAud = rnAudId ? { id: rnAudId } : null
+        // Same rule as retargeting: no purchasers audience → don't ship a broad "retainer" ad set.
+        if (!rnAud) {
+          const why = audienceErrors['M4 — Purchasers 180d'] || 'Meta did not return an audience id'
+          throw new Error(`Couldn't build the past-purchasers audience for the Pixel (${why}). Retainer was skipped so it wouldn't run as a broad ad set.`)
+        }
 
         const rnBudget = Math.max(minBudget, Math.round(safeBudget * 0.2))
         const rnCamp = await post(`${adAccountId}/campaigns`, {
