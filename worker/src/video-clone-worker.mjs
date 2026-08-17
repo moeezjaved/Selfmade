@@ -1024,9 +1024,13 @@ async function composeCleanProduct({ productImageUrls, jobId }) {
 async function composeProductSheet({ productImageUrls, jobId }) {
   if (!GEMINI_KEY || !productImageUrls?.length) return null
   const imgs = []
-  for (const u of productImageUrls.slice(0, 3)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
+  // Absorb up to 6 uploaded assets (front, 3/4, packaging, alt designs) into ONE sheet — the user can
+  // provide many product photos and packaging shots; the composite carries them all so Seedance knows
+  // the product AND its packaging from every side, while the ref count fed per-scene stays low (no
+  // size inflation). Seedance 2.5 accepts up to 50 refs, but a single dense sheet is the reliable path.
+  for (const u of productImageUrls.slice(0, 6)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
   if (!imgs.length) return null
-  const prompt = 'Clean studio PRODUCT SHEET of the EXACT product from the attached photos: two views of the SAME product side by side in one frame — a front view on the left and a 3/4 perspective view on the right, both at matched scale and lighting. Identical container, cap/applicator, colours and label text — sharp and readable. Plain seamless neutral-grey background. NO hands, NO people, NO other objects, NO text overlays — only the product, shown from these two angles.'
+  const prompt = 'Clean studio PRODUCT SHEET built from the attached photos of the SAME product line. Lay out in one frame, at matched scale and even lighting: a front view and a 3/4 perspective view of the product, and — if any attached photo shows PACKAGING (box, pouch, sachet, label) or an ALTERNATE design/variant — include that packaging/variant beside them as a smaller inset. Keep every container, cap/applicator, colour and label text identical to the photos, sharp and readable. Plain seamless neutral-grey background. NO hands, NO people, NO unrelated objects, NO added text overlays — only the real product and its packaging/variants from the photos.'
   const inline = await geminiImage(prompt, imgs)
   const key = `creatives/tmp/${jobId}-product-sheet.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
