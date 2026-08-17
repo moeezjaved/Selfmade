@@ -81,16 +81,28 @@ export async function POST(req: NextRequest) {
   if (b?.castOp === true && typeof b?.castLetter === 'string' && b.castLetter) {
     const letter = String(b.castLetter).toUpperCase().slice(0, 1)
     const sheets = { ...(meta.cast_sheets || {}) }
+    // Which cast letter does a shot feature? Parse it the SAME way the scene keyframe path does; an
+    // unlabelled shot defaults to the lead "A". Used to clear the right scenes when a person is (re)drawn.
+    const sceneLetterOf = (action: string): string => {
+      const m = String(action || '').match(/\b(?:person|man|woman|guy|girl|male|female|lady|dude)\s+([A-E])\b/i) || String(action || '').match(/\b([B-E])\b/)
+      return m ? m[1].toUpperCase() : 'A'
+    }
+    // Drawing/redrawing a person's sheet must RE-LOCK their scenes to it: clear the AI keyframes of every
+    // scene that features this letter (keep user-uploaded frames) so they auto-redraw against the new sheet.
+    const clearedBeatsFor = (): any[] => (Array.isArray(beat.beats) ? beat.beats : []).map((bt: any) =>
+      (bt && bt.preview_source !== 'user' && sceneLetterOf(bt.action || bt.scriptLine || '') === letter)
+        ? { ...bt, preview: null, preview_source: null } : bt)
     // Upload-your-own person for this letter.
     const upKey = typeof b?.uploadedKey === 'string' ? b.uploadedKey.replace(/^\/+/, '') : ''
     if (upKey) {
       const publicUrl = r2PublicUrl(upKey)
       if (!publicUrl) return NextResponse.json({ error: 'could not resolve the uploaded image' }, { status: 500 })
       sheets[letter] = publicUrl
-      const patch: any = { cast_sheets: sheets }
+      const clearedBeats = clearedBeatsFor()
+      const patch: any = { cast_sheets: sheets, beat_sheet: { ...beat, beats: clearedBeats } }
       if (letter === 'A') patch.cast_sheet = publicUrl
       await admin.from('creative_generations').update({ clone_meta: { ...meta, ...patch } }).eq('id', jobId).eq('user_id', user.id)
-      return NextResponse.json({ ok: true, castLetter: letter, sheet: publicUrl, source: 'user' })
+      return NextResponse.json({ ok: true, castLetter: letter, sheet: publicUrl, source: 'user', clearedScenes: true })
     }
     // Draw / redraw this person from their look description (from the analysis people[] list).
     const isServiceC = meta.product_type === 'service' || meta.product_type === 'app'
@@ -117,10 +129,11 @@ export async function POST(req: NextRequest) {
     const uploaded = await uploadBufferToR2(Buffer.from(gen.dataB64, 'base64'), key, gen.mimeType)
     if (!uploaded) return NextResponse.json({ error: 'upload failed' }, { status: 500 })
     sheets[letter] = uploaded
-    const patch: any = { cast_sheets: sheets }
+    const clearedBeats = clearedBeatsFor()
+    const patch: any = { cast_sheets: sheets, beat_sheet: { ...beat, beats: clearedBeats } }
     if (letter === 'A') patch.cast_sheet = uploaded
     await admin.from('creative_generations').update({ clone_meta: { ...meta, ...patch } }).eq('id', jobId).eq('user_id', user.id)
-    return NextResponse.json({ ok: true, castLetter: letter, sheet: uploaded, regenerated: true })
+    return NextResponse.json({ ok: true, castLetter: letter, sheet: uploaded, regenerated: true, clearedScenes: true })
   }
 
   if (sceneIndex == null || sceneIndex < 0) return NextResponse.json({ error: 'sceneIndex required' }, { status: 400 })
