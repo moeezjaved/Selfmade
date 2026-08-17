@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation'
 
 interface UserDetail {
   id: string; email: string; full_name: string; subscription_status: string; plan?: string; plan_label?: string;
-  created_at: string; last_sign_in_at: string | null; business_type: string;
+  created_at: string; last_sign_in_at: string | null; last_active_at?: string | null; business_type: string;
   niche: string; experience_level: string; trial_ends_at: string | null;
   ad_plan_clicked: boolean; campaign_launched: boolean; scale_clicked: boolean;
   campaigns_count: number;
@@ -203,7 +203,8 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           <Row label="Plan" value={<span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{user.plan_label || user.subscription_status}</span>} />
           <Row label="Billing status" value={<span style={{ textTransform: 'capitalize' }}>{user.subscription_status}</span>} />
           <Row label="Signup Date" value={fmt(user.created_at)} />
-          <Row label="Last Login" value={fmt(user.last_sign_in_at)} />
+          <Row label="Last active" value={fmt(user.last_active_at || user.last_sign_in_at)} />
+          <Row label="Last sign-in" value={fmt(user.last_sign_in_at)} />
           <Row label="Trial Ends" value={fmt(user.trial_ends_at)} />
           <Row label="Business Type" value={user.business_type || '—'} />
           <Row label="Niche" value={user.niche || '—'} />
@@ -279,6 +280,14 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                 <div style={{ padding: '7px 8px' }}>
                   <div style={{ fontSize: 11.5, color: '#333', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.brand_name || c.prompt || 'Untitled'}</div>
                   <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>{fmt(c.created_at)}</div>
+                  {/* Which ad this was cloned from — click opens it in Discovery (nested-anchor-safe via onClick). */}
+                  {c.source_ad_id && (
+                    <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`/discovery/${c.source_ad_id}`, '_blank') }}
+                      title={`Cloned from ad ${c.source_ad_id} — open in Discovery`}
+                      style={{ fontSize: 10, color: '#ff5a2c', fontWeight: 700, marginTop: 3, cursor: 'pointer', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      ⧉ cloned from {c.source_ad_id}
+                    </div>
+                  )}
                 </div>
               </a>
             ))}
