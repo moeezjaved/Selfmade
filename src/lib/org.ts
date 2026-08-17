@@ -42,11 +42,19 @@ export async function getUserOrg(admin: SupabaseClient, userId: string): Promise
  */
 export async function resolveBillingOwner(admin: SupabaseClient, userId: string): Promise<string> {
   const db = admin as any
-  const { data: m } = await db.from('org_members')
-    .select('org_id').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (m?.org_id) {
-    const { data: o } = await db.from('organizations').select('owner_id').eq('id', m.org_id).maybeSingle()
-    if (o?.owner_id) return o.owner_id as string
+  // Look at ALL memberships, not just the newest — a user is usually a member of TWO orgs: their own
+  // personal org (owner) AND any team they joined (member). Billing must follow the TEAM they joined
+  // (whose owner pays), so PREFER a membership whose org owner != this user. Only fall back to their own
+  // org (or self) when they haven't joined any team. "Newest row wins" mis-resolved to self → Free.
+  const { data: rows } = await db.from('org_members')
+    .select('org_id').eq('user_id', userId).order('created_at', { ascending: false })
+  const orgIds: string[] = Array.from(new Set((rows || []).map((r: any) => r.org_id).filter(Boolean)))
+  if (orgIds.length) {
+    const { data: orgs } = await db.from('organizations').select('id, owner_id').in('id', orgIds)
+    const byId = new Map<string, string>((orgs || []).map((o: any) => [o.id, o.owner_id]))
+    // A team they joined (owner is someone else) takes priority over their personal org.
+    for (const oid of orgIds) { const owner = byId.get(oid); if (owner && owner !== userId) return owner }
+    for (const oid of orgIds) { const owner = byId.get(oid); if (owner) return owner }
   }
   return userId
 }
