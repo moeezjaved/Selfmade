@@ -14,6 +14,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { triageMessage } from '@/lib/customer/triage'
 import { draftOutbound, OUTBOUND_LABEL, type OutboundType } from '@/lib/customer/outbound'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBillingOwner } from '@/lib/org'
+import { requireFeature } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -25,6 +27,12 @@ export async function GET(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
+  // Customer Inbox is a Creator feature — gate on the billing owner's plan (teammates inherit it).
+  {
+    const owner = await resolveBillingOwner(admin, user.id)
+    const gate = await requireFeature(admin, owner, 'inbox')
+    if (gate) return NextResponse.json(gate, { status: 402 })
+  }
   // The active project: explicit ?brand= wins, else the app-wide `sf_brand` cookie (sidebar switcher).
   const brandId = (await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand'))) || undefined
 
@@ -97,6 +105,12 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
+  // Customer Inbox is a Creator feature — gate sends too (teammates inherit the owner's plan).
+  {
+    const owner = await resolveBillingOwner(admin, user.id)
+    const gate = await requireFeature(admin, owner, 'inbox')
+    if (gate) return NextResponse.json(gate, { status: 402 })
+  }
   const body = await req.json().catch(() => ({}))
   const action = String(body.action || '')
 

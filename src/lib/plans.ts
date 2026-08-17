@@ -21,6 +21,7 @@ export interface PlanEntitlements {
   aiInsights: boolean          // Patterns / AI Insights
   launch: boolean              // Launch Ads
   campaigns: boolean           // Campaigns / Scale & Insights / Deep Reports
+  inbox?: boolean              // customer inbox (Creator+); Free gets an upgrade prompt
   api: boolean                 // API / MCP access
   exports: boolean             // CSV / creative downloads
   canBuyCredits: boolean       // top-ups allowed
@@ -45,7 +46,7 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
     // separately. 75 cr = 5 image ads to try (video is gated by balance → upsell).
     monthlyCredits: 75, welcomeCredits: 0, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: true,
-    teamBoards: false, assetsGb: 0.5, videosPerMonth: 0, imagesUnlimited: false,
+    teamBoards: false, assetsGb: 0.5, videosPerMonth: 0, imagesUnlimited: false, inbox: false,
   },
   // "Creator" — the ONLY paid plan now (one-plan model, 2026-08-01). It unlocks the whole app:
   // Patterns/AI Insights, Launch (M4), Campaigns/Scale & Insights, API — the Meta cockpit included.
@@ -54,27 +55,27 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
     label: 'Creator', priceMonthly: 49, priceAnnualMonthly: 49,
     monthlyCredits: 6000, seats: 3, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, mostPopular: true,
+    teamBoards: true, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, inbox: true, mostPopular: true,
   },
   // Legacy 'pro' — kept valid for any existing subscriber, HIDDEN from the pricing page.
   pro: {
     label: 'Pro', priceMonthly: 99, priceAnnualMonthly: 74,
     monthlyCredits: 12000, seats: 3, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: false, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 50, videosPerMonth: 20, imagesUnlimited: false, hidden: true,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 20, imagesUnlimited: false, inbox: true, hidden: true,
   },
   // "Agency" — teams. 18,000 cr = 30 video ads/mo; image ads free + unlimited; 5 seats.
   business: {
     label: 'Agency', priceMonthly: 149, priceAnnualMonthly: 149,
     monthlyCredits: 18000, seats: 5, brandSpy: 50, expressPulls: 50, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: 50, videosPerMonth: 30, imagesUnlimited: false,
+    teamBoards: true, assetsGb: 50, videosPerMonth: 30, imagesUnlimited: false, inbox: true,
   },
   enterprise: {
     label: 'Enterprise', priceMonthly: 0, priceAnnualMonthly: 0,
     monthlyCredits: null, seats: 25, brandSpy: Infinity, expressPulls: Infinity, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
-    teamBoards: true, assetsGb: null, videosPerMonth: null, imagesUnlimited: false,
+    teamBoards: true, assetsGb: null, videosPerMonth: null, imagesUnlimited: false, inbox: true,
   },
 }
 

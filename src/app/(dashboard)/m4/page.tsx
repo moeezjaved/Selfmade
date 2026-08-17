@@ -2,6 +2,7 @@
 import React, { useState } from 'react'
 import toast from 'react-hot-toast'
 import { alertMessage } from '@/components/ConfirmDialog'
+import { showUpsell } from '@/components/UpsellModal'
 import MetaGate from '@/components/MetaGate'
 import UpgradeGate from '@/components/UpgradeGate'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -504,6 +505,7 @@ function M4Inner() {
     try{
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
+      if(showUpsell(data)){ setLoading(false); return }   // Free plan → upgrade modal
       const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
       const errMsg=data.errors?.length?'\n\nWhy:\n'+data.errors.join('\n'):''
       // Launch failures shown as a CENTERED, on-brand modal that STAYS until dismissed (a toast in the

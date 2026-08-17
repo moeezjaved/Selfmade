@@ -15,6 +15,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Loader2, Check, ExternalLink, Copy } from 'lucide-react'
 import { META_LIVE } from '@/lib/flags'
+import { showUpsell } from '@/components/UpsellModal'
 
 const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', GREEN = '#ef4a1e'
 type Acct = { account_id: string; name: string; currency: string; timezone: string; active: boolean }
@@ -64,6 +65,7 @@ export default function ConnectMetaByo() {
     setBusy(true); setErr(null)
     try {
       const r = await fetch('/api/meta/connect-partner', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'list' }) }).then((x) => x.json())
+      if (showUpsell(r)) return   // Free plan → clean "Upgrade to Creator" modal instead of a raw error
       if (r.error) { setErr(r.error); return }
       if (!r.accounts?.length) { setErr('I don’t see a shared account yet — Meta can take a minute to propagate. Finish the sharing step, wait a moment, and tap again.'); return }
       setPAccounts(r.accounts); setPPicked(r.accounts.map((a: Acct) => a.account_id))
@@ -74,6 +76,7 @@ export default function ConnectMetaByo() {
     setBusy(true); setErr(null)
     try {
       const r = await fetch('/api/meta/connect-partner', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ accountIds: pPicked }) }).then((x) => x.json())
+      if (showUpsell(r)) return   // Free plan → clean "Upgrade to Creator" modal instead of a raw error
       if (r.error) { setErr(r.error); return }
       setLearned(r)
     } catch { setErr('Couldn’t save the connection — try again.') } finally { setBusy(false) }
@@ -83,6 +86,7 @@ export default function ConnectMetaByo() {
     setBusy(true); setErr(null)
     try {
       const r = await fetch('/api/meta/connect-byo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, action: 'validate' }) }).then((x) => x.json())
+      if (showUpsell(r)) return   // Free plan → clean "Upgrade to Creator" modal instead of a raw error
       if (r.error) { setErr(r.error); return }
       setBizName(r.name); setAccounts(r.accounts); setPicked(r.accounts.map((a: Acct) => a.account_id))
     } catch { setErr('Couldn’t reach Meta — try again in a moment.') } finally { setBusy(false) }
@@ -92,6 +96,7 @@ export default function ConnectMetaByo() {
     setBusy(true); setErr(null)
     try {
       const r = await fetch('/api/meta/connect-byo', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token, accountIds: picked }) }).then((x) => x.json())
+      if (showUpsell(r)) return   // Free plan → clean "Upgrade to Creator" modal instead of a raw error
       if (r.error) { setErr(r.error); return }
       setLearned(r)
     } catch { setErr('Couldn’t save the connection — try again.') } finally { setBusy(false) }

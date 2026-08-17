@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
+import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
 
@@ -164,6 +165,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
       const res = await fetch('/api/meta/scale', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: id, newDailyBudget: newBudget }) })
       const j = await res.json().catch(() => null)
       if (res.ok && j?.ok) { setScaled(s => ({ ...s, [id]: true })); onAct?.() }
+      else if (showUpsell(j)) { /* Free plan → upgrade modal */ }
       else toast.error(j?.error || 'Could not scale — open Campaigns to do it manually.')
     } catch { toast.error('Could not scale — open Campaigns to do it manually.') }
     finally { setScaling(null) }
