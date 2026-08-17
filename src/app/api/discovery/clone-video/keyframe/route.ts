@@ -99,10 +99,15 @@ export async function POST(req: NextRequest) {
     const desc = String(b?.look || person?.look || (letter === 'A' ? beat.avatar : '') || '').trim()
     if (!desc) return NextResponse.json({ error: `No look description for person ${letter}.` }, { status: 400 })
     const recastLook = String(meta.character_look || '').trim()
+    const recast = !!recastLook && recastLook.toLowerCase() !== 'match'
     const castPrompt = [
       'Create ONE photorealistic vertical 9:16 CHARACTER REFERENCE SHEET of a SINGLE original person — a fictional everyday creator for a UGC/social ad, NOT any real individual or celebrity.',
-      recastLook && recastLook.toLowerCase() !== 'match' ? `The person is ${recastLook} in appearance.` : '',
-      `They match this person from the reference ad — GENDER first, then age range, ethnicity, hair, wardrobe and build: ${desc}. Give them a brand-new fictional face (never a real person).`,
+      // RECAST OVERRIDES ETHNICITY: when the user chose a look (e.g. "Pakistani"), that wins over the
+      // reference person's ethnicity — take only gender/age/build/hair-style/wardrobe from the reference,
+      // NOT their ethnicity/skin tone (else "Pakistani … but Black" contradicts and the model ignores it).
+      recast
+        ? `The person is ${recastLook} in appearance — this ethnicity/skin tone OVERRIDES the reference. From the reference person, keep ONLY their gender, apparent age, build, hairstyle and wardrobe (IGNORE the reference's ethnicity/skin colour): ${desc}. Give them a brand-new fictional ${recastLook} face (never a real person).`
+        : `They match this person from the reference ad — gender, age, ethnicity, hair, wardrobe and build: ${desc}. Give them a brand-new fictional face (never a real person).`,
       'Compose split-frame: LEFT panel — a tight facial close-up, whole head in frame, calm neutral expression, looking into the lens, real skin texture. RIGHT panel — the SAME person, full-body front view, head-to-toe, relaxed pose, same wardrobe.',
       'Both panels are the identical person: same face, hair, skin tone, build and outfit. Plain neutral-grey seamless background, a thin vertical divider. EXACTLY ONE visible face (the close-up) — remove/soften the full-body face so there is only one face to lock onto. NO text, NO logos, NO product, NO borders.',
     ].filter(Boolean).join(' ')
@@ -237,10 +242,21 @@ export async function POST(req: NextRequest) {
     if (castUrl) castImg = await fetchImageB64(castUrl)
   }
 
-  // SAME PERSON across scenes: the cast sheet is the primary lock (applies to scene 0 too). If it's
-  // unavailable, fall back to the old behaviour — chain off the most recent earlier scene's keyframe.
-  let charLock: { mimeType: string; dataB64: string } | null = castImg
-  if (!charLock && sceneIndex > 0) {
+  // PER-SCENE PERSON: a multi-person ad has scenes featuring NON-lead cast (e.g. "Woman D"). Parse the
+  // cast letter from the shot text and lock to THAT person — their own drawn sheet if it exists, else
+  // describe them — so a "Woman D" scene draws Woman D, not the main creator (Person A). Only fall back
+  // to cast_sheet A (or the previous-scene chain) for the lead / unlabelled scenes.
+  const letterMatch = String(action).match(/\b(?:person|man|woman|guy|girl|male|female|lady|dude)\s+([A-E])\b/i) || String(action).match(/\b([B-E])\b/)
+  const sceneLetter = letterMatch ? letterMatch[1].toUpperCase() : null
+  const castSheetsMap: Record<string, string> = (meta.cast_sheets && typeof meta.cast_sheets === 'object') ? meta.cast_sheets : {}
+  const scenePerson = (sceneLetter && Array.isArray(beat.people)) ? beat.people.find((p: any) => String(p?.id).toUpperCase() === sceneLetter) : null
+  const scenePersonSheetUrl = (sceneLetter && sceneLetter !== 'A') ? castSheetsMap[sceneLetter] : (castSheetsMap.A || meta.cast_sheet)
+  const isNonLeadScene = !!sceneLetter && sceneLetter !== 'A'
+  let charLock: { mimeType: string; dataB64: string } | null = null
+  if (scenePersonSheetUrl) charLock = await fetchImageB64(scenePersonSheetUrl)   // this scene's exact person, already drawn
+  else if (!isNonLeadScene) charLock = castImg                                    // lead scene → the cast_sheet A we minted above
+  // Chain-off-previous-frame fallback is only safe for the SAME person — never for a labelled non-lead scene.
+  if (!charLock && !isNonLeadScene && sceneIndex > 0) {
     for (let j = sceneIndex - 1; j >= 0; j--) {
       if (beats[j]?.preview) { charLock = await fetchImageB64(beats[j].preview); if (charLock) break }
     }
@@ -258,9 +274,17 @@ export async function POST(req: NextRequest) {
   // means the USER's product here. Never render a competitor's product, name or logo.
   const brandNeutral = productName ? `Any product named in the shot refers to "${productName}" (the user's product) — never a competitor's product, brand name or logo.` : 'Any product named in the shot is the user\'s product — never a competitor\'s brand or logo.'
   // When a same-creator lock exists it OVERRIDES the descriptive clause — keep that exact person.
+  // For a labelled non-lead scene with no drawn sheet, describe THAT person (not the lead) so the
+  // keyframe shows e.g. Woman D, and honour any recast (ethnicity overrides the reference's).
+  const recastOn = !!look && look.toLowerCase() !== 'match'
+  const scenePersonDesc = String((scenePerson as any)?.look || '').trim()
   const personClause = charLock
-    ? 'The on-camera person MUST be the EXACT SAME creator shown in the same-creator reference image — match their face, hair, skin tone and wardrobe precisely; it is the same person throughout the video.'
-    : creatorClause
+    ? 'The on-camera person MUST be the EXACT SAME creator shown in the same-creator reference image — match their face, hair, skin tone and wardrobe precisely; it is the same person whenever they appear.'
+    : (isNonLeadScene && scenePersonDesc)
+      ? (recastOn
+          ? `The on-camera person is ${look} in appearance (this ethnicity/skin tone OVERRIDES the reference). Keep only their gender, apparent age, build, hairstyle and wardrobe from: ${scenePersonDesc}. A brand-new fictional ${look} face — a DIFFERENT person from the main creator.`
+          : `The on-camera person for this scene is: ${scenePersonDesc}. A brand-new fictional face — a DIFFERENT person from the main creator, kept consistent whenever they appear.`)
+      : creatorClause
 
   // Mello upgrades the raw shot brief into a proper filmable direction before the model sees it —
   // users write "person holding facewash"; this makes it a real shot (framing, action, lighting).

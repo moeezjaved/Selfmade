@@ -166,7 +166,9 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [typeOverride, setTypeOverride] = useState<string | undefined>(undefined)
   const effType = typeOverride || brandType || 'physical'
   const isService = effType === 'service' || effType === 'app'   // app OR service = no physical product to render
-  const resolvedBucket = bucket === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(bucket)
+  // "Match theirs" targets the ACTUAL source length (clamped 8–60s), not a snapped 15/30/60 bucket —
+  // so a ~20s ad clones at ~20s instead of collapsing to 15s and race-reading the script.
+  const resolvedBucket = bucket === 'match' ? Math.max(8, Math.min(60, Math.round(srcSecs || 15))) : Number(bucket)
   const nSegs = resolvedBucket >= 60 ? 4 : resolvedBucket >= 30 ? 2 : 1
   // Cinematic is priced per scene (video_clone_xN); UGC per 15s clip. Actual charge is server-side.
   // Cinematic: the CHOSEN length drives the scene count (~1 scene per 3s — 15s → 5, 30s → 10, 60s → 16),
@@ -242,7 +244,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       // The drafted script is often paced to the source's slow rate → one short line. Auto-fill it to the
       // resolved length (the source-matched bucket, NOT a hardcoded 15s) so the review shows a full script.
       try {
-        const target = srcS ? (srcS <= 22 ? 15 : srcS <= 45 ? 30 : 60) : 15
+        const target = srcS ? Math.max(8, Math.min(60, Math.round(srcS))) : 15
         const wc = drafted.trim() ? drafted.trim().split(/\s+/).length : 0
         if (wc && wc < target * (RATE[language] || 2.3) * 0.75) {
           const r = await fetch('/api/discovery/clone-video/rescript', {
