@@ -174,7 +174,12 @@ export async function POST(req: NextRequest) {
   // Feed it as a COMPOSITION guide so the keyframe tracks the reference shot-for-shot (framing, angle,
   // subject placement) — while we REPLACE the person with an original creator and swap in the user's
   // product, never reproducing the competitor's pixels or a real face.
-  const refFrameUrl = beats[sceneIndex]?.thumb || null
+  // RECAST GUARD: when the user recast the cast (e.g. Pakistani), the source frame shows the ORIGINAL
+  // person — Nano Banana copies their face/ethnicity from those pixels and quietly ignores the recast.
+  // So on a recast job we DROP the source frame entirely and rely on the locked cast sheet for identity;
+  // framing is guided by the setting text instead. (Non-recast jobs keep the frame for tight composition.)
+  const recastActive = !!look && look.toLowerCase() !== 'match'
+  const refFrameUrl = recastActive ? null : (beats[sceneIndex]?.thumb || null)
   const refFrame = refFrameUrl ? await fetchImageB64(refFrameUrl) : null
 
   const isService = meta.product_type === 'service' || meta.product_type === 'app'
