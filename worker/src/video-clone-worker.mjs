@@ -2116,15 +2116,27 @@ async function generateJob(job) {
       // Per-character look profiles (A/B…) come off a FRESH plan as a non-enumerable prop — stamp them
       // into meta.cast_profiles so they survive a resume (the scene_plan checkpoint is a plain array).
       if (scenes.castProfiles && !meta.cast_profiles) { meta.cast_profiles = scenes.castProfiles; await stamp({ clone_meta: { ...meta, cast_profiles: scenes.castProfiles } }) }
-      // USER-CHOSEN LENGTH drives the cut: distribute duration_target evenly across the kept scenes, so
-      // the footage matches the approved script's pacing. (Scene durations used to keep the SOURCE's
-      // timings — a 71s source with a 15s script rendered minutes of footage that the dead-air guard
-      // then chopped into a mess.) Only when the plan is fresh — a resumed plan keeps its clip timings.
+      // USER-CHOSEN LENGTH drives the cut, but KEEP THE SOURCE'S RHYTHM: distribute the target time
+      // PROPORTIONALLY to each scene's real source-cut length (src_end-src_start) — a 1s flash stays
+      // short, a 5s hold stays long — scaled so the total ≈ target. This fixes the "every scene the same
+      // 3.2s" flatness while still hitting the chosen length. (Even split only as a fallback when the
+      // analysis gave no per-scene timings — that's what avoided the old 71s→dead-air blow-up.) Seedance
+      // renders a ~4s floor and concatClips TRIMS each clip to its planned duration, so short cuts survive.
       const targetSecs = Number(meta.duration_target) || 0
       if (targetSecs && !(Array.isArray(meta.scene_plan) && meta.scene_plan.length)) {
-        const per = Math.max(3, Math.min(15, Math.round(targetSecs / Math.max(1, scenes.length))))
-        for (const s of scenes) s.duration = per
-        console.log(`🎯 ${job.id} cinematic length ${targetSecs}s → ${scenes.length} scenes × ${per}s`)
+        const spans = scenes.map((s) => (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.max(0, +s.src_end - +s.src_start) : 0)
+        const totalSpan = spans.reduce((a, b) => a + b, 0)
+        if (totalSpan > 1) {
+          for (let i = 0; i < scenes.length; i++) {
+            const raw = (spans[i] / totalSpan) * targetSecs
+            scenes[i].duration = Math.max(2, Math.min(15, Math.round(raw * 10) / 10))   // keep the source's proportion
+          }
+          console.log(`🎯 ${job.id} cinematic ${targetSecs}s → per-scene by SOURCE rhythm [${scenes.map((s) => s.duration).join(', ')}]`)
+        } else {
+          const per = Math.max(3, Math.min(15, Math.round(targetSecs / Math.max(1, scenes.length))))
+          for (const s of scenes) s.duration = per
+          console.log(`🎯 ${job.id} cinematic ${targetSecs}s → ${scenes.length}×${per}s (even split — no source timings)`)
+        }
       }
       const base = join(tmpdir(), `fj-${job.id}`)
       const tmp = []
