@@ -319,7 +319,9 @@ export async function POST(req: NextRequest) {
     `Create ONE photorealistic vertical 9:16 video KEYFRAME — the FIRST FRAME of a short video clip.`,
     legend.length ? `Attached reference images, in order — ${legend.join(' ')}` : '',
     refFrame
-      ? `Recreate the COMPOSITION reference's framing, angle, distance and background layout — but make it an ORIGINAL image: give the on-camera person a NEW face (never reproduce the real person) while KEEPING THE SAME gender, age range, ethnicity, hair and build as the person shown in the reference — do NOT change a man to a woman or vice-versa. Swap in the user's product. Recreate the SHOT, not the pixels.`
+      ? (recastOn
+          ? `Recreate the COMPOSITION reference's framing, angle, distance and background layout — but make it an ORIGINAL image: give the on-camera person a NEW ${look} face. KEEP the reference person's gender, age range, hair style and build, but their ETHNICITY/skin tone is ${look} (the recast OVERRIDES the reference's ethnicity — do NOT copy the reference person's skin colour). Do NOT change a man to a woman or vice-versa. Swap in the user's product. Recreate the SHOT, not the pixels.`
+          : `Recreate the COMPOSITION reference's framing, angle, distance and background layout — but make it an ORIGINAL image: give the on-camera person a NEW face (never reproduce the real person) while KEEPING THE SAME gender, age range, ethnicity, hair and build as the person shown in the reference — do NOT change a man to a woman or vice-versa. Swap in the user's product. Recreate the SHOT, not the pixels.`)
       : `Match the scene's shot type (close-up / wide / over-the-shoulder), framing and energy as an ORIGINAL image (never copy any real person's face).`,
     `SCENE TO RECREATE: ${shot}.`,
     setting ? `Setting (match the reference): ${setting}.` : '',
