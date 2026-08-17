@@ -783,6 +783,24 @@ function CampaignsInner() {
               </div>
             )}
 
+            {/* Quick actions — one tap pre-fills a common task into the box; the user reviews and hits
+                send (never auto-runs a budget/spend change). Also teaches people what Mello can do. */}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 14px 0' }}>
+              {[
+                { label: '📈 Scale +20%', cmd: "Increase this campaign's daily budget by 20%" },
+                { label: '💰 Set budget', cmd: 'Set the daily budget to €' },
+                { label: '⏸️ Pause', cmd: 'Pause this campaign' },
+                { label: '▶️ Activate', cmd: 'Activate this campaign' },
+                { label: '🎨 New creative', cmd: 'Add this creative to a new ad set' },
+                { label: '🧬 Duplicate winner', cmd: 'Duplicate the best-performing ad set at a higher budget' },
+              ].map(q => (
+                <button key={q.label} onClick={() => setChatInput(q.cmd)} type="button"
+                  style={{ background: '#fff', border: '1px solid #f6d8cc', color: '#9a3412', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  {q.label}
+                </button>
+              ))}
+            </div>
+
             {/* Input area */}
             <div style={{ padding: '12px 14px', borderTop: '1px solid #e8f0e8', background: '#fff' }}>
               <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
