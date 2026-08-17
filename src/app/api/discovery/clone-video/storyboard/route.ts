@@ -76,5 +76,27 @@ export async function GET(req: NextRequest) {
     // — surfaced so the founder SEES who will be on camera and approves/regenerates BEFORE any video spend.
     castSheet: meta.cast_sheet || null,
     characterLook: meta.character_look || null,
+    // FULL CAST (A, B, C…): every distinct on-camera person the analysis found, each with their look and
+    // their locked sheet (if drawn yet) — so the founder can review/redraw/upload EACH person before spend,
+    // not just the lead. Falls back to a single "A" from the avatar for older jobs with no people[] list.
+    cast: buildCast(beat, meta),
   })
+}
+
+// Assemble the cast list for the storyboard: prefer the analysis people[] (A/B/C…), else synthesise a
+// single "A" from the avatar. Each entry carries its locked sheet from meta.cast_sheets (or the legacy
+// meta.cast_sheet for A) so the UI shows who's drawn and who still needs a sheet.
+function buildCast(beat: any, meta: any): { id: string; look: string; sheet: string | null }[] {
+  const sheets = (meta && meta.cast_sheets) || {}
+  const people: any[] = Array.isArray(beat?.people) ? beat.people.filter((p: any) => p && p.id) : []
+  if (people.length) {
+    return people.slice(0, 5).map((p: any) => ({
+      id: String(p.id),
+      look: String(p.look || '').slice(0, 400),
+      sheet: sheets[String(p.id)] || (String(p.id) === 'A' ? (meta?.cast_sheet || null) : null),
+    }))
+  }
+  const avatar = String(beat?.avatar || '').trim()
+  if (avatar && !/^none/i.test(avatar)) return [{ id: 'A', look: avatar.slice(0, 400), sheet: sheets.A || meta?.cast_sheet || null }]
+  return []
 }

@@ -1037,6 +1037,23 @@ async function composeProductSheet({ productImageUrls, jobId }) {
   return `${R2_PUBLIC}/${key}`
 }
 
+// PACKAGING SHEET — a packaging-hero still built from the uploaded assets, for the beats that show the
+// BOX / pouch / label / flavour variants (a product-reveal montage beat). Distinct from the product sheet
+// (product-in-hand): here the PACKAGING is the subject, big and readable. Composed once, cached, and led
+// only on packaging/flavour scenes so those cuts show the user's real packaging, not a generic box.
+async function composePackagingSheet({ productImageUrls, jobId }) {
+  if (!GEMINI_KEY || !productImageUrls?.length) return null
+  const imgs = []
+  for (const u of productImageUrls.slice(0, 6)) { try { imgs.push(await fetchB64(u)) } catch { /* skip */ } }
+  if (!imgs.length) return null
+  const prompt = 'Clean studio PACKAGING SHOT built from the attached product photos: show the product\'s PACKAGING as the hero — the box, pouch, sachet, carton, label and any flavour/variant designs — arranged neatly together at matched scale and even lighting, large and readable. Keep every label, colour, logo and text EXACTLY as in the photos (do not invent flavours or text). If the photos show multiple variants, line them up like a product family. Plain seamless neutral-grey background. NO hands, NO people, NO unrelated objects.'
+  let inline
+  try { inline = await geminiImage(prompt, imgs) } catch { return null }
+  const key = `creatives/tmp/${jobId}-packaging-sheet.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
 // CHARACTER SHEET — a synthetic, likeness-safe reference portrait of ONE person (split-frame: facial
 // close-up + full-body front). Built per DISTINCT cast member (A, B…) from their look description so
 // EVERY person in a multi-character ad is locked to a canonical sheet, not just the lead. Mirrors the
@@ -2053,6 +2070,7 @@ async function generateJob(job) {
     // ASSET-LOCK · PRODUCT SHEET (Higgsfield method) — one composite of the product from front + 3/4 so
     // Seedance 2.5 knows it from every side and holds it as the camera moves. It's a SINGLE image, so it
     // replaces the clean re-shoot as the lead ref (ref count stays 2 → no size inflation). Cached once.
+    let packagingSheet = meta.packaging_sheet || null   // packaging-hero still, composed lazily on the first flavour/packaging beat
     let productSheet = meta.product_sheet || null
     if (!isService && !productSheet && productImages.length) {
       try {
@@ -2225,12 +2243,27 @@ async function generateJob(job) {
               }
             }
           }
+          // PACKAGING BEAT — a flavour/box/label reveal shot. Lead it with the packaging-hero still so the
+          // cut shows the user's REAL packaging (not a generic box). Composed once on the first such scene.
+          let pkgRef = null
+          if (!isService && s.has_product !== false && productImages.length && process.env.SEEDANCE_PACKAGING !== 'off'
+              && /packag|\bbox\b|pouch|sachet|carton|wrapper|label|flavou?r|\bcores?\b|variant|sku|line[- ]?up/i.test(`${s.prompt || ''} ${s.setting || ''} ${s.action || ''}`)) {
+            if (packagingSheet) pkgRef = packagingSheet
+            else {
+              try {
+                packagingSheet = await composePackagingSheet({ productImageUrls: productImages, jobId: job.id })
+                if (packagingSheet) { pkgRef = packagingSheet; await stamp({ clone_meta: { ...meta, packaging_sheet: packagingSheet } }); meta.packaging_sheet = packagingSheet; console.log(`📦 ${job.id} packaging sheet composed`) }
+              } catch (e) { console.warn(`scene ${i + 1} packaging sheet:`, e.message) }
+            }
+          }
           const baseImgs = keyframe ? [keyframe, ...falProductImages] : [...falProductImages]
           const anchorIdx = baseImgs.length + 1                       // 1-based @Image index of the first cast anchor
           const compIdx = baseImgs.length + anchorRefs.length + 1     // …and of the composition still
           const locIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + 1  // …and of the location plate
-          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : []), ...(locPlate ? [locPlate] : [])].slice(0, 9)
+          const pkgIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + (locPlate ? 1 : 0) + 1  // …and of the packaging still
+          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : []), ...(locPlate ? [locPlate] : []), ...(pkgRef ? [pkgRef] : [])].slice(0, 9)
           const locInFrame = !!locPlate && locIdx <= sceneImages.length   // survived the 9-ref cap?
+          const pkgInFrame = !!pkgRef && pkgIdx <= sceneImages.length
           let scenePrompt = keyframe
             ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY [Image1] — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
@@ -2240,6 +2273,7 @@ async function generateJob(job) {
           if (anchorRefs.length) { const anchorList = anchorRefs.map((_, k) => `[Image${anchorIdx + k}]`).join(anchorRefs.length === 2 ? ' and ' : ', '); scenePrompt += ` CHARACTER LOCK: ${anchorList} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: each on-camera person is EXACTLY the same as their reference — same face, hair, outfit and styling, continuing seamlessly, with NO faces swapped or merged between them. Do NOT invent a different person.` }
           if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of [Image${compIdx}] (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
           if (locInFrame) scenePrompt += ` LOCATION LOCK: [Image${locIdx}] is this ad's LOCKED setting — place the scene in exactly this environment, matching its architecture, surfaces, colour palette and lighting so every cut shares one consistent world and colour grade. It's an empty plate: populate it with the action, but keep the same space. Ignore any text or logos in it.`
+          if (pkgInFrame) scenePrompt += ` PACKAGING: [Image${pkgIdx}] is the user's REAL packaging — render the box/label/flavour variants EXACTLY as shown (same colours, logo and text, no invented flavours). This beat features that packaging as the hero.`
           // LENS DECODE — the exact optics this beat used, read off the source (macro/probe, focal length,
           // anamorphic, DOF). Makes the clone match the reference's shot language instead of a generic look.
           if (s.lens && process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += ` LENS: shoot this on ${String(s.lens)} — match that exact optical character (focal length, depth of field, any macro/probe/anamorphic look and bokeh) as seen in the reference.`
