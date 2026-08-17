@@ -736,6 +736,7 @@ function M4Inner() {
             </div>
             {pixelChoice==='existing'&&(loadingPixels?<div style={{fontSize:13,color:'#7a9a7a'}}>Loading…</div>:pixels.length>0?<select value={pixelId} onChange={e=>setPixelId(e.target.value)} style={{...S.input,background:'#ffffff'}}><option value="">Select pixel…</option>{pixels.map(p=><option key={p.id} value={p.id}>{p.name} {p.id}</option>)}</select>:<input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="Enter Pixel ID" style={S.input}/>)}
             {pixelChoice==='new'&&<div style={{background:'rgba(255,90,44,0.05)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#6b6a58',lineHeight:1.8}}>Meta Events Manager → Connect Data Sources → Web → Pixel → Copy ID<br/><a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#141d15',fontWeight:700}}>Open Events Manager</a></div>}
+            {pixelChoice&&!pixelId&&<div style={{marginTop:10,background:'rgba(255,90,44,0.06)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:'11px 13px',fontSize:12.5,color:'#8b5a44',lineHeight:1.6}}>No Pixel selected? That's fine — we'll launch a <b>Traffic</b> campaign (drives clicks to your site) so your ads still go live. Add a Pixel anytime to optimize for <b>Purchases</b> instead.</div>}
           </div>
           <div style={S.foot}>
             <button onClick={()=>goTo('welcome')} style={S.back}>Back</button>
@@ -897,6 +898,8 @@ function M4Inner() {
                   </div>
                 ))}
               </div>
+              {form.objective==='OUTCOME_SALES'&&!pixelId&&<div style={{marginTop:10,background:'rgba(255,90,44,0.06)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:'11px 13px',fontSize:12.5,color:'#8b5a44',lineHeight:1.6}}>No Meta Pixel selected, so <b>Sales</b> will run as a <b>Traffic</b> campaign (clicks to your site). Go back to the Pixel step and add one to optimize for Purchases.</div>}
+              {form.objective==='OUTCOME_LEADS'&&!selectedPageId&&<div style={{marginTop:10,background:'rgba(255,90,44,0.06)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:'11px 13px',fontSize:12.5,color:'#8b5a44',lineHeight:1.6}}><b>Leads</b> runs off your Facebook Page — pick a Page in the Creatives step first.</div>}
             </div>
             <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14,marginBottom:14}}>
               <div>
