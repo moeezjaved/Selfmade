@@ -632,8 +632,9 @@ async function buildSegmentPlan(beat, product, nImages, script, nSegments, look,
 - "character": ONE dense reusable paragraph describing the on-camera creator in precise repeatable detail — age, ${recast ? `${look} appearance (user's explicit choice)` : `ethnicity/look copied from the reference avatar (${(beat && beat.avatar) || 'as analysed'})`}, hair, wardrobe, plus the exact setting (${(beat && beat.setting) || 'as analysed'}). The SAME paragraph opens every segment prompt so the person cannot drift.
 - "voice": one short line describing their voice (tone, pace, energy) — reused each segment for audio consistency.
 - Per segment "action": ${isService ? 'what the creator does while talking about the service — gesturing, showing the app/site on their phone, a lifestyle beat (never holding a physical product)' : `what they physically do with the user's product (${refList || 'the product'}) in that segment — hold it up, demonstrate, close-up`} — following the reference beats in order.
+- Per segment "shot": DECODE the matching reference beat like a director — one dense line naming the FRAMING (extreme close-up / close-up / medium / wide / over-the-shoulder / POV), the CAMERA MOVE (locked-off, slow push-in, handheld sway, whip-pan, tracking, tilt), the SETTING/backdrop it happens in (copy the analysed location for that beat), and the LIGHTING feel (window daylight, warm lamp, harsh sun, night). Keep it a real UGC creator's phone shot — NOT a film-crew rig. This makes each segment visually match the reference beat it maps to.
 ${productTruthRule(product, isService)}
-Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","action":""}]}  (exactly ${nSegments} segments).`
+Return ONLY minified JSON: {"character":"","voice":"","segments":[{"script":"","action":"","shot":""}]}  (exactly ${nSegments} segments).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || {})}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nAPPROVED SCRIPT (split this, verbatim):\n${script}`
   const r = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST', headers: { Authorization: `Bearer ${OPENAI_KEY}`, 'Content-Type': 'application/json' },
@@ -682,6 +683,9 @@ function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang, opts = {})
   else parts.push(`The user's product is ${productRef} and must match it exactly.`)
   parts.push(`They speak to camera in ${langName(lang).split(' — ')[0]} — ${plan.voice} — lips moving in sync, saying these exact words aloud: "${String(seg.script || '').replace(/"/g, "'")}"`)
   if (seg.action) parts.push(String(seg.action))
+  // DIRECTOR DECODE (UGC): the shot decoded from the reference beat — framing, camera move, setting, light.
+  // Kept in a real-creator idiom (no film-crew rig) so shots match the source montage without going cinematic.
+  if (seg.shot && process.env.SEEDANCE_DIRECTOR !== 'off') parts.push(`SHOT (match the reference beat): ${String(seg.shot)}. Shoot it as a real person filming on a phone — that exact framing, camera move, backdrop and light — natural and unstaged, no crew gear, no rig moves.`)
   if (nImages) parts.push(`PRODUCT TRUTH: whenever ${productRef} is shown, render it EXACTLY as the attached photo — same container type, silhouette, closure, label and colours. Do NOT add, remove or change ANY part vs the photo (cap, lid, spout, nozzle, pump, straw, neck, box, wrapper): keep the exact form factor shown, whatever it is (a pouch stays a pouch, a bottle stays that bottle, a jar stays that jar).`)
   // TRUE SCALE — video models inflate held products; anchor the size so a re-shoot doesn't balloon it.
   if (nImages && sizeAnchor) parts.push(`REAL SIZE: the product is ${sizeAnchor}. Render it at that true real-world scale relative to the hand and face — get it readable by bringing the CAMERA closer, NEVER by enlarging the product. An oversized, out-of-proportion product looks fake.`)
