@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
-import { resolveScopedAccount } from '@/lib/meta/scope'
+import { resolveScopedAccount, resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { logError } from '@/lib/admin/logError'
 
 const V = process.env.META_API_VERSION || 'v20.0'
@@ -30,8 +30,12 @@ export async function GET(request: NextRequest) {
 
     const admin = createAdminClient()
     const accountId = request.nextUrl.searchParams.get('account_id')
-    // Org-scoped: the requested account (if allowed) or the primary of the user's allowed pool.
-    const metaAccount = await resolveScopedAccount(admin, user.id, accountId)
+    // Scope to the ACTIVE BRAND (Aura → ROY 1) when no explicit account is asked for — otherwise the
+    // org primary showed a DIFFERENT brand's old campaigns (2022 Decorly/VirginTeez ads under an Aura
+    // workspace). Explicit ?account_id= still wins; falls back to primary only if the brand has none.
+    const metaAccount = accountId
+      ? await resolveScopedAccount(admin, user.id, accountId)
+      : await resolveBrandScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)
