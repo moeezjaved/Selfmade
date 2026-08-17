@@ -524,6 +524,11 @@ function M4Inner() {
       } else{
         toast.success('LAUNCHED in '+data.account+'! Broad '+data.broad_adsets+' · Interest '+data.interest_adsets+' · Retargeting '+(data.retargeting_adsets||0)+(includeRetainer?' · Retainer '+(data.retainer_adsets||0):'')+'. All PAUSED — activate in Meta Ads Manager.',{duration:9000})
         if(data.note) await alertMessage({ title: 'Launched as a Traffic campaign', body: data.note, confirmLabel: 'Got it' })
+        // PARTIAL launch: broad/interest went live but a campaign (e.g. Retargeting) was refused — say so
+        // with the REAL reason instead of letting it silently vanish from the launch summary.
+        if(data.errors?.length){
+          await alertMessage({ title: 'Launched, but part of it was skipped', body: 'Some campaigns went live, but these didn’t:\n\n'+data.errors.join('\n\n'), confirmLabel: 'OK' })
+        }
         try { sessionStorage.removeItem(DRAFT_KEY) } catch {}   // launched → clear the draft so the next campaign starts fresh
         goTo('grades')
       }
