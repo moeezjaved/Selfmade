@@ -159,6 +159,16 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
   const [castErrMap, setCastErrMap] = useState<Record<string, string>>({})
   useEffect(() => { if (Array.isArray(board?.cast)) setCastList(board!.cast!) }, [board?.cast])
   const setMemberSheet = (id: string, sheet: string | null) => setCastList((prev) => prev.map((m) => m.id === id ? { ...m, sheet } : m))
+  // Which cast letter a shot features (mirror of the server parse; unlabelled → the lead "A").
+  const sceneLetterOf = (a?: string) => { const m = String(a || '').match(/\b(?:person|man|woman|guy|girl|male|female|lady|dude)\s+([A-E])\b/i) || String(a || '').match(/\b([B-E])\b/); return m ? m[1].toUpperCase() : 'A' }
+  // After a person is (re)drawn, re-lock their scenes to the new sheet: clear the AI keyframes of the
+  // scenes featuring that letter and redraw them (they now reference cast_sheets[letter]). Keeps uploads.
+  const relockScenesFor = (id: string) => {
+    const affected = scenes.filter((s) => s.preview_source !== 'user' && sceneLetterOf(s.action || s.scriptLine) === id)
+    if (!affected.length) return
+    setScenes((prev) => prev.map((s) => affected.some((a) => a.index === s.index) ? { ...s, preview: null, preview_source: null } : s))
+    affected.forEach((s) => { genKeyframe({ ...s, preview: null }) })
+  }
   const drawCastMember = async (id: string, look: string) => {
     if (!board?.editable || castBusyMap[id]) return
     setCastBusyMap((m) => ({ ...m, [id]: true })); setCastErrMap((e) => ({ ...e, [id]: '' }))
@@ -167,7 +177,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jobId: board.jobId, castOp: true, castLetter: id, look }),
       }).then((x) => x.json()).catch(() => ({ error: 'network' }))
-      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet) }
+      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet); relockScenesFor(id) }
       else setCastErrMap((e) => ({ ...e, [id]: r?.error || 'Could not draw — try again' }))
     } catch { setCastErrMap((e) => ({ ...e, [id]: 'Could not draw — try again' })) }
     finally { setCastBusyMap((m) => ({ ...m, [id]: false })) }
@@ -184,7 +194,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ jobId: board.jobId, castOp: true, castLetter: id, uploadedKey: pre.key }),
       }).then((x) => x.json()).catch(() => ({ error: 'network' }))
-      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet) }
+      if (r?.sheet) { setMemberSheet(id, r.sheet); if (id === 'A') setCast(r.sheet); relockScenesFor(id) }
       else throw new Error(r?.error || 'Could not save the image')
     } catch (e: any) { setCastErrMap((er) => ({ ...er, [id]: /image|jp|png|type/i.test(String(e?.message)) ? 'Use a JPG or PNG image' : (e?.message || 'Upload failed') })) }
     finally { setCastBusyMap((m) => ({ ...m, [id]: false })) }
