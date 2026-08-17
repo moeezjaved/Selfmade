@@ -54,6 +54,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }))
   const follows = followsRes.data || []
 
+  // "Last active" — auth.last_sign_in_at only updates on a FRESH sign-in, so a user with a long-lived
+  // session shows a stale "last login" while creating things daily. Derive real activity from the most
+  // recent thing they actually did (newest creative / campaign / follow / error) OR their last sign-in.
+  const lastActiveAt = [
+    creatives[0]?.created_at,
+    campaigns[0]?.created_at,
+    follows[0]?.created_at,
+    (errorsRes.data || [])[0]?.created_at,
+    authUser?.last_sign_in_at,
+  ].filter(Boolean).sort().pop() || null
+
   return NextResponse.json({
     id: userId,
     email: authUser?.email || '',
@@ -63,6 +74,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     plan_label: planLabel,   // human label (e.g. 'Creator') — the true plan, for the admin "Plan" row
     created_at: profile?.created_at || authUser?.created_at,
     last_sign_in_at: authUser?.last_sign_in_at || null,
+    last_active_at: lastActiveAt,
     business_type: profile?.business_type || '',
     niche: profile?.niche || '',
     experience_level: profile?.experience_level || '',
