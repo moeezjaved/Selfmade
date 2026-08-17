@@ -72,11 +72,12 @@ export async function GET(request: NextRequest) {
     const px = (raw: any) => {
       const spend = parseFloat(raw?.spend || '0')
       const conv = parseInt(raw?.actions?.find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0')
-      // Revenue (purchase conversion value) → ROAS. Already fetched via action_values; just wasn't
-      // surfaced. This is the number that tells a founder a campaign is worth scaling.
-      const revenue = (raw?.action_values || [])
-        .filter((a: any) => /purchase/.test(a.action_type))
-        .reduce((s: number, a: any) => s + parseFloat(a.value || '0'), 0)
+      // Revenue → ROAS. Meta reports the SAME purchase value under several action types
+      // (offsite_conversion.fb_pixel_purchase, omni_purchase, onsite_web_purchase, purchase, …), so
+      // summing everything matching /purchase/ multi-counts it ~5-6× — that's how ROAS showed 15x when
+      // the account is really ~2.6x. Use the SINGLE canonical pixel-purchase value, identical to
+      // /api/reports, so Campaigns and Reports always agree.
+      const revenue = parseFloat((raw?.action_values || []).find((a: any) => a.action_type === 'offsite_conversion.fb_pixel_purchase')?.value || '0')
       return {
         spend,
         conversions: conv,
