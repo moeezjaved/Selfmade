@@ -196,7 +196,13 @@ export async function POST(request: NextRequest) {
     // account's token → Meta "Object … does not exist / missing permissions".
     // Fall back to primary only when no account_id is given (legacy callers).
     const bodyAccountId = body.account_id ? String(body.account_id).replace(/^act_/, '') : null
-    const metaAccount = await resolveScopedAccount(admin, user.id, bodyAccountId)
+    // No explicit account_id (the Campaigns page's toggle/budget/edit calls) → use the ACTIVE BRAND's
+    // account, exactly like GET. Falling back to the org PRIMARY here pushed a listed campaign's id
+    // through a DIFFERENT account's token → "Object does not exist / missing permissions" for any
+    // multi-brand founder whose active brand isn't the primary.
+    const metaAccount = bodyAccountId
+      ? await resolveScopedAccount(admin, user.id, bodyAccountId)
+      : await resolveBrandScopedAccount(admin, user.id)
     if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
     const token = decryptToken(metaAccount.access_token)

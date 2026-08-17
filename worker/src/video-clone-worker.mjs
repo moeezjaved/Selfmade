@@ -663,10 +663,18 @@ function segmentPrompt(plan, seg, i, total, hasAnchor, nImages, lang, opts = {})
     pf.push('UGC realism: iPhone selfie framing at arm\'s length, natural light, authentic handheld, no on-screen captions.')
     return pf.filter(Boolean).join(' ')
   }
-  const productRef = hasAnchor
-    ? (nImages ? `[Image2]${nImages > 1 ? `–[Image${nImages + 1}]` : ''}` : 'the product')
-    : (nImages ? `[Image1]${nImages > 1 ? `–[Image${nImages}]` : ''}` : 'the product')
+  // Product images sit AFTER any leading non-product refs. leadRefs = how many refs precede the product
+  // photos (the old face anchor was 1; storyboard-first can prepend an approved keyframe AND a hero
+  // character sheet → 2). Getting this offset right is what makes "the product is [ImageN]" point at
+  // the actual product photos instead of a person keyframe (which mis-anchored size + product truth).
+  const lead = Number.isFinite(opts.leadRefs) ? opts.leadRefs : (hasAnchor ? 1 : 0)
+  const first = lead + 1
+  const productRef = nImages ? `[Image${first}]${nImages > 1 ? `–[Image${first + nImages - 1}]` : ''}` : 'the product'
   const parts = [plan.character]
+  // Storyboard-first: tell Seedance what the leading refs ARE, so it uses them as intended.
+  if (opts.leadKeyframe && opts.leadHero) parts.push(`[Image1] is the APPROVED first frame of this exact scene — match its framing, subject placement, product placement and mood. [Image2] is this ad's LOCKED creator (character reference sheet) — the on-camera person is EXACTLY this person: same face, hair, skin tone, build and outfit.`)
+  else if (opts.leadKeyframe) parts.push(`[Image1] is the APPROVED first frame of this exact scene — match its framing, subject placement, product placement and mood.`)
+  else if (opts.leadHero) parts.push(`[Image1] is this ad's LOCKED creator (character reference sheet) — the on-camera person is EXACTLY this person: same face, hair, skin tone, build and outfit.`)
   // CREATOR LOCK (segment re-shoot): an exact appearance captured from a KEPT part of THIS video, so
   // a re-rolled segment keeps the SAME person instead of a new random face. Overrides drift.
   if (creatorLock) parts.push(`CRITICAL — SAME PERSON: the on-camera creator MUST look EXACTLY like this (they already appear in the rest of this video): ${creatorLock}. Match the face, age, skin tone, hair and outfit precisely — do NOT change the person.`)
@@ -1207,7 +1215,7 @@ async function falQueueRun(model, input, iters = 200) {
 // mis-rendered product) instead of re-rolling the whole segment. We feed the clip + the real product
 // photo + a scoped instruction; 2.5 re-renders only what's asked and leaves the rest of the clip
 // (person, motion, camera, audio) untouched. We only pay for THIS segment's seconds, not the full ad.
-// Gated by VIDEO_FIX_ENGINE=seedance25; the endpoint is env-configurable (SEEDANCE_EDIT_MODEL) so a
+// DEFAULT-ON (set VIDEO_FIX_ENGINE=off to disable); the endpoint is env-configurable (SEEDANCE_EDIT_MODEL) so a
 // wrong model id is a config fix, never a code deploy. Returns the fixed clip URL, or null. ──
 async function seedanceEditSegment({ clipUrl, instruction, productImg, aspect }) {
   const model = process.env.SEEDANCE_EDIT_MODEL || 'fal-ai/bytedance/seedance-2.5/edit'
@@ -1754,7 +1762,7 @@ Return ONLY minified JSON: {"overlays":[{"t":"","text":""}]}.`
 // ── PHASE A: analyse the competitor video + draft a script → status='review' (awaits approval) ──
 async function analyzeJob(job) {
   const meta = job.clone_meta || {}
-  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
+  const isService = meta.product_type === 'service' || meta.product_type === 'app'   // service OR app → no physical product; UNDEFINED (pre-2026-07-18 jobs) stays physical
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   try {
     let beat = null
@@ -1790,7 +1798,23 @@ async function analyzeJob(job) {
         if (hit) { cachedA = hit.clone_meta; console.log(`♻️ ${job.id} reusing analysis (scenes=${cachedA.scene_count}, suggest=${cachedA.suggested_mode})`) }
       } catch (e) { console.warn('analysis-cache lookup:', e.message) }
     }
-    if (cachedA) beat = cachedA.beat_sheet
+    if (cachedA) {
+      // Adopt ONLY the source-STRUCTURE from a cached analysis (setting, camera, beats' timing/actions/
+      // source thumbs, hook, scene count). Strip every BRAND-SPECIFIC field another job's Storyboard wrote
+      // onto the beats — preview / preview_source / shot_prompt / approved. The cache is keyed only by
+      // source_video_url, so those previews show ANOTHER user's product/creator; the approvedKf path
+      // feeds beats[i].preview straight into Seedance as the lead reference, which would render user
+      // B's video from user A's approved frame. Transcript is also dropped (re-transcribed below).
+      const src = cachedA.beat_sheet || {}
+      beat = {
+        ...src,
+        transcript: '',
+        beats: (Array.isArray(src.beats) ? src.beats : []).map((b) => {
+          const { preview, preview_source, shot_prompt, approved, ...structural } = b || {}
+          return structural
+        }),
+      }
+    }
     else if (job.source_video_url) { try { beat = await analyzeVideo(job.source_video_url) } catch (e) { console.warn('analyze:', e.message) } }
     // NEVER leave beat null. When Gemini analysis fails/returns nothing (quota, oversized source, a
     // transient error), a null beat made storyboardFrames early-return → the storyboard had ZERO real
@@ -1930,7 +1954,7 @@ async function analyzeJob(job) {
 // ── PHASE B: user approved → generate the video with the APPROVED script → status='done' ──
 async function generateJob(job) {
   const meta = job.clone_meta || {}
-  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
+  const isService = meta.product_type === 'service' || meta.product_type === 'app'   // service OR app → no physical product; UNDEFINED (pre-2026-07-18 jobs) stays physical
   const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
@@ -2353,9 +2377,7 @@ async function generateJob(job) {
           }
           // Product-free once Seedance has proven it can't render this product (see productBroken).
           const productFree = !isService && productBroken
-          const prompt = productFree
-            ? segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, 0, meta.language, { productFree: true })
-            : segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, productImages.length, meta.language, { sizeAnchor: meta.product_details && meta.product_details.size_anchor })
+          // (prompt is built AFTER the reference list below, so its [ImageN] product indices are correct)
           // COST FIX: we USED to pass the previous clip's last frame (the creator's face) as an anchor for
           // cross-cut continuity. But that face frame reliably trips fal's likeness filter at RESULT time —
           // and fal CHARGES for the rejected clip — after which we fell back to product-only anyway. So a
@@ -2368,7 +2390,18 @@ async function generateJob(job) {
           // beat_sheet.beats[i].preview — AI-generated OR their own uploaded asset), lead the reference set
           // with it so Seedance 2.5 renders the video the user already signed off on. Falls back to product
           // photos via the moderation ladder below, so a blocked/absent keyframe never kills the segment.
-          const approvedKf = !productFree && meta.beat_sheet?.beats?.[i]?.preview ? meta.beat_sheet.beats[i].preview : null
+          // SCENE→SEGMENT MAP: the storyboard shows N scene cards (up to ~10-16) but long-form UGC renders
+          // nSeg segments (1/2/4). beats[i] with i = SEGMENT index silently used the wrong scene's frame
+          // (segment 1 got scene 2's still, and a frame the founder uploaded for scene 8 was never used).
+          // Map each segment onto its proportional slice of the scenes and take the FIRST frame in that
+          // slice, preferring a USER-uploaded one — so what you approved is what renders.
+          const kfBeats = Array.isArray(meta.beat_sheet?.beats) ? meta.beat_sheet.beats : []
+          const nSegTotal = Math.max(1, plan.segments.length)
+          const sliceFrom = Math.floor((i * kfBeats.length) / nSegTotal)
+          const sliceTo = Math.max(sliceFrom + 1, Math.floor(((i + 1) * kfBeats.length) / nSegTotal))
+          const slice = kfBeats.slice(sliceFrom, sliceTo)
+          const kfBeat = slice.find((b) => b?.preview && b?.preview_source === 'user') || slice.find((b) => b?.preview) || null
+          const approvedKf = !productFree && kfBeat?.preview ? kfBeat.preview : null
           // HERO CHARACTER SHEET (Higgsfield method): the locked, SYNTHETIC identity sheet minted at
           // storyboard time. Feeding it into every segment is what keeps ONE person across a whole
           // multi-location montage instead of a new face per cut. It's a fictional person (never a real
@@ -2380,7 +2413,18 @@ async function generateJob(job) {
             : heroSheet ? [heroSheet, ...falProductImages].slice(0, 9)
             : useAnchor ? [anchor, ...falProductImages].slice(0, 9)
             : falProductImages
-          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${productFree ? ' (product-free)' : useAnchor ? ' (anchored)' : ''}`)
+          // How many NON-product refs lead the list — the prompt's "the product is [ImageN]" must skip
+          // them, or Seedance size-anchors/product-truths against a person keyframe (→ mismatches → paid
+          // re-rolls). The old anchor path used hasAnchor=true; storyboard-first passes leadRefs directly.
+          const leadRefs = productFree ? 0 : (approvedKf ? 1 : 0) + (heroSheet ? 1 : 0) + (!approvedKf && !heroSheet && useAnchor ? 1 : 0)
+          const nProd = productFree ? 0 : Math.min(falProductImages.length, Math.max(0, 9 - leadRefs))
+          const prompt = productFree
+            ? segmentPrompt(plan, plan.segments[i], i, plan.segments.length, false, 0, meta.language, { productFree: true })
+            : segmentPrompt(plan, plan.segments[i], i, plan.segments.length, !approvedKf && !heroSheet && useAnchor, nProd, meta.language, {
+                sizeAnchor: meta.product_details && meta.product_details.size_anchor,
+                leadRefs, leadKeyframe: !!approvedKf, leadHero: !!heroSheet,
+              })
+          console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${productFree ? ' (product-free)' : approvedKf ? ' (storyboard kf)' : useAnchor ? ' (anchored)' : ''}${heroSheet && !productFree ? ' +hero' : ''}`)
           const segDur = segDurs[i]
           // Default (native voice): generateAudio TRUE → Seedance speaks + lip-syncs the segment itself.
           // Overlay mode (meta.tts_overlay): FALSE → silent clip, one continuous voice added after concat.
@@ -2427,14 +2471,22 @@ async function generateJob(job) {
                   instruction: `Within this clip, replace the product the person holds/shows with the EXACT product in the reference image${prodDesc ? ` (${prodDesc})` : ''} — same container type, closure, colour and label. Change NOTHING else: keep the same person, motion, camera, lighting and audio.` })
                 if (editUrl) {
                   falCost += clipCost(meta.tier, segDur, false)
-                  // Overwrite f's file with the edit and verify it. If it clears, we keep it; if not,
-                  // verdict stays 'mismatch' → the existing re-roll below regenerates f from scratch,
-                  // so overwriting here is safe either way (const f is fine — we write the file, not the var).
-                  await rm(f, { force: true }).catch(() => {})
-                  await downloadToFile(editUrl, f)
-                  const ev = await verifySegmentProduct(f, prodRef, prodDesc, `${job.id}-e`, i)
-                  if (ev === 'match') { videoUrl = editUrl; verdict = 'match'; console.log(`✓ ${job.id} seg ${i + 1} fixed by 2.5-Edit — skipped the re-roll`) }
-                  else console.warn(`2.5-Edit didn't clear seg ${i + 1} — falling to re-roll`)
+                  // Verify the edit in a SEPARATE file — never touch the original clip until it clears.
+                  // (Overwriting f first was wrong: if the edit failed verification AND the re-roll was
+                  // then skipped — fal cap hit / re-roll threw — the disk held an UNVERIFIED edited clip
+                  // while videoUrl/segClips still recorded the original → shipped the wrong file.)
+                  const ef = `${base}-${i}-edit.mp4`
+                  await downloadToFile(editUrl, ef)
+                  const ev = await verifySegmentProduct(ef, prodRef, prodDesc, `${job.id}-e`, i)
+                  if (ev === 'match') {
+                    await rm(f, { force: true }).catch(() => {})
+                    await downloadToFile(editUrl, f)   // adopt: f now IS the verified edit
+                    await rm(ef, { force: true }).catch(() => {})
+                    videoUrl = editUrl; verdict = 'match'; console.log(`✓ ${job.id} seg ${i + 1} fixed by 2.5-Edit — skipped the re-roll`)
+                  } else {
+                    await rm(ef, { force: true }).catch(() => {})   // discard; original f untouched
+                    console.warn(`2.5-Edit didn't clear seg ${i + 1} — falling to re-roll`)
+                  }
                 }
               } catch (e) { console.warn(`2.5-Edit seg ${i + 1} failed (${e.message}) — falling to re-roll`) }
             }
@@ -2606,16 +2658,30 @@ async function generateJob(job) {
     //   1. clean product + motion-ref video   2. clean product only   3. ORIGINAL uploaded photo
     //   4. pure prompt (no refs — product from the description only).
     const blockedUgc = (e) => e.code === 'content_policy_images' || e.code === 'content_policy_video' || /content_policy_violation|likeness|real people/i.test(String(e.message))
+    // STORYBOARD-FIRST for the single take too: the founder approved scene 1's frame + a locked hero
+    // sheet on the storyboard, but this path used to ignore both. Lead with them as rung 0 when present.
+    // The prompt's product index shifts past the leading refs; the ladder falls back to the tuned
+    // product-only rungs (original prompt, untouched) on any moderation block.
+    const sbKf0 = !isService && meta.beat_sheet?.beats?.find?.((b) => b?.preview && b?.preview_source === 'user')?.preview
+      || (!isService && meta.beat_sheet?.beats?.[0]?.preview) || null
+    const sbHero = !isService && meta.cast_sheet ? meta.cast_sheet : null
+    const sbLead = [sbKf0, sbHero].filter(Boolean)
+    const sbLeadLine = sbLead.length
+      ? `${sbKf0 ? '[Image1] is the APPROVED first frame of this ad — match its framing, subject placement, product placement and mood. ' : ''}${sbHero ? `[Image${sbKf0 ? 2 : 1}] is this ad's LOCKED creator (character reference sheet) — the on-camera person is EXACTLY this person: same face, hair, skin tone, build and outfit. ` : ''}The user's product photos follow as [Image${sbLead.length + 1}]${falProductImages.length > 1 ? `–[Image${sbLead.length + falProductImages.length}]` : ''}. `
+      : ''
     const rungs = [
+      ...(sbLead.length ? [{ imageUrls: [...sbLead, ...falProductImages].slice(0, 9), videoUrl: refVideo || null, tag: 'storyboard+hero', promptPrefix: sbLeadLine }] : []),
       { imageUrls: falProductImages, videoUrl: refVideo || null, tag: 'clean+motion' },
       { imageUrls: falProductImages, videoUrl: null, tag: 'clean product' },
       { imageUrls: productImages.slice(0, 1), videoUrl: null, tag: 'original photo' },
       { imageUrls: [], videoUrl: null, tag: 'pure prompt' },
-    ].filter((r, i) => i === 0 || r.imageUrls.length || i === 3)   // skip empty-image middle rungs
+    ].filter((r, i, arr) => r.imageUrls.length || i === arr.length - 1 || r.tag === 'clean+motion')   // skip empty-image middle rungs
     let videoUrl, requestId
     for (let ri = 0; ri < rungs.length; ri++) {
       try {
-        ({ videoUrl, requestId } = await falGenerate({ ...genArgs, imageUrls: rungs[ri].imageUrls, videoUrl: rungs[ri].videoUrl }))
+        // A storyboard rung prefixes the tuned prompt with what the leading refs ARE (approved frame /
+        // locked creator) and shifts the product index; the product-only rungs use the prompt untouched.
+        ({ videoUrl, requestId } = await falGenerate({ ...genArgs, prompt: rungs[ri].promptPrefix ? `${rungs[ri].promptPrefix}${genArgs.prompt}` : genArgs.prompt, imageUrls: rungs[ri].imageUrls, videoUrl: rungs[ri].videoUrl }))
         if (ri > 0) console.warn(`ugc ${job.id}: landed on rung "${rungs[ri].tag}"`)
         break
       } catch (e) {
@@ -2765,7 +2831,7 @@ const CHIP_FIX = {
 async function tweakJob(job) {
   const meta = job.clone_meta || {}
   const t = meta.tweak || {}
-  const isService = meta.product_type !== 'physical'   // service OR app brand → no physical product path
+  const isService = meta.product_type === 'service' || meta.product_type === 'app'   // service OR app → no physical product; UNDEFINED (pre-2026-07-18 jobs) stays physical
   const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
   const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0), at: Date.now() } } }).catch(() => {})   // `at` = heartbeat, lets a watchdog spot stalls
   // Restore the row to its previous DONE state (original video intact) + refund the tweak tx.

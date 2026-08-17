@@ -80,14 +80,16 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
   const [zoom, setZoom] = useState<string | null>(null)   // enlarged keyframe (click a thumbnail)
   // Generate (or regenerate) a keyframe for one scene — a cheap image preview of what THIS scene will
   // look like with your product/creator, BEFORE paying video prices. The worker animates it on approve.
-  const genKeyframe = async (s: Scene) => {
+  const genKeyframe = async (s: Scene, opts: { force?: boolean } = {}) => {
     if (!board?.editable || busy[s.index]) return
     setBusy((b) => ({ ...b, [s.index]: true })); setGenErr((e) => ({ ...e, [s.index]: '' }))
     // One call, with a single retry when the image model is momentarily busy (Gemini congestion) — a
     // transient blip shouldn't leave a permanent hole in the storyboard the way it used to.
     const once = () => fetch('/api/discovery/clone-video/keyframe', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action, scriptLine: s.scriptLine }),
+      // opts.force = a DELIBERATE click on Regenerate — allowed to replace a user-uploaded frame. The
+      // auto-gen loop never passes it, so uploads can't be trashed implicitly.
+      body: JSON.stringify({ jobId: board.jobId, sceneIndex: s.index, action: s.action, scriptLine: s.scriptLine, ...(opts.force ? { force: true } : {}) }),
     }).then((x) => x.json()).catch(() => ({ error: 'network' }))
     try {
       let r = await once()
@@ -157,7 +159,10 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     // Regenerate a scene if it has NO preview, OR a STALE one — a keyframe URL that belongs to a
     // different job (the beats can carry a previous analysis's previews, which is how old-run women
     // kept showing). A fresh keyframe for THIS job uses the reference frame + gender lock.
-    const stale = (s: Scene) => !s.preview || (!!board?.jobId && !s.preview.includes(board.jobId))
+    // A USER-uploaded frame is never stale — it lives at an assets URL with no jobId in it, and the
+    // founder chose it. Without this guard the auto-gen loop regenerated over uploads and the AI path
+    // overwrote them in the DB.
+    const stale = (s: Scene) => s.preview_source !== 'user' && (!s.preview || (!!board?.jobId && !s.preview.includes(board.jobId)))
     // Fill the whole board fast: do the FIRST scene alone (it mints the shared cast sheet so every
     // other scene locks to the same presenter), then generate the rest with light concurrency (2 at a
     // time) so a 5-scene storyboard appears in ~two waves instead of five slow serial renders. Previews
@@ -293,7 +298,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
                 {busy[s.index] && <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#3a7d2c', fontWeight: 700 }}>…</div>}
               </div>
               {board.editable && (
-                <button onClick={() => genKeyframe(s)} disabled={busy[s.index]} style={{ width: 96, marginTop: 5, fontSize: 10.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 6, padding: '4px 0', cursor: busy[s.index] ? 'default' : 'pointer' }}>
+                <button onClick={() => genKeyframe(s, { force: true })} disabled={busy[s.index]} style={{ width: 96, marginTop: 5, fontSize: 10.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 6, padding: '4px 0', cursor: busy[s.index] ? 'default' : 'pointer' }}>
                   {busy[s.index] ? 'Generating…' : s.preview ? 'Regenerate' : 'Preview scene'}
                 </button>
               )}

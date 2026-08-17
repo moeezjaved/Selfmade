@@ -238,11 +238,11 @@ function M4Inner() {
         if (Array.isArray(d.retargetingCreatives)) setRetargetingCreatives(d.retargetingCreatives.filter((c: any) => c.hash))
         if (Array.isArray(d.retainerCreatives)) setRetainerCreatives(d.retainerCreatives.filter((c: any) => c.hash))
         if (Array.isArray(d.interests)) setInterests(d.interests)
-        // Restore the step so a refresh mid-wizard resumes — but NEVER into 'grades' (or 'review', which
-        // holds a launched campaign). After a launch the autosave re-saved step:'grades', so every later
-        // visit to /m4 reopened on the grades screen and the campaign creator was permanently hidden.
-        // A terminal step means the wizard is done: start the next campaign fresh from 'welcome'.
-        if (d.step && d.step !== 'grades' && d.step !== 'review') setStep(d.step)
+        // Restore the step so a refresh mid-wizard resumes — but NEVER into 'grades' (the only TERMINAL
+        // step; 'review' is the PRE-launch confirm screen and must resume, e.g. after an upgrade round-trip).
+        // After a launch the autosave re-saved step:'grades', so every later visit to /m4 reopened on the
+        // grades screen and the campaign creator was permanently hidden. Finished → start fresh.
+        if (d.step && d.step !== 'grades') setStep(d.step)
       }
     } catch { /* corrupt draft — ignore */ }
     restored.current = true

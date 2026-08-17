@@ -110,7 +110,8 @@ export async function POST(req: NextRequest) {
     product_type: ['physical', 'service', 'app'].includes(body.productType) ? body.productType : 'physical',
     // Optional user-uploaded screen recording (R2 key from the presigned Assets upload) → shown in the
     // split-screen top half as MOVING UI. Resolved server-side to a public URL; ignored for physical.
-    screencast_url: (body.productType === 'service' && typeof body.screencastKey === 'string' && body.screencastKey.trim())
+    // Screencast applies to any NON-physical brand — 'app' most of all (it IS the app-demo source).
+    screencast_url: ((body.productType === 'service' || body.productType === 'app') && typeof body.screencastKey === 'string' && body.screencastKey.trim())
       ? r2PublicUrl(body.screencastKey.trim()) : null,
   }
 
