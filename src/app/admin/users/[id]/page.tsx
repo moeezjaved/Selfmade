@@ -9,6 +9,8 @@ interface UserDetail {
   ad_plan_clicked: boolean; campaign_launched: boolean; scale_clicked: boolean;
   campaigns_count: number;
   campaigns: { id: string; name: string; status: string; created_at: string }[];
+  brands_count?: number;
+  brands_created?: { id: string; name: string; brand_type: string | null; created_at: string | null }[];
   errors: { id: string; error_message: string; page_url: string | null; created_at: string }[];
   follows: { page_id: string; brand_name: string | null; email_alerts: boolean; created_at: string }[];
   creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
@@ -218,6 +220,7 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           <Row label="Launched Campaign" value={<Check yes={user.campaign_launched} />} />
           <Row label="Clicked Scale" value={<Check yes={user.scale_clicked} />} />
           <Row label="Campaigns Created" value={user.campaigns_count} />
+          <Row label="Brands Created" value={user.brands_count ?? 0} />
         </Section>
       </div>
 
@@ -244,6 +247,21 @@ export default function UserProfile({ params }: { params: { id: string } }) {
               ))}
             </tbody>
           </table>
+        </Section>
+      )}
+
+      {/* Brands the user CREATED (their own projects) — distinct from the competitor brands they follow. */}
+      {(user.brands_created?.length ?? 0) > 0 && (
+        <Section title={`Brands Created (${user.brands_created!.length})`}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {user.brands_created!.map(b => (
+              <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '7px 12px', background: '#f7f9f7', border: '1px solid #e5e9e5', borderRadius: '20px', fontSize: '13px', color: '#222' }}>
+                <span style={{ fontWeight: 600 }}>{b.name || b.id}</span>
+                {b.brand_type && <span style={{ fontSize: '11px', color: '#888' }}>{b.brand_type}</span>}
+                {b.created_at && <span style={{ fontSize: '11px', color: '#aaa' }}>{fmt(b.created_at)}</span>}
+              </div>
+            ))}
+          </div>
         </Section>
       )}
 

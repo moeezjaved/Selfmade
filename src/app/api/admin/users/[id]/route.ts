@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     // Brands this user follows (spy/alerts) + their AI creatives.
     admin.from('followed_brands').select('page_id, brand_name, email_alerts, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
     admin.from('creative_generations').select('id, type, tier, media_type, status, prompt, image_url, brand_id, source_ad_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
-    admin.from('brands').select('id, name').eq('user_id', userId),
+    admin.from('brands').select('id, name, created_at, brand_type').eq('user_id', userId).order('created_at', { ascending: false }),
     // Did they engage the M4 launch flow at all (even a failed attempt)? Newly tracked as an activity.
     admin.from('activity_logs').select('id').eq('user_id', userId).ilike('action_type', 'M4%').limit(1),
   ])
@@ -85,6 +85,9 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     scale_clicked: scaleClicked,
     campaigns_count: campaigns.length,
     campaigns,
+    // Brands (projects) this user created — count + list for the admin.
+    brands_count: (brandsRes.data || []).length,
+    brands_created: (brandsRes.data || []).map((b: any) => ({ id: b.id, name: b.name, brand_type: b.brand_type || null, created_at: b.created_at || null })),
     errors: errorsRes.data || [],
     follows,
     creatives,
