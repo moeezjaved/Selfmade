@@ -504,6 +504,14 @@ Return ONLY minified JSON: {"prompt":"","script":""${nonEn ? ',"gloss":""' : ''}
 // would NOT be a clone. We suggest faithful scene-by-scene cloning instead (user still chooses).
 function detectCinematic(beat) {
   if (!beat) return false
+  // STRUCTURAL GUARD (2026-08-17): a multi-location MONTAGE with a narrator (the Füm ad — one hero
+  // across ~10 real locations + product macros + end card) got is_talking_head=true from Gemini because
+  // a person speaks — but a talking-head clone would collapse the whole montage into one static
+  // creator, which is NOT a clone. Many hard cuts + long runtime = cinematic, whatever Gemini said.
+  // A real talking head is one continuous take (or a couple of cuts), never a 6+ scene montage.
+  const cutCount = Math.round(Number(beat.scene_count) || 0)
+  const secs = Number(beat.duration_seconds) || 0
+  if (cutCount >= 6 || (cutCount >= 4 && secs >= 40)) return true
   // Gemini watched the video — trust its explicit call (a VO-over-b-roll ad has a long transcript
   // but is NOT a talking head; the heuristic below can't tell those apart).
   if (typeof beat.is_talking_head === 'boolean') return !beat.is_talking_head
@@ -2361,8 +2369,15 @@ async function generateJob(job) {
           // with it so Seedance 2.5 renders the video the user already signed off on. Falls back to product
           // photos via the moderation ladder below, so a blocked/absent keyframe never kills the segment.
           const approvedKf = !productFree && meta.beat_sheet?.beats?.[i]?.preview ? meta.beat_sheet.beats[i].preview : null
+          // HERO CHARACTER SHEET (Higgsfield method): the locked, SYNTHETIC identity sheet minted at
+          // storyboard time. Feeding it into every segment is what keeps ONE person across a whole
+          // multi-location montage instead of a new face per cut. It's a fictional person (never a real
+          // face), so it passes fal's likeness filter — unlike the old real-frame anchor. Also fed to 2.5
+          // via the ladder so a blocked/absent sheet never kills the segment.
+          const heroSheet = !productFree && meta.cast_sheet ? meta.cast_sheet : null
           const imgs = productFree ? []
-            : approvedKf ? [approvedKf, ...falProductImages].slice(0, 9)
+            : approvedKf ? [approvedKf, ...(heroSheet ? [heroSheet] : []), ...falProductImages].slice(0, 9)
+            : heroSheet ? [heroSheet, ...falProductImages].slice(0, 9)
             : useAnchor ? [anchor, ...falProductImages].slice(0, 9)
             : falProductImages
           console.log(`🎞 ${job.id} segment ${i + 1}/${plan.segments.length}${productFree ? ' (product-free)' : useAnchor ? ' (anchored)' : ''}`)
@@ -2374,7 +2389,7 @@ async function generateJob(job) {
           const segBlocked = (x) => x.code === 'content_policy_images' || x.code === 'content_policy_video'
           // Ladder: (anchor+products if enabled →) products only → PURE PROMPT. A segment must never kill
           // the whole long-form render on a moderation block (same contract as faithful mode).
-          const rungs = productFree ? [[]] : [imgs, ...((approvedKf || useAnchor) ? [falProductImages] : []), []]
+          const rungs = productFree ? [[]] : [imgs, ...((approvedKf || heroSheet || useAnchor) ? [falProductImages] : []), []]
           for (let ri = 0; ri < rungs.length; ri++) {
             try { ({ videoUrl } = await falGenerate({ prompt, imageUrls: rungs[ri], resolution: meta.resolution, duration: segDur, aspect: meta.aspect, tier: meta.tier, generateAudio: genAudio })); break }
             catch (e) {

@@ -333,19 +333,15 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* REVIEW — edit script + length, then render */}
       {phase === 'review' && (
         <div>
-          {/* UGC = one continuous take → a plain SCRIPT is the whole plan (no scene storyboard). Cinematic
-              = scene-by-scene, so it gets the visual storyboard with keyframes. */}
-          {style === 'cinematic'
-            ? <>
-                <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit any scene, preview it, reorder — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
-                {jobId
-                  ? <Storyboard jobId={jobId} embedded mode={style} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
-                  : <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />}
-              </>
-            : <>
-                <div style={label}>Your script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the creator says this — edit it freely{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
-                <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />
-              </>}
+          {/* STORYBOARD-FIRST for BOTH modes (2026-08-17). UGC used to show only a script textarea —
+              "just a script and a Generate button" — with zero visibility into what the video would look
+              like. Now that Seedance 2.5 feeds each scene's APPROVED keyframe into the UGC segment path,
+              the storyboard is the product: see every scene as a still, regenerate or upload your own frame,
+              edit the line — approve BEFORE paying. Falls back to the plain script only before a job exists. */}
+          <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· preview every scene, regenerate or upload your own frame, edit the line — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
+          {jobId
+            ? <Storyboard jobId={jobId} embedded mode={style} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
+            : <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
               Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}

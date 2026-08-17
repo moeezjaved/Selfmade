@@ -71,5 +71,9 @@ export async function GET(req: NextRequest) {
     scenes,
     onScreenText: Array.isArray(beat.on_screen_text) ? beat.on_screen_text : [],
     sourcePoster: meta.source_poster || null,
+    // The locked HERO CHARACTER SHEET (the recast creator, e.g. "Pakistani" when the source was American)
+    // — surfaced so the founder SEES who will be on camera and approves/regenerates BEFORE any video spend.
+    castSheet: meta.cast_sheet || null,
+    characterLook: meta.character_look || null,
   })
 }

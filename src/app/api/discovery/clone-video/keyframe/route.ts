@@ -121,7 +121,10 @@ export async function POST(req: NextRequest) {
     (!!avatar && !/^none/i.test(avatar)) || beat.is_talking_head === true || beat.is_talking_head === undefined
   )
   let castImg: { mimeType: string; dataB64: string } | null = null
-  let castUrl: string | null = meta.cast_sheet || null
+  // regenerateCast: the founder didn't like the locked creator (or changed the recast look) → mint a
+  // fresh hero sheet. Every later scene keyframe then re-locks to the new person.
+  const regenCast = b?.regenerateCast === true
+  let castUrl: string | null = regenCast ? null : (meta.cast_sheet || null)
   if (wantsPerson) {
     if (!castUrl) {
       // GENDER LOCK for the cast sheet: when the analysis gave us no avatar text, ground the cast's
@@ -137,13 +140,28 @@ export async function POST(req: NextRequest) {
           : castRefs.length
             ? 'MATCH the GENDER, apparent age, ethnicity and build of the person in the attached reference photo (Image 1) — but give them a COMPLETELY NEW, different face (a fictional person, never the real one). Same kind of person, brand-new identity. Do NOT change a man to a woman or vice-versa.'
             : 'A natural, relatable, real-looking person (any gender) suited to this ad.',
-        'Waist-up, relaxed and friendly, looking toward the camera, soft natural indoor light, simple neutral background. This is a CHARACTER REFERENCE — clean, sharp and clear so the exact same person can be recreated in later shots.',
-        'NO text, NO logos, NO product in frame, NO borders.',
+        // HERO CHARACTER SHEET (Higgsfield method): the sheet that lets ONE person hold across a whole
+        // multi-location montage. Two panels of the SAME person — a tight face close-up (locks the face)
+        // and a full-body front view (locks the build + wardrobe) — matched lighting/scale, plain grey
+        // background so nothing competes with the character. CRITICAL: exactly ONE visible face in the
+        // whole image — a second face in frame makes the video model drift between identities.
+        'Compose it as a CHARACTER REFERENCE SHEET, split-frame, photorealistic: LEFT panel — a tight facial close-up, the entire head fully in frame including all the hair, calm neutral expression, looking straight into the lens, real skin texture and pores, soft cinematic key light with gentle fill. RIGHT panel — the SAME person, full-body front view, head-to-toe, standing straight in a relaxed pose, arms at their sides, same wardrobe, even full-length lighting.',
+        'Both panels are the identical person: same face, hair, skin tone, build and outfit. Plain solid neutral-grey seamless background, matched framing and scale, a thin vertical divider between the panels. EXACTLY ONE face visible in the entire image (the close-up) — the full-body figure must not show a second detailed face turned to camera; keep its face small/soft or angled so there is only one face to lock onto.',
+        'This is a locked reference — clean, sharp and clear so the exact same person can be recreated identically in every later shot. NO text, NO logos, NO product in frame, NO borders.',
       ].filter(Boolean).join(' ')
       const castGen = await generateImage(castPrompt, castRefs, 'pro', { aspectRatio: '9:16', imageSize: '1K' })
       if (castGen.ok) {
         const uploaded = await uploadBufferToR2(Buffer.from(castGen.dataB64, 'base64'), `creatives/cast/${jobId}.jpg`, castGen.mimeType)
         if (uploaded) {
+          if (regenCast) {
+            // Explicit regenerate: the NEW sheet wins. Persist it and clear every scene's stale keyframe
+            // (they were drawn against the old person) so the storyboard redraws with the new creator.
+            castUrl = uploaded
+            const cleared = beats.map((bt: any) => (bt && bt.preview_source !== 'user') ? { ...bt, preview: null, preview_source: null } : bt)
+            await admin.from('creative_generations').update({ clone_meta: { ...meta, cast_sheet: castUrl, beat_sheet: { ...beat, beats: cleared } } }).eq('id', jobId).eq('user_id', user.id)
+            meta.cast_sheet = castUrl
+            return NextResponse.json({ ok: true, castSheet: castUrl, regenerated: true })
+          }
           // Race guard: a parallel scene request may have minted the cast sheet first. Re-read and, if
           // one now exists, use THAT one so every scene locks to the SAME person (never two casts).
           const { data: fresh } = await admin.from('creative_generations').select('clone_meta').eq('id', jobId).maybeSingle()
@@ -151,6 +169,8 @@ export async function POST(req: NextRequest) {
           castUrl = freshCast || uploaded
           meta.cast_sheet = castUrl
         }
+      } else if (regenCast) {
+        return NextResponse.json({ error: castGen.error === 'pro_model_busy' ? 'The image model is busy — try again in a moment.' : (castGen.error || 'Could not draw the creator') }, { status: 502 })
       }
     }
     if (castUrl) castImg = await fetchImageB64(castUrl)
