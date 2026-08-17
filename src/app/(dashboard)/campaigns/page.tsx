@@ -785,20 +785,25 @@ function CampaignsInner() {
 
             {/* Quick actions — one tap pre-fills a common task into the box; the user reviews and hits
                 send (never auto-runs a budget/spend change). Also teaches people what Mello can do. */}
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', padding: '10px 14px 0' }}>
-              {[
-                { label: '📈 Scale +20%', cmd: "Increase this campaign's daily budget by 20%" },
-                { label: '💰 Set budget', cmd: 'Set the daily budget to €' },
-                { label: '⏸️ Pause', cmd: 'Pause this campaign' },
-                { label: '▶️ Activate', cmd: 'Activate this campaign' },
-                { label: '🎨 New creative', cmd: 'Add this creative to a new ad set' },
-                { label: '🧬 Duplicate winner', cmd: 'Duplicate the best-performing ad set at a higher budget' },
-              ].map(q => (
-                <button key={q.label} onClick={() => setChatInput(q.cmd)} type="button"
-                  style={{ background: '#fff', border: '1px solid #f6d8cc', color: '#9a3412', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
-                  {q.label}
-                </button>
-              ))}
+            <div style={{ padding: '12px 14px 0' }}>
+              <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 8 }}>Quick actions</div>
+              <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+                {[
+                  { label: '📈 Scale +20%', cmd: "Increase this campaign's daily budget by 20%" },
+                  { label: '💰 Set budget', cmd: 'Set the daily budget to €' },
+                  { label: '⏸️ Pause', cmd: 'Pause this campaign' },
+                  { label: '▶️ Activate', cmd: 'Activate this campaign' },
+                  { label: '🎨 New creative', cmd: 'Add this creative to a new ad set' },
+                  { label: '🧬 Duplicate winner', cmd: 'Duplicate the best-performing ad set at a higher budget' },
+                ].map(q => (
+                  <button key={q.label} onClick={() => setChatInput(q.cmd)} type="button"
+                    onMouseEnter={e => (e.currentTarget.style.background = '#d63e16')}
+                    onMouseLeave={e => (e.currentTarget.style.background = '#ef4a1e')}
+                    style={{ background: '#ef4a1e', border: 'none', color: '#fff', borderRadius: 100, padding: '7px 13px', fontSize: 12, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 1px 2px rgba(239,74,30,.25)', transition: 'background .12s' }}>
+                    {q.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             {/* Input area */}
