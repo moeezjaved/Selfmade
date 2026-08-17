@@ -62,13 +62,20 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
     // dashboard
     if (c.id === 'free') return
     if (c.id === 'payg') { openCredits('buy'); return }
-    // Reactivate a scheduled cancel — flip status back to active, no re-checkout.
+    // Reactivate a cancelled plan. Silent-resume ONLY if PayPal still has a live agreement; otherwise
+    // (our cancel killed it) run a FRESH PayPal checkout so they actually pay again — never free access.
     if (current === c.id && canceledCurrent) {
       setBusy(c.id)
       try {
         const j = await fetch('/api/billing/reactivate', { method: 'POST' }).then((r) => r.json()).catch(() => ({}))
-        if (j?.ok) window.location.reload()
-        else toast.error(j?.error || 'Could not reactivate — try again or contact support.')
+        if (j?.ok) { window.location.reload(); return }
+        if (j?.needsCheckout) {
+          const { startPaypalCheckout } = await import('@/lib/paypal/start')
+          const res = await startPaypalCheckout({ kind: 'subscription', plan: c.id, cycle: 'monthly' })
+          if (res?.error) toast.error(res.message || res.error || 'Could not start checkout.')
+          return   // redirecting to PayPal
+        }
+        toast.error(j?.error || 'Could not reactivate — try again or contact support.')
       } finally { setBusy(null) }
       return
     }
