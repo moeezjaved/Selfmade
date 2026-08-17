@@ -13,7 +13,7 @@
  */
 import { useEffect, useRef, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play } from 'lucide-react'
+import { Upload, Download, Wand2, Loader2, ArrowUp, Check, Image as ImageIcon, Globe, Plus, Trophy, Play, X } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
 import { useChatStream, type CreationEvent } from '@/components/mello/useChatStream'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -114,6 +114,7 @@ function StudioInner() {
   // gen
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<{ url: string; genId: string | null } | null>(null)
+  const [resultOpen, setResultOpen] = useState(false)   // the finished-image popup (opens on generate; already saved to My Creatives)
   const [versions, setVersions] = useState<{ url: string; genId: string | null; kind: string }[]>([])
   const [work, setWork] = useState<{ id: string; image_url: string; type?: string }[]>([])
   const [err, setErr] = useState<string | null>(null)
@@ -223,9 +224,9 @@ function StudioInner() {
   }
   const send = () => { const t = draft.trim(); if (!t || !convId || chat.streaming) return; chatStartedRef.current = true; setDraft(''); chat.sendMessage(convId, t, canvasContext()) }
   // Every generate/tweak becomes a version you can revert to (Ploy's Versions).
-  const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]) }
+  const land = (url: string, genId: string | null, kind: string) => { setResult({ url, genId }); setVersions(v => [...v, { url, genId, kind }]); setResultOpen(true) }
   // Open a past creation from My Work into the canvas — tweak or download it again.
-  const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); setTimeout(() => resultRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60) }
+  const openWork = (c: { id: string; image_url: string }) => { setResult({ url: c.image_url, genId: c.id }); setVersions([{ url: c.image_url, genId: c.id, kind: 'saved' }]); setErr(null); setResultOpen(true) }
 
   const generate = async (ov?: GenOverride) => {
     setErr(null)
@@ -582,10 +583,16 @@ function StudioInner() {
           )}
           {err && <div style={{ marginTop: 12, fontSize: 13, color: '#b42318', background: '#fef2f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px', maxWidth: 460 }}>{err}</div>}
 
-          {/* result actions (image shown in the two-col above for remake; standalone for fresh) */}
-          {result && (
-            <div ref={resultRef} style={{ marginTop: 8, display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start' }}>
-              {!remake && /* eslint-disable-next-line @next/next/no-img-element */ <img src={result.url} alt="Your ad" style={{ width: 320, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(20,29,21,.4)', display: 'block' }} />}
+          {/* FINISHED-IMAGE POPUP — opens automatically when a generation lands (it's already saved to My
+              Creatives). Modal so the result is front-and-centre; X or backdrop closes it (the image stays
+              in My Creatives and in the versions strip). */}
+          {result && resultOpen && (
+            <div onClick={() => setResultOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 4000, background: 'rgba(14,20,14,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, animation: 'sm-fade .18s ease both' }}>
+              <style>{`@keyframes sm-fade{from{opacity:0}to{opacity:1}}@keyframes sm-pop{0%{opacity:0;transform:translateY(12px) scale(.97)}100%{opacity:1;transform:none}}`}</style>
+              <div ref={resultRef} onClick={e => e.stopPropagation()} style={{ background: '#fff', borderRadius: 20, width: 'min(860px, 96vw)', maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 40px 90px -30px rgba(0,0,0,.5)', animation: 'sm-pop .28s cubic-bezier(.2,.7,.2,1) both', display: 'flex', gap: 24, flexWrap: 'wrap', alignItems: 'flex-start', padding: 22, position: 'relative' }}>
+              <button onClick={() => setResultOpen(false)} aria-label="Close" style={{ position: 'absolute', top: 12, right: 12, width: 30, height: 30, borderRadius: 8, border: 'none', background: '#f4f4f2', color: '#6b6b6b', cursor: 'pointer', display: 'grid', placeItems: 'center', zIndex: 1 }}><X size={16} /></button>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={result.url} alt="Your ad" style={{ width: 340, maxWidth: '100%', borderRadius: 16, border: `1px solid ${LINE}`, boxShadow: '0 30px 60px -30px rgba(20,29,21,.4)', display: 'block' }} />
               <div style={{ flex: 1, minWidth: 240 }}>
                 <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{remake ? 'Your version is ready.' : 'Here’s your ad.'}</div>
                 {/* Tell the founder it's already safe — the #1 confusion was "where did it go?". */}
@@ -628,6 +635,7 @@ function StudioInner() {
                   </div>
                 )}
               </div>
+            </div>
             </div>
           )}
 
