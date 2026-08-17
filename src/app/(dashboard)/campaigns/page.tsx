@@ -412,10 +412,7 @@ function CampaignsInner() {
                 {/* Actions */}
                 <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center' }} onClick={e => e.stopPropagation()}>
                   <button onClick={() => openChat(camp)} className="mello-manage"
-                    style={{ background: 'linear-gradient(180deg,#ff5a2c 0%,#ef4a1e 100%)', color: '#fff', border: 'none', padding: '8px 16px 8px 12px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 7, whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 10px 22px -12px rgba(239,74,30,.55)', transition: 'transform .12s, box-shadow .12s' }}>
-                    <span style={{ width: 18, height: 18, borderRadius: '50%', background: 'rgba(255,255,255,.20)', display: 'grid', placeItems: 'center', flexShrink: 0 }}>
-                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.6 1.7L21.3 17.3l-1.7.6L19 19.6l-.6-1.7L16.7 17.3l1.7-.6z"/></svg>
-                    </span>
+                    style={{ background: 'linear-gradient(180deg,#ff5a2c 0%,#ef4a1e 100%)', color: '#fff', border: 'none', padding: '8px 16px', borderRadius: 100, fontSize: 12, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', display: 'flex', alignItems: 'center', whiteSpace: 'nowrap', boxShadow: '0 1px 2px rgba(17,24,17,.10), 0 10px 22px -12px rgba(239,74,30,.55)', transition: 'transform .12s, box-shadow .12s' }}>
                     <span>Manage with Mello</span>
                   </button>
                 </div>
