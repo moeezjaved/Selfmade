@@ -304,61 +304,31 @@ export async function POST(req: NextRequest) {
     const gate = await requireUnder(admin, billingOwner, 'brandSpy', trackedCount || 0)
     if (gate) return NextResponse.json(gate, { status: 402 })
 
-    // Re-spy is FREE if the org already PAID for this brand before (stop-spy then spy-again must not
-    // double-charge). We keep the credit_transactions ledger on un-spy, so a prior committed brand_spy
-    // for this page_id means "already bought" → track again for free.
-    // Search the FULL payer population: org members + the billing owner + the acting user. The credit
-    // engine writes the charge under the resolved billing owner (which reserve_credits derives via its
-    // own org query), so orgIds alone could miss it and re-charge — this superset closes that gap.
-    const payerIds = Array.from(new Set([...orgIds, billingOwner, user.id]))
-    // Primary match: a committed/reserved brand_spy charge whose reference_id is this exact page_id.
-    let { data: priorPaid } = await admin.from('credit_transactions')
-      .select('id').in('user_id', payerIds).eq('action_type', 'brand_spy').eq('reference_id', pageId)
-      .neq('status', 'refunded').limit(1).maybeSingle()
-    // Fallback: the SAME brand can come back with a DIFFERENT page_id (directory id vs crawl id, or a
-    // Meta page version), which slipped past the reference_id match and DOUBLE-CHARGED on re-spy. The
-    // charge's metadata carries {pageId,name} (see commitCredits below), so also treat it as already
-    // paid if a prior brand_spy recorded this page_id OR this resolved brand name. Name-matching only
-    // when we have a real (non-numeric) name; brand_spy is cheap so a rare false-free is far better than
-    // charging twice for one brand.
-    if (!priorPaid) {
-      const orFilters = [`metadata->>pageId.eq.${pageId}`]
-      const cleanName = String(name || '').trim()
-      if (cleanName && !/^\d+$/.test(cleanName)) orFilters.push(`metadata->>name.ilike.${cleanName}`)
-      const { data: byMeta } = await admin.from('credit_transactions')
-        .select('id').in('user_id', payerIds).eq('action_type', 'brand_spy')
-        .neq('status', 'refunded').or(orFilters.join(',')).limit(1).maybeSingle()
-      if (byMeta) priorPaid = byMeta
+    // Every fresh spy runs a real Meta-Ad-Library crawl through our proxy pool (IPRoyal), which costs us
+    // money PER BRAND. So a spy always costs 50cr — including re-adding a brand you removed earlier: that
+    // teardown deletes the follow (DELETE below), and adding it back is a brand-new crawl on our side, not
+    // a free re-open. The ONLY free case is re-opening a brand you are STILL actively spying (the no-op
+    // refresh handled above at the `prior`/spied check). Reserve first so we never track a brand we
+    // couldn't bill.
+    let tx
+    try {
+      tx = await reserveCredits(admin, user.id, 'brand_spy', pageId)
+    } catch (e) {
+      if (e instanceof InsufficientCreditsError) {
+        return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, action: 'brand_spy' }, { status: 402 })
+      }
+      throw e
     }
-
-    let charged = false
-    if (!priorPaid) {
-      // First time on this brand → charge 50cr. Reserve first so we never track a brand we couldn't bill.
-      let tx
-      try {
-        tx = await reserveCredits(admin, user.id, 'brand_spy', pageId)
-      } catch (e) {
-        if (e instanceof InsufficientCreditsError) {
-          return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, action: 'brand_spy' }, { status: 402 })
-        }
-        throw e
-      }
-      try {
-        await ensureTracked(admin, pageId, name, true)
-        await ensureFollowed(admin, user.id, pageId, name, activeBrandId)
-      } catch (e) {
-        await refundCredits(admin, tx.id).catch(() => {})   // never charge for a spy that didn't start
-        throw e
-      }
-      await commitCredits(admin, tx.id, { pageId, name })
-      charged = true
-    } else {
-      // Already paid before → free re-spy.
+    try {
       await ensureTracked(admin, pageId, name, true)
       await ensureFollowed(admin, user.id, pageId, name, activeBrandId)
+    } catch (e) {
+      await refundCredits(admin, tx.id).catch(() => {})   // never charge for a spy that didn't start
+      throw e
     }
-    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name}${charged ? ' (−50 cr)' : ' (re-spy, free)'}`)
-    return NextResponse.json({ pageId, charged, cost: charged ? 50 : 0 })
+    await commitCredits(admin, tx.id, { pageId, name })
+    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name} (−50 cr)`)
+    return NextResponse.json({ pageId, charged: true, cost: 50 })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong — please try again.' }, { status: 500 })
   }

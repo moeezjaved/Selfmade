@@ -52,7 +52,7 @@ export const PLANS: Record<PlanId, PlanEntitlements> = {
   // 6,000 cr = 10 video ads/mo; image ads free + unlimited.
   starter: {
     label: 'Creator', priceMonthly: 49, priceAnnualMonthly: 49,
-    monthlyCredits: 6000, seats: 1, brandSpy: 15, expressPulls: 15, discoveryPages: null,
+    monthlyCredits: 6000, seats: 3, brandSpy: 15, expressPulls: 15, discoveryPages: null,
     aiInsights: true, launch: true, campaigns: true, api: true, exports: true, canBuyCredits: true,
     teamBoards: true, assetsGb: 5, videosPerMonth: 10, imagesUnlimited: false, mostPopular: true,
   },
