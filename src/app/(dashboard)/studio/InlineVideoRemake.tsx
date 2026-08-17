@@ -9,7 +9,7 @@
  *   review  → edit the script + pick length → "Create video · N cr" (spends on approve)
  *   done    → the video, download, make another
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import dynamic from 'next/dynamic'
 import { Loader2, Film, Download, Wand2, Play } from 'lucide-react'
 import { useCredits, confirmCredits, refreshCredits } from '@/components/credits/CreditCounter'
@@ -155,6 +155,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
   const [bucket, setBucket] = useState<'15' | '30' | '60' | 'match'>('15')
+  const bucketTouched = useRef(false)   // did the user pick a length? (else auto-default to match the source)
   const [progress, setProgress] = useState<{ label?: string; pct?: number; eta_sec?: number } | null>(null)
   const [videoUrl, setVideoUrl] = useState<string | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -186,6 +187,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
 
   // Pick a length → re-pace the script to fill/trim to that many seconds (free, like the old modal).
   async function pickLength(b: '15' | '30' | '60' | 'match') {
+    bucketTouched.current = true
     setBucket(b)
     if (!script.trim() || rescripting) return
     const target = b === 'match' ? ((srcSecs || 15) <= 22 ? 15 : (srcSecs || 15) <= 45 ? 30 : 60) : Number(b)
@@ -228,15 +230,19 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       if (st.timedOut) { setErr('The script is taking longer than usual — try again in a moment.'); setPhase('setup'); return }
       if (st.error) { setErr(st.error); setPhase('setup'); return }
       let drafted = st.script || ''
-      setSrcSecs(Number(st.sourceSeconds) || null)
+      const srcS = Number(st.sourceSeconds) || null
+      setSrcSecs(srcS)
       setSrcScenes(Math.max(2, Math.min(10, Number(st.sceneCount) || 3)))
       // Auto-pick the mode from the analysis (talking-head → UGC; b-roll / multi-scene → Cinematic),
       // unless the user already chose one. Stops UGC being forced onto a b-roll ad (→ invented creator).
       if (!styleTouched && cineOn && st.suggestedMode) setStyle(st.suggestedMode === 'faithful' ? 'cinematic' : 'ugc')
-      // The drafted UGC script is often paced to the source's slow rate → one short line. Auto-fill it
-      // to the default length (15s) so the review screen shows a real, full-length script, not a stub.
+      // AUTO-LENGTH: default to "Match theirs" so a 51s ad clones at ~51s, not a hardcoded 15s (which
+      // race-read a 61s script). The user can still override; once they do, bucketTouched locks their pick.
+      if (!bucketTouched.current) setBucket('match')
+      // The drafted script is often paced to the source's slow rate → one short line. Auto-fill it to the
+      // resolved length (the source-matched bucket, NOT a hardcoded 15s) so the review shows a full script.
       try {
-        const target = 15
+        const target = srcS ? (srcS <= 22 ? 15 : srcS <= 45 ? 30 : 60) : 15
         const wc = drafted.trim() ? drafted.trim().split(/\s+/).length : 0
         if (wc && wc < target * (RATE[language] || 2.3) * 0.75) {
           const r = await fetch('/api/discovery/clone-video/rescript', {
