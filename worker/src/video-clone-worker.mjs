@@ -478,7 +478,7 @@ async function buildSeedancePrompt(beat, product, nImages, forcedScript, look, l
   (b) anchor the size to a CONCRETE everyday object (pen, lipstick, credit card, soda can, palm of the hand — pick what matches this product) and to the creator's hand ("no taller than her palm");
   (c) repeat the anchor once more in the timeline at the product close-up beat;
   (d) get it readable by bringing it CLOSE to the camera, never by enlarging it — an oversized, out-of-proportion product looks fake.`
-  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). This is a TALKING-HEAD UGC ad:
+  const sys = `You write prompts for ByteDance Seedance 2.5 (reference-to-video; reference images are addressed as [Image1], [Image2]…). This is a TALKING-HEAD UGC ad:
 a real-looking creator talks straight to the phone camera and delivers the script out loud. Rules:
 - ONE dense paragraph: subject (the on-camera creator) → they SPEAK to camera → action/product → camera → lighting → mood, then a short beat-by-beat timeline.
 - The creator must be SPEAKING ALOUD to the viewer, lips moving in sync — NOT a silent scene, NOT b-roll with background music. Describe their mouth moving, natural gestures, eye contact with the lens.
@@ -561,7 +561,7 @@ async function buildScenePlan(beat, product, nImages, nScenes, look, voiceover, 
     ? `- NO PHYSICAL PRODUCT — this is a SERVICE / app / website. NEVER show, hold or invent a bottle, box, package or device. Where the reference features its product, instead show the service on a phone/laptop screen (only if a screenshot image is provided), the brand logo, or a relevant lifestyle moment. The action in each scene is a person talking/gesturing or a lifestyle beat — never handling a product.`
     : `- PRODUCT SWAP — wherever the reference features its product, feature the user's product (${refList || 'the product'}) instead, matching ${refList || 'the product'} exactly.
 - PRODUCT HERO FRAMING (critical for fidelity): whenever the product is the focus of a scene, get it BIG IN FRAME by moving the CAMERA close (a tight macro/close-up shot), NOT by enlarging the product — the exact container, cap/applicator and label clearly readable and in sharp focus. AI video renders a product accurately only when the camera is close; a wide shot of a person holding it far away comes out as a generic blurry bottle. CRUCIAL: keep the product's REAL size and proportion relative to the hand — a small handheld device is small in the hand, never inflated or stretched to fill the frame (that looks fake). The frame fills because the CAMERA is close, not because the product grew. For the product-reveal / product-in-use beats, write a close macro shot of hands + product at true scale, NOT a full-body wide shot. At least half the scenes must feature the product this way.`
-  const sys = `You write prompts for ByteDance Seedance 2.0 (reference-to-video). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
+  const sys = `You write prompts for ByteDance Seedance 2.5 (reference-to-video; reference images are addressed as [Image1], [Image2]…). Each scene is rendered as its OWN continuous clip and the clips are stitched — so write each scene as ONE unbroken shot (no internal cuts). The reference ad is a MULTI-SCENE / B-roll style ad. Clone it FAITHFULLY, scene by scene — this is a CLONE of its edit structure, not a talking-head rewrite.
 Rules:
 - Map the beat sheet's beats (in the "beats" array) onto EXACTLY ${nScenes} scenes, IN ORDER, covering the ad's full arc (hook first). Each scene must RECREATE a specific reference beat — its subject, its action, its shot type — not invent a new one. If there are more beats than scenes, group adjacent beats; if fewer, expand the strongest beats. Each scene = one continuous shot.
 - THE HOOK IS SACRED: scene 1 MUST recreate the reference's OPENING beat and start at src_start=0 — that's the attention hook (often a person / problem moment) and the reason the ad works. NEVER drop or skip the first beats. When there are more beats than scenes, MERGE adjacent beats into one continuous shot; dropping a beat that contains PEOPLE while keeping product-only beats is FORBIDDEN — people beats carry the story. If scene 1 shows a person, they FACE the camera with a clear expression/reaction (the reaction IS the hook) — never shot from behind or faceless.
@@ -1046,6 +1046,17 @@ async function composeCharacterSheet({ desc, jobId, tag }) {
   ].join(' ')
   let inline
   try { inline = await geminiImage(prompt, []) } catch { return null }
+  // FACE-REMOVAL EDIT PASS (Thomas's exact trick): a second edit that DELETES the face from the RIGHT
+  // full-body panel, leaving only the LEFT close-up as the single face Seedance can lock onto — so a
+  // re-shoot can't grab the wrong (smaller, body-panel) face. Best-effort: if the edit fails, keep the
+  // one-face-prompt sheet. Toggle with SEEDANCE_FACE_STRIP=off.
+  if (process.env.SEEDANCE_FACE_STRIP !== 'off') {
+    try {
+      const editPrompt = 'Edit this character reference sheet. Keep the LEFT facial close-up panel EXACTLY as it is — untouched. On the RIGHT full-body panel ONLY, REMOVE the face: replace the head\'s facial features with smooth blank skin (no eyes, nose or mouth) so that face is gone, keeping the same head shape, hair, wardrobe, pose, scale, background and layout identical. The finished sheet must have EXACTLY ONE visible face — the left close-up. No text, no watermarks.'
+      const edited = await geminiImage(editPrompt, [{ mime: inline.mime_type || inline.mimeType || 'image/png', b64: inline.data }])
+      if (edited?.data) inline = edited
+    } catch (e) { console.warn(`character sheet face-strip ${tag}:`, e.message) }
+  }
   const key = `creatives/tmp/${jobId}-cast-${tag}.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
   return `${R2_PUBLIC}/${key}`
