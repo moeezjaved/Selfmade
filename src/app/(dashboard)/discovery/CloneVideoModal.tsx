@@ -291,7 +291,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setOverlays(Array.isArray(st.overlays) ? st.overlays : [])
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
-      setSuggestedMode(sug); setMode('ugc')   // Cinematic gated to Coming-soon — everything ships as UGC for now
+      setSuggestedMode(sug); setMode(sug)   // Cinematic LIVE — honour Mello's auto-pick ('faithful' = cinematic, b-roll/montage)
       setSrcScenes(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
       setPhase('review'); setStep(4)   // land on the first review step (Length & format)
@@ -380,7 +380,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     { t: 'Extras', s: 'Optional add-ons' },
     { t: 'Script & create', s: 'Review the free script' },
   ]
-  const pickLook = (m: 'ugc' | 'faithful') => { if (m === 'faithful') return; modeTouched.current = true; setMode(m) }   // Cinematic gated
+  const pickLook = (m: 'ugc' | 'faithful') => { modeTouched.current = true; setMode(m) }   // Cinematic LIVE
   const brandName = brands.find((b) => b.id === brandId)?.name || productName.trim() || 'your brand'
   const selPhotos = photos.filter((p) => selected.includes(p.id))
 
@@ -732,9 +732,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       <FieldLabel>Style</FieldLabel>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button onClick={() => pickLook('ugc')} style={chip(mode === 'ugc')}>UGC creator · 1 clip · {UGC_COST[tier]} cr</button>
-                        {/* Cinematic is temporarily gated — multi-scene identity/style consistency isn't reliable
-                            enough yet (see cast-anchor work). Shown as Coming soon; not selectable. */}
-                        <button disabled title="We're perfecting multi-scene consistency — back soon." style={{ ...chip(false), opacity: 0.5, cursor: 'not-allowed', position: 'relative' }}>Cinematic · <span style={{ fontWeight: 800 }}>Coming soon</span></button>
+                        <button onClick={() => pickLook('faithful')} style={chip(mode === 'faithful')}>Cinematic · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr</button>
                       </div>
                     </div>
                     {mode === 'ugc' && (

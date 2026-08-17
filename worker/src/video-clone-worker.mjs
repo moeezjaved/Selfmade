@@ -572,7 +572,8 @@ ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera
 - Per scene pick "duration": 5 for a quick cut, 10 for a longer beat (numbers only).
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
 - CAST: label each distinct person "A", "B"… and use the SAME letter for the same person across every scene (A = the main character). Per scene report "cast": the letters visible in that scene ([] when no people). Most ads have ONE character — only use B when the reference clearly shows a second distinct person.
-Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"cast":["A"],"src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
+- SETTING: per scene report "setting" — a SHORT phrase naming the physical location/backdrop of that beat (e.g. "sunlit marble kitchen counter", "moody bar at night", "bright bathroom vanity"). REUSE the exact same phrase for scenes that share a location, so the whole ad locks to a consistent world and colour grade. This is what stops each cut looking like a different film.
+Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"cast":["A"],"setting":"","src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   // VERIFIER (hook-drop): when beats > scenes, gpt has been seen "grouping" by DELETING the opening
   // person/hook beats and keeping only product b-roll (a FÜM clone opened at src 5s — the coughing-man
@@ -615,6 +616,7 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
       has_product: s.has_product !== false, // default TRUE (safe: route to the high-fidelity generator)
       // Cast letters (A/B…) — same letter = same person across scenes; drives per-character anchors.
       cast: Array.isArray(s.cast) ? s.cast.map(String).slice(0, 2) : (s.has_people !== false ? ['A'] : []),
+      setting: String(s.setting || '').slice(0, 160),
       src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
       src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
     }
@@ -2064,6 +2066,13 @@ async function generateJob(job) {
         // features them passes that frame as an @Image ref ("the SAME person as this frame"). Identity
         // flows through pixels, not adjectives — the fix for "a different person in every scene".
         const charAnchors = { ...(meta.scene_char_anchors || {}) }
+        // ── ASSET-LOCK · LOCATION PLATES (Higgsfield method) ────────────────────────────────────────
+        // Thomas's most-emphasised asset: an empty establishing STILL of each location locks the whole
+        // ad's environment + colour grade so every cut looks like the SAME film, not a different one.
+        // Compose ONE plate per distinct setting (keyed by a normalised phrase), cache it in clone_meta
+        // so it's reused across scenes AND survives a worker restart. Best-effort — never blocks a scene.
+        const locPlates = { ...(meta.location_plates || {}) }
+        const locKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 60)
         // ── PHASE 2.5 (CINEMATIC ONLY) · SEED IDENTITY FROM THE SYNTHETIC CAST SHEET ──────────────
         // fal's likeness filter blocks REAL faces but ACCEPTS AI-generated portraits — so the cast
         // sheet (a clean, synthetic, front-facing portrait built during the storyboard) is a safe,
@@ -2132,15 +2141,35 @@ async function generateJob(job) {
           let compStill = null
           if (!s.has_people && sceneRef) { try { compStill = await stillFromClip(sceneRef, job.id, `sc${i}`) } catch (e) { console.warn(`scene ${i + 1} comp still:`, e.message) } }
 
+          // LOCATION PLATE for this scene's setting — compose once per distinct location, then reuse.
+          let locPlate = null
+          if (s.setting && process.env.SEEDANCE_LOCATIONS !== 'off') {
+            const lk = locKey(s.setting)
+            if (lk) {
+              if (locPlates[lk]) locPlate = locPlates[lk]
+              else {
+                try {
+                  locPlate = await composeLocationPlate({ setting: s.setting, jobId: job.id, aspect: meta.aspect })
+                  if (locPlate) { locPlates[lk] = locPlate; await stamp({ clone_meta: { ...meta, location_plates: locPlates } }); meta.location_plates = locPlates; console.log(`🏙 ${job.id} location plate composed (${lk})`) }
+                } catch (e) { console.warn(`scene ${i + 1} location plate:`, e.message) }
+              }
+            }
+          }
           const baseImgs = keyframe ? [keyframe, ...falProductImages] : [...falProductImages]
           const anchorIdx = baseImgs.length + 1                       // 1-based @Image index of the first cast anchor
           const compIdx = baseImgs.length + anchorRefs.length + 1     // …and of the composition still
-          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : [])].slice(0, 9)
+          const locIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + 1  // …and of the location plate
+          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : []), ...(locPlate ? [locPlate] : [])].slice(0, 9)
+          const locInFrame = !!locPlate && locIdx <= sceneImages.length   // survived the 9-ref cap?
           let scenePrompt = keyframe
             ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY [Image1] — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
+          // HANDS MANDATE (Thomas's #1 montage failure): a product beat with no on-camera person must
+          // still show real HANDS performing the action — never disembodied objects moving by themselves.
+          if (!s.has_people && s.has_product !== false) scenePrompt += ` HANDS ON PRODUCT: show real human hands actively performing the action with the product (holding, pouring, glazing, opening, placing) — never a floating product moving by itself. Only the hands and forearms are in frame, no face.`
           if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: [Image${anchorIdx}]${anchorRefs.length > 1 ? ` and [Image${anchorIdx + 1}]` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
           if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of [Image${compIdx}] (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
+          if (locInFrame) scenePrompt += ` LOCATION LOCK: [Image${locIdx}] is this ad's LOCKED setting — place the scene in exactly this environment, matching its architecture, surfaces, colour palette and lighting so every cut shares one consistent world and colour grade. It's an empty plate: populate it with the action, but keep the same space. Ignore any text or logos in it.`
           scenePrompt += STYLE_LOCK
           if (process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += DIRECTOR_STYLE
 

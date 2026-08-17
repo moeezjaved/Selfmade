@@ -144,10 +144,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [benefit, setBenefit] = useState('')
   const [look, setLook] = useState('match')   // recast the on-camera person (default: keep original)
   const [jobId, setJobId] = useState<string | null>(null)
-  // Cinematic is PARKED behind Coming-soon (2026-07-28): output quality isn't there yet and each render
-  // costs ~$6 of fal — not worth users' credits until it's right. All the plumbing stays; ?cinematic=1
-  // re-enables it for admin testing. UGC (the proven path) is the only public style for now.
-  const [cineOn, setCineOn] = useState(false)
+  // Cinematic is LIVE (2026-08-17): Higgsfield-method asset-lock now wired — product sheet, hero
+  // character sheet (single-face body trick), per-location plates locking the colour grade, shot-list
+  // director prompts on Seedance 2.5, and self-heal via 2.5-Edit. Both styles ship publicly.
+  const [cineOn, setCineOn] = useState(true)
   const [styleTouched, setStyleTouched] = useState(false)   // did the user manually pick a mode? (else auto-pick from analysis)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
@@ -297,9 +297,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
             <div style={label}>Style</div>
             <div style={pillRow}>
               <button onClick={() => { setStyle('ugc'); setStyleTouched(true) }} style={pill(style === 'ugc')}>UGC</button>
-              {cineOn
-                ? <button onClick={() => { setStyle('cinematic'); setStyleTouched(true) }} style={pill(style === 'cinematic')}>Cinematic · testing</button>
-                : <button disabled title="Coming soon" style={{ ...pill(false), cursor: 'default', opacity: 0.6 }}>Cinematic · soon</button>}
+              <button onClick={() => { setStyle('cinematic'); setStyleTouched(true) }} style={pill(style === 'cinematic')}>Cinematic</button>
             </div>
             <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Mello picks the right one from the ad — UGC for a talking creator, Cinematic (scene-by-scene, Remotion-assembled) for a b-roll ad. Override anytime.</div>
           </div>
