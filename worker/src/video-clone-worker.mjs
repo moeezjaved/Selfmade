@@ -62,9 +62,13 @@ async function logErr(userId, message, extra) { try { await fetch(`${U}/rest/v1/
 
 // ── Gemini: watch the competitor video → structured beat sheet ────────────────
 const BEAT_SCHEMA_PROMPT = `You are a UGC ad director. Watch this video ad and return ONLY minified JSON (no prose, no code fence):
-{"setting":"","avatar":"","camera":"","hook_type":"","beats":[{"t":"0-2s","action":""}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"app_demo":[{"t":"0-4s","region":"split_top"}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
+{"setting":"","avatar":"","camera":"","optics":"","film_look":"","people":[{"id":"A","look":""}],"hook_type":"","beats":[{"t":"0-2s","action":"","lens":""}],"scene_count":0,"on_screen_text":[{"t":"0-4s","text":""}],"app_demo":[{"t":"0-4s","region":"split_top"}],"product_role":"","transcript":"","tone":"","duration_seconds":0,"is_talking_head":true}
 - app_demo: time ranges where the ad shows a SOFTWARE UI / app screen / website / dashboard / phone-or-laptop screen recording (NOT a physical product, NOT a person). region: "split_top" if the screen fills only the TOP portion while a person stays on screen below; "full" if the screen fills the whole frame (a cut to the app). Empty array if the ad never shows a screen/app UI.
 - setting: physical scene. avatar: who's on camera (age, look, wardrobe) or "none". camera: framing + movement.
+- optics: the LENS / OPTICAL signature you can read off the footage — name it like a cinematographer: focal-length feel (wide 24mm / normal 35-50mm / tele 85mm+), macro or a Laowa probe-lens look on product close-ups, anamorphic squeeze + oval bokeh, shallow vs deep depth of field, lens flares, distortion. If different beats use different lenses, say so. This drives how each shot is generated, so be specific.
+- film_look: the overall colour grade / film emulation — e.g. "warm teal-orange commercial grade", "clean bright natural", "moody low-key with crushed blacks", "Kodak 2383 film stock, gentle halation". One consistent look for the whole ad.
+- people: ONE entry per DISTINCT on-camera person (id "A" = main character, "B" = second person, etc). "look" = a DENSE description of that exact person — apparent age, gender, ethnicity, hair, build, wardrobe, distinguishing features — enough to redraw them consistently. Empty array if nobody is on camera. Most ads have just A.
+- beats[].lens: for THAT beat, the specific shot optics (e.g. "extreme macro probe-lens push across the glaze", "35mm handheld medium of the chef", "85mm shallow product hero"). Pull it from what the footage actually shows.
 - on_screen_text: the BIG designed text CALLOUTS/graphics burned on screen (headlines, stats like "25g PROTEIN", prices, offers, CTAs) with the time range each is visible — NOT the spoken words, NOT tiny legal text. Empty array if the ad has no on-screen text.
 - hook_type: first-3-seconds pattern. beats: 3-8 time-ranged actions. transcript: exact spoken words. Be concrete.
 - scene_count: the EXACT number of distinct visual scenes/shots (hard cuts to a new location, subject, or camera setup) in the ad — count the real cuts you see, 1 for a single continuous take. This is the number of clips a faithful clone must reproduce, so be precise.
@@ -573,12 +577,15 @@ ${voiceover ? `- NARRATION IS ADDED IN POST — scenes must contain NO on-camera
 - Per scene also report: "has_people": true if ANY person/face is visible in that reference beat (false = pure product/object/environment b-roll), "has_product": true if the user's product appears (held/used/shown) in that scene, and "src_start"/"src_end": the SECONDS range of the reference footage this scene recreates (derive from the beats' "t" ranges, e.g. "4-9s" → 4 and 9).
 - CAST: label each distinct person "A", "B"… and use the SAME letter for the same person across every scene (A = the main character). Per scene report "cast": the letters visible in that scene ([] when no people). Most ads have ONE character — only use B when the reference clearly shows a second distinct person.
 - SETTING: per scene report "setting" — a SHORT phrase naming the physical location/backdrop of that beat (e.g. "sunlit marble kitchen counter", "moody bar at night", "bright bathroom vanity"). REUSE the exact same phrase for scenes that share a location, so the whole ad locks to a consistent world and colour grade. This is what stops each cut looking like a different film.
-Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"cast":["A"],"setting":"","src_start":0,"src_end":5}]}  (exactly ${nScenes} scenes, in order).`
+- LENS: per scene report "lens" — the exact optics for THAT shot, DECODED from the reference (use the beat's "lens" and the ad's "optics"${beat && beat.optics ? ` = "${String(beat.optics).replace(/"/g, "'").slice(0, 200)}"` : ''}): focal-length feel (24mm wide / 35-50mm normal / 85mm+ tele), macro or Laowa probe-lens look on product close-ups, anamorphic squeeze, depth of field, flares/distortion. Match what the reference actually used for that beat — do NOT default every shot to the same lens.
+- CAST PROFILES: also return "cast_profiles" — an object mapping each cast letter used ("A","B"…) to a DENSE look description of that exact person (age, gender, ethnicity, hair, build, wardrobe, distinguishing features), ${recast ? `recast as ${look}` : 'copied faithfully from the reference'}. Use the reference "people" list${beat && Array.isArray(beat.people) && beat.people.length ? ` = ${JSON.stringify(beat.people).slice(0, 400)}` : ''} when present. This lets us draw a locked character sheet for EACH person, not just the lead.
+Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has_people":false,"has_product":true,"cast":["A"],"setting":"","lens":"","src_start":0,"src_end":5}],"cast_profiles":{"A":""}}  (exactly ${nScenes} scenes, in order).`
   const usr = `REFERENCE AD (beat sheet):\n${JSON.stringify(beat || { note: 'analysis unavailable — infer a natural multi-scene structure' })}\n\nUSER PRODUCT:\n${JSON.stringify(product)}\n\nProduct image tokens: ${refList || '(none)'}.`
   // VERIFIER (hook-drop): when beats > scenes, gpt has been seen "grouping" by DELETING the opening
   // person/hook beats and keeping only product b-roll (a FÜM clone opened at src 5s — the coughing-man
   // hook was gone). If the plan doesn't start at the source's beginning, retry once with a correction.
   let scenes = []
+  let castProfiles = {}
   for (let attempt = 1; attempt <= 2; attempt++) {
     const messages = [{ role: 'system', content: sys }, { role: 'user', content: usr }]
     if (attempt === 2) messages.push({ role: 'user', content: `Your previous plan skipped the reference's opening — scene 1 must start at src_start=0 and recreate the ORIGINAL FIRST BEAT (including its people). Merge later beats to fit ${nScenes} scenes. Regenerate the full JSON.` })
@@ -590,6 +597,7 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
     const j = await r.json()
     const out = JSON.parse(j.choices?.[0]?.message?.content || '{}')
     scenes = Array.isArray(out.scenes) ? out.scenes.filter((s) => s && s.prompt) : []
+    if (out.cast_profiles && typeof out.cast_profiles === 'object') castProfiles = out.cast_profiles
     if (!scenes.length) throw new Error('no scenes from gpt')
     const firstStart = Number(scenes[0]?.src_start)
     if (!(Number.isFinite(firstStart) && firstStart >= 3) || attempt === 2) break
@@ -606,7 +614,7 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
   // their true length at stitch (concatClips hard-caps each clip to its planned duration).
   const srcSecs = Number(beat && beat.duration_seconds) || (picked.length * 7)
   const evenSplit = Math.max(1, Math.min(15, Math.round(srcSecs / picked.length)))
-  return picked.map((s) => {
+  const mapped = picked.map((s) => {
     const span = (Number.isFinite(+s.src_end) && Number.isFinite(+s.src_start)) ? Math.round((+s.src_end - +s.src_start) * 10) / 10 : 0
     const dur = span > 0 ? Math.max(1, Math.min(15, span)) : evenSplit
     return {
@@ -617,10 +625,18 @@ Return ONLY minified JSON: {"scenes":[{"prompt":"","script":"","duration":5,"has
       // Cast letters (A/B…) — same letter = same person across scenes; drives per-character anchors.
       cast: Array.isArray(s.cast) ? s.cast.map(String).slice(0, 2) : (s.has_people !== false ? ['A'] : []),
       setting: String(s.setting || '').slice(0, 160),
+      lens: String(s.lens || '').slice(0, 200),   // decoded optics for this shot (focal length / macro-probe / anamorphic / DOF)
       src_start: Number.isFinite(+s.src_start) ? Math.max(0, +s.src_start) : null,
       src_end: Number.isFinite(+s.src_end) ? +s.src_end : null,
     }
   })
+  // Expose the per-character look profiles as a non-enumerable prop so JSON.stringify(scene_plan) — the
+  // resumable checkpoint — stays a clean array; the caller reads it once (fresh plan) and stamps
+  // meta.cast_profiles separately for resume. Normalise values to strings.
+  const profiles = {}
+  for (const [k, v] of Object.entries(castProfiles || {})) profiles[String(k)] = String(v || '').slice(0, 400)
+  Object.defineProperty(mapped, 'castProfiles', { value: profiles, enumerable: false })
+  return mapped
 }
 
 // ── gpt-4o: split the APPROVED script into N contiguous segments for long-form UGC (30/60s).
@@ -1013,6 +1029,24 @@ async function composeProductSheet({ productImageUrls, jobId }) {
   const prompt = 'Clean studio PRODUCT SHEET of the EXACT product from the attached photos: two views of the SAME product side by side in one frame — a front view on the left and a 3/4 perspective view on the right, both at matched scale and lighting. Identical container, cap/applicator, colours and label text — sharp and readable. Plain seamless neutral-grey background. NO hands, NO people, NO other objects, NO text overlays — only the product, shown from these two angles.'
   const inline = await geminiImage(prompt, imgs)
   const key = `creatives/tmp/${jobId}-product-sheet.png`
+  await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
+  return `${R2_PUBLIC}/${key}`
+}
+
+// CHARACTER SHEET — a synthetic, likeness-safe reference portrait of ONE person (split-frame: facial
+// close-up + full-body front). Built per DISTINCT cast member (A, B…) from their look description so
+// EVERY person in a multi-character ad is locked to a canonical sheet, not just the lead. Mirrors the
+// app-side keyframe route's cast-sheet prompt (single clear face → no face confusion for Seedance).
+async function composeCharacterSheet({ desc, jobId, tag }) {
+  if (!GEMINI_KEY || !desc) return null
+  const prompt = [
+    `Photorealistic CHARACTER REFERENCE SHEET of ONE person: ${String(desc).slice(0, 400)}.`,
+    'Compose it split-frame: LEFT panel — a tight facial close-up, the entire head fully in frame including all the hair, calm neutral expression, looking straight into the lens, real skin texture and pores, soft cinematic key light with gentle fill. RIGHT panel — the SAME person, full-body front view, head-to-toe, standing straight in a relaxed pose, arms at their sides, same wardrobe, even full-length lighting.',
+    'Both panels are the identical person: same face, hair, skin tone, build and outfit. Plain solid neutral-grey seamless background, matched framing and scale, a thin vertical divider between the panels. EXACTLY ONE face visible in the entire image (the close-up) — the full-body figure must not show a second detailed face turned to camera; keep its face small/soft or angled so there is only one face to lock onto. No text, no watermarks.',
+  ].join(' ')
+  let inline
+  try { inline = await geminiImage(prompt, []) } catch { return null }
+  const key = `creatives/tmp/${jobId}-cast-${tag}.png`
   await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: Buffer.from(inline.data, 'base64'), ContentType: inline.mime_type || inline.mimeType || 'image/png', CacheControl: 'public, max-age=86400' }))
   return `${R2_PUBLIC}/${key}`
 }
@@ -2042,6 +2076,9 @@ async function generateJob(job) {
       const scenes = (Array.isArray(meta.scene_plan) && meta.scene_plan.length)
         ? meta.scene_plan
         : await buildScenePlan(meta.beat_sheet, meta.product_details || { name: 'the product' }, productImages.length, nScenes, meta.character_look, finalScript, isService)
+      // Per-character look profiles (A/B…) come off a FRESH plan as a non-enumerable prop — stamp them
+      // into meta.cast_profiles so they survive a resume (the scene_plan checkpoint is a plain array).
+      if (scenes.castProfiles && !meta.cast_profiles) { meta.cast_profiles = scenes.castProfiles; await stamp({ clone_meta: { ...meta, cast_profiles: scenes.castProfiles } }) }
       // USER-CHOSEN LENGTH drives the cut: distribute duration_target evenly across the kept scenes, so
       // the footage matches the approved script's pacing. (Scene durations used to keep the SOURCE's
       // timings — a 71s source with a 15s script rendered minutes of footage that the dead-air guard
@@ -2082,6 +2119,24 @@ async function generateJob(job) {
         // a real-frame reference got filter-blocked. The per-scene capture below only fills anchors we
         // DON'T already have, so this cast-sheet seed is never overwritten. UGC never reaches this code.
         if (meta.cast_sheet && !charAnchors.A) { charAnchors.A = meta.cast_sheet; console.log(`🎭 ${job.id} identity seeded from cast sheet (cinematic)`) }
+        // PER-PERSON CHARACTER SHEETS (A, B, …): a multi-character ad needs EVERY distinct person locked
+        // to their own canonical sheet, not just the lead. For each cast letter the plan uses that has no
+        // anchor yet AND has a look profile, compose a synthetic character sheet up front and seed its
+        // anchor — so person B is consistent from their first scene instead of captured from a render.
+        // Cached in clone_meta.cast_sheets for resume. Lead A keeps the storyboard cast_sheet above.
+        const castSheets = { ...(meta.cast_sheets || {}) }
+        const profiles = meta.cast_profiles || {}
+        const distinctCast = [...new Set(scenes.flatMap((s) => Array.isArray(s.cast) ? s.cast.map(String) : []))]
+        for (const letter of distinctCast) {
+          if (charAnchors[letter]) continue                       // already locked (A from storyboard, or a resume)
+          if (castSheets[letter]) { charAnchors[letter] = castSheets[letter]; continue }
+          const desc = profiles[letter]
+          if (!desc) continue                                     // no look profile → fall back to per-scene render capture
+          try {
+            const sheet = await composeCharacterSheet({ desc, jobId: job.id, tag: letter })
+            if (sheet) { castSheets[letter] = sheet; charAnchors[letter] = sheet; await stamp({ clone_meta: { ...meta, cast_sheets: castSheets, scene_char_anchors: charAnchors } }); meta.cast_sheets = castSheets; console.log(`🎭 ${job.id} character sheet composed for "${letter}"`) }
+          } catch (e) { console.warn(`character sheet ${letter} ${job.id}:`, e.message) }
+        }
         const N = scenes.length
         const PER_SCENE = 75   // ~seconds a scene render takes → drives the ETA
         for (let i = 0; i < scenes.length; i++) {
@@ -2170,6 +2225,11 @@ async function generateJob(job) {
           if (anchorRefs.length) scenePrompt += ` CHARACTER LOCK: [Image${anchorIdx}]${anchorRefs.length > 1 ? ` and [Image${anchorIdx + 1}]` : ''} show this ad's cast one moment ago — treat ${anchorRefs.length > 1 ? 'them' : 'it'} as ground truth: the person${cast.length > 1 ? 's' : ''} in this scene ${cast.length > 1 ? 'are' : 'is'} EXACTLY the same — same face, hair, outfit and styling, continuing seamlessly. Do NOT invent a different person.`
           if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of [Image${compIdx}] (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
           if (locInFrame) scenePrompt += ` LOCATION LOCK: [Image${locIdx}] is this ad's LOCKED setting — place the scene in exactly this environment, matching its architecture, surfaces, colour palette and lighting so every cut shares one consistent world and colour grade. It's an empty plate: populate it with the action, but keep the same space. Ignore any text or logos in it.`
+          // LENS DECODE — the exact optics this beat used, read off the source (macro/probe, focal length,
+          // anamorphic, DOF). Makes the clone match the reference's shot language instead of a generic look.
+          if (s.lens && process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += ` LENS: shoot this on ${String(s.lens)} — match that exact optical character (focal length, depth of field, any macro/probe/anamorphic look and bokeh) as seen in the reference.`
+          // FILM LOOK — the source ad's overall colour grade / film emulation, so every scene shares it.
+          if (meta.beat_sheet?.film_look && process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += ` GRADE: colour-grade to match — ${String(meta.beat_sheet.film_look).slice(0, 160)}.`
           scenePrompt += STYLE_LOCK
           if (process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += DIRECTOR_STYLE
 
