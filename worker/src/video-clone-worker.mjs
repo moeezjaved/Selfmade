@@ -2324,16 +2324,34 @@ async function generateJob(job) {
           // LOCATION PLATE for this scene's setting — compose once per distinct location, then reuse.
           let locPlate = null
           if (s.setting && process.env.SEEDANCE_LOCATIONS !== 'off') {
-            const lk = locKey(s.setting)
-            if (lk) {
-              if (locPlates[lk]) locPlate = locPlates[lk]
-              else {
-                try {
-                  locPlate = await composeLocationPlate({ setting: s.setting, jobId: job.id, aspect: meta.aspect })
-                  if (locPlate) { locPlates[lk] = locPlate; await stamp({ clone_meta: { ...meta, location_plates: locPlates } }); meta.location_plates = locPlates; console.log(`🏙 ${job.id} location plate composed (${lk})`) }
-                } catch (e) { console.warn(`scene ${i + 1} location plate:`, e.message) }
+            // PREFER a REAL uploaded location photo (asset shelf) matching this scene's setting — a label
+            // match, or the only uploaded location. Falls back to the auto-composed plate when none fits.
+            const userLocs = Array.isArray(meta.user_assets?.locations) ? meta.user_assets.locations : []
+            const setL = String(s.setting || '').toLowerCase()
+            const firstWord = (setL.split(/\s+/)[0] || ' ')
+            const matchLoc = userLocs.find((a) => a && a.url && a.label && (setL.includes(String(a.label).toLowerCase()) || String(a.label).toLowerCase().includes(firstWord)))
+              || (userLocs.length === 1 && userLocs[0]?.url ? userLocs[0] : null)
+            if (matchLoc && matchLoc.url) { locPlate = matchLoc.url; console.log(`🏙 ${job.id} scene ${i + 1} using UPLOADED location (${matchLoc.label || 'unlabeled'})`) }
+            else {
+              const lk = locKey(s.setting)
+              if (lk) {
+                if (locPlates[lk]) locPlate = locPlates[lk]
+                else {
+                  try {
+                    locPlate = await composeLocationPlate({ setting: s.setting, jobId: job.id, aspect: meta.aspect })
+                    if (locPlate) { locPlates[lk] = locPlate; await stamp({ clone_meta: { ...meta, location_plates: locPlates } }); meta.location_plates = locPlates; console.log(`🏙 ${job.id} location plate composed (${lk})`) }
+                  } catch (e) { console.warn(`scene ${i + 1} location plate:`, e.message) }
+                }
               }
             }
+          }
+          // PROP: a real uploaded prop whose label appears in this scene → pass it as an extra reference.
+          let propRef = null
+          const userProps = Array.isArray(meta.user_assets?.props) ? meta.user_assets.props : []
+          if (userProps.length) {
+            const hay = `${s.prompt || ''} ${s.action || ''} ${s.setting || ''}`.toLowerCase()
+            const mp = userProps.find((a) => a && a.url && a.label && hay.includes(String(a.label).toLowerCase()))
+            if (mp && mp.url) propRef = mp.url
           }
           // PACKAGING BEAT — a flavour/box/label reveal shot. Lead it with the packaging-hero still so the
           // cut shows the user's REAL packaging (not a generic box). Composed once on the first such scene.
@@ -2353,9 +2371,11 @@ async function generateJob(job) {
           const compIdx = baseImgs.length + anchorRefs.length + 1     // …and of the composition still
           const locIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + 1  // …and of the location plate
           const pkgIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + (locPlate ? 1 : 0) + 1  // …and of the packaging still
-          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : []), ...(locPlate ? [locPlate] : []), ...(pkgRef ? [pkgRef] : [])].slice(0, 9)
+          const propIdx = baseImgs.length + anchorRefs.length + (compStill ? 1 : 0) + (locPlate ? 1 : 0) + (pkgRef ? 1 : 0) + 1  // …and of the uploaded prop
+          const sceneImages = [...baseImgs, ...anchorRefs, ...(compStill ? [compStill] : []), ...(locPlate ? [locPlate] : []), ...(pkgRef ? [pkgRef] : []), ...(propRef ? [propRef] : [])].slice(0, 9)
           const locInFrame = !!locPlate && locIdx <= sceneImages.length   // survived the 9-ref cap?
           const pkgInFrame = !!pkgRef && pkgIdx <= sceneImages.length
+          const propInFrame = !!propRef && propIdx <= sceneImages.length
           let scenePrompt = keyframe
             ? `${s.prompt} IMPORTANT — the creator PERFORMS this action fully and visibly on camera (e.g. applies/rolls/sprays/uses the product on themselves as described) — real, continuous movement, NOT just holding the product still. The product in their hands is EXACTLY [Image1] — identical container, cap/applicator, colour and label — kept sharp and identical throughout the motion.`
             : s.prompt
@@ -2366,6 +2386,8 @@ async function generateJob(job) {
           if (compStill) scenePrompt += ` COMPOSITION: match the framing, subject placement and camera feel of [Image${compIdx}] (a frame from the reference ad's same beat). Do NOT copy any brand text or logos from it — any product shown must be the user's product, exactly as its reference photo.`
           if (locInFrame) scenePrompt += ` LOCATION LOCK: [Image${locIdx}] is this ad's LOCKED setting — place the scene in exactly this environment, matching its architecture, surfaces, colour palette and lighting so every cut shares one consistent world and colour grade. It's an empty plate: populate it with the action, but keep the same space. Ignore any text or logos in it.`
           if (pkgInFrame) scenePrompt += ` PACKAGING: [Image${pkgIdx}] is the user's REAL packaging — render the box/label/flavour variants EXACTLY as shown (same colours, logo and text, no invented flavours). This beat features that packaging as the hero.`
+          if (locInFrame && (Array.isArray(meta.user_assets?.locations) && meta.user_assets.locations.some((a) => a && a.url === locPlate))) scenePrompt += ` (The location [Image${locIdx}] is the user's REAL place — reproduce it faithfully.)`
+          if (propInFrame) scenePrompt += ` PROP: [Image${propIdx}] is a real prop the user provided — include it in the scene exactly as shown.`
           // LENS DECODE — the exact optics this beat used, read off the source (macro/probe, focal length,
           // anamorphic, DOF). Makes the clone match the reference's shot language instead of a generic look.
           if (s.lens && process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += ` LENS: shoot this on ${String(s.lens)} — match that exact optical character (focal length, depth of field, any macro/probe/anamorphic look and bokeh) as seen in the reference.`

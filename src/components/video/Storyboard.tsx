@@ -14,7 +14,9 @@ type Board = {
   castSheet?: string | null; characterLook?: string | null
   cast?: { id: string; look: string; sheet: string | null }[]
   heroProduct?: string | null; rejectedProduct?: string | null
+  userAssets?: { locations: Asset[]; props: Asset[] }
 }
+type Asset = { id: string; label: string; url: string }
 
 const ROLE_LABEL: Record<string, string> = { hook: 'Hook', body: 'Body', cta: 'CTA' }
 
@@ -168,6 +170,33 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
     if (!affected.length) return
     setScenes((prev) => prev.map((s) => affected.some((a) => a.index === s.index) ? { ...s, preview: null, preview_source: null } : s))
     affected.forEach((s) => { genKeyframe({ ...s, preview: null }) })
+  }
+  // ── ASSET SHELF: reusable location/prop photos the founder uploads once; the generator uses them as
+  // references (a real location locks that setting; props are passed to matching scenes). Additive. ──
+  const [assets, setAssets] = useState<{ locations: Asset[]; props: Asset[] }>({ locations: [], props: [] })
+  const [assetBusy, setAssetBusy] = useState<Record<string, boolean>>({})
+  useEffect(() => { if (board?.userAssets) setAssets({ locations: board.userAssets.locations || [], props: board.userAssets.props || [] }) }, [board?.userAssets])
+  const uploadAsset = async (kind: 'location' | 'prop', file: File | null) => {
+    if (!board?.editable || !file) return
+    const k = `up-${kind}`
+    setAssetBusy((m) => ({ ...m, [k]: true }))
+    try {
+      const pre = await fetch('/api/assets/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ fileType: file.type, sizeBytes: file.size }) }).then((x) => x.json()).catch(() => ({}))
+      if (!pre?.uploadUrl || !pre?.key) throw new Error('upload start failed')
+      const put = await fetch(pre.uploadUrl, { method: 'PUT', headers: { 'content-type': pre.fileType || file.type }, body: file })
+      if (!put.ok) throw new Error('upload failed')
+      const r = await fetch('/api/discovery/clone-video/keyframe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: board.jobId, assetOp: true, assetKind: kind, uploadedKey: pre.key }) }).then((x) => x.json()).catch(() => ({}))
+      if (r?.userAssets) setAssets({ locations: r.userAssets.locations || [], props: r.userAssets.props || [] })
+    } catch { /* surface nothing loud — user can retry */ } finally { setAssetBusy((m) => ({ ...m, [k]: false })) }
+  }
+  const removeAsset = async (kind: 'location' | 'prop', id: string) => {
+    if (!board?.editable) return
+    setAssets((a) => ({ ...a, [kind === 'prop' ? 'props' : 'locations']: a[kind === 'prop' ? 'props' : 'locations'].filter((x) => x.id !== id) }))
+    try { await fetch('/api/discovery/clone-video/keyframe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: board.jobId, assetOp: true, assetKind: kind, remove: true, assetId: id }) }) } catch { /* optimistic */ }
+  }
+  const relabelAsset = async (kind: 'location' | 'prop', id: string, label: string) => {
+    if (!board?.editable) return
+    try { await fetch('/api/discovery/clone-video/keyframe', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ jobId: board.jobId, assetOp: true, assetKind: kind, assetId: id, label }) }) } catch { /* best-effort */ }
   }
   // Toggle whether a scene shows YOUR product (✅ hero) or the RIVAL/bad item (🚫 rejected, e.g. a vape),
   // then redraw it — so the user can say "show the vape here, not Aura." Persists the intent on the beat.
@@ -382,6 +411,39 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
           <button onClick={regenerateCast} disabled={castBusy} style={{ fontSize: 11.5, fontWeight: 700, color: '#20321c', background: '#fff', border: '1px solid #d7ddd2', borderRadius: 8, padding: '7px 12px', cursor: castBusy ? 'default' : 'pointer', flexShrink: 0, fontFamily: 'inherit' }}>
             {castBusy ? 'Redrawing…' : cast ? '↻ Redraw creator' : 'Draw creator'}
           </button>
+        </div>
+      )}
+
+      {/* ASSET SHELF — upload real location photos + props so the clone uses YOUR world, not an AI guess. */}
+      {showKeyframes && board.editable && (
+        <div style={{ border: '1px solid #e6ece2', borderRadius: 12, padding: '12px 14px', background: '#fbfcfa', marginBottom: 12 }}>
+          <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872', marginBottom: 2 }}>Your assets · optional — make it look like your world</div>
+          <div style={{ fontSize: 11.5, color: '#66755d', marginBottom: 10 }}>Upload a real location photo (we lock scenes in it) or a prop. Label a location to match it to a scene’s setting. Leave empty and we’ll generate them.</div>
+          {(['location', 'prop'] as const).map((kind) => {
+            const listKey = kind === 'prop' ? 'props' : 'locations'
+            const list = assets[listKey]
+            const busy = !!assetBusy[`up-${kind}`]
+            return (
+              <div key={kind} style={{ marginBottom: kind === 'location' ? 12 : 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#20321c', marginBottom: 6 }}>{kind === 'location' ? '📍 Locations' : '🎁 Props / other'}</div>
+                <div style={{ display: 'flex', gap: 10, overflowX: 'auto', paddingBottom: 2 }}>
+                  {list.map((a) => (
+                    <div key={a.id} style={{ width: 110, flexShrink: 0, border: '1px solid #e6ece2', borderRadius: 10, overflow: 'hidden', background: '#fff' }}>
+                      <div style={{ width: '100%', aspectRatio: '1/1', background: '#eef2ec', position: 'relative' }}>
+                        <img src={a.url} alt="" onClick={() => setZoom(a.url)} title="Click to enlarge" style={{ width: '100%', height: '100%', objectFit: 'cover', cursor: 'zoom-in' }} />
+                        <button onClick={() => removeAsset(kind, a.id)} title="Remove" style={{ position: 'absolute', top: 3, right: 3, width: 18, height: 18, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 11, lineHeight: 1, cursor: 'pointer' }}>×</button>
+                      </div>
+                      <input defaultValue={a.label} placeholder={kind === 'location' ? 'name (e.g. kitchen)' : 'name'} onBlur={(e) => relabelAsset(kind, a.id, e.target.value)} style={{ width: '100%', border: 'none', borderTop: '1px solid #eef2ec', fontSize: 10.5, padding: '5px 7px', fontFamily: 'inherit', outline: 'none', background: '#fff' }} />
+                    </div>
+                  ))}
+                  <label style={{ width: 110, flexShrink: 0, aspectRatio: '1/1', border: '1px dashed #cdd6c6', borderRadius: 10, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, cursor: busy ? 'default' : 'pointer', color: '#66755d', fontSize: 11, fontWeight: 700 }}>
+                    {busy ? '…' : <>＋ Upload<span style={{ fontSize: 9.5, fontWeight: 400, color: '#a7b09e' }}>{kind === 'location' ? 'a real place' : 'a prop'}</span></>}
+                    <input type="file" accept="image/png,image/jpeg,image/webp" disabled={busy} onChange={(e) => { uploadAsset(kind, e.target.files?.[0] || null); e.currentTarget.value = '' }} style={{ display: 'none' }} />
+                  </label>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
 
