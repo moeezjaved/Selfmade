@@ -2176,8 +2176,20 @@ async function generateJob(job) {
         }
         const N = scenes.length
         const PER_SCENE = 75   // ~seconds a scene render takes → drives the ETA
+        // ── DIALOGUE MODE (Option B · Seedance 2.5 native audio) ────────────────────────────────────
+        // Interview / vox-pop ads are a CONVERSATION (host asks, people answer), not one narrator. When
+        // on, each people-scene renders with Seedance's OWN lip-synced audio speaking THAT scene's line
+        // (so the man asks and the women answer, each in their own voice), and we SKIP the single TTS VO
+        // track + the Remotion re-render (which would replace the audio). Gated by SEEDANCE_DIALOGUE
+        // (default on) and only when the ad actually has on-camera speech.
+        const dialogueMode = process.env.SEEDANCE_DIALOGUE !== 'off' &&
+          (meta.beat_sheet?.is_talking_head === true || scenes.some((sc) => sc.has_people && String(sc.script || '').trim().length > 1))
+        if (dialogueMode) console.log(`🗣 ${job.id} DIALOGUE MODE — per-scene native audio (Seedance 2.5 speaks each line)`)
         for (let i = 0; i < scenes.length; i++) {
           const s = scenes[i]
+          // Does THIS scene speak? (a person on camera + a line to say → Seedance lip-syncs it natively)
+          const sceneLine = String(s.script || '').trim()
+          const sceneSpeaks = dialogueMode && s.has_people !== false && sceneLine.length > 1
           // Live progress: scenes are the bulk of the wait (10%→82%), ETA = remaining scenes + finish.
           await prog(`Creating scene ${i + 1} of ${N}…`, 10 + (i / N) * 72, (N - i) * PER_SCENE + 35)
           // Scenes render VISUALS ONLY (ambience, no spoken dialogue) — the narration is one
@@ -2285,6 +2297,9 @@ async function generateJob(job) {
           if (meta.beat_sheet?.film_look && process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += ` GRADE: colour-grade to match — ${String(meta.beat_sheet.film_look).slice(0, 160)}.`
           scenePrompt += STYLE_LOCK
           if (process.env.SEEDANCE_DIRECTOR !== 'off') scenePrompt += DIRECTOR_STYLE
+          // DIALOGUE: make the on-camera person SPEAK this scene's line, lip-synced, in Seedance's own
+          // audio — the conversation (Q → A) instead of one narrator. Scene 1 reads as the host asking.
+          if (sceneSpeaks) scenePrompt += ` SPOKEN LINE — the on-camera person says these EXACT words ALOUD to camera, clearly lip-synced, in ${langName(meta.language).split(' — ')[0]}: "${sceneLine.replace(/"/g, "'")}". ${i === 0 ? 'Deliver it like a friendly interviewer/host addressing someone.' : 'Deliver it as a candid, honest real reaction.'} Real mouth movement in sync with the words. Natural ambient street sound only — NO background music.`
 
           let videoUrl = null
           // GENERATOR ROUTING BY CONTENT — the general fidelity rule (any product, not one vial):
@@ -2297,9 +2312,9 @@ async function generateJob(job) {
           //  • PEOPLE, NO product → VACE pose-restyle (motion copy is its strength; nothing to blur).
           //  • PEOPLE-free b-roll → Seedance with the source motion ref (no faces → safe).
           if (s.has_people && s.has_product !== false) {
-            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance keyframe-led)`)
+            console.log(`🎞 ${job.id} scene ${i + 1}/${scenes.length} (${s.duration}s, product-scene · seedance keyframe-led${sceneSpeaks ? ' · 🗣 speaks' : ''})`)
             try {
-              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: false }))
+              ;({ videoUrl } = await falGenerate({ prompt: scenePrompt, imageUrls: sceneImages, resolution: meta.resolution, duration: renderDur, aspect: meta.aspect, tier: meta.tier, generateAudio: sceneSpeaks }))
             } catch (e) {
               // The keyframe shows the action (for an application shot, near the head) and Nano Banana
               // sometimes leaves a face in it → fal's likeness filter rejects it. Salvage: retry with
@@ -2408,7 +2423,10 @@ async function generateJob(job) {
         // Pace the voiceover to the FULL stitched length so the voice covers the whole ad (UGC-style)
         // instead of finishing early and getting the tail trimmed. Expanded once, reused by every cut.
         const vidSecs = scenes.reduce((a, s) => a + (Number(s.duration) || 5), 0)
-        const voScript = await fillScriptToLength(finalScript, vidSecs, meta.language, meta.product_details?.name)
+        // Dialogue mode: the scenes ALREADY carry their own spoken audio (Seedance native) — do NOT lay a
+        // single narrator VO over the top (that's what made it "one girl speaking"). Empty voScript →
+        // assemble() skips TTS/mux and ships the stitched clips with their native per-scene voices.
+        const voScript = dialogueMode ? '' : await fillScriptToLength(finalScript, vidSecs, meta.language, meta.product_details?.name)
         await prog('Stitching + voiceover…', 86, 30)
         const main = await assemble(files, voScript, 'main')
         await prog('Finishing up…', 95, 12)
@@ -2424,8 +2442,10 @@ async function generateJob(job) {
         // Remotion is the DEFAULT cinematic assembly: emit the timeline (silent scene clips + VO track +
         // captions + brand) and request a render that REPLACES image_url with the Remotion cut. The
         // ffmpeg `url` above stays as image_url until selfmade-render succeeds → automatic fallback if it fails.
+        // Skip the Remotion re-render in dialogue mode: it rebuilds audio from the (now empty) VO track and
+        // would strip the scenes' native speech. Ship the direct ffmpeg cut, which keeps the per-scene voices.
         let cineTimeline = null
-        try { cineTimeline = buildCinematicTimeline(meta, scenes, clipsDone, voScript, mainVoUrl) } catch (e) { console.warn(`cine timeline ${job.id}:`, e.message) }
+        if (!dialogueMode) { try { cineTimeline = buildCinematicTimeline(meta, scenes, clipsDone, voScript, mainVoUrl) } catch (e) { console.warn(`cine timeline ${job.id}:`, e.message) } }
         await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, scene_plan: scenes, script: voScript, final_script: voScript, fal_cost_est: +falCost.toFixed(2), ...(meta.hook_variants_tx ? { hook_label: 'Original hook' } : {}), ...(cineTimeline ? { timeline: cineTimeline, render: { status: 'requested', aspects: ['9:16'], replaceImageUrl: true } } : {}) } })
         if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'faithful', scenes: scenes.length, actual_cost_usd: +falCost.toFixed(2) } })
         console.log(`🎬 cloned (faithful, ${scenes.length} scenes) ${job.id} → ${url}`)
