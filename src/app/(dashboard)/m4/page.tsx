@@ -952,8 +952,13 @@ function M4Inner() {
             <div style={{...S.card,padding:48,textAlign:'center'}}>
               <div style={{fontSize:32,marginBottom:12}}>Chart</div>
               <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No campaign data yet</div>
-              <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Run campaigns for 7 days then grade.</div>
-              <button onClick={gradeNow} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
+              <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20}}>Launch a campaign, then grade it after ~7 days of data.</div>
+              {/* Primary path back to the creator — without this the grades EMPTY state trapped users who
+                  just launched (only "Grade Now" showed, no way to build another campaign). */}
+              <div style={{display:'flex',gap:10,justifyContent:'center',flexWrap:'wrap'}}>
+                <button onClick={()=>goTo('welcome')} style={{background:'#ff5a2c',color:'#fff',border:'none',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>+ New campaign</button>
+                <button onClick={gradeNow} style={{background:'none',border:'1.5px solid rgba(255,90,44,0.25)',color:'#141d15',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Grade Now</button>
+              </div>
             </div>
           ):(
             <div style={{display:'flex',flexDirection:'column',gap:14}}>
