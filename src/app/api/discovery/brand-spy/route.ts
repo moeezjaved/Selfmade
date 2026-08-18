@@ -358,6 +358,10 @@ export async function DELETE(req: NextRequest) {
   const { data: fb } = await admin.from('followed_brands').select('brand_name, brand_id').in('user_id', orgIds).eq('page_id', pageId).not('brand_name', 'is', null).limit(1).maybeSingle()
   const label = fb?.brand_name && !/^\d+$/.test(String(fb.brand_name).trim()) ? fb.brand_name : pageId
   await admin.from('followed_brands').delete().in('user_id', orgIds).eq('page_id', pageId)
+  // Prune the competitor's stale new-ad alerts too. suggestTasks (the brief plan) aggregates from
+  // `notifications`, so leaving them behind kept a REMOVED competitor generating "Produce the X
+  // intelligence report" cards. Data must be dynamic across the app: unspy → gone everywhere.
+  await admin.from('notifications').delete().in('user_id', orgIds).eq('type', 'new_ad').eq('page_id', pageId).then(() => {}, () => {})
   await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${label}`, 'brand', (fb as any)?.brand_id || null)
   return NextResponse.json({ ok: true, pageId })
 }

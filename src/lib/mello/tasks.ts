@@ -90,19 +90,25 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
     cur.ads += Number(n.ad_count) || 1
     byPage.set(pid, cur)
   }
-  const ranked = Array.from(byPage.values()).sort((a, b) => b.ads - a.ads)
+  let ranked = Array.from(byPage.values()).sort((a, b) => b.ads - a.ads)
 
   // Map each watched competitor (page_id) → the BRAND that actually follows it, so a creative for
   // "country delight" is built for the brand tracking it (Ejad Farm), NOT whatever brand is active
   // (that mismatch is how a country-delight task produced an Aura ad). mig 117: followed_brands.brand_id.
   const followMap = new Map<string, string>()
+  const followedPages = new Set<string>()   // page_ids the user CURRENTLY follows (any brand)
   if (ranked.length) {
     const { data: fb } = await admin.from('followed_brands')
       .select('page_id, brand_id').eq('user_id', userId).in('page_id', ranked.map((c) => c.pageId))
     for (const r of (fb || []) as any[]) {
+      if (r.page_id) followedPages.add(String(r.page_id))
       if (r.page_id && r.brand_id && !followMap.has(String(r.page_id))) followMap.set(String(r.page_id), String(r.brand_id))
     }
   }
+  // STALE-DATA FIX: notifications persist after a competitor is removed from Spy (followed_brands row
+  // deleted), so a removed rival kept generating "Produce the X intelligence report". Only suggest tasks
+  // for competitors the user STILL follows — the brief must reflect current Spy state across the app.
+  ranked = ranked.filter((c) => followedPages.has(c.pageId))
 
   // ── RESEARCH — the strongest signal first (a burst worth a full report) ──
   for (const c of ranked) {
