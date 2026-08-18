@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       ageMin = '18',
       ageMax = '65',
       gender = 'ALL',
-      pixelId = '',
+      pixelId: pixelIdIn = '',
       objective = 'OUTCOME_SALES',
       pageId = '',
       instagramActorId = '',
@@ -92,6 +92,24 @@ export async function POST(request: NextRequest) {
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = `act_${metaAccount.account_id}`
     const currency = metaAccount.currency || 'USD'
+
+    // Resolve a Pixel that ACTUALLY belongs to THIS ad account. Purchase/conversion ads run fine on a
+    // brand-new account + pixel (no prior events needed) — the ONLY hard requirement is that the pixel is
+    // on the ad account. The wizard persists the chosen pixelId across brand/account switches, so it can
+    // point at a pixel from a DIFFERENT account → Meta then rejects the conversion campaign with 1487888
+    // ("no conversion tracking source on the promoted object"). Prefer the chosen pixel when it's on this
+    // account; otherwise use the account's OWN pixel; only when the account has NO pixel do we fall back.
+    let pixelId = pixelIdIn
+    try {
+      const pxRes = await fetch(`https://graph.facebook.com/${V}/${adAccountId}/adspixels?fields=id&limit=50&access_token=${encodeURIComponent(token)}`)
+      const px = await pxRes.json()
+      const ids: string[] = (px?.data || []).map((p: any) => String(p.id))
+      if (ids.length) {
+        if (!pixelId || !ids.includes(String(pixelId))) pixelId = ids[0]   // chosen pixel not on this account → use its own
+      } else {
+        pixelId = ''   // account genuinely has no pixel → Sales will fall back to Traffic below
+      }
+    } catch { /* keep the chosen pixel; Meta validates on create */ }
 
     // Pre-flight: is this ad account actually ready to run ads? Catches the "campaign created but no ads /
     // Account overview" dead-end BEFORE we build anything. Never hard-blocks on a check that itself fails.
@@ -205,24 +223,11 @@ export async function POST(request: NextRequest) {
       return d
     }
 
-    // Create an ad set, self-healing Meta's conversion-source / object validation walls. A Sales
-    // campaign optimizes PURCHASE via the Pixel, but a FRESH pixel with no recorded conversions isn't a
-    // valid conversion source yet → Meta rejects with 1487888 ("no conversion tracking source") or
-    // 1885154 ("selected object"). Instead of dying, retry the SAME ad set optimized for LINK_CLICKS
-    // (Traffic — needs no pixel/object; the ad's URL is the object). Under a Sales campaign LINK_CLICKS is
-    // an allowed optimization, so the ad still goes live and drives clicks until the Pixel starts
-    // recording purchases, at which point a relaunch optimizes for Sales.
-    const createAdset = async (body: Record<string, unknown>) => {
-      try { return await post(`${adAccountId}/adsets`, body) }
-      catch (e: any) {
-        if (/1487888|1885154|conversion tracking|conversion source|selected object|promoted object/i.test(String(e?.message || ''))) {
-          const { promoted_object, ...rest } = body as any
-          downgradeNote = downgradeNote || 'Your Meta Pixel has no conversion events yet, so we launched a Traffic campaign (drives clicks to your site). Once the Pixel records purchases, relaunch to optimize for Sales.'
-          return await post(`${adAccountId}/adsets`, { ...rest, optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS', destination_type: 'WEBSITE' })
-        }
-        throw e
-      }
-    }
+    // Create an ad set. Purchase/conversion ads DO run on a brand-new account + pixel (no prior events
+    // needed) — we no longer silently downgrade Sales to Traffic. The pixel was already resolved to one
+    // that belongs to THIS ad account (above), which is the real fix for the 1487888 conversion-source
+    // rejection; a genuinely pixel-less account already downgraded the objective to Traffic upstream.
+    const createAdset = async (body: Record<string, unknown>) => post(`${adAccountId}/adsets`, body)
 
     // Search for real Meta interest ID
     const searchInterest = async (name: string) => {
