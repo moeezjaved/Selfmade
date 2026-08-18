@@ -15,6 +15,11 @@ const MODEL_LABEL: Record<string, string> = {
   'claude-opus': 'Claude Opus', 'gemini-2.5-pro': 'Gemini 2.5 Pro', 'gpt-4o': 'GPT-4o',
 }
 
+// Ad copy crawled from Meta sometimes carries unresolved Liquid/Handlebars merge tags like
+// {{product.brand}} or {{ product.name }} (the rival's own dynamic-copy placeholders). Never show the
+// raw token to the user — strip it so a swipe card reads clean instead of "{{product.brand}}".
+const cleanTpl = (t?: string | null): string => (t || '').replace(/\{\{[^}]*\}\}/g, '').replace(/\s{2,}/g, ' ').trim()
+
 export default async function DocumentPage({ params }: { params: { id: string } }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -155,7 +160,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
                           <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
                             {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ') || 'their creative'}
                           </div>
-                          <div style={{ fontSize: 11.5, color: '#3a7d2c', fontWeight: 800 }}>Make my version →</div>
+                          <div style={{ fontSize: 11.5, color: '#ef4a1e', fontWeight: 800 }}>Make my version →</div>
                         </div>
                       </Link>
                     )
@@ -186,12 +191,12 @@ export default async function DocumentPage({ params }: { params: { id: string } 
                   </div>
                   <div style={{ padding: '11px 12px', display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
                     <div style={{ fontSize: 12.5, color: '#2f3b2b', lineHeight: 1.4, flex: 1 }}>
-                      {(s.headline || s.copy || 'Untitled ad').slice(0, 90)}
+                      {(cleanTpl(s.headline) || cleanTpl(s.copy) || 'Untitled ad').slice(0, 90)}
                     </div>
                     <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
                       {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ')}
                     </div>
-                    <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#c9f24d', color: '#141d15', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>
+                    <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#ef4a1e', color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>
                       ✨ Make my version →
                     </Link>
                   </div>
