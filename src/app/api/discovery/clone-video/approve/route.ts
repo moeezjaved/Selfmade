@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   // Mode: 'ugc' (one talking-head clip, default) or 'faithful' (scene-by-scene + stitch — priced by
   // scene count via the video_clone_xN credit_pricing rows). Scene count is server-side (worker's
   // analysis), clamped 2-4, so the client can't pick a cheaper row than the work costs.
-  const chosenMode = mode === 'faithful' ? 'faithful' : 'ugc'
+  const chosenMode = mode === 'faithful' ? 'faithful' : mode === 'oneshot' ? 'oneshot' : 'ugc'
   // Cinematic length follows the user's script: the client sends how many scenes cover the narration.
   // Clamp to [2, the source ad's analysed cut count] — the client can pick FEWER (shorter/cheaper, less
   // work) but never MORE than the source has (that ceiling keeps pricing honest). Stored back into
@@ -61,6 +61,13 @@ export async function POST(req: NextRequest) {
     const lenCapScenes = Math.max(2, Math.min(16, Math.floor(targetSecs / 3)))
     nScenes = Math.min(nScenes, lenCapScenes)
   }
+  // ONE-SHOT: a single Seedance 2.5 generation of the whole spot (up to 30s, the model's max). Length is
+  // the picked bucket, never longer than the source. Priced as one clip (30s ≈ 2× a 15s gen).
+  if (chosenMode === 'oneshot') {
+    let b = Number(durationBucket) || 15
+    if (durationBucket === 'match') b = Math.round(srcSecs)
+    targetSecs = Math.max(4, Math.min(b, 30, Math.round(srcSecs) || 30))
+  }
   let nSeg = 1
   if (chosenMode === 'ugc') {
     let bucket: number = Number(durationBucket) || 15
@@ -72,9 +79,11 @@ export async function POST(req: NextRequest) {
   const suffix = meta.tier === 'fast' ? '_fast' : ''
   const action = chosenMode === 'faithful'
     ? `video_clone_x${nScenes}${suffix}`
-    : nSeg > 1
-      ? `video_clone_x${nSeg}${suffix}`
-      : (meta.tier === 'fast' ? 'video_clone_fast' : 'video_clone')
+    : chosenMode === 'oneshot'
+      ? (targetSecs > 22 ? `video_clone_x2${suffix}` : (meta.tier === 'fast' ? 'video_clone_fast' : 'video_clone'))
+      : nSeg > 1
+        ? `video_clone_x${nSeg}${suffix}`
+        : (meta.tier === 'fast' ? 'video_clone_fast' : 'video_clone')
 
   // Reserve now — this is the billable moment (the user has approved the script).
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
