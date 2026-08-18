@@ -125,7 +125,7 @@ export async function runTask(admin: any, ctx: RunTaskCtx, task: any): Promise<a
         await admin.from('activity_logs').insert({
           user_id: userId, action_type: task.kind.toUpperCase(), entity_type: 'campaign',
           description: `${task.kind === 'meta_pause' ? 'Paused' : `Scaled to $${ev.newBudget}/day`} “${ev.campaignName || ev.metaCampaignId}” — approved via ${source}`,
-          performed_by: 'mello',
+          performed_by: 'mello', brand_id: (ev as any).brandId || task.brand_id || null,
         }).then(() => {}, () => {})
       }
 
@@ -141,7 +141,7 @@ export async function runTask(admin: any, ctx: RunTaskCtx, task: any): Promise<a
         await admin.from('activity_logs').insert({
           user_id: userId, action_type: task.kind.toUpperCase(), entity_type: 'campaign',
           description: `Duplicated a winner into a focused campaign (${ev.apply?.label || 'best segment'}) at $${ev.newBudget}/day — approved via ${source}`,
-          performed_by: 'mello',
+          performed_by: 'mello', brand_id: (ev as any).brandId || task.brand_id || null,
         }).then(() => {}, () => {})
       }
 
