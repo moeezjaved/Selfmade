@@ -66,6 +66,23 @@ export async function orgMemberIds(admin: SupabaseClient, orgId: string): Promis
 }
 
 /**
+ * Every user_id that shares ANY org with this user — self + the owner + all teammates, across ALL orgs
+ * they belong to. The correct "workspace pool" for shared, user-keyed resources (brands/projects,
+ * connected Meta accounts): a member sees the OWNER's brands, the owner sees a member's, one shared
+ * workspace. Unlike the newest-membership shortcut, this doesn't collapse to a member's empty personal
+ * org (which is how a teammate landed on the brief with zero brands). Falls back to [userId] for solos.
+ */
+export async function allOrgMemberIds(admin: SupabaseClient, userId: string): Promise<string[]> {
+  const db = admin as any
+  const { data: rows } = await db.from('org_members').select('org_id').eq('user_id', userId)
+  const orgIds = Array.from(new Set((rows || []).map((r: any) => r.org_id).filter(Boolean)))
+  if (!orgIds.length) return [userId]
+  const { data: members } = await db.from('org_members').select('user_id').in('org_id', orgIds)
+  const ids = Array.from(new Set([userId, ...(members || []).map((m: any) => m.user_id).filter(Boolean)])) as string[]
+  return ids.length ? ids : [userId]
+}
+
+/**
  * The org's shared Meta ad-account POOL: every active account connected by any member. One shared
  * workspace ⇒ the team draws from the same set of connected accounts (not just each person's own).
  */

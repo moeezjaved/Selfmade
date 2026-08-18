@@ -6,13 +6,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
+import { allOrgMemberIds } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 const ARR = (v: any) => Array.isArray(v) ? v.map(String) : (v ? [String(v)] : [])
 
+// One shared workspace: a brand is "accessible" to anyone in its owner's org (member edits assets, uses
+// Studio, etc.) — not just the row's user_id. Was self-only, which is why an invited member couldn't
+// open the owner's brand.
 async function owned(admin: any, brandId: string, userId: string) {
-  const { data } = await admin.from('brands').select('id').eq('id', brandId).eq('user_id', userId).maybeSingle()
+  const ids = await allOrgMemberIds(admin, userId).catch(() => [userId])
+  const { data } = await admin.from('brands').select('id').eq('id', brandId).in('user_id', ids).maybeSingle()
   return !!data
 }
 
@@ -21,7 +26,8 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const { data: brand } = await admin.from('brands').select('*').eq('id', params.id).eq('user_id', user.id).maybeSingle()
+  const memberIds = await allOrgMemberIds(admin, user.id).catch(() => [user.id])
+  const { data: brand } = await admin.from('brands').select('*').eq('id', params.id).in('user_id', memberIds).maybeSingle()
   if (!brand) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const [{ data: products }, { data: assets }] = await Promise.all([
     admin.from('brand_products').select('*').eq('brand_id', params.id).order('created_at', { ascending: false }),
@@ -113,6 +119,13 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   else if (productId) await admin.from('brand_products').delete().eq('id', productId).eq('brand_id', params.id)
   else if (assetId) await admin.from('brand_assets').delete().eq('id', assetId).eq('brand_id', params.id)
   else {
+    // Deleting a WHOLE brand is destructive and shared-workspace-visible. `owned` is org-scoped now, so
+    // guard here: only the brand's actual creator may delete it — a teammate must not be able to nuke the
+    // owner's brand (child deletes above stay open, since editing assets is normal shared-workspace use).
+    const { data: br } = await admin.from('brands').select('user_id').eq('id', params.id).maybeSingle()
+    if (br && (br as any).user_id !== user.id) {
+      return NextResponse.json({ error: 'Only the teammate who created this brand can delete it.' }, { status: 403 })
+    }
     // Ghost-data cleanup: followed_brands.brand_id is ON DELETE SET NULL (mig 117) and brief_events has
     // NO foreign key (mig 108) — so deleting a brand otherwise leaves its competitors behind (orphaned
     // to account-level, still spied) and its brief cards forever. That's the "removed all brands but the
