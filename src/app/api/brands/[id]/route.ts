@@ -120,19 +120,30 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
   else if (assetId) await admin.from('brand_assets').delete().eq('id', assetId).eq('brand_id', params.id)
   else {
     // Deleting a WHOLE brand is destructive and shared-workspace-visible. `owned` is org-scoped now, so
-    // guard here: only the brand's actual creator may delete it — a teammate must not be able to nuke the
-    // owner's brand (child deletes above stay open, since editing assets is normal shared-workspace use).
+    // guard here: the brand's creator can delete it, AND so can an org OWNER/ADMIN (they run the
+    // workspace — this is what lets an owner remove a duplicate brand a member created during the old
+    // from-scratch onboarding). A plain member still can't nuke someone else's brand.
     const { data: br } = await admin.from('brands').select('user_id').eq('id', params.id).maybeSingle()
     if (br && (br as any).user_id !== user.id) {
-      return NextResponse.json({ error: 'Only the teammate who created this brand can delete it.' }, { status: 403 })
+      const { data: myRoles } = await admin.from('org_members').select('org_id, role').eq('user_id', user.id)
+      const adminOrgs = (myRoles || []).filter((r: any) => r.role === 'owner' || r.role === 'admin').map((r: any) => r.org_id)
+      let allowed = false
+      if (adminOrgs.length) {
+        const { data: shared } = await admin.from('org_members').select('org_id').eq('user_id', (br as any).user_id).in('org_id', adminOrgs)
+        allowed = !!(shared && shared.length)
+      }
+      if (!allowed) return NextResponse.json({ error: 'Only the teammate who created this brand, or an org owner/admin, can delete it.' }, { status: 403 })
     }
+    // When an owner/admin deletes a brand created by ANOTHER member, the ghost-data cleanup must target
+    // that CREATOR's rows, not the caller's, or the competitors/brief cards orphan.
+    const ownerUid = (br as any)?.user_id || user.id
     // Ghost-data cleanup: followed_brands.brand_id is ON DELETE SET NULL (mig 117) and brief_events has
     // NO foreign key (mig 108) — so deleting a brand otherwise leaves its competitors behind (orphaned
     // to account-level, still spied) and its brief cards forever. That's the "removed all brands but the
     // brief + Feed still show their competitors" bug. Delete them explicitly FIRST, while brand_id still
     // matches (the SET NULL fires the moment the brand row goes), then delete the brand.
-    await admin.from('followed_brands').delete().eq('user_id', user.id).eq('brand_id', params.id).then(() => {}, () => {})
-    await admin.from('brief_events').delete().eq('user_id', user.id).eq('brand_id', params.id).then(() => {}, () => {})
+    await admin.from('followed_brands').delete().eq('user_id', ownerUid).eq('brand_id', params.id).then(() => {}, () => {})
+    await admin.from('brief_events').delete().eq('user_id', ownerUid).eq('brand_id', params.id).then(() => {}, () => {})
     await admin.from('brands').delete().eq('id', params.id)  // delete the whole brand (cascades the rest)
   }
   return NextResponse.json({ success: true })
