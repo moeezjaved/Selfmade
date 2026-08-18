@@ -27,6 +27,30 @@ const uid = () => Math.random().toString(36).slice(2)
 const fileToDataUrl = (f: File) => new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) })
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// ── ONE-SHOT PROMPT PREVIEW — mirrors the exact prompt the worker (video-clone-worker.mjs, oneshot
+// branch) sends to Seedance 2.5, so the founder SEES what the model receives before spending credits.
+// Keep the two craft blocks below byte-identical to the worker's STYLE_LOCK / DIRECTOR_STYLE constants.
+const OS_STYLE_LOCK = ' STYLE LOCK: full colour, bright natural lighting, one consistent realistic colour grade across the whole ad — never black-and-white, never a different mood or film look from the other scenes.'
+const OS_DIRECTOR_STYLE = ' CINEMATIC DIRECTION: photorealistic, shot on a physical cine lens with natural motion blur — no 3D/CGI/game-engine look. A motivated camera move (a real reason to push or track). Natural motivated lighting with gentle atmospheric depth. Pore-level skin realism, catch-lights in living eyes, Hollywood micro-acting — micro-pauses, real breathing, precise eye-line, always reacting, never a static pose. Real gravity and weight, correct contact shadows. Smooth 24fps, sharp detail.'
+function buildOneShotPreview(o: { secs: number; isService: boolean; productCount: number; script: string; langLabel: string; aspect?: string }): string {
+  const aspect = o.aspect || '9:16'
+  const prodFirst = 2   // storyboard-first yields an approved opening frame → it's [Image1]; product photos follow
+  const productRef = o.productCount ? `[Image${prodFirst}]${o.productCount > 1 ? `–[Image${prodFirst + o.productCount - 1}]` : ''}` : 'the product'
+  const spoken = String(o.script || '').trim()
+  let p = [
+    `A polished ${o.secs}-second vertical ${aspect} social ad — ONE continuous piece, real people, authentic energy.`,
+    o.isService
+      ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.'
+      : o.productCount ? `The product is ${productRef} — render it EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size; get it big by moving the CAMERA close, never by enlarging it.` : '',
+    '[Image1] is the approved opening frame — begin from it and keep its look and person.',
+    spoken
+      ? `The on-camera person speaks these EXACT words aloud, clearly lip-synced, in ${o.langLabel}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.`
+      : 'Ambient sound only, no music, no on-screen captions.',
+  ].filter(Boolean).join(' ')
+  p += OS_STYLE_LOCK + OS_DIRECTOR_STYLE
+  return p
+}
+
 export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePoster, onClose, onGenerated }: { sourceAdId: string; sourceVideoUrl?: string | null; sourcePoster?: string | null; onClose: () => void; onGenerated?: () => void }) {
   const [brands, setBrands] = useState<Brand[]>([])
   const [brandId, setBrandId] = useState<string | null>(null)
@@ -51,7 +75,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const [gloss, setGloss] = useState<string | null>(null)   // English one-liner for non-English scripts
   const [previewing, setPreviewing] = useState(false)
   const [rescripting, setRescripting] = useState(false)   // one-tap length picker re-pacing the script
-  const [mode, setMode] = useState<'ugc' | 'faithful'>('ugc')
+  const [mode, setMode] = useState<'ugc' | 'faithful' | 'oneshot'>('oneshot')   // One-shot = the reliable default (one Seedance 2.5 gen)
   const modeTouched = useRef(false)                    // user explicitly picked a look → don't let the auto-suggestion override it
   const [suggestedMode, setSuggestedMode] = useState<'ugc' | 'faithful'>('ugc')
   const [srcScenes, setSrcScenes] = useState(2)   // the source ad's analysed cut count (the MAX scenes)
@@ -141,7 +165,9 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const sceneCount = Math.min(srcScenes, Math.max(2, Math.ceil((spokenSecs || 5) / 5.2)))
   const baseCost = mode === 'faithful'
     ? (FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]
-    : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
+    : mode === 'oneshot'
+      ? (resolvedBucket > 22 ? (FAITHFUL_COST[2] || UGC_COST)[tier] : UGC_COST[tier])   // one gen; 30s ≈ 2×
+      : nSegs > 1 ? (FAITHFUL_COST[nSegs] || FAITHFUL_COST[2])[tier] : UGC_COST[tier]
   const addonCost = (mode === 'faithful' ? extraLangs.length * 200 : 0) + (ecOn ? 50 : 0) + (hooksOn && mode === 'faithful' ? 800 : 0)
   const cost = baseCost + addonCost
   // Look → language pairing nudge ("picked Pakistani → speak Urdu?"). Suggests, never forces.
@@ -155,7 +181,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     { id: 'onyx', label: 'Onyx · deep male' }, { id: 'echo', label: 'Echo · calm male' },
   ]
   // Faithful length now follows sceneCount (which follows the script); UGC uses its chosen bucket.
-  const targetSecs = mode === 'faithful' ? Math.max(8, Math.round(sceneCount * 5.2)) : resolvedBucket
+  const targetSecs = mode === 'faithful' ? Math.max(8, Math.round(sceneCount * 5.2)) : mode === 'oneshot' ? Math.min(30, resolvedBucket) : resolvedBucket
   const busy = phase === 'analyzing' || phase === 'generating'
   const LOOKS = ['match', 'Pakistani', 'Indian', 'Arab', 'East Asian', 'Black', 'White', 'Hispanic']
 
@@ -291,7 +317,10 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       setOverlays(Array.isArray(st.overlays) ? st.overlays : [])
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
-      setSuggestedMode(sug); setMode(sug)   // Cinematic LIVE — honour Mello's auto-pick ('faithful' = cinematic, b-roll/montage)
+      setSuggestedMode(sug)
+      // One-shot is the reliable DEFAULT — we no longer auto-switch to UGC/Cinematic. Only honour the
+      // analysis suggestion if the founder explicitly picked a different look.
+      if (modeTouched.current) setMode(sug)
       setSrcScenes(Math.min(10, Math.max(2, Number(st.sceneCount) || 2)))
       setSrcSecs(Number(st.sourceSeconds) || null)
       setPhase('review'); setStep(4)   // land on the first review step (Length & format)
@@ -380,7 +409,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
     { t: 'Extras', s: 'Optional add-ons' },
     { t: 'Script & create', s: 'Review the free script' },
   ]
-  const pickLook = (m: 'ugc' | 'faithful') => { modeTouched.current = true; setMode(m) }   // Cinematic LIVE
+  const pickLook = (m: 'ugc' | 'faithful' | 'oneshot') => { modeTouched.current = true; setMode(m) }   // One-shot / UGC / Cinematic
   const brandName = brands.find((b) => b.id === brandId)?.name || productName.trim() || 'your brand'
   const selPhotos = photos.filter((p) => selected.includes(p.id))
 
@@ -731,11 +760,17 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     <div className="field" style={{ marginBottom: 16 }}>
                       <FieldLabel>Style</FieldLabel>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button onClick={() => pickLook('ugc')} style={chip(mode === 'ugc')}>UGC creator · 1 clip · {UGC_COST[tier]} cr</button>
+                        <button onClick={() => pickLook('oneshot')} style={chip(mode === 'oneshot')}>One-shot ✦ · 1 Seedance take · {resolvedBucket > 22 ? (FAITHFUL_COST[2] || UGC_COST)[tier] : UGC_COST[tier]} cr</button>
+                        <button onClick={() => pickLook('ugc')} style={chip(mode === 'ugc')}>UGC creator · {UGC_COST[tier]} cr</button>
                         <button onClick={() => pickLook('faithful')} style={chip(mode === 'faithful')}>Cinematic · {sceneCount} scenes · {(FAITHFUL_COST[sceneCount] || FAITHFUL_COST[2])[tier]} cr</button>
                       </div>
+                      <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 6, lineHeight: 1.5 }}>
+                        {mode === 'oneshot' ? 'One-shot — the whole ad in a single Seedance 2.5 take (up to 30s), native lip-synced audio, locked to your product. The most reliable — recommended.'
+                          : mode === 'faithful' ? 'Cinematic — scene-by-scene clone, stitched. Most ambitious, more variable.'
+                          : 'UGC — one talking creator (chained clips for longer lengths).'}
+                      </div>
                     </div>
-                    {mode === 'ugc' && (
+                    {mode !== 'faithful' && (
                       <div className="field" style={{ marginBottom: 16 }}>
                         <FieldLabel>Video length</FieldLabel>
                         {(() => {
@@ -766,8 +801,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                           const est = Math.min(bucket, [...Array(nS)].reduce((a) => a + Math.max(5, Math.min(15, Math.round(per / 2.6) + 1)), 0))
                           return <div style={{ fontSize: 11.5, color: GREEN, marginTop: 6, fontWeight: 600 }}>⏱ Your script fills ≈{est}s — we render exactly that (no silent padding), so the final video may be shorter than {bucket}s.</div>
                         })()}
-                        {srcSecs ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : ''}</div>
-                          : nSegs > 1 ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>{nSegs} chained clips of the same creator, stitched into one take.</div> : null}
+                        {srcSecs ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>Source is {srcSecs}s — a remake matches the original length (longer options are disabled).{mode === 'ugc' && nSegs > 1 ? ` ${nSegs} chained clips stitched into one take.` : mode === 'oneshot' && resolvedBucket > 22 ? ' One continuous 30s Seedance take.' : ''}</div>
+                          : mode === 'ugc' && nSegs > 1 ? <div style={{ fontSize: 11.5, color: L_FAINT, marginTop: 6 }}>{nSegs} chained clips of the same creator, stitched into one take.</div> : null}
                       </div>
                     )}
                     <div onClick={() => setOverlaysOn(!overlaysOn)} style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1.5px solid ${overlaysOn ? SEL_BORDER : L_LINE}`, background: overlaysOn ? SEL_BG : '#fff', borderRadius: 14, padding: '13px 15px', cursor: 'pointer' }}>
@@ -846,7 +881,23 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       </div>
                       <textarea value={draftScript} onChange={(e) => setDraftScript(e.target.value)} rows={7} dir={langCfg.rtl ? 'rtl' : 'ltr'} style={{ ...input, width: '100%', resize: 'vertical', lineHeight: langCfg.rtl ? 1.9 : 1.5, fontSize: langCfg.rtl ? 15 : 13.5 }} />
                       {gloss && language !== 'en' && <div style={{ fontSize: 11.5, color: L_MUTED, marginTop: 6, fontStyle: 'italic' }}>In English: “{gloss}”</div>}
-                      {mode !== 'faithful' && (
+                      {/* ONE-SHOT: the EXACT prompt Seedance 2.5 receives, live from the script above — read-only,
+                          so the founder can eyeball-tune before spending credits. The script + product photos are
+                          the only levers; this is transparency, not an input. */}
+                      {mode === 'oneshot' && (
+                        <details style={{ marginTop: 12, border: `1px solid ${L_LINE}`, borderRadius: 12, background: '#fafaf7', overflow: 'hidden' }}>
+                          <summary style={{ cursor: 'pointer', padding: '10px 13px', fontSize: 12.5, fontWeight: 800, color: L_INK, listStyle: 'none' }}>
+                            ✦ What Seedance 2.5 receives <span style={{ color: L_MUTED, fontWeight: 600 }}>· exact prompt + {selected.length + 1} reference image{selected.length ? 's' : ''} — updates as you edit</span>
+                          </summary>
+                          <div style={{ padding: '0 13px 13px' }}>
+                            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Menlo, monospace', background: '#fff', border: `1px solid ${L_LINE}`, borderRadius: 10, padding: '10px 12px' }}>
+                              {buildOneShotPreview({ secs: targetSecs, isService, productCount: selected.length, script: draftScript, langLabel: (langCfg.label || 'English').split(' ')[0] })}
+                            </div>
+                            <div style={{ fontSize: 11, color: L_MUTED, marginTop: 7 }}><b>[Image1]</b> = approved opening frame · <b>[Image2…]</b> = your product photos.</div>
+                          </div>
+                        </details>
+                      )}
+                      {mode === 'ugc' && (
                         <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginTop: 10, background: '#fef1ec', border: `1px solid ${SEL_BORDER}`, borderRadius: 10, padding: '9px 11px', cursor: 'pointer' }}>
                           <input type="checkbox" checked={voiceAccurate} onChange={(e) => setVoiceAccurate(e.target.checked)} style={{ marginTop: 2 }} />
                           <span style={{ fontSize: 12, color: SEL_TEXT, lineHeight: 1.5 }}><b>Use this exact voice in the video</b> — what you hear in “Hear full script” is what ships (best for getting brand names &amp; tricky words right). Trade-off: slightly less-perfect lip-sync. Leave off for the tightest lip-sync (the creator&apos;s own voice).</span>
@@ -882,7 +933,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                       )}
                     </div>
                     <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 16, overflow: 'hidden', marginBottom: 14 }}>
-                      <ReviewRow k="Style" v={mode === 'faithful' ? `Cinematic · ${sceneCount} scenes` : 'UGC creator'} onEdit={() => setStep(4)} />
+                      <ReviewRow k="Style" v={mode === 'faithful' ? `Cinematic · ${sceneCount} scenes` : mode === 'oneshot' ? 'One-shot ✦ · single Seedance take' : 'UGC creator'} onEdit={() => setStep(4)} />
                       <ReviewRow k="Length" v={mode === 'faithful' ? `~${targetSecs}s` : `${resolvedBucket}s`} onEdit={() => setStep(4)} />
                       <ReviewRow k="Brand" v={brandName} onEdit={() => setStep(0)} />
                       <ReviewRow k="Language & voice" v={`${langCfg.label} · ${(VOICES.find(v => v.id === voice) || VOICES[0]).label.split(' · ')[0]}`} onEdit={() => setStep(3)} />
