@@ -145,6 +145,7 @@ export async function POST(request: NextRequest) {
       description: `Campaign launched: "${draft.campaign_name}" — $${draft.budget.amount}/day — ${draft.objective}`,
       meta_api_response: launchResult,
       performed_by: 'user',
+      brand_id: (metaAccount as any).brand_id || null,   // scope to the brand this ad account is linked to
     })
 
     return NextResponse.json({

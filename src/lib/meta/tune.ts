@@ -122,10 +122,11 @@ export async function applyTune(admin: any, userId: string, input: { metaCampaig
     }
     await post(newAdsetId, { status: 'ACTIVE' }).catch(() => null)
 
+    const tuneBrand = await import('@/lib/brand/active').then((m) => m.resolveActiveBrandId(admin, userId)).catch(() => null)
     await admin.from('activity_logs').insert({
       user_id: userId, action_type: apply.kind === 'audience' ? 'META_AUDIENCE' : 'META_PLACEMENT', entity_type: 'campaign',
       description: `Duplicated “${owned.name || winning.name}” into “${tunedName}” at ${budgetMajor}/day, tuned to ${apply.label}. Original untouched.`,
-      performed_by: 'mello',
+      performed_by: 'mello', brand_id: tuneBrand || null,
     }).then(() => {}, () => {})
 
     return { ok: true, campaign: winning.name, newCampaign: tunedName, newDailyBudget: budgetMajor, apply }

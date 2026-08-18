@@ -110,10 +110,11 @@ export async function POST(req: NextRequest) {
       await post(`${adAccountId}/ads`, { name: `${ad.name} — Scale`, adset_id: newAdsetId, creative: { creative_id: creativeId }, status: 'ACTIVE' }).catch(() => null)
     }
 
+    const scaleBrand = await import('@/lib/brand/active').then((m) => m.resolveActiveBrandId(admin, user.id)).catch(() => null)
     await admin.from('activity_logs').insert({
       user_id: user.id, action_type: 'META_SCALE', entity_type: 'campaign',
       description: `Scaled “${owned.name || winning.name}” — duplicated into “${scalingName}” at ${budgetMajor}/day. Original untouched. Approved from the brief.`,
-      performed_by: 'mello',
+      performed_by: 'mello', brand_id: scaleBrand || null,
     }).then(() => {}, () => {})
 
     return NextResponse.json({ ok: true, campaign: winning.name, scalingCampaign: scalingName, newDailyBudget: budgetMajor })
