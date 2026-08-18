@@ -85,6 +85,12 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const enc = encryptToken(TOKEN)   // platform token, encrypted like any other — downstream is door-agnostic
   const { data: existing } = await admin.from('meta_accounts').select('id').eq('user_id', user.id).limit(1)
+  // ONE AD ACCOUNT PER BRAND: if a specific brand is active (the project switcher isn't on "All brands"),
+  // link the account(s) being connected to THAT brand. Otherwise a freshly-connected account is brand_id
+  // null → shows only under "All brands", and the active brand keeps saying "Connect Meta" even though
+  // the account is right there. Link-on-connect is what makes "Aura → its own ad account" actually stick.
+  let activeBrand: string | null = null
+  try { const { resolveActiveBrandId } = await import('@/lib/brand/active'); activeBrand = await resolveActiveBrandId(admin, user.id).catch(() => null) } catch { /* All-brands → leave null */ }
   for (let i = 0; i < chosen.length; i++) {
     const a = chosen[i]
     await admin.from('meta_accounts').upsert({
@@ -96,6 +102,7 @@ export async function POST(req: NextRequest) {
       timezone: a.timezone_name || 'America/New_York',
       status: 'active',
       is_primary: !existing?.length && i === 0,
+      ...(activeBrand ? { brand_id: activeBrand } : {}),
     }, { onConflict: 'user_id,account_id' })
   }
 
