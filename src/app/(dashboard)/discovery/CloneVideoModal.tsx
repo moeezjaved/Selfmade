@@ -94,6 +94,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const bodyRef = useRef<HTMLDivElement | null>(null)          // scroll container — reset to top on step change
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
+  const [shotList, setShotList] = useState<{ t: string; action: string; lens?: string; shows?: string }[]>([])   // one-shot timestamped scene list
   const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
   const [overlaysOn, setOverlaysOn] = useState(false)  // on-screen text is OPT-IN — clean video by default
   const [err, setErr] = useState<string | null>(null)
@@ -314,6 +315,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
       if (st.timedOut) { setErr('Analysis is taking longer than usual — try again in a moment.'); setPhase('form'); return }
       if (st.error) { setErr(st.error); setPhase('form'); return }
       setDraftScript(st.script || '')
+      setShotList(Array.isArray(st.shotList) ? st.shotList : [])
       setOverlays(Array.isArray(st.overlays) ? st.overlays : [])
       setGloss(st.gloss || null)
       const sug = st.suggestedMode === 'faithful' ? 'faithful' : 'ugc'
@@ -873,6 +875,21 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                     <Kicker>Step 7 of 7</Kicker>
                     <H2>Your script — read it, tweak it, create</H2>
                     <Lead>This is exactly what the video will say. Edit any word. Nothing is charged until you press create.</Lead>
+                    {/* ONE-SHOT: the timestamped shot list — the scenes the ad moves through, in order.
+                        Read-only (Seedance films it in one take); the editable voiceover is below. */}
+                    {mode === 'oneshot' && shotList.length > 0 && (
+                      <div className="field" style={{ marginBottom: 14 }}>
+                        <FieldLabel>Shot list · the scenes your ad moves through</FieldLabel>
+                        <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fbfaf7' }}>
+                          {shotList.map((s, i) => (
+                            <div key={i} style={{ display: 'flex', gap: 12, padding: '9px 12px', borderTop: i ? `1px solid ${L_LINE}` : 'none', alignItems: 'baseline' }}>
+                              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, fontWeight: 700, color: '#ef4a1e', whiteSpace: 'nowrap', minWidth: 58 }}>{s.t}</span>
+                              <span style={{ fontSize: 12.5, color: '#33372f', lineHeight: 1.5 }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: '#ef4a1e', fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div className="field" style={{ marginBottom: 14 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 6 }}>
                         <FieldLabel>{mode === 'faithful' ? 'Voiceover (one continuous narration)' : 'Voiceover script'}{language !== 'en' ? ` · ${langCfg.label}` : ''}</FieldLabel>

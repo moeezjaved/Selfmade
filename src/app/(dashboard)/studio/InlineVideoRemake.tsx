@@ -177,6 +177,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [styleTouched, setStyleTouched] = useState(false)   // did the user manually pick a mode? (else auto-pick from analysis)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
+  const [shotList, setShotList] = useState<{ t: string; action: string; lens?: string; shows?: string; line?: string }[]>([])   // one-shot timestamped scene list (from the beat sheet)
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])   // admin backdoor while parked
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
@@ -258,6 +259,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       if (st.timedOut) { setErr('The script is taking longer than usual — try again in a moment.'); setPhase('setup'); return }
       if (st.error) { setErr(st.error); setPhase('setup'); return }
       let drafted = st.script || ''
+      setShotList(Array.isArray(st.shotList) ? st.shotList : [])   // the timestamped scene decode for one-shot
       const srcS = Number(st.sourceSeconds) || null
       setSrcSecs(srcS)
       setSrcScenes(Math.max(2, Math.min(10, Number(st.sceneCount) || 3)))
@@ -385,15 +387,35 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       {/* REVIEW — edit script + length, then render */}
       {phase === 'review' && (
         <div>
-          {/* STORYBOARD-FIRST for BOTH modes (2026-08-17). UGC used to show only a script textarea —
-              "just a script and a Generate button" — with zero visibility into what the video would look
-              like. Now that Seedance 2.5 feeds each scene's APPROVED keyframe into the UGC segment path,
-              the storyboard is the product: see every scene as a still, regenerate or upload your own frame,
-              edit the line — approve BEFORE paying. Falls back to the plain script only before a job exists. */}
-          <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· preview every scene, regenerate or upload your own frame, edit the line — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
-          {jobId
-            ? <Storyboard jobId={jobId} embedded mode={style === 'cinematic' ? 'cinematic' : 'ugc'} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
-            : <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />}
+          {/* ONE-SHOT: no per-scene storyboard (Seedance films the whole ad in one take from the
+              timestamped shot list). Show that shot list as the "script" — the exact scene-by-scene
+              timeline the ad will move through — plus the editable voiceover below. UGC/Cinematic keep
+              the storyboard, where approving each keyframe actually feeds the render. */}
+          {style === 'oneshot' ? (
+            <>
+              <div style={label}>Shot list <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the scenes your ad moves through, in order{srcSecs ? ` · ~${Math.round(srcSecs)}s` : ''}</span></div>
+              {shotList.length > 0 ? (
+                <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fbfaf7', marginBottom: 6 }}>
+                  {shotList.map((s, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 13px', borderTop: i ? `1px solid ${LINE}` : 'none', alignItems: 'baseline' }}>
+                      <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11.5, fontWeight: 700, color: GREEN, whiteSpace: 'nowrap', minWidth: 62 }}>{s.t}</span>
+                      <span style={{ fontSize: 13, color: '#33372f', lineHeight: 1.5 }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: GREEN, fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 8, padding: '10px 13px', border: `1px dashed ${LINE}`, borderRadius: 12 }}>One continuous take — Seedance films the whole ad from your script below.</div>
+              )}
+              <div style={{ ...label, marginTop: 14 }}>Voiceover script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit the words — spoken across the ad{spokenSecs ? ` · ~${spokenSecs}s` : ''}</span></div>
+              <textarea value={script} onChange={e => setScript(e.target.value)} rows={6} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 130 }} />
+            </>
+          ) : (<>
+            {/* STORYBOARD-FIRST for UGC/Cinematic — each approved keyframe feeds the render. */}
+            <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· preview every scene, regenerate or upload your own frame, edit the line — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
+            {jobId
+              ? <Storyboard jobId={jobId} embedded mode={style === 'cinematic' ? 'cinematic' : 'ugc'} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
+              : <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />}
+          </>)}
           {/* ONE-SHOT: show the EXACT prompt Seedance 2.5 will receive (live from the script above),
               read-only, so the founder can eyeball-tune before spending credits. Nothing to configure —
               the script + your product photos are the levers; this is transparency, not an input. */}
