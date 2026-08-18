@@ -379,7 +379,7 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
 
   const slim = (x: Graded) => ({ name: x.name, metaCampaignId: x.metaCampaignId, roas: +x.roas.toFixed(2), spend: Math.round(x.spend), conversions: x.conversions, dailyBudget: x.dailyBudget })
   const result = {
-    accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary })),
+    accounts: accounts.map((a: any) => ({ accountId: a.account_id, name: a.account_name || `act_${a.account_id}`, currency: a.currency || 'USD', isPrimary: !!a.is_primary, brandId: a.brand_id ?? null })),
     selected: acct.account_id, currency: acct.currency || 'USD', accountName: acct.account_name || null, range,
     total: audit.total, spend: audit.spend, avgRoas: audit.avgRoas, revenue: audit.revenue ?? 0, purchases: audit.purchases ?? 0,
     impressions: audit.impressions ?? 0, clicks: audit.clicks ?? 0, ctr: audit.ctr ?? 0, cpc: audit.cpc ?? 0, cpm: audit.cpm ?? 0, spendToday: Math.round(spendToday),
