@@ -21,6 +21,32 @@ const RemotionEditor = dynamic(() => import('@/components/video/RemotionEditor')
 const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', GREEN = '#ef4a1e'
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
 
+// ── ONE-SHOT PROMPT PREVIEW — mirrors the exact prompt the worker (video-clone-worker.mjs, oneshot
+// branch) sends to Seedance 2.5, so the founder SEES what the model receives before spending credits.
+// Keep the two craft blocks below byte-identical to the worker's STYLE_LOCK / DIRECTOR_STYLE constants.
+const OS_STYLE_LOCK = ' STYLE LOCK: full colour, bright natural lighting, one consistent realistic colour grade across the whole ad — never black-and-white, never a different mood or film look from the other scenes.'
+const OS_DIRECTOR_STYLE = ' CINEMATIC DIRECTION: photorealistic, shot on a physical cine lens with natural motion blur — no 3D/CGI/game-engine look. A motivated camera move (a real reason to push or track). Natural motivated lighting with gentle atmospheric depth. Pore-level skin realism, catch-lights in living eyes, Hollywood micro-acting — micro-pauses, real breathing, precise eye-line, always reacting, never a static pose. Real gravity and weight, correct contact shadows. Smooth 24fps, sharp detail.'
+function buildOneShotPreview(o: { secs: number; isService: boolean; productCount: number; script: string; langLabel: string; aspect?: string }): string {
+  const aspect = o.aspect || '9:16'
+  // Storyboard-first always yields an approved opening frame → it leads the refs as [Image1], so the
+  // product photos start at [Image2]. (If no keyframe exists, the worker slides these down by one.)
+  const prodFirst = 2
+  const productRef = o.productCount ? `[Image${prodFirst}]${o.productCount > 1 ? `–[Image${prodFirst + o.productCount - 1}]` : ''}` : 'the product'
+  const spoken = String(o.script || '').trim()
+  let p = [
+    `A polished ${o.secs}-second vertical ${aspect} social ad — ONE continuous piece, real people, authentic energy.`,
+    o.isService
+      ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.'
+      : o.productCount ? `The product is ${productRef} — render it EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size; get it big by moving the CAMERA close, never by enlarging it.` : '',
+    '[Image1] is the approved opening frame — begin from it and keep its look and person.',
+    spoken
+      ? `The on-camera person speaks these EXACT words aloud, clearly lip-synced, in ${o.langLabel}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.`
+      : 'Ambient sound only, no music, no on-screen captions.',
+  ].filter(Boolean).join(' ')
+  p += OS_STYLE_LOCK + OS_DIRECTOR_STYLE
+  return p
+}
+
 // ── UGC RECORDING BOOTH — UGC is one continuous selfie take, so there are no shots to strip. The
 // honest, alive wait: a phone viewfinder RECORDING your creator, with your REAL approved script
 // running as a karaoke teleprompter (the words they're speaking), a live waveform, a REC dot and a
@@ -368,6 +394,25 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           {jobId
             ? <Storyboard jobId={jobId} embedded mode={style === 'cinematic' ? 'cinematic' : 'ugc'} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
             : <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />}
+          {/* ONE-SHOT: show the EXACT prompt Seedance 2.5 will receive (live from the script above),
+              read-only, so the founder can eyeball-tune before spending credits. Nothing to configure —
+              the script + your product photos are the levers; this is transparency, not an input. */}
+          {style === 'oneshot' && (
+            <details style={{ marginTop: 14, border: `1px solid ${LINE}`, borderRadius: 12, background: '#fafaf7', overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', padding: '11px 14px', fontSize: 12.5, fontWeight: 800, color: INK, listStyle: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Wand2 size={14} color={GREEN} /> What Seedance 2.5 receives
+                <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the exact prompt + {productImages.length + 1} reference image{productImages.length ? 's' : ''} — updates as you edit the script</span>
+              </summary>
+              <div style={{ padding: '0 14px 14px' }}>
+                <div style={{ fontSize: 12.5, lineHeight: 1.65, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Menlo, monospace', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 13px' }}>
+                  {buildOneShotPreview({ secs: resolvedBucket, isService, productCount: productImages.length, script, langLabel: (LANGS.find(l => l.code === language)?.label || 'English').split(' ')[0] })}
+                </div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8 }}>
+                  <b>[Image1]</b> = your approved opening frame · <b>[Image2…]</b> = your product photos. Edit the script above to change the spoken line; swap frames/photos to change what it shows.
+                </div>
+              </div>
+            </details>
+          )}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>
               Length {srcSecs ? <span style={{ color: '#aab0a6', fontWeight: 600 }}>· their ad runs ~{Math.round(srcSecs)}s</span> : null}
