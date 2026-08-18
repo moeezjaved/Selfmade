@@ -2257,15 +2257,26 @@ async function generateJob(job) {
       console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${keptBeats?.length || 0}/${allBeats.length} scenes @ ${effSecs}s`)
       const base = join(tmpdir(), `os-${job.id}`)
       const tmp = []
-      let videoUrl = null, falCost = 0
-      const gen = async (refs) => { const r = await falGenerate({ prompt, imageUrls: refs, resolution: meta.resolution, duration: effSecs, aspect: meta.aspect, tier: meta.tier, generateAudio: true }); falCost += clipCost(meta.tier, effSecs, true); return r.videoUrl }
-      try { videoUrl = await gen(imgs) }
-      catch (e) {
-        // A likeness/policy block on the refs must never kill the job: retry product-only, then bare prompt.
-        console.warn(`one-shot ${job.id} refs blocked (${e.message}) — retry product-only`)
-        try { videoUrl = await gen(falProductImages) } catch { try { videoUrl = await gen([]) } catch (e3) { throw e3 } }
+      // SAFETY NET / RESUME: if a prior run already PAID Seedance and stashed the raw clip URL but then
+      // crashed in post-processing (upload/end-card/overlay), reuse that URL — never bill fal twice.
+      let videoUrl = meta.raw_fal_url || null
+      let falCost = Number(meta.fal_cost_est) || 0
+      if (videoUrl) {
+        console.log(`♻️  one-shot ${job.id} resuming from stashed fal clip (no re-charge)`)
+      } else {
+        const gen = async (refs) => { const r = await falGenerate({ prompt, imageUrls: refs, resolution: meta.resolution, duration: effSecs, aspect: meta.aspect, tier: meta.tier, generateAudio: true }); falCost += clipCost(meta.tier, effSecs, true); return r.videoUrl }
+        try { videoUrl = await gen(imgs) }
+        catch (e) {
+          // A likeness/policy block on the refs must never kill the job: retry product-only, then bare prompt.
+          console.warn(`one-shot ${job.id} refs blocked (${e.message}) — retry product-only`)
+          try { videoUrl = await gen(falProductImages) } catch { try { videoUrl = await gen([]) } catch (e3) { throw e3 } }
+        }
+        if (!videoUrl) throw new Error('one-shot generation returned no video')
+        // Persist the PAID clip IMMEDIATELY, before any post-processing that could throw. A re-run then
+        // resumes from raw_fal_url above instead of re-generating (this is what would have saved the $15).
+        meta.raw_fal_url = videoUrl
+        await stamp({ clone_meta: { ...meta, raw_fal_url: videoUrl, fal_cost_est: +falCost.toFixed(2) } }).catch(() => {})
       }
-      if (!videoUrl) throw new Error('one-shot generation returned no video')
       await prog('Finishing up…', 88, 15)
       let f = `${base}.mp4`; await downloadToFile(videoUrl, f); tmp.push(f)
       f = await ensureAudio(f); if (!tmp.includes(f)) tmp.push(f)
@@ -3197,7 +3208,12 @@ async function generateJob(job) {
     // from the per-scene checkpoints — finished scenes cost nothing to reuse, so a retry re-renders
     // only what actually failed. Two automatic attempts; only then does it hard-fail + refund. Real
     // errors (content policy, bad input, insufficient credits) never retry — they fail honestly at once.
-    const retryable = /timed out|still IN_PROGRESS|fetch failed|network|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|abort|socket|\b(500|502|503|504)\b|overload|unavailable|Premature close|terminated/i.test(msg)
+    // Once the PAID fal clip is stashed (raw_fal_url — one-shot), ANY later failure is in cheap
+    // post-processing (ffmpeg/end-card/upload). Always worth a self-heal retry: the resume reuses the
+    // stashed clip and NEVER re-charges Seedance, so we salvage the render instead of discarding a paid
+    // asset AND refunding. Before that point, only genuine transient errors retry.
+    const postPaid = !!meta.raw_fal_url
+    const retryable = (postPaid || /timed out|still IN_PROGRESS|fetch failed|network|ECONNRESET|ETIMEDOUT|ECONNREFUSED|ENOTFOUND|abort|socket|\b(500|502|503|504)\b|overload|unavailable|Premature close|terminated/i.test(msg))
       && !/content_policy|likeness|real people|insufficient|no product|not found/i.test(msg)
     const tries = Number(meta.auto_retries || 0)
     if (retryable && tries < 2) {
