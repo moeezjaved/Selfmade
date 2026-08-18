@@ -52,9 +52,13 @@ export async function GET(req: NextRequest) {
       if (!beats.length) return []
       const total = Math.max(4, Number(meta.duration_target) || Number(meta?.beat_sheet?.duration_seconds) || 15)
       const n = beats.length
+      const parse = (s: string) => { const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?)/); return m ? [parseFloat(m[1]), parseFloat(m[2])] : null }
+      const ranges = beats.map((b: any) => parse(b.t || b.time))
+      const srcMax = Math.max(0, ...ranges.map((r: any) => (r ? r[1] : 0)))
+      const scale = srcMax > 0 ? total / srcMax : 0   // rescale real timestamps to the chosen duration (50s ad → 30s)
       return beats.map((b: any, i: number) => {
-        let t = String(b.t || b.time || '').replace(/\s/g, '')
-        if (!/\d/.test(t)) t = `${Math.round((i * total) / n)}s-${Math.round(((i + 1) * total) / n)}s`
+        const r = ranges[i]
+        const t = (r && scale) ? `${Math.round(r[0] * scale)}s-${Math.round(r[1] * scale)}s` : `${Math.round((i * total) / n)}s-${Math.round(((i + 1) * total) / n)}s`
         return { t, action: String(b.action || b.visual || ''), lens: String(b.lens || ''), shows: (b.shows && b.shows !== 'none') ? String(b.shows) : '', line: String(b.script || '') }
       })
     })(),

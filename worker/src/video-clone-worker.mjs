@@ -942,12 +942,18 @@ function timestampedShotList(beats, totalSecs, dialogue) {
   const total = Math.max(4, Number(totalSecs) || 15)
   const n = beats.length
   // A clean "Ns-Ms" time range, so EVERY scene has an explicit slot Seedance must hit in order (the
-  // thing that turns one gen into "person speaks → box opens → room shot"). Prefer Gemini's own `t`;
-  // synthesize an even split across the target duration when a beat has none.
+  // thing that turns one gen into "person speaks → box opens → room shot"). RESCALE Gemini's real
+  // timestamps to the CHOSEN duration so a 50s ad rendered at 30s compresses every scene to fit (hitting
+  // all of them) instead of running the list off the end of the clip. Synthesize an even split for any
+  // beat with no parseable time.
+  const parse = (s) => { const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?)/); return m ? [parseFloat(m[1]), parseFloat(m[2])] : null }
+  const ranges = beats.map((b) => parse(b.t || b.time))
+  const srcMax = Math.max(0, ...ranges.map((r) => (r ? r[1] : 0)))
+  const scale = srcMax > 0 ? total / srcMax : 0
   const fmt = (a, b) => `${Math.round(a)}s-${Math.round(b)}s`
   return beats.map((b, i) => {
-    let t = (b.t || b.time || '').toString().trim().replace(/\s/g, '')
-    if (!/\d/.test(t)) t = fmt((i * total) / n, ((i + 1) * total) / n)
+    const r = ranges[i]
+    const t = (r && scale) ? fmt(r[0] * scale, r[1] * scale) : fmt((i * total) / n, ((i + 1) * total) / n)
     const action = (b.action || b.visual || '').toString().trim()
     const lens = (b.lens || '').toString().trim()
     const shows = b.shows && b.shows !== 'none' ? ` [shows the ${b.shows} product]` : ''
