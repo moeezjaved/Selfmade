@@ -178,6 +178,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
   const [shotList, setShotList] = useState<{ t: string; action: string; lens?: string; shows?: string; line?: string }[]>([])   // one-shot timestamped scene list (from the beat sheet)
+  const [removedShots, setRemovedShots] = useState<Set<number>>(new Set())   // scenes the founder cut from the one-shot shot list
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])   // admin backdoor while parked
   const [script, setScript] = useState('')
   const [srcSecs, setSrcSecs] = useState<number | null>(null)
@@ -295,7 +296,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       const apiMode = style === 'cinematic' ? 'faithful' : style === 'oneshot' ? 'oneshot' : 'ugc'
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script, mode: apiMode, durationBucket: bucket, sceneCount: cinematic ? cineScenes : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
+        body: JSON.stringify({ jobId, script, mode: apiMode, durationBucket: bucket, sceneCount: cinematic ? cineScenes : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false,
+          // One-shot: the shots the founder KEPT (indices into the shot list). Worker filters the beat
+          // sheet to these, so removing scenes actually reaches Seedance. Omitted = keep all.
+          keepShots: apiMode === 'oneshot' && removedShots.size ? shotList.map((_, i) => i).filter(i => !removedShots.has(i)) : undefined }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()
@@ -393,17 +397,28 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
               the storyboard, where approving each keyframe actually feeds the render. */}
           {style === 'oneshot' ? (
             <>
-              <div style={label}>Shot list <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the scenes your ad moves through, in order{srcSecs ? ` · ~${Math.round(srcSecs)}s` : ''}</span></div>
-              {shotList.length > 0 ? (
-                <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fbfaf7', marginBottom: 6 }}>
-                  {shotList.map((s, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 12, padding: '10px 13px', borderTop: i ? `1px solid ${LINE}` : 'none', alignItems: 'baseline' }}>
-                      <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11.5, fontWeight: 700, color: GREEN, whiteSpace: 'nowrap', minWidth: 62 }}>{s.t}</span>
-                      <span style={{ fontSize: 13, color: '#33372f', lineHeight: 1.5 }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: GREEN, fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
-                    </div>
-                  ))}
+              {look !== 'match' && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#f2f8ea', border: `1px solid ${GREEN}`, borderRadius: 100, padding: '5px 12px', fontSize: 12, fontWeight: 800, color: INK, marginBottom: 10 }}>
+                  🎭 Recasting the presenter as {look} <span style={{ color: MUTED, fontWeight: 600 }}>· same scenes, new person</span>
                 </div>
-              ) : (
+              )}
+              <div style={label}>Shot list <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the scenes your ad moves through{shotList.length ? ` · ${shotList.length - removedShots.size} of ${shotList.length} kept` : ''}{srcSecs ? ` · ~${resolvedBucket}s` : ''}</span></div>
+              {shotList.length > 0 ? (<>
+                <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fbfaf7', marginBottom: 6 }}>
+                  {shotList.map((s, i) => {
+                    const cut = removedShots.has(i)
+                    return (
+                      <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 13px', borderTop: i ? `1px solid ${LINE}` : 'none', alignItems: 'baseline', opacity: cut ? 0.4 : 1 }}>
+                        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11.5, fontWeight: 700, color: GREEN, whiteSpace: 'nowrap', minWidth: 62, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
+                        <span style={{ flex: 1, fontSize: 13, color: '#33372f', lineHeight: 1.5, textDecoration: cut ? 'line-through' : 'none' }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: GREEN, fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
+                        <button onClick={() => setRemovedShots(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
+                          style={{ background: 'none', border: 'none', color: cut ? GREEN : '#c0392b', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}>{cut ? 'Undo' : 'Remove'}</button>
+                      </div>
+                    )
+                  })}
+                </div>
+                <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>Remove scenes you don't want — the kept ones stretch to fill your chosen length. Great for trimming a long ad down to {resolvedBucket}s.</div>
+              </>) : (
                 <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 8, padding: '10px 13px', border: `1px dashed ${LINE}`, borderRadius: 12 }}>One continuous take — Seedance films the whole ad from your script below.</div>
               )}
               <div style={{ ...label, marginTop: 14 }}>Voiceover script <span style={{ color: '#aab0a6', fontWeight: 600 }}>· edit the words — spoken across the ad{spokenSecs ? ` · ~${spokenSecs}s` : ''}</span></div>
