@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { orgMemberIds, allowedAdAccountIds } from '@/lib/org'
+import { workspaceMemberIds, allowedAdAccountIds } from '@/lib/org'
 import { resolvePrimary } from '@/lib/meta/audit'
 
 export async function GET() {
@@ -9,12 +9,11 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient() as any
-  // One shared workspace: the pool is every account connected by ANY member of the caller's org
-  // (not just their own). Then scope to what THIS member is allowed to see (default-all). Solo users
-  // (no org membership) just see their own accounts — unchanged behaviour.
-  const { data: mem } = await admin.from('org_members')
-    .select('org_id').eq('user_id', user.id).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  const userIds = mem?.org_id ? await orgMemberIds(admin, mem.org_id) : [user.id]
+  // ISOLATION: the pool is every account connected by a member of the caller's ONE workspace org (the org
+  // owned by their billing owner) — NOT the "newest org membership" (which, with cross-invited accounts,
+  // pooled unrelated users' Facebook connections into the picker — a cross-account leak). Solo users just
+  // see their own. Then scope to what THIS member is allowed to see (default-all).
+  const userIds = await workspaceMemberIds(admin, user.id).catch(() => [user.id])
 
   const sel = (cols: string) => admin.from('meta_accounts').select(cols)
     .in('user_id', userIds.length ? userIds : [user.id]).eq('status', 'active').order('is_primary', { ascending: false })
