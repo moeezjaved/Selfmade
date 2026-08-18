@@ -13,13 +13,36 @@ import React, { useEffect, useState } from 'react'
 
 export default function MetaGate({ feature, children }: { feature: string; children: React.ReactNode }) {
   const [state, setState] = useState<'loading' | 'connected' | 'none'>('loading')
-  useEffect(() => {
+  // Accounts already connected in the workspace but NOT linked to the active brand — offer to link one
+  // here instead of forcing a reconnect (the "Aura says Connect Meta though I already connected" case).
+  const [unlinked, setUnlinked] = useState<Array<{ account_id: string; account_name: string | null; currency?: string | null }>>([])
+  const [activeBrand, setActiveBrand] = useState<string | null>(null)
+  const [linking, setLinking] = useState('')
+
+  const load = React.useCallback(() => {
     let alive = true
     fetch('/api/meta/accounts', { cache: 'no-store' }).then((r) => r.json())
-      .then((j) => { if (alive) setState((j.accounts || []).length ? 'connected' : 'none') })
+      .then((j) => {
+        if (!alive) return
+        const brand = j.activeBrand || null
+        setActiveBrand(brand)
+        // accounts NOT yet linked to the active brand (any brand_id !== active, incl. null)
+        setUnlinked(brand ? (j.workspaceAccounts || []).filter((a: any) => a.brand_id !== brand) : [])
+        setState((j.accounts || []).length ? 'connected' : 'none')
+      })
       .catch(() => { if (alive) setState('none') })
     return () => { alive = false }
   }, [])
+  useEffect(() => load(), [load])
+
+  const linkExisting = async (accountId: string) => {
+    if (!activeBrand) return
+    setLinking(accountId)
+    try {
+      await fetch('/api/meta/accounts', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ account_id: accountId, brand_id: activeBrand }) })
+      load()
+    } finally { setLinking('') }
+  }
 
   if (state === 'loading') return <div style={{ padding: 60, textAlign: 'center', color: '#9aa79a', fontFamily: "'Inter',-apple-system,sans-serif" }}>Loading…</div>
   if (state === 'connected') return <>{children}</>
@@ -52,8 +75,25 @@ export default function MetaGate({ feature, children }: { feature: string; child
             </div>
           ))}
         </div>
+        {/* Already connected an account, just not linked to THIS brand → let them link it in one click
+            (one ad account per brand) instead of reconnecting Facebook again. */}
+        {activeBrand && unlinked.length > 0 && (
+          <div style={{ margin: '0 auto 20px', maxWidth: 400, textAlign: 'left', background: '#f7faf3', border: '1px solid #e1ecd7', borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 13, fontWeight: 800, color: '#141d15', marginBottom: 3 }}>Already connected an account?</div>
+            <div style={{ fontSize: 12.5, color: '#6f6d5a', lineHeight: 1.5, marginBottom: 10 }}>Link one you’ve connected to this brand — no need to reconnect.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {unlinked.map((a) => (
+                <button key={a.account_id} onClick={() => linkExisting(a.account_id)} disabled={!!linking}
+                  style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, background: '#fff', border: '1px solid #e1ecd7', borderRadius: 10, padding: '10px 13px', cursor: linking ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit', opacity: linking && linking !== a.account_id ? 0.5 : 1 }}>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#141d15', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.account_name || a.account_id}{a.currency ? <span style={{ color: '#9aa79a', fontWeight: 600 }}> · {a.currency}</span> : null}</span>
+                  <span style={{ fontSize: 12, fontWeight: 800, color: '#ef4a1e', flexShrink: 0 }}>{linking === a.account_id ? 'Linking…' : 'Link →'}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         <a href="/connect/meta" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '13px 30px', fontSize: 14.5, fontWeight: 800, textDecoration: 'none' }}>
-          Connect Facebook →
+          {unlinked.length > 0 ? 'Connect a different account →' : 'Connect Facebook →'}
         </a>
         <div style={{ fontSize: 12, color: '#9aa79a', marginTop: 12 }}>Two clicks, ~30 seconds. You can disconnect anytime.</div>
       </div>
