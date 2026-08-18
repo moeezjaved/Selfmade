@@ -513,11 +513,19 @@ function M4Inner() {
       const res=await fetch('/api/m4/launch',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({campaignName:form.campaignName||'M4',creatives:validCreatives,retargetingCreatives:validRetargeting,retainerCreatives:validRetainer,interests:selectedInterests,budget:form.budget,location:form.location,ageMin:form.ageMin,ageMax:form.ageMax,gender:form.gender,pixelId,objective:form.objective,pageId:selectedPageId,instagramActorId:selectedInstagramId,primaryText:adCopy.primaryText,headline:adCopy.headline,cta:adCopy.cta,websiteUrl:adCopy.destinationUrl,retargetingCopy,retainerCopy,includeRetainer})})
       const data=await res.json()
       if(showUpsell(data)){ setLoading(false); return }   // Free plan → upgrade modal
-      // Custom Audiences ToS not accepted (Meta 2663) — caught PRE-FLIGHT (nothing spent). Send them
-      // straight to Meta's acceptance page; after they accept, one more Launch sends broad + retargeting.
+      // Custom Audiences ToS not accepted (Meta 2663). Two cases:
+      //  • PRE-FLIGHT (data.success falsy): nothing launched/charged — accept, then launch.
+      //  • POST-LAUNCH (data.success): broad + interest ARE live; only retargeting/retainer was skipped —
+      //    accept, then relaunch and retargeting goes out too. Either way, send them to Meta's accept page.
       if(data.needsCustomAudienceTos){
-        await alertMessage({ title: 'One step before retargeting', body: data.error+'\n\nClick below to open Meta’s acceptance page, hit Accept, then launch again — nothing was charged.', confirmLabel: 'Open Meta to accept' })
+        const launched = !!data.success
+        await alertMessage({
+          title: launched ? 'Retargeting wasn’t created' : 'One step before retargeting',
+          body: (data.note || data.error || 'Your ad account hasn’t accepted Meta’s Custom Audiences Terms of Service yet.') + '\n\nClick below to open Meta’s acceptance page, press Accept, then ' + (launched ? 'relaunch — retargeting will go out too.' : 'launch again — nothing was charged.'),
+          confirmLabel: 'Open Meta to accept',
+        })
         try { window.open(data.tosUrl, '_blank', 'noopener') } catch {}
+        if(launched){ try { sessionStorage.removeItem(DRAFT_KEY) } catch {} }
         setLoading(false); return
       }
       const totalAds=(data.broad_adsets||0)+(data.interest_adsets||0)+(data.retargeting_adsets||0)+(data.retainer_adsets||0)
@@ -753,13 +761,34 @@ function M4Inner() {
                 <div style={{fontSize:18,marginBottom:4}}>No</div><div style={{fontSize:13,fontWeight:700,color:'#141d15'}}>I need one</div>
               </div>
             </div>
-            {pixelChoice==='existing'&&(loadingPixels?<div style={{fontSize:13,color:'#7a9a7a'}}>Loading…</div>:pixels.length>0?<select value={pixelId} onChange={e=>setPixelId(e.target.value)} style={{...S.input,background:'#ffffff'}}><option value="">Select pixel…</option>{pixels.map(p=><option key={p.id} value={p.id}>{p.name} {p.id}</option>)}</select>:<input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="Enter Pixel ID" style={S.input}/>)}
-            {pixelChoice==='new'&&<div style={{background:'rgba(255,90,44,0.05)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#6b6a58',lineHeight:1.8}}>Meta Events Manager → Connect Data Sources → Web → Pixel → Copy ID<br/><a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#141d15',fontWeight:700}}>Open Events Manager</a></div>}
-            {pixelChoice&&!pixelId&&<div style={{marginTop:10,background:'rgba(255,90,44,0.06)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:'11px 13px',fontSize:12.5,color:'#8b5a44',lineHeight:1.6}}>No Pixel selected? That's fine — we'll launch a <b>Traffic</b> campaign (drives clicks to your site) so your ads still go live. Add a Pixel anytime to optimize for <b>Purchases</b> instead.</div>}
+            {pixelChoice==='existing'&&(loadingPixels?<div style={{fontSize:13,color:'#7a9a7a'}}>Loading…</div>:pixels.length>0?(
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                <select value={pixelId} onChange={e=>setPixelId(e.target.value)} style={{...S.input,background:'#ffffff',flex:1}}><option value="">Select pixel…</option>{pixels.map(p=><option key={p.id} value={p.id}>{p.name} {p.id}</option>)}</select>
+                <button onClick={()=>fetchPixels()} style={{...S.back,whiteSpace:'nowrap'}}>↻ Refresh</button>
+              </div>
+            ):(
+              <div>
+                <div style={{fontSize:12.5,color:'#8b5a44',marginBottom:8,lineHeight:1.6}}>No pixel found on this ad account yet. Create one below, or paste an existing Pixel ID.</div>
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <input value={pixelId} onChange={e=>setPixelId(e.target.value)} placeholder="Enter Pixel ID (16 digits)" style={{...S.input,flex:1}}/>
+                  <button onClick={()=>fetchPixels()} style={{...S.back,whiteSpace:'nowrap'}}>↻ Refresh</button>
+                </div>
+              </div>
+            ))}
+            {pixelChoice==='new'&&<div style={{background:'rgba(255,90,44,0.05)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:14,fontSize:13,color:'#6b6a58',lineHeight:1.8}}>
+              <b style={{color:'#141d15'}}>Create your Meta Pixel (2 min):</b><br/>
+              1. <a href="https://business.facebook.com/events_manager" target="_blank" rel="noreferrer" style={{color:'#141d15',fontWeight:700}}>Open Events Manager ↗</a><br/>
+              2. Click <b>Connect data sources</b> → <b>Web</b> → <b>Next</b><br/>
+              3. Name your pixel → enter your website → <b>Create</b><br/>
+              4. Make sure the pixel is assigned to <b>this ad account</b> (Business Settings → Data Sources → Pixels → Assign)<br/>
+              5. Come back and press <b>“I’ve created it — load my pixel”</b><br/>
+              <button onClick={()=>{setPixelChoice('existing');fetchPixels()}} style={{marginTop:10,background:'#141d15',color:'#ff5a2c',border:'none',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:800,fontFamily:'inherit',cursor:'pointer'}}>I’ve created it — load my pixel</button>
+            </div>}
+            {pixelChoice==='existing'&&!pixelId&&<div style={{marginTop:10,background:'rgba(255,90,44,0.06)',border:'1px solid rgba(255,90,44,0.15)',borderRadius:10,padding:'11px 13px',fontSize:12.5,color:'#8b5a44',lineHeight:1.6}}>Select your Pixel to continue — it’s what lets us optimize for <b>Purchases</b> and build retargeting audiences. Don’t have one? Choose <b>No — I need one</b> above for the setup steps.</div>}
           </div>
           <div style={S.foot}>
             <button onClick={()=>goTo('welcome')} style={S.back}>Back</button>
-            {nb(async()=>{if(interests.length===0)await generateInterests();goTo('creatives')},loading?'Loading…':'Continue →',!pixelChoice||!form.product||!form.campaignName||!form.description||loading)}
+            {nb(async()=>{if(interests.length===0)await generateInterests();goTo('creatives')},loading?'Loading…':'Continue →',!pixelId||!form.product||!form.campaignName||!form.description||loading)}
           </div>
         </div>
       )}
@@ -772,8 +801,8 @@ function M4Inner() {
               <div style={{fontSize:13,color:'rgba(255,255,255,0.65)',lineHeight:1.7}}><strong style={{color:'#ef4a1e'}}>One creative per ad set.</strong> Each image gets its own ad set so you know exactly which creative wins.</div>
             </div>
             <div style={{marginBottom:6,fontSize:13,fontWeight:700,color:'#141d15'}}>Prospecting Creatives</div>
-            <UploadBox list={creatives} setter={setCreatives} label="Upload prospecting creatives"/>
-            <CopyBox copy={adCopy} setCopy={setAdCopy} type="main" title="Prospecting Ad Copy"/>
+            {UploadBox({list:creatives, setter:setCreatives, label:"Upload prospecting creatives"})}
+            {CopyBox({copy:adCopy, setCopy:setAdCopy, type:"main", title:"Prospecting Ad Copy"})}
             <div style={{background:'#f9f5ec',borderRadius:14,border:'1px solid rgba(255,255,255,0.07)',padding:16}}>
               <div style={{fontSize:13,fontWeight:800,color:'#141d15',marginBottom:10}}>Facebook Page and Instagram</div>
               {pages.length>0?(
@@ -819,8 +848,8 @@ function M4Inner() {
             <div style={{marginBottom:20}}>
               <div style={{fontSize:14,fontWeight:800,color:'#141d15',marginBottom:4}}>Retargeting Campaign</div>
               <div style={{fontSize:12,color:'#7a9a7a',marginBottom:12}}>Website visitors last 60 days — audiences created automatically from your pixel</div>
-              <UploadBox list={retargetingCreatives} setter={setRetargetingCreatives} label="Upload retargeting creative — remind them why they visited"/>
-              <CopyBox copy={retargetingCopy} setCopy={setRetargetingCopy} type="retargeting" title="Retargeting Ad Copy"/>
+              {UploadBox({list:retargetingCreatives, setter:setRetargetingCreatives, label:"Upload retargeting creative — remind them why they visited"})}
+              {CopyBox({copy:retargetingCopy, setCopy:setRetargetingCopy, type:"retargeting", title:"Retargeting Ad Copy"})}
             </div>
             <div style={{border:'1px solid rgba(249,168,212,0.2)',borderRadius:14,padding:18,background:'rgba(249,168,212,0.03)'}}>
               <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:includeRetainer?16:0}}>
@@ -834,8 +863,8 @@ function M4Inner() {
               </div>
               {includeRetainer&&(
                 <div>
-                  <UploadBox list={retainerCreatives} setter={setRetainerCreatives} label="Upload retainer creative — loyalty offer for past buyers"/>
-                  <CopyBox copy={retainerCopy} setCopy={setRetainerCopy} type="retainer" title="Retainer Ad Copy"/>
+                  {UploadBox({list:retainerCreatives, setter:setRetainerCreatives, label:"Upload retainer creative — loyalty offer for past buyers"})}
+                  {CopyBox({copy:retainerCopy, setCopy:setRetainerCopy, type:"retainer", title:"Retainer Ad Copy"})}
                 </div>
               )}
             </div>

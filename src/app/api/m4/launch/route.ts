@@ -161,10 +161,22 @@ export async function POST(request: NextRequest) {
     // the promoted object. If the account has no Pixel we cannot run Sales — fall back to a Traffic
     // campaign (optimizes link clicks; the ad's website URL is the object) so the launch still goes live
     // instead of dying. This is the exact failure the founder hit: Sales objective + no Pixel selected.
+    // Every ad set MUST carry the object its objective optimizes toward, or Meta rejects it with 1885154
+    // ("include an ad set with a selected object … e.g. a Page, URL or event"). We only build a
+    // promoted_object for Sales (Pixel) and Leads (Page); for anything else — or when that object is
+    // missing — fall back to Traffic, which optimizes LINK_CLICKS and needs no object (the ad's URL IS
+    // the object). This guarantees the launch goes live instead of dying with 1885154.
     let downgradeNote = ''
+    const SUPPORTED = new Set(['OUTCOME_SALES', 'OUTCOME_LEADS', 'OUTCOME_TRAFFIC', 'OUTCOME_AWARENESS'])
     if (apiObjective === 'OUTCOME_SALES' && !pixelId) {
       apiObjective = 'OUTCOME_TRAFFIC'
       downgradeNote = 'No Meta Pixel found on this ad account, so we launched a Traffic campaign (drives clicks to your site). Add a Pixel in Meta Events Manager, then relaunch to optimize for Purchases.'
+    } else if (apiObjective === 'OUTCOME_LEADS' && !pageId) {
+      apiObjective = 'OUTCOME_TRAFFIC'
+      downgradeNote = 'No Facebook Page was selected, so we launched a Traffic campaign (clicks to your site) instead of Leads. Pick a Page in the Creatives step, then relaunch to run Lead ads.'
+    } else if (!SUPPORTED.has(apiObjective)) {
+      apiObjective = 'OUTCOME_TRAFFIC'
+      downgradeNote = 'That objective isn’t supported yet, so we launched a Traffic campaign (clicks to your site).'
     }
 
     const optimizationMap: Record<string,{optimization_goal:string,billing_event:string}> = {
@@ -205,6 +217,11 @@ export async function POST(request: NextRequest) {
     }
 
     const errors: string[] = []
+    // Set when a retargeting/retainer audience is refused because Meta's Custom Audiences ToS isn't
+    // accepted (error 2663). The broad + interest campaigns still launch; we return ONE clean, actionable
+    // message + the exact accept link instead of Meta's wall of text.
+    let tosBlocked = false
+    const tosUrl = `https://www.facebook.com/customaudiences/app/tos/?act=${metaAccount.account_id}`
 
     // Reuse existing custom audience by name — only create if not found
     // Remember WHY an audience couldn't be built, so a retargeting/retainer campaign can report the real
@@ -427,6 +444,10 @@ export async function POST(request: NextRequest) {
         // the retargeting budget on everyone. Refuse to create it and say exactly why the audience failed.
         if (!rtAud) {
           const why = audienceErrors['M4 — Website Visitors 180d (Retargeting)'] || 'Meta did not return an audience id'
+          if (/2663|terms of service/i.test(why)) {
+            tosBlocked = true
+            throw new Error('Retargeting needs Meta’s Custom Audiences Terms of Service accepted for this ad account first.')
+          }
           throw new Error(`Couldn't build the website-visitor audience for the Pixel (${why}). Retargeting was skipped so it wouldn't run as a broad ad set. An empty audience is fine (a new Pixel fills over time) — if Meta refused it, it's usually the Custom Audience terms not yet accepted for this ad account (Ads Manager → Audiences), or the Pixel isn't shared with this ad account.`)
         }
 
@@ -489,6 +510,10 @@ export async function POST(request: NextRequest) {
         // Same rule as retargeting: no purchasers audience → don't ship a broad "retainer" ad set.
         if (!rnAud) {
           const why = audienceErrors['M4 — Purchasers 180d'] || 'Meta did not return an audience id'
+          if (/2663|terms of service/i.test(why)) {
+            tosBlocked = true
+            throw new Error('Retainer needs Meta’s Custom Audiences Terms of Service accepted for this ad account first.')
+          }
           throw new Error(`Couldn't build the past-purchasers audience for the Pixel (${why}). Retainer was skipped so it wouldn't run as a broad ad set.`)
         }
 
@@ -498,7 +523,11 @@ export async function POST(request: NextRequest) {
           objective: apiObjective,
           status: 'PAUSED',
           special_ad_categories: [],
-          daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.2)),
+          daily_budget: rnBudget,
+          // Without an explicit strategy Meta applies the account's default, which on many accounts is a
+          // BID-CAP strategy that then demands a bid_amount we don't collect → error 1815857 "Bid amount
+          // required". Pin the same auto-bidding (no cap) the other three campaigns use so it never asks.
+          bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
           is_adset_budget_sharing_enabled: false,
         })
 
@@ -586,6 +615,24 @@ export async function POST(request: NextRequest) {
         needsVerify: true,
         errors,
       }, { status: 400 })
+    }
+
+    // Retargeting/retainer was refused for the Custom Audiences ToS → the broad + interest campaigns
+    // still launched. Return ONE clean, actionable message + the exact accept link (not the raw errors).
+    if (tosBlocked) {
+      return NextResponse.json({
+        success: true,
+        account: metaAccount.account_name,
+        broad_campaign_id: broadCamp.id,
+        interest_campaign_id: intCamp.id,
+        broad_adsets: broadCount,
+        interest_adsets: intCount,
+        retargeting_adsets: retargetingCount,
+        retainer_adsets: retainerCount,
+        needsCustomAudienceTos: true,
+        tosUrl,
+        note: `Your broad + interest campaigns are live. Your retargeting/retainer campaign was NOT created — this ad account hasn’t accepted Meta’s Custom Audiences Terms of Service yet. Accept it once here, then relaunch and retargeting will go out too.`,
+      })
     }
 
     return NextResponse.json({
