@@ -109,6 +109,12 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
   // deleted), so a removed rival kept generating "Produce the X intelligence report". Only suggest tasks
   // for competitors the user STILL follows — the brief must reflect current Spy state across the app.
   ranked = ranked.filter((c) => followedPages.has(c.pageId))
+  // BRAND SCOPE: when a specific brand is active (project switcher not on "All brands"), the plan must
+  // only cover THAT brand's competitors. Mars Men is new-spacemen's rival — it must not show a "Produce
+  // the Mars Men report" / "Make Aura version of Mars Men's ad" card while Aura is active. Keep only
+  // competitors whose FOLLOWING brand is the active one (strict — unassigned/null follows show only under
+  // All brands, matching the brand-isolation rule).
+  if (brandId) ranked = ranked.filter((c) => followMap.get(c.pageId) === brandId)
 
   // ── RESEARCH — the strongest signal first (a burst worth a full report) ──
   for (const c of ranked) {
