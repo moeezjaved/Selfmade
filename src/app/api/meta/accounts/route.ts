@@ -63,9 +63,15 @@ export async function POST(request: Request) {
   const { account_id } = body
   const admin = createAdminClient()
 
-  // Assign this account to a brand (the "project" link) — brand_id null clears it.
+  // Assign this account to a brand (the "project" link) — brand_id null clears it. Scope to the WHOLE
+  // workspace, not just the caller's own rows: the account is often connected by the OWNER while a member
+  // (or the owner on a different session) does the linking. Matching only .eq(user_id,self) silently
+  // updated ZERO rows for a shared account → "it still says link to a brand after a thousand times".
   if ('brand_id' in body) {
-    await admin.from('meta_accounts').update({ brand_id: body.brand_id || null }).eq('user_id', user.id).eq('account_id', account_id)
+    const { workspaceMemberIds } = await import('@/lib/org')
+    const poolIds = await workspaceMemberIds(admin, user.id).catch(() => [user.id])
+    const acctBare = String(account_id || '').replace(/^act_/, '')
+    await admin.from('meta_accounts').update({ brand_id: body.brand_id || null }).in('user_id', poolIds).eq('account_id', acctBare)
     return NextResponse.json({ success: true })
   }
 
