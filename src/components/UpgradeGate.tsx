@@ -4,7 +4,7 @@
  * from /api/credits/balance; if the plan lacks the feature it renders an animated on-brand upsell
  * (locked hero → "Upgrade your plan" CTA → /billing). Server routes still enforce independently.
  */
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { planEntitlements, firstPlanWith, PLANS, type PlanEntitlements, type PlanId } from '@/lib/plans'
 
@@ -26,16 +26,40 @@ export default function UpgradeGate({ feature, name, children }: {
 }) {
   const [ent, setEnt] = useState<PlanEntitlements | null>(null)
   const [loading, setLoading] = useState(true)
+  const [failed, setFailed] = useState(false)   // balance couldn't be read → DON'T show the paid wall
   const router = useRouter()
 
-  useEffect(() => {
-    fetch('/api/credits/balance').then((r) => r.json())
-      .then((j) => setEnt(planEntitlements(j.plan)))
-      .catch(() => setEnt(planEntitlements('free')))
-      .finally(() => setLoading(false))
+  // Read the (owner-resolved) plan. A team member draws the OWNER's plan, so this must reflect the
+  // billing owner — which /api/credits/balance already resolves server-side. Critical: never fall back
+  // to 'free' on a transient failure — that shows a PAYING user the upgrade wall (the team-member bug).
+  // cache:'no-store' so a stale cached response from before an upgrade can't gate them either.
+  const load = useCallback(async () => {
+    setLoading(true); setFailed(false)
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const r = await fetch('/api/credits/balance', { cache: 'no-store' })
+        if (!r.ok) throw new Error(`balance ${r.status}`)
+        const j = await r.json()
+        if (!j || typeof j.plan !== 'string') throw new Error('no plan in balance')
+        setEnt(planEntitlements(j.plan)); setLoading(false); return
+      } catch {
+        if (attempt === 0) { await new Promise((res) => setTimeout(res, 700)); continue }
+        setFailed(true); setLoading(false); return
+      }
+    }
   }, [])
 
+  useEffect(() => { void load() }, [load])
+
   if (loading) return <div style={{ padding: 40, color: '#9ca3af' }}>Loading…</div>
+  // Couldn't read the plan — show a retry, NEVER the upgrade wall (a paying user must never be told to
+  // upgrade because of a network blip or a stale cache).
+  if (failed) return (
+    <div style={{ padding: 40, textAlign: 'center', color: '#6b7280' }}>
+      <div style={{ marginBottom: 12, fontSize: 14 }}>Couldn’t load your plan. Check your connection and try again.</div>
+      <button onClick={() => void load()} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 22px', fontWeight: 800, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit' }}>Retry</button>
+    </div>
+  )
   if (ent && (ent as any)[feature]) return <>{children}</>
 
   const need: PlanId = firstPlanWith(feature)
