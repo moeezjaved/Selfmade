@@ -15,12 +15,15 @@ export async function readBrandCookie(): Promise<string> {
   try { return (await cookies()).get(BRAND_COOKIE)?.value || '' } catch { return '' }
 }
 
-/** Resolve the active brand id for this user: explicit param → cookie → null, validated for ownership. */
+/** Resolve the active brand id for this user: explicit param → cookie → null, validated against the
+ *  ORG's brands (one shared workspace — a member can select the owner's brand, not just their own). */
 export async function resolveActiveBrandId(admin: any, userId: string, explicit?: string | null): Promise<string | null> {
   const raw = (explicit || '') || (await readBrandCookie())
   if (!raw) return null
   try {
-    const { data } = await admin.from('brands').select('id').eq('user_id', userId).eq('id', raw).maybeSingle()
+    const { allOrgMemberIds } = await import('@/lib/org')
+    const ids = await allOrgMemberIds(admin, userId).catch(() => [userId])
+    const { data } = await admin.from('brands').select('id').in('user_id', ids).eq('id', raw).maybeSingle()
     return data ? String(raw) : null
   } catch { return null }
 }
