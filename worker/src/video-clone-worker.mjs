@@ -2225,9 +2225,10 @@ async function generateJob(job) {
       // (person speaks → box opens → room b-roll → website → back home) instead of a single vibe. ──
       // Honor the founder's manual scene cuts: keep only the beats they didn't remove in the review.
       // Omitted keep_shots = keep every scene.
-      const keptBeats = (Array.isArray(meta.keep_shots) && meta.keep_shots.length && Array.isArray(beat?.beats))
-        ? beat.beats.filter((_, i) => meta.keep_shots.includes(i))
-        : beat?.beats
+      const allBeats = Array.isArray(meta.beat_sheet?.beats) ? meta.beat_sheet.beats : []
+      const keptBeats = (Array.isArray(meta.keep_shots) && meta.keep_shots.length && allBeats.length)
+        ? allBeats.filter((_, i) => meta.keep_shots.includes(i))
+        : allBeats
       // RENDER LENGTH FOLLOWS THE KEPT SCENES (like the script meter): the ad runs as long as the SHORTER
       // of {what you picked, the kept scenes' natural total}, capped at Seedance's 30s. So cutting scenes
       // literally shortens the clip instead of stretching a few shots to fill the picked length.
@@ -2239,7 +2240,7 @@ async function generateJob(job) {
       }
       const shotList = timestampedShotList(keptBeats, effSecs)
       const swapProduct = !isService && falProductImages.length
-        ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
+        ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${meta.beat_sheet?.rejected_product ? `; keep the "${meta.beat_sheet.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
         : ''
 
       let prompt = [
@@ -2248,12 +2249,12 @@ async function generateJob(job) {
         isService ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.' : swapProduct,
         leadFrame ? `[Image1] is the opening frame — begin the FIRST shot from it and keep its look, framing and person.` : '',
         recast ? `Recast the on-camera person(s) as ${meta.character_look} — keep everything else identical.` : '',
-        (recast || (Array.isArray(beat?.people) && beat.people.length >= 2)) ? 'Make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.' : '',
+        (recast || (Array.isArray(meta.beat_sheet?.people) && meta.beat_sheet.people.length >= 2)) ? 'Make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.' : '',
         spoken ? `Spoken audio across the whole ad, clearly lip-synced by the on-camera person(s), in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
       ].filter(Boolean).join('\n\n')
       prompt += STYLE_LOCK
       if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
-      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${keptBeats?.length || 0}/${beat?.beats?.length || 0} scenes @ ${effSecs}s`)
+      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${keptBeats?.length || 0}/${allBeats.length} scenes @ ${effSecs}s`)
       const base = join(tmpdir(), `os-${job.id}`)
       const tmp = []
       let videoUrl = null, falCost = 0
