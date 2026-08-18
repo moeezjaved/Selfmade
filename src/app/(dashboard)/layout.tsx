@@ -7,6 +7,7 @@
 import AppShell from '@/components/app/AppShell'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { readBrandCookie } from '@/lib/brand/active'
+import { brandPoolUserIds } from '@/lib/org'
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   let brands: { id: string; name: string }[] = []
@@ -16,7 +17,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
       const admin = createAdminClient()
-      const { data } = await admin.from('brands').select('id, name').eq('user_id', user.id).order('created_at', { ascending: true })
+      // Org-aware: a team member owns no brands but must see the OWNER's in the switcher (shared
+      // workspace). Was .eq('user_id', self) → the member's rail had no switcher at all.
+      const poolIds = await brandPoolUserIds(admin, user.id).catch(() => [user.id])
+      const { data } = await admin.from('brands').select('id, name').in('user_id', poolIds).order('created_at', { ascending: true })
       brands = (data || []).map((b: any) => ({ id: String(b.id), name: String(b.name) }))
       activeBrand = await readBrandCookie()
     }

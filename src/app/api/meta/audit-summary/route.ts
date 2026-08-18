@@ -7,6 +7,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { auditAccount } from '@/lib/meta/audit'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { workspaceMemberIds } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -27,12 +28,19 @@ export async function GET(req: NextRequest) {
     // brand's ad data (Hair ResQ, no account, showed ROY 1's 6.9x ROAS + moves). Return an empty, no-account
     // summary so the card shows "connect this brand's ad account" instead.
     if (!accountId && brandId) {
+      // Workspace-scoped: the brand's linked account may be connected by the OWNER, not this member.
+      const poolIds = await workspaceMemberIds(admin, user.id).catch(() => [user.id])
       const { data: acct } = await admin.from('meta_accounts').select('account_id')
-        .eq('user_id', user.id).eq('status', 'active').eq('brand_id', brandId).limit(1).maybeSingle()
+        .in('user_id', poolIds).eq('status', 'active').eq('brand_id', brandId).limit(1).maybeSingle()
       if (acct?.account_id) accountId = acct.account_id
       else return NextResponse.json({ accounts: [], noAccountForBrand: true })
     }
-    const r = await auditAccount(admin, user.id, accountId, range)
+    const r: any = await auditAccount(admin, user.id, accountId, range)
+    // BRAND-SCOPE THE SWITCHER: under a specific brand, show only that brand's linked account in the
+    // picker (one account per brand), not the whole workspace pool. Under All-brands, show everything.
+    if (r && brandId && accountId && Array.isArray(r.accounts)) {
+      r.accounts = r.accounts.filter((a: any) => a.accountId === accountId || a.account_id === accountId)
+    }
     return NextResponse.json(r || { accounts: [] })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'failed', accounts: [] }, { status: 200 })
