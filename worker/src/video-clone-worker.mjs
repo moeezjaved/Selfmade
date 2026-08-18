@@ -937,16 +937,23 @@ async function firstFrameOfSource(sourceVideoUrl, id) {
 // its lens, and which product it shows, plus the attributed spoken line for that beat when we have one.
 // This is what makes ONE 30s generation reproduce all 6-7 scenes (unboxing, plug-in, b-roll, website…)
 // instead of a single vibe. `dialogue` (optional) is a per-beat array aligned to beats.
-function timestampedShotList(beats, dialogue) {
+function timestampedShotList(beats, totalSecs, dialogue) {
   if (!Array.isArray(beats) || !beats.length) return ''
+  const total = Math.max(4, Number(totalSecs) || 15)
+  const n = beats.length
+  // A clean "Ns-Ms" time range, so EVERY scene has an explicit slot Seedance must hit in order (the
+  // thing that turns one gen into "person speaks → box opens → room shot"). Prefer Gemini's own `t`;
+  // synthesize an even split across the target duration when a beat has none.
+  const fmt = (a, b) => `${Math.round(a)}s-${Math.round(b)}s`
   return beats.map((b, i) => {
-    const t = (b.t || b.time || '').toString().trim()
+    let t = (b.t || b.time || '').toString().trim().replace(/\s/g, '')
+    if (!/\d/.test(t)) t = fmt((i * total) / n, ((i + 1) * total) / n)
     const action = (b.action || b.visual || '').toString().trim()
     const lens = (b.lens || '').toString().trim()
     const shows = b.shows && b.shows !== 'none' ? ` [shows the ${b.shows} product]` : ''
     const line = String(b.script || (Array.isArray(dialogue) ? dialogue[i] : '') || '').trim()
-    const said = line ? `  Spoken: "${line.replace(/"/g, "'")}"` : ''
-    return `${t ? t + ' — ' : `Scene ${i + 1}: `}${action}${lens ? ` (${lens})` : ''}${shows}.${said}`
+    const said = line ? ` — she/he says: "${line.replace(/"/g, "'")}"` : ''
+    return `${t}: ${action}${lens ? ` (${lens})` : ''}${shows}${said}`
   }).join('\n')
 }
 
@@ -2207,25 +2214,26 @@ async function generateJob(job) {
       const prodFirst = leadFrame ? 2 : 1
       const productRef = falProductImages.length ? `[Image${prodFirst}]${falProductImages.length > 1 ? `–[Image${prodFirst + falProductImages.length - 1}]` : ''}` : 'the product'
 
-      // ── The prompt IS the timestamped shot-by-shot decode (what the tutorial pastes from Gemini),
-      // so ONE 30s generation reproduces every scene of the source instead of a single vibe. ──
-      const shotList = timestampedShotList(beat?.beats)
+      // ── The prompt LEADS with the timestamped shot-by-shot decode (what the tutorial pastes from
+      // Gemini) — this is THE thing that makes ONE generation walk through every scene in order
+      // (person speaks → box opens → room b-roll → website → back home) instead of a single vibe. ──
+      const shotList = timestampedShotList(beat?.beats, targetSecs)
       const swapProduct = !isService && falProductImages.length
-        ? `IMPORTANT — swap the product: ${productRef} is MY product. Render it as the promoted/hero product in EVERY shot that shows a product, EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
+        ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
         : ''
 
       let prompt = [
-        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing, scene order and vibe as a fresh regenerated version (not a copy).`,
+        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing and scene order as a fresh regenerated version (not a copy).`,
+        shotList ? `SHOT LIST — hit each timestamp in order, cutting to a NEW scene at each one, so the finished ${targetSecs}s ad moves through ALL of these shots:\n${shotList}` : '',
         isService ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.' : swapProduct,
-        leadFrame ? `[Image1] is the opening frame — begin from it and keep its look, framing and person.` : '',
-        shotList ? `Follow this shot list beat by beat, in order, filling the full ${targetSecs} seconds:\n${shotList}` : '',
+        leadFrame ? `[Image1] is the opening frame — begin the FIRST shot from it and keep its look, framing and person.` : '',
         recast ? `Recast the on-camera person(s) as ${meta.character_look} — keep everything else identical.` : '',
         (recast || (Array.isArray(beat?.people) && beat.people.length >= 2)) ? 'Make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.' : '',
-        spoken ? `The on-camera person(s) speak these EXACT words aloud across the ad, clearly lip-synced, in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
+        spoken ? `Spoken audio across the whole ad, clearly lip-synced by the on-camera person(s), in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
       ].filter(Boolean).join('\n\n')
       prompt += STYLE_LOCK
       if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
-      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${beat?.beats?.length || 0} beats in shot list`)
+      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${beat?.beats?.length || 0}-scene timestamped shot list`)
       const base = join(tmpdir(), `os-${job.id}`)
       const tmp = []
       let videoUrl = null, falCost = 0
