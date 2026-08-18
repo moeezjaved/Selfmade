@@ -8,7 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
 import { sendFirstBrandEmail } from '@/lib/email'
 import { getPlanId } from '@/lib/entitlements'
-import { allOrgMemberIds } from '@/lib/org'
+import { brandPoolUserIds } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,10 +20,9 @@ export async function GET() {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
 
-  // One shared workspace: list every brand owned by ANYONE in the user's org (a member sees the owner's
-  // brands, the owner sees a member's) — not just the caller's own, which left invited members with an
-  // empty project switcher on the shared brief.
-  const memberIds = await allOrgMemberIds(admin, user.id).catch(() => [user.id])
+  // Shared workspace = the OWNER's brand catalog: a member inherits the owner's brands, the owner sees
+  // only their own (NOT a duplicate a teammate created under their own user). See brandPoolUserIds.
+  const memberIds = await brandPoolUserIds(admin, user.id).catch(() => [user.id])
   const { data: brands } = await admin
     .from('brands').select('*').in('user_id', memberIds).order('created_at', { ascending: false })
   const ids = (brands || []).map((b: any) => b.id)
