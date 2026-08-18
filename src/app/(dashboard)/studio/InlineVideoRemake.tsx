@@ -177,7 +177,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   const [styleTouched, setStyleTouched] = useState(false)   // did the user manually pick a mode? (else auto-pick from analysis)
   const [srcScenes, setSrcScenes] = useState(3)   // analyzed scene count, used for cinematic cost + approve
   const [sbScenes, setSbScenes] = useState(0)     // scenes the founder KEPT in the embedded storyboard
-  const [shotList, setShotList] = useState<{ t: string; action: string; lens?: string; shows?: string; line?: string }[]>([])   // one-shot timestamped scene list (from the beat sheet)
+  const [shotList, setShotList] = useState<{ t: string; secs?: number; action: string; lens?: string; shows?: string; line?: string }[]>([])   // one-shot timestamped scene list (from the beat sheet)
   const [removedShots, setRemovedShots] = useState<Set<number>>(new Set())   // scenes the founder cut from the one-shot shot list
   useEffect(() => { try { if (new URLSearchParams(window.location.search).get('cinematic') === '1') setCineOn(true) } catch {} }, [])   // admin backdoor while parked
   const [script, setScript] = useState('')
@@ -417,7 +417,17 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
                     )
                   })}
                 </div>
-                <div style={{ fontSize: 11.5, color: MUTED, marginBottom: 6 }}>Remove scenes you don't want — the kept ones stretch to fill your chosen length. Great for trimming a long ad down to {resolvedBucket}s.</div>
+                {(() => {
+                  const keptSecs = shotList.reduce((a, s, i) => a + (removedShots.has(i) ? 0 : (s.secs || 0)), 0)
+                  const renderSecs = Math.min(removedShots.size ? keptSecs : resolvedBucket, resolvedBucket, 30)
+                  const over = keptSecs > 30
+                  return (
+                    <div style={{ fontSize: 12, marginBottom: 6, color: over ? '#a16207' : MUTED }}>
+                      Kept scenes ≈ <b style={{ color: over ? '#a16207' : INK }}>{keptSecs}s</b> · renders at <b style={{ color: INK }}>~{renderSecs}s</b>
+                      {over ? ' — still over Seedance’s 30s max, so it’ll compress. Remove a few to hit exactly 30s.' : ' — remove scenes to shorten; the kept ones set the length (like trimming the script).'}
+                    </div>
+                  )
+                })()}
               </>) : (
                 <div style={{ fontSize: 12.5, color: MUTED, marginBottom: 8, padding: '10px 13px', border: `1px dashed ${LINE}`, borderRadius: 12 }}>One continuous take — Seedance films the whole ad from your script below.</div>
               )}

@@ -94,7 +94,8 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
   const bodyRef = useRef<HTMLDivElement | null>(null)          // scroll container — reset to top on step change
   const [jobId, setJobId] = useState<string | null>(null)
   const [draftScript, setDraftScript] = useState('')
-  const [shotList, setShotList] = useState<{ t: string; action: string; lens?: string; shows?: string }[]>([])   // one-shot timestamped scene list
+  const [shotList, setShotList] = useState<{ t: string; secs?: number; action: string; lens?: string; shows?: string }[]>([])   // one-shot timestamped scene list
+  const [removedShots, setRemovedShots] = useState<Set<number>>(new Set())   // scenes cut from the one-shot list
   const [overlays, setOverlays] = useState<{ t: string; text: string }[]>([])  // auto-detected on-screen text callouts (editable)
   const [overlaysOn, setOverlaysOn] = useState(false)  // on-screen text is OPT-IN — clean video by default
   const [err, setErr] = useState<string | null>(null)
@@ -338,6 +339,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
         method: 'POST', headers: { 'content-type': 'application/json' },
         body: JSON.stringify({
           jobId, script: draftScript, mode, durationBucket, sceneCount,
+          keepShots: mode === 'oneshot' && removedShots.size ? shotList.map((_, i) => i).filter(i => !removedShots.has(i)) : undefined,
           overlays: overlaysOn ? overlays.filter((o) => o.text.trim()) : [],
           extraLangs: mode === 'faithful' ? extraLangs : [],
           endCard: ecOn ? { offer: ecOffer.trim(), cta: ecCta.trim() || 'Shop now' } : null,
@@ -879,15 +881,29 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                         Read-only (Seedance films it in one take); the editable voiceover is below. */}
                     {mode === 'oneshot' && shotList.length > 0 && (
                       <div className="field" style={{ marginBottom: 14 }}>
-                        <FieldLabel>Shot list · the scenes your ad moves through</FieldLabel>
+                        {look !== 'match' && (
+                          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fef1ec', border: '1px solid #ef4a1e', borderRadius: 100, padding: '5px 12px', fontSize: 12, fontWeight: 800, color: '#141d15', marginBottom: 10 }}>
+                            🎭 Recasting the presenter as {look} <span style={{ color: L_MUTED, fontWeight: 600 }}>· same scenes, new person</span>
+                          </div>
+                        )}
+                        <FieldLabel>Shot list · the scenes your ad moves through — remove any to shorten</FieldLabel>
                         <div style={{ border: `1px solid ${L_LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fbfaf7' }}>
-                          {shotList.map((s, i) => (
-                            <div key={i} style={{ display: 'flex', gap: 12, padding: '9px 12px', borderTop: i ? `1px solid ${L_LINE}` : 'none', alignItems: 'baseline' }}>
-                              <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, fontWeight: 700, color: '#ef4a1e', whiteSpace: 'nowrap', minWidth: 58 }}>{s.t}</span>
-                              <span style={{ fontSize: 12.5, color: '#33372f', lineHeight: 1.5 }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: '#ef4a1e', fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
-                            </div>
-                          ))}
+                          {shotList.map((s, i) => {
+                            const cut = removedShots.has(i)
+                            return (
+                              <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderTop: i ? `1px solid ${L_LINE}` : 'none', alignItems: 'baseline', opacity: cut ? 0.4 : 1 }}>
+                                <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, fontWeight: 700, color: '#ef4a1e', whiteSpace: 'nowrap', minWidth: 58, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
+                                <span style={{ flex: 1, fontSize: 12.5, color: '#33372f', lineHeight: 1.5, textDecoration: cut ? 'line-through' : 'none' }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: '#ef4a1e', fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
+                                <button onClick={() => setRemovedShots(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })} style={{ background: 'none', border: 'none', color: cut ? '#ef4a1e' : '#c0392b', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}>{cut ? 'Undo' : 'Remove'}</button>
+                              </div>
+                            )
+                          })}
                         </div>
+                        {(() => {
+                          const keptSecs = shotList.reduce((a, s, i) => a + (removedShots.has(i) ? 0 : (s.secs || 0)), 0)
+                          const over = keptSecs > 30
+                          return <div style={{ fontSize: 12, marginTop: 6, color: over ? '#a16207' : L_MUTED }}>Kept scenes ≈ <b style={{ color: over ? '#a16207' : '#141d15' }}>{keptSecs}s</b>{over ? ' — over Seedance’s 30s max; remove a few to hit 30s.' : ' — the kept scenes set the video length.'}</div>
+                        })()}
                       </div>
                     )}
                     <div className="field" style={{ marginBottom: 14 }}>
