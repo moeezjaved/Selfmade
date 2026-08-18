@@ -12,7 +12,7 @@ const FOREST = '#141d15', LIME = '#ff5a2c', INK = '#161c17', MUTED = '#6f6d5a', 
 const KIND: Record<string, { label: string; run: string }> = {
   research: { label: 'Research', run: 'Reading their ads · writing the report…' },
   creative: { label: 'Creative', run: 'Designing the ad…' },
-  video: { label: 'Video', run: 'Building the storyboard…' },
+  video: { label: 'Video', run: 'Building the shot list…' },
   meta_pause: { label: 'Your ads', run: 'Pausing the campaign on Meta…' },
   meta_scale: { label: 'Your ads', run: 'Raising the budget on Meta…' },
 }

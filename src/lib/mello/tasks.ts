@@ -156,7 +156,7 @@ export async function suggestTasks(admin: SupabaseClient, userId: string, brandI
       out.push({
         kind: 'video',
         title: `Recreate ${lead.name}'s top video for ${brand.name || 'your brand'}`,
-        why: `Their strongest video ad${runs}. I'll analyze it into a storyboard for ${brand.name || 'your product'} — you approve the plan before any video credits are spent.`,
+        why: `Their strongest video ad${runs}. I'll break it into a timestamped shot list for ${brand.name || 'your product'} — you approve the plan before any video credits are spent.`,
         evidence: { competitor: lead.name, sourceAdId: video.adId, sourceVideoUrl: video.media, brandId: brand.id, productType: brand.brandType, format: 'video' },
         credits: null,   // storyboard is free; video is charged only on approve
         suggested_key: `video:${video.adId}:${isoDay()}`,
