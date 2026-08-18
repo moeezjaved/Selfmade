@@ -205,6 +205,25 @@ export async function POST(request: NextRequest) {
       return d
     }
 
+    // Create an ad set, self-healing Meta's conversion-source / object validation walls. A Sales
+    // campaign optimizes PURCHASE via the Pixel, but a FRESH pixel with no recorded conversions isn't a
+    // valid conversion source yet → Meta rejects with 1487888 ("no conversion tracking source") or
+    // 1885154 ("selected object"). Instead of dying, retry the SAME ad set optimized for LINK_CLICKS
+    // (Traffic — needs no pixel/object; the ad's URL is the object). Under a Sales campaign LINK_CLICKS is
+    // an allowed optimization, so the ad still goes live and drives clicks until the Pixel starts
+    // recording purchases, at which point a relaunch optimizes for Sales.
+    const createAdset = async (body: Record<string, unknown>) => {
+      try { return await post(`${adAccountId}/adsets`, body) }
+      catch (e: any) {
+        if (/1487888|1885154|conversion tracking|conversion source|selected object|promoted object/i.test(String(e?.message || ''))) {
+          const { promoted_object, ...rest } = body as any
+          downgradeNote = downgradeNote || 'Your Meta Pixel has no conversion events yet, so we launched a Traffic campaign (drives clicks to your site). Once the Pixel records purchases, relaunch to optimize for Sales.'
+          return await post(`${adAccountId}/adsets`, { ...rest, optimization_goal: 'LINK_CLICKS', billing_event: 'IMPRESSIONS', destination_type: 'WEBSITE' })
+        }
+        throw e
+      }
+    }
+
     // Search for real Meta interest ID
     const searchInterest = async (name: string) => {
       try {
@@ -343,7 +362,7 @@ export async function POST(request: NextRequest) {
         // set so we never leave an orphaned ad set with no ad (the "empty ad sets" bug).
         const creativeId = await createAdCreative(`Creative — ${c.name}`, c.hash || null, undefined, c.type === 'video')
         if (!creativeId) continue
-        const broadAdset = await post(`${adAccountId}/adsets`, {
+        const broadAdset = await createAdset({
           name: `${campaignName} — Broad — ${c.name}`,
           campaign_id: broadCamp.id,
           status: 'PAUSED',
@@ -406,7 +425,7 @@ export async function POST(request: NextRequest) {
         // Creative FIRST — skip the ad set entirely if it can't be built (no orphan ad sets).
         const creativeId = await createAdCreative(`Creative — ${interest.name}`, firstHash, undefined, firstCreative?.type === 'video')
         if (!creativeId) continue
-        const intAdset = await post(`${adAccountId}/adsets`, {
+        const intAdset = await createAdset({
           name: `${campaignName} — Interest — ${interest.name}`,
           campaign_id: intCamp.id,
           status: 'PAUSED',
@@ -473,7 +492,7 @@ export async function POST(request: NextRequest) {
             }
             if (rtAud?.id) rtTargeting.custom_audiences = [{ id: rtAud.id }]
 
-            const rtAdset = await post(`${adAccountId}/adsets`, {
+            const rtAdset = await createAdset({
               name: `${campaignName} — Retargeting — ${c.name}`,
               campaign_id: rtCamp.id,
               status: 'PAUSED',
@@ -541,7 +560,7 @@ export async function POST(request: NextRequest) {
             }
             if (rnAud?.id) rnTargeting.custom_audiences = [{ id: rnAud.id }]
 
-            const rnAdset = await post(`${adAccountId}/adsets`, {
+            const rnAdset = await createAdset({
               name: `${campaignName} — Retainer — ${c.name}`,
               campaign_id: rnCamp.id,
               status: 'PAUSED',
