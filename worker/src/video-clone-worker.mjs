@@ -2223,7 +2223,12 @@ async function generateJob(job) {
       // ── The prompt LEADS with the timestamped shot-by-shot decode (what the tutorial pastes from
       // Gemini) — this is THE thing that makes ONE generation walk through every scene in order
       // (person speaks → box opens → room b-roll → website → back home) instead of a single vibe. ──
-      const shotList = timestampedShotList(beat?.beats, targetSecs)
+      // Honor the founder's manual scene cuts: keep only the beats they didn't remove in the review, then
+      // rescale (kept scenes stretch to fill the chosen length). Omitted keep_shots = keep every scene.
+      const keptBeats = (Array.isArray(meta.keep_shots) && meta.keep_shots.length && Array.isArray(beat?.beats))
+        ? beat.beats.filter((_, i) => meta.keep_shots.includes(i))
+        : beat?.beats
+      const shotList = timestampedShotList(keptBeats, targetSecs)
       const swapProduct = !isService && falProductImages.length
         ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
         : ''

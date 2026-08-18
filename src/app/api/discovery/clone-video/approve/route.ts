@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { jobId, script, mode, durationBucket, sceneCount, extraLangs, endCard, hookVariants, overlays } = await req.json().catch(() => ({}))
+  const { jobId, script, mode, durationBucket, sceneCount, extraLangs, endCard, hookVariants, overlays, keepShots } = await req.json().catch(() => ({}))
   if (!jobId) return NextResponse.json({ error: 'jobId required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -140,6 +140,9 @@ export async function POST(req: NextRequest) {
   const { error } = await admin.from('creative_generations').update({
     // User-edited on-screen text callouts (falls back to the auto-detected ones). Sanitized + capped.
     status: 'processing', credit_tx: txId, clone_meta: { ...meta, ...addonMeta, final_script: finalScript, mode: chosenMode, scene_count: nScenes, segments: nSeg, duration: clipDuration, ...(targetSecs ? { duration_target: targetSecs } : {}),
+      // One-shot: the beat indices the founder KEPT in the shot list (removed scenes dropped). Worker
+      // filters the beat sheet to these before building the timestamped prompt.
+      ...(chosenMode === 'oneshot' && Array.isArray(keepShots) && keepShots.length ? { keep_shots: keepShots.filter((n: any) => Number.isInteger(n)) } : {}),
       overlays: Array.isArray(overlays)
         ? overlays.filter((o: any) => o && String(o.text || '').trim()).slice(0, 8).map((o: any) => ({ t: String(o.t || '').slice(0, 12), text: String(o.text).trim().slice(0, 60) }))
         : (meta.overlays || []) },
