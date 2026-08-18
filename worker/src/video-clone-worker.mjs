@@ -914,6 +914,42 @@ async function stillFromClip(clipUrl, id, tag) {
   } finally { await rm(f, { force: true }).catch(() => {}); await rm(jpg, { force: true }).catch(() => {}) }
 }
 
+// The SOURCE video's actual opening frame, hosted on R2 → used as [Image1] for a faithful one-shot clone.
+// This is the ARC-ads method: anchoring generation to the real first frame reproduces the look far harder
+// than a re-generated keyframe. Grabs ~0.3s in (frame 0 is often black/fade). Returns null on any failure
+// (caller falls back to the generated keyframe). Only for faithful clones — a recast uses the drawn frame.
+async function firstFrameOfSource(sourceVideoUrl, id) {
+  if (!sourceVideoUrl) return null
+  const f = join(tmpdir(), `src0-${id}.mp4`), jpg = join(tmpdir(), `src0-${id}.jpg`)
+  try {
+    await downloadToFile(sourceVideoUrl, f)
+    await ff(['-y', '-ss', '0.3', '-i', f, '-frames:v', '1', '-q:v', '3', jpg])
+    const buf = await readFile(jpg)
+    const key = `creatives/tmp/${id}-src0.jpg`
+    await r2.send(new PutObjectCommand({ Bucket: process.env.R2_BUCKET_NAME, Key: key, Body: buf, ContentType: 'image/jpeg', CacheControl: 'public, max-age=86400' }))
+    return `${R2_PUBLIC}/${key}`
+  } catch { return null }
+  finally { await rm(f, { force: true }).catch(() => {}); await rm(jpg, { force: true }).catch(() => {}) }
+}
+
+// Render the beat sheet as a TIMESTAMPED shot-by-shot list — the exact thing the ARC-ads tutorial pastes
+// as the Seedance prompt ("break this video down 1:1 with timestamps"). Each line: time range — action,
+// its lens, and which product it shows, plus the attributed spoken line for that beat when we have one.
+// This is what makes ONE 30s generation reproduce all 6-7 scenes (unboxing, plug-in, b-roll, website…)
+// instead of a single vibe. `dialogue` (optional) is a per-beat array aligned to beats.
+function timestampedShotList(beats, dialogue) {
+  if (!Array.isArray(beats) || !beats.length) return ''
+  return beats.map((b, i) => {
+    const t = (b.t || b.time || '').toString().trim()
+    const action = (b.action || b.visual || '').toString().trim()
+    const lens = (b.lens || '').toString().trim()
+    const shows = b.shows && b.shows !== 'none' ? ` [shows the ${b.shows} product]` : ''
+    const line = String(b.script || (Array.isArray(dialogue) ? dialogue[i] : '') || '').trim()
+    const said = line ? `  Spoken: "${line.replace(/"/g, "'")}"` : ''
+    return `${t ? t + ' — ' : `Scene ${i + 1}: `}${action}${lens ? ` (${lens})` : ''}${shows}.${said}`
+  }).join('\n')
+}
+
 // Storyboard reference frames: grab one frame from the SOURCE video at each beat's moment so the
 // pre-generation storyboard shows a real film strip (not text). Best-effort — mutates beats[i].thumb
 // in place, downloads the source ONCE. Any failure leaves beats untouched (caller wraps in try/catch).
@@ -2157,23 +2193,39 @@ async function generateJob(job) {
       const targetSecs = Math.max(4, Math.min(30, Number(meta.duration_target) || Number(meta.duration) || 15))
       await prog('Directing your one-shot ad…', 10, targetSecs * 4 + 40)
       const langN = langName(meta.language || 'en').split(' — ')[0]
-      const kf0 = meta.beat_sheet?.beats?.[0]?.preview || null   // approved opening keyframe leads the refs
-      const imgs = [kf0, ...falProductImages].filter(Boolean).slice(0, 9)
-      const prodFirst = kf0 ? 2 : 1
-      const productRef = falProductImages.length ? `[Image${prodFirst}]${falProductImages.length > 1 ? `–[Image${prodFirst + falProductImages.length - 1}]` : ''}` : 'the product'
+      const recast = meta.character_look && meta.character_look !== 'match'
       const spoken = String(finalScript || '').trim()
+
+      // ── REFERENCE #1 = the SOURCE video's REAL opening frame (ARC-ads method) for a faithful clone;
+      // only a recast uses the re-generated keyframe (the source frame drags the original person's
+      // pixels). Fall back to the generated keyframe if extraction fails. Refs are just TWO — the lead
+      // frame + the product — never a 9-image pile (fewer, stronger anchors = Seedance gets it right). ──
+      const genKf0 = meta.beat_sheet?.beats?.[0]?.preview || null
+      let leadFrame = genKf0
+      if (!recast) { try { leadFrame = (await firstFrameOfSource(job.source_video_url, job.id)) || genKf0 } catch { leadFrame = genKf0 } }
+      const imgs = [leadFrame, ...falProductImages].filter(Boolean).slice(0, 2)
+      const prodFirst = leadFrame ? 2 : 1
+      const productRef = falProductImages.length ? `[Image${prodFirst}]${falProductImages.length > 1 ? `–[Image${prodFirst + falProductImages.length - 1}]` : ''}` : 'the product'
+
+      // ── The prompt IS the timestamped shot-by-shot decode (what the tutorial pastes from Gemini),
+      // so ONE 30s generation reproduces every scene of the source instead of a single vibe. ──
+      const shotList = timestampedShotList(beat?.beats)
+      const swapProduct = !isService && falProductImages.length
+        ? `IMPORTANT — swap the product: ${productRef} is MY product. Render it as the promoted/hero product in EVERY shot that shows a product, EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
+        : ''
+
       let prompt = [
-        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy.`,
-        isService
-          ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.'
-          : falProductImages.length ? `The product is ${productRef} — render it EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size; get it big by moving the CAMERA close, never by enlarging it.` : '',
-        kf0 ? '[Image1] is the approved opening frame — begin from it and keep its look and person.' : '',
-        spoken
-          ? `The on-camera person speaks these EXACT words aloud, clearly lip-synced, in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.`
-          : 'Ambient sound only, no music, no on-screen captions.',
-      ].filter(Boolean).join(' ')
+        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing, scene order and vibe as a fresh regenerated version (not a copy).`,
+        isService ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.' : swapProduct,
+        leadFrame ? `[Image1] is the opening frame — begin from it and keep its look, framing and person.` : '',
+        shotList ? `Follow this shot list beat by beat, in order, filling the full ${targetSecs} seconds:\n${shotList}` : '',
+        recast ? `Recast the on-camera person(s) as ${meta.character_look} — keep everything else identical.` : '',
+        (recast || (Array.isArray(beat?.people) && beat.people.length >= 2)) ? 'Make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.' : '',
+        spoken ? `The on-camera person(s) speak these EXACT words aloud across the ad, clearly lip-synced, in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
+      ].filter(Boolean).join('\n\n')
       prompt += STYLE_LOCK
       if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
+      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${beat?.beats?.length || 0} beats in shot list`)
       const base = join(tmpdir(), `os-${job.id}`)
       const tmp = []
       let videoUrl = null, falCost = 0
