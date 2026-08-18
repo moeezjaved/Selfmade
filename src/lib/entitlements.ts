@@ -13,10 +13,18 @@ export async function getPlanId(admin: SupabaseClient, ownerId: string): Promise
   // generous of the two — never under-serve a paying/granted user. Was: subscription-wins, which
   // showed a Business user "Your Free plan includes 1 tracked brand".
   const [{ data: sub }, { data: prof }] = await Promise.all([
-    admin.from('subscriptions').select('plan, status').eq('owner_id', ownerId).in('status', ['active', 'trialing']).maybeSingle(),
+    admin.from('subscriptions').select('plan, status, current_period_end').eq('owner_id', ownerId).maybeSingle(),
     admin.from('user_profiles').select('plan_id').eq('user_id', ownerId).maybeSingle(),
   ])
-  const subPlan = (sub as any)?.plan ? normalizePlan((sub as any).plan) : null
+  // A subscription entitles the user when it's active/trialing OR SOFT-CANCELLED but still inside the paid
+  // period (cancel keeps access until current_period_end — the renewals cron drops it to Free after that).
+  // Excluding 'canceled' here is what made a cancelled Creator lose access mid-period.
+  const s: any = sub
+  const subEntitled = !!s?.plan && (
+    ['active', 'trialing'].includes(String(s.status)) ||
+    (String(s.status) === 'canceled' && s.current_period_end && new Date(s.current_period_end) > new Date())
+  )
+  const subPlan = subEntitled ? normalizePlan(s.plan) : null
   const profPlan = (prof as any)?.plan_id ? normalizePlan((prof as any).plan_id) : null
   if (subPlan && profPlan) return PLAN_ORDER.indexOf(subPlan) >= PLAN_ORDER.indexOf(profPlan) ? subPlan : profPlan
   return subPlan || profPlan || 'free'

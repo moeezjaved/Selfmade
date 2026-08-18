@@ -89,7 +89,7 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   const [{ data: prof }, { data: wallet }, { data: sub }] = await Promise.all([
     admin.from('user_profiles').select('credits_balance, plan_id, credits_reset_at, subscription_status, trial_ends_at').eq('user_id', owner).maybeSingle(),
     admin.from('credit_wallets').select('plan_credits_balance, topup_credits_balance, plan_credits_reset_at').eq('owner_id', owner).maybeSingle(),
-    admin.from('subscriptions').select('stripe_subscription_id, status, plan').eq('owner_id', owner).maybeSingle(),
+    admin.from('subscriptions').select('stripe_subscription_id, status, plan, current_period_end').eq('owner_id', owner).maybeSingle(),
   ])
   const plan_credits = (wallet as any)?.plan_credits_balance ?? 0
   const topup_credits = (wallet as any)?.topup_credits_balance ?? 0
@@ -104,7 +104,12 @@ export async function getBalance(admin: SupabaseClient, userId: string) {
   // profile plan_id, so a paying Creator whose profile row wasn't synced showed as "Free" everywhere the
   // brief/onboarding read getBalance (the "You're on Free / Free tracks 1 competitor" bug). Match
   // getPlanId: take the MORE GENEROUS of the two active sources — never under-serve a paying user.
-  const subActive = (sub as any)?.plan && ['active', 'trialing'].includes(String((sub as any)?.status || ''))
+  // Entitled while active/trialing OR soft-cancelled but still inside the paid period (access until
+  // current_period_end). Otherwise a cancelled Creator would lose plan credits/features mid-period.
+  const subActive = (sub as any)?.plan && (
+    ['active', 'trialing'].includes(String((sub as any)?.status || '')) ||
+    (String((sub as any)?.status || '') === 'canceled' && (sub as any)?.current_period_end && new Date((sub as any).current_period_end) > new Date())
+  )
   const subPlan = subActive ? normalizePlan((sub as any).plan) : null
   const profPlan = (prof as any)?.plan_id ? normalizePlan((prof as any).plan_id) : null
   const plan = (subPlan && profPlan)
