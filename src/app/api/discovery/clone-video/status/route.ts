@@ -43,6 +43,21 @@ export async function GET(req: NextRequest) {
     sourceSeconds: Number(meta?.beat_sheet?.duration_seconds) || null,
     progress: meta.progress || null,   // { label, pct, eta_sec } — live render step + ETA
     overlays: Array.isArray(meta.overlays) ? meta.overlays : [],   // auto-detected on-screen text callouts (editable)
+    // ONE-SHOT shot list — the timestamped scene-by-scene decode the worker feeds Seedance. Surfaced so
+    // the review step SHOWS the shots the ad will move through (person speaks → box opens → room b-roll…)
+    // instead of a per-scene storyboard. Each beat gets an explicit Ns-Ms slot (synthesized if Gemini
+    // left it blank). Read-only; the editable voiceover script stays separate.
+    shotList: (() => {
+      const beats = Array.isArray(meta?.beat_sheet?.beats) ? meta.beat_sheet.beats : []
+      if (!beats.length) return []
+      const total = Math.max(4, Number(meta.duration_target) || Number(meta?.beat_sheet?.duration_seconds) || 15)
+      const n = beats.length
+      return beats.map((b: any, i: number) => {
+        let t = String(b.t || b.time || '').replace(/\s/g, '')
+        if (!/\d/.test(t)) t = `${Math.round((i * total) / n)}s-${Math.round(((i + 1) * total) / n)}s`
+        return { t, action: String(b.action || b.visual || ''), lens: String(b.lens || ''), shows: (b.shows && b.shows !== 'none') ? String(b.shows) : '', line: String(b.script || '') }
+      })
+    })(),
     // Tweak panel: a finished faithful render with cached per-scene clips can be fixed per-scene.
     tweakable: (row as any).status === 'done' && meta.mode === 'faithful'
       && Array.isArray(meta.scene_plan) && meta.scene_plan.length > 0
