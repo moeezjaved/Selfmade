@@ -25,13 +25,19 @@ export async function GET() {
   const allowed = await allowedAdAccountIds(admin, user.id)
   if (!allowed.all) accounts = accounts.filter(a => allowed.ids.includes(a.account_id))
 
+  // The full workspace pool BEFORE brand filtering — so a brand with no linked account can offer
+  // "link one you already connected" instead of forcing a reconnect (the "Aura says Connect Meta even
+  // though I already connected an account" case). Only account_id/name/brand_id — no tokens.
+  const workspaceAccounts = accounts.map(a => ({ account_id: a.account_id, account_name: a.account_name, currency: a.currency, brand_id: ('brand_id' in a ? a.brand_id : null) }))
+
   // STRICT scope to the ACTIVE brand (project switcher): an account shows ONLY under the brand it's
   // linked to (meta_accounts.brand_id, mig 142). Unassigned accounts (brand_id null) show ONLY under
   // "All brands", NOT under every brand — matching competitors + the inbox. A brand with no linked
   // account shows an empty picker (correct: Hair ResQ has no account, so no ROY4/Aura account leaks in).
+  let activeBrand: string | null = null
   try {
     const { resolveActiveBrandId } = await import('@/lib/brand/active')
-    const activeBrand = await resolveActiveBrandId(admin, user.id).catch(() => null)
+    activeBrand = await resolveActiveBrandId(admin, user.id).catch(() => null)
     if (activeBrand && accounts.some(a => 'brand_id' in a)) {
       accounts = accounts.filter(a => a.brand_id === activeBrand)
     }
@@ -45,7 +51,7 @@ export async function GET() {
     accounts = accounts.map(a => ({ ...a, is_primary: a.account_id === primary?.account_id }))
   }
 
-  return NextResponse.json({ accounts })
+  return NextResponse.json({ accounts, workspaceAccounts, activeBrand })
 }
 
 export async function POST(request: Request) {
