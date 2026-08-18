@@ -22,6 +22,12 @@ export async function POST(request: NextRequest) {
     { org_id: inv.org_id, user_id: user.id, role: inv.role },
     { onConflict: 'org_id,user_id', ignoreDuplicates: true },
   )
+  // A team member joins an EXISTING workspace — there is nothing to onboard (brand, competitors, and
+  // assets are the owner's, shared org-wide). Stamp onboarding_completed so middleware doesn't drag the
+  // new member through the from-scratch onboarding wizard; they land straight on the shared brief.
+  await admin.from('user_profiles')
+    .upsert({ user_id: user.id, onboarding_completed: true }, { onConflict: 'user_id' })
+    .then(() => {}, () => admin.from('user_profiles').update({ onboarding_completed: true }).eq('user_id', user.id).then(() => {}, () => {}))
   await admin.from('org_invites').update({ status: 'accepted', accepted_at: new Date().toISOString() }).eq('id', inv.id)
   const { data: org } = await admin.from('organizations').select('name').eq('id', inv.org_id).maybeSingle()
   return NextResponse.json({ ok: true, org: org?.name || 'the team' })

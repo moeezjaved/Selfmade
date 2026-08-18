@@ -18,7 +18,7 @@ export default function JoinPage() {
     fetch('/api/account/team/accept', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ token }) })
       .then(async r => ({ ok: r.ok, status: r.status, j: await r.json().catch(() => ({})) }))
       .then(({ ok, status, j }) => {
-        if (ok) { setState('ok'); setMsg(j.org || 'the team'); setTimeout(() => { window.location.href = '/discovery' }, 1600) }
+        if (ok) { setState('ok'); setMsg(j.org || 'the team'); setTimeout(() => { window.location.href = '/brief' }, 1600) }
         else if (status === 401) setState('authneeded')
         else { setState('error'); setMsg(j.error || 'Could not accept the invite.') }
       })
