@@ -12,6 +12,7 @@ export async function logActivity(
   actionType: string,
   description: string,
   entityType = 'brand',
+  brandId?: string | null,   // brand-facing event → attach the brand; account-level (billing/auth) → null
 ): Promise<void> {
   try {
     await (admin as any).from('activity_logs').insert({
@@ -20,6 +21,7 @@ export async function logActivity(
       entity_type: entityType,
       description,
       performed_by: 'user',
+      brand_id: brandId || null,
     })
   } catch { /* audit log is best-effort */ }
 }

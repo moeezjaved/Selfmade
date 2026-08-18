@@ -281,7 +281,7 @@ export async function POST(req: NextRequest) {
       const gate = await requireUnder(admin, billingOwner, 'expressPulls', pullsToday || 0)
       if (gate) return NextResponse.json(gate, { status: 402 })
       await ensureTracked(admin, pageId, name, true)
-      await logActivity(admin, user.id, 'BRAND_PULLED', `Pulled ads for ${name}`)
+      await logActivity(admin, user.id, 'BRAND_PULLED', `Pulled ads for ${name}`, 'brand', activeBrandId)
       return NextResponse.json({ pageId, crawlOnly: true, pullsToday: (pullsToday || 0) + 1 })
     }
 
@@ -331,7 +331,7 @@ export async function POST(req: NextRequest) {
       throw e
     }
     await commitCredits(admin, tx.id, { pageId, name })
-    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name} (−50 cr)`)
+    await logActivity(admin, user.id, 'BRAND_SPIED', `Started spying ${name} (−50 cr)`, 'brand', activeBrandId)
     return NextResponse.json({ pageId, charged: true, cost: 50 })
   } catch (e) {
     return NextResponse.json({ error: e instanceof Error ? e.message : 'Something went wrong — please try again.' }, { status: 500 })
@@ -355,9 +355,9 @@ export async function DELETE(req: NextRequest) {
   // across the whole org so it actually persists for everyone.
   const orgIds = await orgMemberIds(admin, user.id)
   // Resolve the brand's real name BEFORE deleting so the activity log reads "Stopped spying Nike".
-  const { data: fb } = await admin.from('followed_brands').select('brand_name').in('user_id', orgIds).eq('page_id', pageId).not('brand_name', 'is', null).limit(1).maybeSingle()
+  const { data: fb } = await admin.from('followed_brands').select('brand_name, brand_id').in('user_id', orgIds).eq('page_id', pageId).not('brand_name', 'is', null).limit(1).maybeSingle()
   const label = fb?.brand_name && !/^\d+$/.test(String(fb.brand_name).trim()) ? fb.brand_name : pageId
   await admin.from('followed_brands').delete().in('user_id', orgIds).eq('page_id', pageId)
-  await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${label}`)
+  await logActivity(admin, user.id, 'BRAND_UNSPIED', `Stopped spying ${label}`, 'brand', (fb as any)?.brand_id || null)
   return NextResponse.json({ ok: true, pageId })
 }

@@ -544,6 +544,7 @@ export async function POST(request: NextRequest) {
         entity_type: 'campaign',
         description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp.id}`,
         performed_by: 'user',
+        brand_id: (metaAccount as any).brand_id || null,   // scope to the brand this ad account is linked to
       })
     } catch(e) { console.log('Activity log error') }
 

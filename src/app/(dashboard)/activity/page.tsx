@@ -1,6 +1,14 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
+
+// Read the active brand the ProjectSwitcher stored (client-safe cookie). Empty = "All brands".
+function activeBrandId(): string {
+  if (typeof document === 'undefined') return ''
+  const m = document.cookie.match(new RegExp('(?:^|; )' + BRAND_COOKIE + '=([^;]+)'))
+  return m ? decodeURIComponent(m[1]) : ''
+}
 
 export default function ActivityPage() {
   const [logs, setLogs] = useState<any[]>([])
@@ -11,11 +19,20 @@ export default function ActivityPage() {
     async function load() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) return
-      const { data } = await supabase.from('activity_logs').select('*').eq('user_id', user.id).order('created_at', { ascending: false }).limit(50)
+      // BRAND ISOLATION: show this brand's events + account-level events (brand_id NULL — billing, auth,
+      // credits). "All brands" (no cookie) shows everything. Matches the app-wide sf_brand scoping rule.
+      const brand = activeBrandId()
+      let q = supabase.from('activity_logs').select('*').eq('user_id', user.id)
+      if (brand && brand !== 'all') q = q.or(`brand_id.eq.${brand},brand_id.is.null`)
+      const { data } = await q.order('created_at', { ascending: false }).limit(50)
       setLogs(data || [])
       setLoading(false)
     }
     load()
+    // Re-scope when the user switches brands from the top ProjectSwitcher (it broadcasts this event).
+    const onBrand = () => { setLoading(true); load() }
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
   }, [])
 
   const icons: Record<string,string> = { META_CONNECTED:'🔗', SYNC_COMPLETED:'↻', META_OAUTH_STARTED:'🔐', RECOMMENDATION_APPROVED:'✓', RECOMMENDATION_REJECTED:'✕', AD_LAUNCHED:'🚀', CAMPAIGN_CREATED:'📣', CREATIVE_GENERATED:'🎨', BRAND_FOLLOWED:'❤️', BRAND_UNFOLLOWED:'💔', BRAND_SPIED:'🎯', BRAND_UNSPIED:'🚫' }
