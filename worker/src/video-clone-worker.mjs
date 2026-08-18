@@ -2269,8 +2269,15 @@ async function generateJob(job) {
       await prog('Finishing up…', 88, 15)
       let f = `${base}.mp4`; await downloadToFile(videoUrl, f); tmp.push(f)
       f = await ensureAudio(f); if (!tmp.includes(f)) tmp.push(f)
-      let outF = await burnOverlays(f, meta.overlays, job.id); tmp.push(outF)
-      outF = await withEndCard(outF, meta, job.id, 'main', tmp)
+      // withEndCard returns { file, applied } — NOT a path. Use .file for the next step and .applied to
+      // settle the end-card credit; passing the object straight on made uploadVideo readFile({object})
+      // → "path must be string…Object" AFTER fal had already been billed. (canonical pattern, cf. 3006/3173)
+      const carded = await withEndCard(f, meta, job.id, 'main', tmp)
+      if (meta.end_card && meta.end_card.tx) {
+        if (carded.applied) await rpc('commit_credits', { p_tx: meta.end_card.tx, p_metadata: { endcard: true } })
+        else await rpc('refund_credits', { p_tx: meta.end_card.tx })
+      }
+      const outF = await burnOverlays(carded.file, meta.overlays, job.id); tmp.push(outF)
       const url = await uploadVideo(outF, `creatives/${job.user_id}/${job.id}.mp4`)
       await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, script: spoken, final_script: spoken, fal_cost_est: +falCost.toFixed(2) } })
       if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'oneshot', secs: effSecs, actual_cost_usd: +falCost.toFixed(2) } })
