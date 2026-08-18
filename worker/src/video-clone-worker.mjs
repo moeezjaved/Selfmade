@@ -2223,19 +2223,28 @@ async function generateJob(job) {
       // ── The prompt LEADS with the timestamped shot-by-shot decode (what the tutorial pastes from
       // Gemini) — this is THE thing that makes ONE generation walk through every scene in order
       // (person speaks → box opens → room b-roll → website → back home) instead of a single vibe. ──
-      // Honor the founder's manual scene cuts: keep only the beats they didn't remove in the review, then
-      // rescale (kept scenes stretch to fill the chosen length). Omitted keep_shots = keep every scene.
+      // Honor the founder's manual scene cuts: keep only the beats they didn't remove in the review.
+      // Omitted keep_shots = keep every scene.
       const keptBeats = (Array.isArray(meta.keep_shots) && meta.keep_shots.length && Array.isArray(beat?.beats))
         ? beat.beats.filter((_, i) => meta.keep_shots.includes(i))
         : beat?.beats
-      const shotList = timestampedShotList(keptBeats, targetSecs)
+      // RENDER LENGTH FOLLOWS THE KEPT SCENES (like the script meter): the ad runs as long as the SHORTER
+      // of {what you picked, the kept scenes' natural total}, capped at Seedance's 30s. So cutting scenes
+      // literally shortens the clip instead of stretching a few shots to fill the picked length.
+      let effSecs = targetSecs
+      if (Array.isArray(meta.keep_shots) && meta.keep_shots.length && Array.isArray(keptBeats)) {
+        const dur = (s) => { const m = String(s || '').match(/(\d+(?:\.\d+)?)\s*(?:[-–—]|to)\s*(\d+(?:\.\d+)?)/); return m ? (parseFloat(m[2]) - parseFloat(m[1])) : 0 }
+        const natSum = keptBeats.reduce((a, b) => a + dur(b.t || b.time), 0)
+        if (natSum > 0) effSecs = Math.max(6, Math.min(targetSecs, Math.round(natSum), 30))
+      }
+      const shotList = timestampedShotList(keptBeats, effSecs)
       const swapProduct = !isService && falProductImages.length
         ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${beat?.rejected_product ? `; keep the "${beat.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
         : ''
 
       let prompt = [
-        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing and scene order as a fresh regenerated version (not a copy).`,
-        shotList ? `SHOT LIST — hit each timestamp in order, cutting to a NEW scene at each one, so the finished ${targetSecs}s ad moves through ALL of these shots:\n${shotList}` : '',
+        `A polished ${effSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing and scene order as a fresh regenerated version (not a copy).`,
+        shotList ? `SHOT LIST — hit each timestamp in order, cutting to a NEW scene at each one, so the finished ${effSecs}s ad moves through ALL of these shots:\n${shotList}` : '',
         isService ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.' : swapProduct,
         leadFrame ? `[Image1] is the opening frame — begin the FIRST shot from it and keep its look, framing and person.` : '',
         recast ? `Recast the on-camera person(s) as ${meta.character_look} — keep everything else identical.` : '',
@@ -2244,11 +2253,11 @@ async function generateJob(job) {
       ].filter(Boolean).join('\n\n')
       prompt += STYLE_LOCK
       if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
-      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${beat?.beats?.length || 0}-scene timestamped shot list`)
+      console.log(`🎬 one-shot ${job.id} — ${imgs.length} refs (lead=${recast ? 'recast-kf' : 'source-frame0'}), ${keptBeats?.length || 0}/${beat?.beats?.length || 0} scenes @ ${effSecs}s`)
       const base = join(tmpdir(), `os-${job.id}`)
       const tmp = []
       let videoUrl = null, falCost = 0
-      const gen = async (refs) => { const r = await falGenerate({ prompt, imageUrls: refs, resolution: meta.resolution, duration: targetSecs, aspect: meta.aspect, tier: meta.tier, generateAudio: true }); falCost += clipCost(meta.tier, targetSecs, true); return r.videoUrl }
+      const gen = async (refs) => { const r = await falGenerate({ prompt, imageUrls: refs, resolution: meta.resolution, duration: effSecs, aspect: meta.aspect, tier: meta.tier, generateAudio: true }); falCost += clipCost(meta.tier, effSecs, true); return r.videoUrl }
       try { videoUrl = await gen(imgs) }
       catch (e) {
         // A likeness/policy block on the refs must never kill the job: retry product-only, then bare prompt.
@@ -2263,8 +2272,8 @@ async function generateJob(job) {
       outF = await withEndCard(outF, meta, job.id, 'main', tmp)
       const url = await uploadVideo(outF, `creatives/${job.user_id}/${job.id}.mp4`)
       await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, script: spoken, final_script: spoken, fal_cost_est: +falCost.toFixed(2) } })
-      if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'oneshot', secs: targetSecs, actual_cost_usd: +falCost.toFixed(2) } })
-      console.log(`🎬 one-shot ${job.id} (${targetSecs}s) → ${url}`)
+      if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'oneshot', secs: effSecs, actual_cost_usd: +falCost.toFixed(2) } })
+      console.log(`🎬 one-shot ${job.id} (${effSecs}s) → ${url}`)
       for (const t of tmp) await rm(t, { force: true }).catch(() => {})
       return
     }

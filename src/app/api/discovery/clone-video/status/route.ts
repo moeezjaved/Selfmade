@@ -56,10 +56,14 @@ export async function GET(req: NextRequest) {
       const ranges = beats.map((b: any) => parse(b.t || b.time))
       const srcMax = Math.max(0, ...ranges.map((r: any) => (r ? r[1] : 0)))
       const scale = srcMax > 0 ? total / srcMax : 0   // rescale real timestamps to the chosen duration (50s ad → 30s)
+      const natFallback = (srcMax || n * 2) / n
       return beats.map((b: any, i: number) => {
         const r = ranges[i]
         const t = (r && scale) ? `${Math.round(r[0] * scale)}s-${Math.round(r[1] * scale)}s` : `${Math.round((i * total) / n)}s-${Math.round(((i + 1) * total) / n)}s`
-        return { t, action: String(b.action || b.visual || ''), lens: String(b.lens || ''), shows: (b.shows && b.shows !== 'none') ? String(b.shows) : '', line: String(b.script || '') }
+        // secs = the scene's NATURAL duration (before rescale) — lets the UI sum kept scenes into a live
+        // "kept ≈ Xs" meter so you can cut a long ad down to exactly your target, like the script meter.
+        const secs = Math.max(1, Math.round(r ? (r[1] - r[0]) : natFallback))
+        return { t, secs, action: String(b.action || b.visual || ''), lens: String(b.lens || ''), shows: (b.shows && b.shows !== 'none') ? String(b.shows) : '', line: String(b.script || '') }
       })
     })(),
     // Tweak panel: a finished faithful render with cached per-scene clips can be fixed per-scene.
