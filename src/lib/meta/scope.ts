@@ -9,13 +9,13 @@
  * Do NOT use these for crawler-token lookups (admin/*, indexer) — those legitimately key on user_id.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { allOrgMemberIds, allowedAdAccountIds } from '@/lib/org'
+import { workspaceMemberIds, allowedAdAccountIds } from '@/lib/org'
 
-/** The user_ids whose connected accounts form this user's visible pool (every org they're in, or just
- *  self). Uses the full org union — the newest-membership shortcut collapsed a member to their own empty
- *  personal org, hiding the OWNER's connected ad accounts (so the member's Ads/Reports saw nothing). */
+/** The user_ids whose connected accounts form this user's visible pool: the members of their ONE
+ *  workspace org (owner + real teammates). NOT a union across every org they were ever added to — that
+ *  leaked ad accounts from stray/other orgs into the picker ("3 connected accounts I didn't add"). */
 async function poolUserIds(admin: SupabaseClient, userId: string): Promise<string[]> {
-  return allOrgMemberIds(admin, userId).catch(() => [userId])
+  return workspaceMemberIds(admin, userId).catch(() => [userId])
 }
 
 /**
