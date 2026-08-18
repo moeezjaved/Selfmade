@@ -83,6 +83,17 @@ export async function allOrgMemberIds(admin: SupabaseClient, userId: string): Pr
 }
 
 /**
+ * The user_ids whose BRANDS this user should see = self + the workspace billing owner. Deliberately
+ * NARROWER than allOrgMemberIds: a member inherits the OWNER's brand catalog (shared workspace), and the
+ * owner sees ONLY their own — NOT a duplicate brand a teammate happened to create under their own user
+ * (which is how "2 Aura" appeared in the owner's switcher). One workspace = the owner's brands.
+ */
+export async function brandPoolUserIds(admin: SupabaseClient, userId: string): Promise<string[]> {
+  const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
+  return Array.from(new Set([userId, owner]))
+}
+
+/**
  * The org's shared Meta ad-account POOL: every active account connected by any member. One shared
  * workspace ⇒ the team draws from the same set of connected accounts (not just each person's own).
  */

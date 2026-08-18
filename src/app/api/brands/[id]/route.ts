@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
-import { allOrgMemberIds } from '@/lib/org'
+import { brandPoolUserIds } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -16,7 +16,7 @@ const ARR = (v: any) => Array.isArray(v) ? v.map(String) : (v ? [String(v)] : []
 // Studio, etc.) — not just the row's user_id. Was self-only, which is why an invited member couldn't
 // open the owner's brand.
 async function owned(admin: any, brandId: string, userId: string) {
-  const ids = await allOrgMemberIds(admin, userId).catch(() => [userId])
+  const ids = await brandPoolUserIds(admin, userId).catch(() => [userId])
   const { data } = await admin.from('brands').select('id').eq('id', brandId).in('user_id', ids).maybeSingle()
   return !!data
 }
@@ -26,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const memberIds = await allOrgMemberIds(admin, user.id).catch(() => [user.id])
+  const memberIds = await brandPoolUserIds(admin, user.id).catch(() => [user.id])
   const { data: brand } = await admin.from('brands').select('*').eq('id', params.id).in('user_id', memberIds).maybeSingle()
   if (!brand) return NextResponse.json({ error: 'Not found' }, { status: 404 })
   const [{ data: products }, { data: assets }] = await Promise.all([

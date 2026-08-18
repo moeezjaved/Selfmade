@@ -21,8 +21,8 @@ export async function resolveActiveBrandId(admin: any, userId: string, explicit?
   const raw = (explicit || '') || (await readBrandCookie())
   if (!raw) return null
   try {
-    const { allOrgMemberIds } = await import('@/lib/org')
-    const ids = await allOrgMemberIds(admin, userId).catch(() => [userId])
+    const { brandPoolUserIds } = await import('@/lib/org')
+    const ids = await brandPoolUserIds(admin, userId).catch(() => [userId])
     const { data } = await admin.from('brands').select('id').in('user_id', ids).eq('id', raw).maybeSingle()
     return data ? String(raw) : null
   } catch { return null }
