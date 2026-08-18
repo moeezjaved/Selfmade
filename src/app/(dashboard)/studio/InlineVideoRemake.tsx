@@ -136,7 +136,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
 }) {
   const { balance } = useCredits()
   const [phase, setPhase] = useState<'setup' | 'scripting' | 'review' | 'rendering' | 'done'>('setup')
-  const [style, setStyle] = useState<'ugc' | 'cinematic'>('ugc')   // Cinematic is gated (coming soon) — UGC ships
+  const [style, setStyle] = useState<'ugc' | 'cinematic' | 'oneshot'>('oneshot')   // One-shot = the reliable default (one Seedance 2.5 gen)
   const [language, setLanguage] = useState('en')
   const [voice, setVoice] = useState('nova')
   // Parity with the old video modal — these feed the analysis/generation, so keep collecting them.
@@ -174,7 +174,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
   // Cinematic: the CHOSEN length drives the scene count (~1 scene per 3s — 15s → 5, 30s → 10, 60s → 16),
   // capped by what the source actually has. This is what the user pays for and what renders.
   const cineScenes = Math.max(2, Math.min(sbScenes || srcScenes || 2, Math.floor(resolvedBucket / 3), 16))
-  const cost = style === 'cinematic' ? 600 * cineScenes : (nSegs > 1 ? 600 * nSegs : 600)
+  const cost = style === 'cinematic' ? 600 * cineScenes : style === 'oneshot' ? (resolvedBucket > 22 ? 1200 : 600) : (nSegs > 1 ? 600 * nSegs : 600)
 
   // Speaking-time meter — same per-language rates as the old modal. Longer than the target = talks fast.
   const RATE: Record<string, number> = { en: 2.3, ur: 2.0, hi: 2.1, ar: 1.8, es: 2.6, fr: 2.4, de: 2.2 }
@@ -235,9 +235,8 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
       const srcS = Number(st.sourceSeconds) || null
       setSrcSecs(srcS)
       setSrcScenes(Math.max(2, Math.min(10, Number(st.sceneCount) || 3)))
-      // Auto-pick the mode from the analysis (talking-head → UGC; b-roll / multi-scene → Cinematic),
-      // unless the user already chose one. Stops UGC being forced onto a b-roll ad (→ invented creator).
-      if (!styleTouched && cineOn && st.suggestedMode) setStyle(st.suggestedMode === 'faithful' ? 'cinematic' : 'ugc')
+      // One-shot is the default (one reliable Seedance 2.5 gen). We NO LONGER auto-switch to UGC/Cinematic
+      // from the analysis — the user opts into those explicitly. (Keeps the dependable path as the default.)
       // AUTO-LENGTH: default to "Match theirs" so a 51s ad clones at ~51s, not a hardcoded 15s (which
       // race-read a 61s script). The user can still override; once they do, bucketTouched locks their pick.
       if (!bucketTouched.current) setBucket('match')
@@ -265,9 +264,10 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
     setErr(null); setProgress(null); setPhase('rendering')
     try {
       const cinematic = style === 'cinematic'
+      const apiMode = style === 'cinematic' ? 'faithful' : style === 'oneshot' ? 'oneshot' : 'ugc'
       const ap = await fetch('/api/discovery/clone-video/approve', {
         method: 'POST', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ jobId, script, mode: cinematic ? 'faithful' : 'ugc', durationBucket: bucket, sceneCount: cinematic ? cineScenes : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
+        body: JSON.stringify({ jobId, script, mode: apiMode, durationBucket: bucket, sceneCount: cinematic ? cineScenes : nSegs, overlays: [], extraLangs: [], endCard: null, hookVariants: false }),
       }).then(r => r.json())
       if (ap.error) { setErr(ap.error === 'insufficient_credits' ? 'Not enough credits.' : ap.error); setPhase('review'); return }
       refreshCredits()
@@ -304,10 +304,11 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
           <div style={{ marginBottom: 16 }}>
             <div style={label}>Style</div>
             <div style={pillRow}>
+              <button onClick={() => { setStyle('oneshot'); setStyleTouched(true) }} style={pill(style === 'oneshot')}>One-shot ✦</button>
               <button onClick={() => { setStyle('ugc'); setStyleTouched(true) }} style={pill(style === 'ugc')}>UGC</button>
               <button onClick={() => { setStyle('cinematic'); setStyleTouched(true) }} style={pill(style === 'cinematic')}>Cinematic</button>
             </div>
-            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>Mello picks the right one from the ad — UGC for a talking creator, Cinematic (scene-by-scene, Remotion-assembled) for a b-roll ad. Override anytime.</div>
+            <div style={{ fontSize: 12, color: MUTED, marginTop: 6 }}>{style === 'oneshot' ? 'One-shot — a single Seedance 2.5 take of the whole ad (up to 30s), native audio. The most reliable — recommended.' : style === 'cinematic' ? 'Cinematic — scene-by-scene multi-cut clone, stitched. Most ambitious, more variable.' : 'UGC — one talking creator, stitched segments.'}</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
             <div><div style={label}>Language</div>
@@ -365,7 +366,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
               edit the line — approve BEFORE paying. Falls back to the plain script only before a job exists. */}
           <div style={label}>Your storyboard <span style={{ color: '#aab0a6', fontWeight: 600 }}>· preview every scene, regenerate or upload your own frame, edit the line — free{spokenSecs ? ` · ~${spokenSecs}s of speech` : ''}</span></div>
           {jobId
-            ? <Storyboard jobId={jobId} embedded mode={style} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
+            ? <Storyboard jobId={jobId} embedded mode={style === 'cinematic' ? 'cinematic' : 'ugc'} maxScenes={Math.max(2, Math.min(16, Math.floor(resolvedBucket / 3)))} resyncScript={script} resyncKey={rescriptTick} onScript={setScript} onSceneCount={setSbScenes} />
             : <textarea value={script} onChange={e => setScript(e.target.value)} rows={7} style={{ ...field, resize: 'vertical', lineHeight: 1.6, minHeight: 150 }} />}
           <div style={{ margin: '16px 0' }}>
             <div style={label}>

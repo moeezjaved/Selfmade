@@ -2149,6 +2149,55 @@ async function generateJob(job) {
     // verifier with auto re-roll) are what make the second ref safe to allow.
     const falProductImages = [productSheet || cleanProduct || productImages[0], productImages[1]].filter(Boolean).slice(0, 2)
 
+    // ── ONE-SHOT mode: the reliable way people actually make Seedance 2.5 AI ads — ONE strong generation
+    // of the whole spot (up to 30s), native lip-synced audio, product-locked. NO scene plan, NO stitching,
+    // NO Remotion → a single point of success instead of 16 fragile ones. This is the default going forward
+    // for a clean, dependable clip; Cinematic (faithful) stays for anyone who wants the multi-cut clone. ──
+    if (meta.mode === 'oneshot') {
+      const targetSecs = Math.max(4, Math.min(30, Number(meta.duration_target) || Number(meta.duration) || 15))
+      await prog('Directing your one-shot ad…', 10, targetSecs * 4 + 40)
+      const langN = langName(meta.language || 'en').split(' — ')[0]
+      const kf0 = meta.beat_sheet?.beats?.[0]?.preview || null   // approved opening keyframe leads the refs
+      const imgs = [kf0, ...falProductImages].filter(Boolean).slice(0, 9)
+      const prodFirst = kf0 ? 2 : 1
+      const productRef = falProductImages.length ? `[Image${prodFirst}]${falProductImages.length > 1 ? `–[Image${prodFirst + falProductImages.length - 1}]` : ''}` : 'the product'
+      const spoken = String(finalScript || '').trim()
+      let prompt = [
+        `A polished ${targetSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy.`,
+        isService
+          ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.'
+          : falProductImages.length ? `The product is ${productRef} — render it EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size; get it big by moving the CAMERA close, never by enlarging it.` : '',
+        kf0 ? '[Image1] is the approved opening frame — begin from it and keep its look and person.' : '',
+        spoken
+          ? `The on-camera person speaks these EXACT words aloud, clearly lip-synced, in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.`
+          : 'Ambient sound only, no music, no on-screen captions.',
+      ].filter(Boolean).join(' ')
+      prompt += STYLE_LOCK
+      if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
+      const base = join(tmpdir(), `os-${job.id}`)
+      const tmp = []
+      let videoUrl = null, falCost = 0
+      const gen = async (refs) => { const r = await falGenerate({ prompt, imageUrls: refs, resolution: meta.resolution, duration: targetSecs, aspect: meta.aspect, tier: meta.tier, generateAudio: true }); falCost += clipCost(meta.tier, targetSecs, true); return r.videoUrl }
+      try { videoUrl = await gen(imgs) }
+      catch (e) {
+        // A likeness/policy block on the refs must never kill the job: retry product-only, then bare prompt.
+        console.warn(`one-shot ${job.id} refs blocked (${e.message}) — retry product-only`)
+        try { videoUrl = await gen(falProductImages) } catch { try { videoUrl = await gen([]) } catch (e3) { throw e3 } }
+      }
+      if (!videoUrl) throw new Error('one-shot generation returned no video')
+      await prog('Finishing up…', 88, 15)
+      let f = `${base}.mp4`; await downloadToFile(videoUrl, f); tmp.push(f)
+      f = await ensureAudio(f); if (!tmp.includes(f)) tmp.push(f)
+      let outF = await burnOverlays(f, meta.overlays, job.id); tmp.push(outF)
+      outF = await withEndCard(outF, meta, job.id, 'main', tmp)
+      const url = await uploadVideo(outF, `creatives/${job.user_id}/${job.id}.mp4`)
+      await stamp({ status: 'done', media_type: 'video', image_url: url, clone_meta: { ...meta, script: spoken, final_script: spoken, fal_cost_est: +falCost.toFixed(2) } })
+      if (job.credit_tx) await rpc('commit_credits', { p_tx: job.credit_tx, p_metadata: { mode: 'oneshot', secs: targetSecs, actual_cost_usd: +falCost.toFixed(2) } })
+      console.log(`🎬 one-shot ${job.id} (${targetSecs}s) → ${url}`)
+      for (const t of tmp) await rm(t, { force: true }).catch(() => {})
+      return
+    }
+
     // ── FAITHFUL mode: clone the source's edit structure scene-by-scene, then stitch. Each scene is
     // its own Seedance clip with a scene-appropriate prompt (b-roll/lifestyle/product allowed — no
     // forced talking head). No video reference per scene: the beat sheet grounds each prompt, and
