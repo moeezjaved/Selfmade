@@ -94,6 +94,22 @@ export async function brandPoolUserIds(admin: SupabaseClient, userId: string): P
 }
 
 /**
+ * The members of this user's ONE workspace org — the org owned by their billing owner (self for an
+ * owner, the team owner for a member). Used to pool shared Meta ad accounts across the team. Scoped to a
+ * SINGLE org, NOT a union across every org the user was ever added to (that leaked ad accounts from
+ * stray/other orgs into the picker — the "3 connected accounts I didn't add" report). Always includes
+ * self so a solo user with no org still sees their own accounts.
+ */
+export async function workspaceMemberIds(admin: SupabaseClient, userId: string): Promise<string[]> {
+  const db = admin as any
+  const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
+  const { data: org } = await db.from('organizations').select('id').eq('owner_id', owner).order('created_at', { ascending: true }).limit(1).maybeSingle()
+  if (!org?.id) return [userId]
+  const ids = await orgMemberIds(admin, org.id)
+  return Array.from(new Set([userId, ...ids])) as string[]
+}
+
+/**
  * The org's shared Meta ad-account POOL: every active account connected by any member. One shared
  * workspace ⇒ the team draws from the same set of connected accounts (not just each person's own).
  */
