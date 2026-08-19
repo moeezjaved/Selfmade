@@ -126,8 +126,9 @@ export default function ProductTour() {
     if (!active) return
     const step = STEPS[idx]
     let cancelled = false
+    setRect(null)   // drop the previous step's spotlight immediately so it can never linger (stale rect)
     if (step.route && pathname !== step.route) router.push(step.route)
-    if (!step.target) { setRect(null); return }
+    if (!step.target) return
     const started = Date.now()
     let settleUntil = 0
     // Rail icons resolve instantly; page-content anchors (search bars, channel rows) appear after the
