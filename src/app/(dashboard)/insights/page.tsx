@@ -22,6 +22,7 @@ interface CampaignInsight {
 function InsightsPage() {
   const [campaigns, setCampaigns] = useState<CampaignInsight[]>([])
   const [loading, setLoading] = useState(true)
+  const [noAccount, setNoAccount] = useState(false)   // active brand has no Meta ad account linked
   const [acting, setActing] = useState<string|null>(null)
   const [accountName, setAccountName] = useState('')
   const [totals, setTotals] = useState({spend:0,revenue:0,roas:0,conversions:0})
@@ -36,6 +37,14 @@ function InsightsPage() {
   const grid = (n: number) => isMobile ? (n >= 4 ? 'repeat(2,1fr)' : '1fr') : `repeat(${n},1fr)`
 
   useEffect(() => { loadInsights() }, [dateRange])
+  // Follow the top ProjectSwitcher: re-fetch when the active brand changes so the insights re-resolve
+  // to the NEW brand's linked account (the route is brand-scoped server-side via sf_brand).
+  useEffect(() => {
+    const onBrand = () => loadInsights()
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dateRange])
 
   const loadInsights = async () => {
     setLoading(true)
@@ -43,6 +52,7 @@ function InsightsPage() {
       const url = '/api/insights/campaigns?dateRange=' + dateRange
       const res = await fetch(url)
       const data = await res.json()
+      setNoAccount(!!data.noAccountForBrand)
       setCampaigns(data.campaigns || [])
       setAccountName(data.account || '')
       setTotals(data.totals || {spend:0,revenue:0,roas:0,conversions:0})
@@ -143,6 +153,13 @@ function InsightsPage() {
         <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
           <div className="selfmade-loading" style={{width:44,height:44,borderRadius:12,margin:'0 auto 16px'}}/>
           <div style={{fontSize:15,color:'#141d15',fontWeight:700}}>Analyzing your campaigns...</div>
+        </div>
+      ) : noAccount ? (
+        <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
+          <div style={{fontSize:32,marginBottom:12}}>🔗</div>
+          <div style={{fontSize:16,fontWeight:700,color:'#141d15',marginBottom:8}}>No ad account linked to this brand yet</div>
+          <div style={{fontSize:13,color:'#7a9a7a',marginBottom:20,maxWidth:420,margin:'0 auto 20px'}}>Link this brand&apos;s Facebook ad account and its campaigns show up here — nothing from your other brands.</div>
+          <a href='/connect/meta' style={{background:'#ff5a2c',color:'#fff',padding:'11px 24px',borderRadius:100,fontSize:14,fontWeight:800,textDecoration:'none',display:'inline-block'}}>Connect an ad account →</a>
         </div>
       ) : campaigns.length === 0 ? (
         <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:20,padding:48,textAlign:'center'}}>
