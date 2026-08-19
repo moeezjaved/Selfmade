@@ -188,6 +188,64 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // ── Customer trend: "Draft replies for all N" (value carries the topic, e.g. trend_shipping_37).
+  //    Surfaces the replies already drafted at ingest for one-tap sending in the inbox — never sends
+  //    from Slack (the inbox's "nothing sends on its own" rule). ──
+  if (action.action_id === 'draft_replies') {
+    const INTENTS = ['shipping', 'refund', 'price', 'complaint', 'question', 'other']
+    const intent = INTENTS.find(k => String(taskId).includes(k)) || 'shipping'
+    const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+    const { count } = await admin.from('customer_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId).eq('intent', intent).eq('direction', 'in').eq('status', 'pending')
+    const n = count || 0
+    const line = n
+      ? `✍️ *${n} ${intent} repl${n === 1 ? 'y is' : 'ies are'} drafted and waiting.* Review and send each with one tap in your inbox — nothing sends on its own. <${APP}/inbox|Open the inbox →>`
+      : `Your ${intent} messages are already handled — nothing waiting. <${APP}/inbox|Open the inbox →>`
+    await slackRespond(responseUrl, line)
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Customer trend: "Change promise to 3–7 days" (value = "3-7"). Writes the fact into the Company
+  //    Brain (DNA) so every future reply + brief uses it. ──
+  if (action.action_id === 'update_shipping_promise') {
+    const val = String(action.value || '3-7').replace(/[^0-9-]/g, '') || '3-7'
+    const pretty = val.replace('-', '–')
+    const { brandPoolUserIds } = await import('@/lib/org')
+    const poolIds = await brandPoolUserIds(admin, userId).catch(() => [userId])
+    const { data: brand } = await admin.from('brands').select('id, name').in('user_id', poolIds).order('created_at', { ascending: false }).limit(1).maybeSingle()
+    try {
+      const { teachRule } = await import('@/lib/brain')
+      await teachRule(admin, { userId, brandId: brand?.id || null, rule: `Shipping promise: we deliver in ${pretty} days — tell customers this timeframe.`, department: 'customer', source: 'slack' })
+      await slackRespond(responseUrl, `✅ *Done — I'll promise ${pretty} days from now on.*${brand?.name ? ` (for ${brand.name})` : ''} It's in the Company Brain, so every customer reply and brief uses it.`)
+    } catch (e: any) {
+      await slackRespond(responseUrl, `⚠️ Couldn't save that just now — ${String(e?.message || e).slice(0, 100)}`)
+    }
+    return NextResponse.json({ ok: true })
+  }
+
+  // ── Creative launch (value = a creative_generations id). Launching is REAL ad spend on the founder's
+  //    Meta account, so we never fire it blind: hand back a deep-link into the launcher, preloaded with
+  //    the creative, where the founder sets a budget and confirms. M4's ?img= preload never auto-launches. ──
+  if (action.action_id === 'creative_launch') {
+    const genId = String(taskId)
+    const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+    const { data: gen } = await admin.from('creative_generations')
+      .select('id, image_url, media_type, status').eq('id', genId).eq('user_id', userId).maybeSingle()
+    if (!gen || gen.status !== 'done' || !gen.image_url) {
+      await slackRespond(responseUrl, "That creative isn't ready to launch yet — give it a moment, then try again.")
+      return NextResponse.json({ ok: true })
+    }
+    const isVideo = gen.media_type === 'video'
+    const url = isVideo ? `${APP}/studio` : `${APP}/m4?img=${encodeURIComponent(gen.image_url)}`
+    await slackRespond(responseUrl, `🚀 Ready to launch`, [
+      { type: 'section', text: { type: 'mrkdwn', text: `🚀 *Let's get this ${isVideo ? 'video ' : ''}ad live.*\nI'll open the launcher with it loaded — you set the budget and confirm. Nothing spends until you do.` } },
+      { type: 'actions', elements: [{ type: 'button', style: 'primary', action_id: 'open_launcher', text: { type: 'plain_text', text: 'Set budget & launch →' }, url }] },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: 'Real Meta ad spend · nothing goes live until you set a budget and confirm in the launcher' }] },
+    ])
+    return NextResponse.json({ ok: true })
+  }
+
   const { data: task } = await admin.from('mello_tasks').select('*').eq('id', String(taskId)).eq('user_id', userId).maybeSingle()
   if (!task) { await slackRespond(responseUrl, '⚠️ I can’t find that task anymore — it may have expired.'); return NextResponse.json({ ok: true }) }
 
