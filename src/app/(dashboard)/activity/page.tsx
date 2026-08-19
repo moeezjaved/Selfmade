@@ -17,15 +17,12 @@ export default function ActivityPage() {
 
   useEffect(() => {
     async function load() {
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
-      // BRAND ISOLATION: show this brand's events + account-level events (brand_id NULL — billing, auth,
-      // credits). "All brands" (no cookie) shows everything. Matches the app-wide sf_brand scoping rule.
+      // WORKSPACE audit trail: /api/activity is workspace-scoped (admin client) and attributes each row
+      // to the real actor, so the owner sees a teammate's launches labelled by name — not everything as
+      // "You". BRAND ISOLATION: pass the active brand; the route returns brand + account-level events.
       const brand = activeBrandId()
-      let q = supabase.from('activity_logs').select('*').eq('user_id', user.id)
-      if (brand && brand !== 'all') q = q.or(`brand_id.eq.${brand},brand_id.is.null`)
-      const { data } = await q.order('created_at', { ascending: false }).limit(50)
-      setLogs(data || [])
+      const j = await fetch(`/api/activity${brand && brand !== 'all' ? `?brand=${encodeURIComponent(brand)}` : ''}`).then(r => r.json()).catch(() => ({}))
+      setLogs(Array.isArray(j.logs) ? j.logs : [])
       setLoading(false)
     }
     load()
@@ -66,11 +63,13 @@ export default function ActivityPage() {
     if (d && !looksLikeId(d)) return d
     return log.action_type ? log.action_type.replace(/_/g,' ').toLowerCase().replace(/^\w/, (c:string)=>c.toUpperCase()) : '—'
   }
-  // Actor: user actions = "You"; agent actions = "AI"; everything else (OAuth, syncs, webhooks) = "System".
+  // Actor: the REAL person who did it (from /api/activity) — "You" for the viewer's own rows, the
+  // teammate's name/email for others (so owner vs member is legible). AI/System for non-human actions.
   const byOf = (log:any): { label:string; color:string; bg:string } => {
-    if (log.performed_by === 'user') return { label:'You', color:'#3a7a3a', bg:'rgba(255,90,44,0.35)' }
     if (log.performed_by === 'ai' || log.performed_by === 'assistant' || log.performed_by === 'agent') return { label:'AI', color:'#2563eb', bg:'rgba(147,197,253,0.18)' }
-    return { label:'System', color:'#6b7280', bg:'rgba(0,0,0,0.05)' }
+    if (log.performed_by === 'system') return { label:'System', color:'#6b7280', bg:'rgba(0,0,0,0.05)' }
+    if (log.is_self) return { label:'You', color:'#3a7a3a', bg:'rgba(255,90,44,0.35)' }
+    return { label: log.actor || 'Teammate', color:'#7a4a1e', bg:'rgba(255,180,120,0.22)' }
   }
 
   return (
