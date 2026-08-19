@@ -807,6 +807,25 @@ async function downloadToFile(url, path) {
   await writeFile(path, Buffer.from(await r.arrayBuffer()))
 }
 
+// ── Slack "ping when ready" — a clone started from Slack (clone_meta.notify_source==='slack') calls back
+// to the app when it reaches review (storyboard ready) and done (video rendered). All Slack posting +
+// token decryption stay in the app; the worker just fires a secured webhook. Best-effort, never blocks.
+async function notifyCloneReady(job, stage) {
+  try {
+    if (job?.clone_meta?.notify_source !== 'slack') return
+    const secret = process.env.AUTOPILOT_SECRET
+    if (!secret) return
+    const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+    await fetch(`${APP}/api/channels/slack/notify-clone`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-autopilot-secret': secret },
+      body: JSON.stringify({ asUserId: job.user_id, jobId: job.id, stage }),
+      signal: AbortSignal.timeout(15000),
+    })
+    console.log(`🔔 pinged Slack: clone ${job.id} → ${stage}`)
+  } catch (e) { console.warn(`notifyCloneReady ${job?.id} (${stage}):`, e?.message) }
+}
+
 // Concat local clips into one mp4. Re-encode via the concat demuxer — clips come from the same
 // model/resolution/aspect but re-encoding guarantees clean joins.
 async function concatClips(files, out, durs) {
@@ -2136,6 +2155,7 @@ async function analyzeJob(job) {
     // (mutates beat.beats[i].thumb in place). Best-effort — never blocks the draft.
     try { await storyboardFrames(job.source_video_url, beat, scenes, job.id) } catch (e) { console.warn(`storyboard frames ${job.id}:`, e.message) }
     await stamp({ status: 'review', clone_meta: { ...meta, beat_sheet: beat, seedance_prompt: prompt, script, script_gloss: gloss, suggested_mode: cinematic ? 'faithful' : 'ugc', scene_count: scenes, overlays } })
+    notifyCloneReady(job, 'review').catch(() => {})   // Slack-started clones: DM "ready to review"
     console.log(`📝 drafted ${job.id} → awaiting approval (suggest=${cinematic ? 'faithful' : 'ugc'}, scenes=${scenes})`)
   } catch (e) {
     console.warn(`analyze ${job.id} failed:`, e.message)
@@ -2149,7 +2169,9 @@ async function generateJob(job) {
   const meta = job.clone_meta || {}
   const isService = meta.product_type === 'service' || meta.product_type === 'app'   // service OR app → no physical product; UNDEFINED (pre-2026-07-18 jobs) stays physical
   const productImages = Array.isArray(meta.product_image_urls) ? meta.product_image_urls : []
-  const stamp = (b) => patch(`creative_generations?id=eq.${job.id}`, b)
+  // Wrapped so a Slack-started clone DMs the founder "your ad is rendered" the moment the render lands —
+  // fires on the terminal 'done' write only (all main-render modes route through this stamp).
+  const stamp = async (b) => { const r = await patch(`creative_generations?id=eq.${job.id}`, b); if (b && b.status === 'done' && job.clone_meta?.notify_source === 'slack') notifyCloneReady(job, 'done').catch(() => {}); return r }
   // Live progress the modal polls: {label, pct, eta_sec}. fal gives no % for video gen, so WE report
   // the real pipeline step + a running ETA (best-effort; never fails the render).
   const prog = (label, pct, etaSec) => stamp({ clone_meta: { ...meta, progress: { label, pct: Math.round(pct), eta_sec: Math.round(etaSec || 0), at: Date.now() } } }).catch(() => {})   // `at` = heartbeat, lets a watchdog spot stalls

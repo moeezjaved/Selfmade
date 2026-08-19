@@ -177,7 +177,7 @@ export async function POST(req: NextRequest) {
       const r = await fetch(`${APP}/api/discovery/clone-video`, {
         method: 'POST',
         headers: { 'content-type': 'application/json', 'x-autopilot-secret': process.env.AUTOPILOT_SECRET || '' },
-        body: JSON.stringify({ asUserId: userId, sourceAdId: adId, brandId: chosen.id, productImages, productType, characterLook: 'match' }),
+        body: JSON.stringify({ asUserId: userId, sourceAdId: adId, brandId: chosen.id, productImages, productType, characterLook: 'match', notifySlack: true }),
       })
       started = r.ok
     } catch { started = false }
