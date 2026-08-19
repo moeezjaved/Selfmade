@@ -8,7 +8,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { persistImagesToR2 } from '@/lib/brand-photos'
 import { sendFirstBrandEmail } from '@/lib/email'
 import { getPlanId } from '@/lib/entitlements'
-import { brandPoolUserIds } from '@/lib/org'
+import { brandPoolUserIds, resolveBillingOwner } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,9 +53,18 @@ async function brandQuota(admin: ReturnType<typeof createAdminClient>, userId: s
   // first, then falls back to user_profiles.plan_id. The old code read user_profiles.plan_id directly
   // — so a paying user whose subscription hadn't synced to their profile (row missing / stale
   // plan_id) was silently capped at the default limit of 1, and a 2nd brand save 402'd invisibly.
+  //
+  // WORKSPACE QUOTA: both the count and the plan must reflect the shared workspace, not the caller's
+  // own user — otherwise a team member saw "0 / 1 used" (their empty personal user + Free plan) while
+  // the owner saw "2 / 15". Count over the SAME pool the list uses (brandPoolUserIds) and read the plan
+  // from the BILLING OWNER, so member and owner see the identical quota.
+  const [owner, memberIds] = await Promise.all([
+    resolveBillingOwner(admin as any, userId).catch(() => userId),
+    brandPoolUserIds(admin, userId).catch(() => [userId]),
+  ])
   const [planId, { count }] = await Promise.all([
-    getPlanId(admin as any, userId),
-    admin.from('brands').select('id', { count: 'exact', head: true }).eq('user_id', userId),
+    getPlanId(admin as any, owner),
+    admin.from('brands').select('id', { count: 'exact', head: true }).in('user_id', memberIds),
   ])
   let limit = 1
   const { data: plan } = await admin.from('plans').select('brand_limit').eq('id', planId).maybeSingle()

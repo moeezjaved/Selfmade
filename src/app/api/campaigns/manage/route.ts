@@ -37,8 +37,10 @@ export async function GET(request: NextRequest) {
     // workspace). Explicit ?account_id= still wins; falls back to primary only if the brand has none.
     const metaAccount = accountId
       ? await resolveScopedAccount(admin, user.id, accountId)
-      : await resolveBrandScopedAccount(admin, user.id)
-    if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
+      : await resolveBrandScopedAccount(admin, user.id, null, { strict: true })
+    // strict → a brand with no linked account returns null (instead of borrowing another brand's
+    // primary). Surface that as a clean "connect an ad account for this brand" empty state, not an error.
+    if (!metaAccount) return NextResponse.json({ campaigns: [], noAccountForBrand: true })
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = 'act_' + metaAccount.account_id

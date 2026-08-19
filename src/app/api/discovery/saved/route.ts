@@ -24,16 +24,13 @@ export async function GET(request: NextRequest) {
   const { user, admin, org } = c
   const boardId = request.nextUrl.searchParams.get('board_id')
 
-  let isTeam = false
-  if (boardId) {
-    const { data: b } = await admin.from('discovery_boards').select('visibility, org_id').eq('id', boardId).maybeSingle()
-    isTeam = !!b && b.org_id === org.orgId && b.visibility === 'team'
-  }
-
   let query = admin.from('discovery_saved_ads').select('*').order('saved_at', { ascending: false })
   if (boardId) query = query.eq('board_id', boardId)
-  // Team board → everyone's saves in the org; personal board / library → just mine.
-  query = isTeam ? query.eq('org_id', org.orgId) : query.eq('user_id', user.id)
+  // ONE SHARED WORKSPACE: saved ads belong to the org, not the individual — a teammate opening a board
+  // sees every member's saves in it, matching the now-shared boards. Scoped by org_id (single org, no
+  // cross-workspace leak). Replaces the old `team board → org / else → self` gate that hid the owner's
+  // saves from members (boards were never 'team' by default, so it always collapsed to self).
+  query = query.eq('org_id', org.orgId)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

@@ -209,12 +209,19 @@ export async function GET(request: NextRequest) {
       hookTypes.length === 0 && emotions.length === 0 && angles.length === 0 &&
       formatStyles.length === 0 && visualStyles.length === 0 && ctaStyles.length === 0
     const snapKey = `feed:default:${sort}:${page}`
+    // Keep the snapshot payload around even when it's too old to serve fresh: if the live query later
+    // times out (57014 under rollup/drain write load), a STALE snapshot beats the "index was busy"
+    // error banner — the user still sees cards. Populated in the lookup below, used at the error return.
+    let staleSnap: any = null
     if (isBareFeed && !fresh) {
       try {
         const { data: snapRows } = await admin.from('discovery_feed_cache').select('payload, updated_at').eq('key', snapKey).limit(1)
         const snap = snapRows?.[0]
-        if (snap && Date.now() - new Date(snap.updated_at).getTime() < 6 * 60_000) {
-          return NextResponse.json({ ...snap.payload, cached: 'snapshot' })
+        if (snap) {
+          if (Date.now() - new Date(snap.updated_at).getTime() < 6 * 60_000) {
+            return NextResponse.json({ ...snap.payload, cached: 'snapshot' })
+          }
+          staleSnap = snap.payload   // too old to serve fresh, but a good crash-net if the live query dies
         }
       } catch { /* table not present yet → fall through to the live query */ }
     }
@@ -571,6 +578,9 @@ export async function GET(request: NextRequest) {
     }
 
     if (kwErr) {
+      // Crash-net: on the bare default feed, a stale snapshot beats the "index was busy" banner —
+      // serve the last good cards instead of an empty error so the page always has content.
+      if (staleSnap) return NextResponse.json({ ...staleSnap, cached: 'snapshot-stale', timedOut: true })
       return NextResponse.json({ ads: [], total: 0, totalInDB, source: 'indexed', searchMethod: 'error', timedOut: true })
     }
 

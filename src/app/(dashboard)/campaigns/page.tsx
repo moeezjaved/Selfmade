@@ -78,6 +78,7 @@ function CampaignsInner() {
   const [campaigns, setCampaigns] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [currency, setCurrency] = useState('USD')
+  const [noAccount, setNoAccount] = useState(false)   // active brand has no Meta ad account linked
   const [dateRange, setDateRange] = useState('last_7d')
   const [editModal, setEditModal] = useState<any>(null)
   const [saving, setSaving] = useState(false)
@@ -109,6 +110,7 @@ function CampaignsInner() {
     try {
       const res = await fetch(`/api/campaigns/manage?dateRange=${dateRange}`)
       const data = await res.json()
+      setNoAccount(!!data.noAccountForBrand)
       setCampaigns(data.campaigns || [])
       if (data.currency) setCurrency(data.currency)
     } catch {}
@@ -344,6 +346,13 @@ function CampaignsInner() {
         <div style={{ textAlign: 'center', padding: 80 }}>
           <div className="selfmade-loading" style={{ width: 44, height: 44, borderRadius: 12, margin: '0 auto 16px' }} />
           <div style={{ color: '#141d15', fontWeight: 700 }}>Loading campaigns...</div>
+        </div>
+      ) : noAccount ? (
+        <div style={{ background: '#ffffff', border: '1px solid #e8f0e8', borderRadius: 16, padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔗</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: '#141d15', marginBottom: 8 }}>No ad account linked to this brand yet</div>
+          <div style={{ fontSize: 13, color: '#5a6a5a', marginBottom: 16, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>Link this brand&apos;s Facebook ad account and its real spend, results and campaigns show up here — nothing from your other brands.</div>
+          <button onClick={() => window.location.href = '/connect/meta'} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>Connect an ad account →</button>
         </div>
       ) : campaigns.length === 0 ? (
         <div style={{ background: '#ffffff', border: '1px solid #e8f0e8', borderRadius: 16, padding: 48, textAlign: 'center' }}>
