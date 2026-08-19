@@ -18,7 +18,7 @@ const TABS = [
 export default function AdsTabs() {
   const pathname = usePathname()
   return (
-    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, borderBottom: '1px solid #efece2', paddingBottom: 2 }}>
+    <div data-tour="ads-tabs" style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 18, borderBottom: '1px solid #efece2', paddingBottom: 2 }}>
       {TABS.map((t) => {
         const active = pathname === t.href || pathname.startsWith(t.href + '/')
         return (

@@ -120,7 +120,7 @@ export default function BrandSpyList() {
           <Link href="/discovery/brand-spy" style={tab(true)}>Brands</Link>
           <Link href="/discovery/brand-spy/feed" style={tab(false)}>Feed</Link>
         </div>
-        <button onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
+        <button data-tour="spy-add" onClick={() => { setOpen(true); setModalTab('search'); setMQ(''); setManualUrl(''); setMsg('') }}
           style={{ padding: '9px 16px', background: '#2075ff', color: '#fff', border: 'none', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
           + Spy new brand
         </button>
