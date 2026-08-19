@@ -481,7 +481,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
           {/* premium: open with print-like air; the day should feel unhurried, not a dashboard. */}
           {/* First arrival: the welcome banner above already greeted, so drop the standard "greet,
               name —" line (it was double-greeting) and tighten the air. Keep the ad-count as proof. */}
-          <div style={{ marginTop: welcome ? 22 : 68 }}>
+          <div data-tour="brief-hero" style={{ marginTop: welcome ? 22 : 68 }}>
             <Say delay={60}>
               <span style={{ fontSize: 13.5, color: MUTED, fontWeight: 600, letterSpacing: '.002em' }}>
                 {welcome
@@ -677,7 +677,7 @@ export default function BriefClient({ initialBrief, initialView = 'standup', bra
         @keyframes bcIn{from{opacity:.001;transform:translateY(10px)}to{opacity:1;transform:none}}
         @media(prefers-reduced-motion:reduce){.brief-composer form{animation:none}}`}</style>
       {brief && (
-        <div className="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 44%)', paddingTop: 30, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
+        <div className="brief-composer" data-tour="brief-composer" style={{ position: 'fixed', left: 0, right: 0, bottom: 0, background: 'linear-gradient(transparent, #f6f8f5 44%)', paddingTop: 30, paddingRight: 20, paddingBottom: 22, pointerEvents: 'none' }}>
           {/* The composer floats — Claude-style: one centered pill, soft elevation, always there.
               Talking to Mello should feel like talking to your co-founder, not filling a form. */}
           <form onSubmit={(e) => { e.preventDefault(); say(draft) }} style={{ maxWidth: 680, margin: '0 auto', display: 'flex', alignItems: 'flex-end', gap: 9, pointerEvents: 'auto' }}>

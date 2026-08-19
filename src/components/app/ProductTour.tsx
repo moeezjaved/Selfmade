@@ -14,31 +14,62 @@
 import React from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 
-type Step = { target?: string; route?: string; title: string; body: string; placement?: 'right' | 'bottom' | 'center' }
+type Step = { target?: string; route?: string; title: string; body: string; placement?: 'right' | 'bottom' | 'top' | 'center' }
 
 const DONE_KEY = 'sf_tour_v1_done'
 
 const STEPS: Step[] = [
+  // ── Act 0 · Welcome ──
   { placement: 'center', title: 'Meet the company that runs itself',
-    body: "You didn't buy software — you hired a marketing team. Here's a 60-second tour of who does what, and how to point them." },
+    body: "You didn't buy software — you hired a marketing team. In 90 seconds I'll show you how to spy on rivals, make ads, answer customers, and launch — the whole company." },
+
+  // ── Act 1 · Your brand + the Brief ──
   { target: 'project-switcher', route: '/brief', placement: 'bottom', title: 'This is your brand',
     body: 'Everything — ads, competitors, reports, replies — is scoped to whoever’s selected here. Running several brands? Switch in one click.' },
-  { target: 'nav-home', route: '/brief', title: 'Your Morning Brief',
-    body: 'Every morning: what changed overnight, what it means, and the few decisions only you can make. This is where you start your day.' },
-  { target: 'nav-mello', route: '/mello', title: 'Mello — your AI CEO',
-    body: 'Ask anything about your ads, rivals or customers, and tell it to act. Every answer is grounded in your real numbers, not guesses.' },
-  { target: 'nav-library', route: '/discovery', title: 'Spy on competitors',
-    body: 'Every ad your rivals are running, decoded — so you can copy the winning formula before it saturates.' },
-  { target: 'nav-studio', route: '/studio', title: 'Studio makes your ads',
-    body: 'Turn any winning ad into yours — your product, your brand, image or video — in a couple of taps.' },
-  { target: 'nav-ads', route: '/reports', title: 'Your ads, read for you',
-    body: 'Real Meta spend, ROAS and exactly what to scale or cut — not just charts. The whole account, in plain English.' },
-  { target: 'nav-inbox', route: '/inbox', title: 'Customer Inbox',
-    body: 'Every customer message, triaged with a reply already drafted. You approve — nothing sends on its own.' },
-  { target: 'rail-create', title: 'Make something now',
-    body: 'Whenever inspiration strikes, this is Create — a fresh ad, a clone of a winner, or a video, any time.' },
+  { target: 'brief-hero', route: '/brief', placement: 'bottom', title: 'Your Morning Brief',
+    body: 'Every morning I read the night’s changes and hand you one page: what happened, what it means, and the few calls only you can make. Start here daily.' },
+  { target: 'brief-composer', route: '/brief', placement: 'top', title: 'Talk to Mello anytime',
+    body: 'Ask anything in plain language — “which ad is winning?”, “write me a hook”, “pause the losers” — and I answer (or act) from your real numbers.' },
+
+  // ── Act 2 · Spy a competitor ──
+  { target: 'nav-library', route: '/discovery', placement: 'right', title: 'Now — let’s catch a competitor',
+    body: 'This is Spy. Every ad your rivals are running, in one live feed, so you can copy what’s working before it burns out.' },
+  { target: 'spy-search', route: '/discovery', placement: 'bottom', title: 'Search the whole ad library',
+    body: 'Type a brand, a product, or an angle (“sensitive skin”, “% off”) and AI pulls every matching ad running right now across Meta.' },
+  { target: 'spy-filters', route: '/discovery', placement: 'bottom', title: 'Filter down to the winners',
+    body: 'Narrow by date, format (video / image / carousel), platform, or industry — and the “Winning ads” preset surfaces the proven, long-running ones.' },
+  { target: 'spy-feed', route: '/discovery', placement: 'center', title: 'What each ad tells you',
+    body: 'On every ad you see how long it’s been running, how many placements it’s reused, its full copy and call-to-action. A long run = it’s making them money. (Meta hides spend, so we rank by these public signals instead of guessing.)' },
+  { target: 'spy-feed', route: '/discovery', placement: 'center', title: 'Steal it — the right way',
+    body: 'See a winner? Hover it and hit “Remake”. I rebuild that exact ad — image or video — with YOUR product and brand swapped in. Their proven format, your store.' },
+  { target: 'spy-add', route: '/discovery/brand-spy', placement: 'bottom', title: 'Watch one rival closely',
+    body: 'To track a specific competitor, hit “Spy new brand” and paste their Facebook Ad Library link. I pull their whole ad archive and ping you the moment they launch something new.' },
+
+  // ── Act 3 · Make ads ──
+  { target: 'rail-create', placement: 'right', title: 'Make an ad — the + button',
+    body: 'This is Create. Four ways to make an ad: remake a competitor’s winner, remake your OWN past ad, start a fresh one, or let me make ads for you every day on autopilot.' },
+  { target: 'studio-composer', route: '/studio', placement: 'top', title: 'Studio — where ads get made',
+    body: 'Tell me what you want in a sentence, pick image or video, and I generate it on your brand — your product, your colours, your voice. Tweak and regenerate until it’s right.' },
+
+  // ── Act 4 · Customers ──
+  { target: 'nav-inbox', route: '/inbox', placement: 'right', title: 'Your customers live here',
+    body: 'Every DM and email lands in one inbox, sorted by what actually matters — refunds and complaints first, browsing questions later.' },
+  { target: 'inbox-channels', route: '/inbox', placement: 'bottom', title: 'Connect your channels',
+    body: 'Hit Connect on Instagram, WhatsApp, Messenger or email — one click each — and real customer messages start flowing into this inbox.' },
+  { target: 'inbox-compose', route: '/inbox', placement: 'bottom', title: 'Replies, drafted for you',
+    body: 'Try it: type a customer message here. I triage it and draft the reply for you to approve with one tap — nothing ever sends on its own.' },
+
+  // ── Act 5 · Launch + measure ──
+  { target: 'nav-ads', route: '/reports', placement: 'right', title: 'Run & measure your ads',
+    body: 'This is Ads — your live Meta performance, read in plain English: what’s making money, what’s leaking, and exactly what to scale or cut.' },
+  { target: 'ads-tabs', route: '/reports', placement: 'bottom', title: 'Reports, four ways',
+    body: 'Reports (the story of your spend), Scale & Insights (where to put more), Leaderboard (your best ads), and Snapshots (frozen weekly proof).' },
+  { target: 'm4-wizard', route: '/m4', placement: 'bottom', title: 'Launch, safely',
+    body: 'Ready to go live? The M4 launcher walks you through pixel → creatives → audiences → budget → review, building your campaigns for you. Nothing spends until you confirm the budget.' },
+
+  // ── Act 6 · Close ──
   { placement: 'center', title: 'That’s the whole company',
-    body: 'It works while you sleep and pings you on Slack the moment something needs you. Ready to run it?' },
+    body: 'It works while you sleep and pings you on Slack the moment something needs you. Spy, make, reply, launch — you’re running it now. Let’s go.' },
 ]
 
 const CARD_W = 336
@@ -90,11 +121,13 @@ export default function ProductTour() {
     if (step.route && pathname !== step.route) router.push(step.route)
     if (!step.target) { setRect(null); return }
     const started = Date.now()
+    // Rail icons resolve instantly; page-content anchors (search bars, tab strips) appear after the route
+    // loads + fetches — so poll generously before falling back to a centered card.
     const tick = () => {
       if (cancelled) return
       const el = document.querySelector(`[data-tour="${step.target}"]`)
-      if (el) { setRect(measure(el)); return }
-      if (Date.now() - started < 1800) requestAnimationFrame(tick)
+      if (el) { const r = measure(el); if (r.width > 0 && r.height > 0) { setRect(r); return } }
+      if (Date.now() - started < 4500) setTimeout(() => requestAnimationFrame(tick), 80)
       else setRect(null)   // never found → centered fallback, tour still advances
     }
     tick()
@@ -136,15 +169,21 @@ export default function ProductTour() {
   if (!active) return null
   const step = STEPS[idx]
   const isLast = idx === STEPS.length - 1
-  const centered = step.placement === 'center' || !rect
   const vw = typeof window !== 'undefined' ? window.innerWidth : 1280
   const vh = typeof window !== 'undefined' ? window.innerHeight : 800
+  // A target bigger than ~55% of the screen (e.g. the whole ad feed) reads better as a plain centered
+  // card over the visible page than as a giant spotlight hole.
+  const bigTarget = !!rect && rect.width * rect.height > 0.55 * vw * vh
+  const centered = step.placement === 'center' || !rect || bigTarget
   const pad = 8
 
   // Card position.
   let cardStyle: React.CSSProperties
   if (centered) {
     cardStyle = { left: '50%', top: '50%', transform: 'translate(-50%,-50%)' }
+  } else if (step.placement === 'top') {
+    const left = Math.min(Math.max(12, rect!.left), vw - CARD_W - 12)
+    cardStyle = { left, top: Math.max(12, rect!.top - 232), bottom: 'auto' as any }
   } else if (step.placement === 'bottom') {
     const left = Math.min(Math.max(12, rect!.left), vw - CARD_W - 12)
     cardStyle = { left, top: Math.min(rect!.top + rect!.height + 14, vh - 240) }

@@ -602,7 +602,7 @@ function M4Inner() {
           <div style={{width:40,height:40,borderRadius:10,background:'rgba(255,90,44,0.1)',border:'1px solid rgba(239,74,30,0.2)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:13,fontWeight:900,color:'#141d15'}}>M4</div>
           <div><h1 style={{fontSize:22,fontWeight:800,color:'#141d15'}}>M4 Method</h1><p style={{fontSize:13,color:'#7a9a7a'}}>Find winners, scale them, retarget everyone</p></div>
         </div>
-        <div style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#141d15':STEPS.indexOf(step)>i?'rgba(20,29,21,0.3)':'rgba(0,0,0,0.08)'}}/>)}</div>
+        <div data-tour="m4-wizard" style={{display:'flex',gap:3}}>{STEPS.map((s,i)=><div key={s} style={{flex:1,height:4,borderRadius:100,background:step===s?'#141d15':STEPS.indexOf(step)>i?'rgba(20,29,21,0.3)':'rgba(0,0,0,0.08)'}}/>)}</div>
       </div>
 
       {step==='welcome'&&(

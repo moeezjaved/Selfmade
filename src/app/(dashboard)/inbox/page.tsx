@@ -246,7 +246,7 @@ export default function InboxPage() {
         ]
         const pending = CH.filter(c => !channels.includes(c.k)).length
         return (
-          <div style={{ ...card, padding: '12px 14px', marginBottom: 16 }}>
+          <div data-tour="inbox-channels" style={{ ...card, padding: '12px 14px', marginBottom: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
               <span style={{ fontSize: 12.5, fontWeight: 800, color: INK }}>Your channels</span>
               <span style={{ fontSize: 12, color: SUB }}>{channels.length} connected{pending ? ` · ${pending} to connect` : ' · all set 🌱'}</span>
@@ -311,7 +311,7 @@ export default function InboxPage() {
             )}
           </div>
         )}
-        <div style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div data-tour="inbox-compose" style={{ ...card, padding: 14, marginBottom: 20, display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <input value={simText} onChange={e => setSimText(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') simulate() }}
             placeholder="Try a customer message — e.g. “my order hasn't arrived” or “can I get a refund?”"
             style={{ flex: '1 1 320px', minWidth: 200, padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#f9f5ec', color: INK, fontSize: 13.5, fontFamily: 'inherit', outline: 'none' }} />

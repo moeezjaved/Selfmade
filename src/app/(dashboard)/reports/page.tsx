@@ -177,7 +177,7 @@ function ReportsPage() {
           <h1 style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: INK, letterSpacing: '-.01em', lineHeight: 1.05, margin: 0 }}>Reports</h1>
           <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4 }}>Deep insights from your Meta ads.</div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div data-tour="ads-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* Which ad account this report is for. The selector RESOLVES the healthy connected account
               (and honors ?account= from the brief); we fetch the report for exactly that account so a
               stale/banned org-primary can never load an empty report in the wrong currency. */}

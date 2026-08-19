@@ -1956,7 +1956,7 @@ export default function DiscoveryPage() {
             ))}
           </div>
           {/* Search with dropdown */}
-          <div ref={searchContainerRef} style={{ flex: isMobile ? '1 1 100%' : 1, order: isMobile ? 3 : 0, maxWidth: isMobile ? '100%' : 520, minWidth: isMobile ? '100%' : 0, position: 'relative' }}>
+          <div ref={searchContainerRef} data-tour="spy-search" style={{ flex: isMobile ? '1 1 100%' : 1, order: isMobile ? 3 : 0, maxWidth: isMobile ? '100%' : 520, minWidth: isMobile ? '100%' : 0, position: 'relative' }}>
             <form onSubmit={e => { e.preventDefault(); if (searchInput.trim()) { setQuery(searchInput); setShowDropdown(false) } }}>
               <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
                 <Search size={15} style={{ position: 'absolute', left: 12, color: '#9ca3af', pointerEvents: 'none' }} />
@@ -2113,7 +2113,7 @@ export default function DiscoveryPage() {
 
         {/* Filter tray — Motion-style: icon pills with chevrons in one soft container, the
             coming-soon set on a quieter second row, numeric filters as compact pills, Sort right. */}
-        <div style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center',
+        <div data-tour="spy-filters" style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center',
           background: '#fcfdfb', border: '1px solid #efece2', borderRadius: 16, padding: '10px 12px' }}>
           {/* Time filter (segmented) */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 2, padding: '3px', background: '#fff', borderRadius: 11, border: '1px solid #efece2', flexShrink: 0 }}>
@@ -2183,7 +2183,7 @@ export default function DiscoveryPage() {
       </div>
 
       {/* ── Content ── */}
-      <div style={{ padding: '24px', overflowX: 'hidden', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
+      <div data-tour="spy-feed" style={{ padding: '24px', overflowX: 'hidden', minWidth: 0, maxWidth: '100%', boxSizing: 'border-box' }}>
 
         {/* Permission error */}
         {isPermError && (
