@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import SearchPalette from '@/components/SearchPalette'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
+import ProductTour from '@/components/app/ProductTour'
 import { cn } from '@/lib/utils'
 import { useIsMobile } from '@/lib/useIsMobile'
 import BootMotion from '@/components/motion/BootMotion'
@@ -92,11 +93,11 @@ const ADS_AREA_EXTRA_PATHS = ['/insights', '/leaderboard', '/snapshots', '/dashb
 
 const RAIL_W = 72
 
-function RailIcon({ href, active, title, accent, label, children }: {
-  href: string; active: boolean; title: string; accent?: boolean; label?: string; children: React.ReactNode
+function RailIcon({ href, active, title, accent, label, children, dataTour }: {
+  href: string; active: boolean; title: string; accent?: boolean; label?: string; children: React.ReactNode; dataTour?: string
 }) {
   return (
-    <Link href={href} title={title} aria-label={title}
+    <Link href={href} title={title} aria-label={title} data-tour={dataTour}
       className={cn('rail-icon', accent && 'accent', active && 'active')}>
       {children}
       {label && <span className="rail-label">{label}</span>}
@@ -209,6 +210,10 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           {/* "Dashboard" → the Meta ads cockpit (KPIs / Scale & Insights / Deep Reports). */}
           <AcctItem href="/dashboard" icon={LayoutDashboard} label="Dashboard" />
           <AcctItem href="/activity" icon={ClipboardList} label="Activity log" />
+          <button onClick={() => { setAcctOpen(false); window.dispatchEvent(new Event('sf:starttour')) }} className="sm-acct-item"
+            style={{ ...ACCT_ITEM, width: '100%', border: 'none', background: 'none', cursor: 'pointer', color: '#161c17', fontSize: 13, fontWeight: 600, fontFamily: 'inherit', textAlign: 'left' }}>
+            <Sparkles size={16} style={{ flexShrink: 0 }} /><span>Take a tour</span>
+          </button>
           <AcctItem href="/mcp" icon={Sparkles} label="API & MCP" />
           <AcctItem href="/team" icon={Users} label="Team & members" />
           <AcctItem href="/billing" icon={CreditCard} label="Billing & plan" />
@@ -301,12 +306,12 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           </Link>
 
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}
-          <div onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>
+          <div data-tour="rail-create" onMouseEnter={() => setFlyout(null)} style={{ marginBottom: 6 }}>
             <RemakeStarter variant="icon" />
           </div>
 
           <div onMouseEnter={() => setFlyout(null)}>
-            <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello"><MelloFace size={22} /></RailIcon>
+            <RailIcon href="/mello" active={melloActive} title="Ask Mello" accent label="Mello" dataTour="nav-mello"><MelloFace size={22} /></RailIcon>
           </div>
 
           <div style={{ width: 30, height: 1, background: '#e6eae4', margin: '5px 0' }} />
@@ -315,7 +320,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
             const hasFlyout = a.items.filter(i => i.href).length > 1
             return (
               <div key={a.key} style={{ position: 'relative' }} onMouseEnter={() => setFlyout(hasFlyout ? a.key : null)}>
-                <RailIcon href={a.defaultHref} title={a.label} label={a.railLabel} active={!melloActive && activeArea?.key === a.key}>
+                <RailIcon href={a.defaultHref} title={a.label} label={a.railLabel} active={!melloActive && activeArea?.key === a.key} dataTour={`nav-${a.key}`}>
                   <a.railIcon size={20} />
                 </RailIcon>
                 {/* hover flyout — the old permanent panel, now on demand */}
@@ -362,6 +367,8 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
         <UpsellModalHost />
         <ConfirmHost />
         <CreditModal />
+        <ProductTour />
+
       </div>
     </div>
   )
