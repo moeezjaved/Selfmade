@@ -126,10 +126,16 @@ export async function POST(req: NextRequest) {
     const updated = await runTask(admin, { userId, email: userRow?.user?.email, source: 'slack' }, task)
     await admin.from('channel_messages').update({ status: updated.status === 'done' ? 'executed' : 'failed' }).eq('task_id', task.id).eq('provider', 'slack')
     const done = updated.status === 'done'
+    // Rewrite the approval card into a receipt — the DM becomes a ledger (ask → decision → outcome).
+    // Money moves note they're reversible for 24h and link the audit trail; failures say what to do next.
+    const nb = updated.result?.newBudget
+    const when = (() => { try { return new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: process.env.BRIEF_TZ || 'Asia/Karachi' }).format(new Date()) } catch { return '' } })()
     const line = done
-      ? `✅ *${task.title}*\n_Done.${updated.result?.newBudget ? ` Now at $${updated.result.newBudget}/day.` : ''} I’m watching it._`
+      ? `✅ *${task.title}* — done${nb ? ` · now at *$${nb}/day*` : ''}.\n_Approved via Slack${when ? ` at ${when}` : ''}.${nb ? ' Reversible for 24h — just say the word.' : ' I’m watching it.'}_`
       : `⚠️ *${task.title}*\n_${updated.error || 'That didn’t go through.'}${updated.needsApp ? ' Open it in the app to finish.' : ''}_`
-    if (channel && ts) await slackUpdate(channel, ts, done ? `${task.title} · done` : `${task.title} · needs attention`, [{ type: 'section', text: { type: 'mrkdwn', text: line } }], botToken)
+    const receiptBlocks: any[] = [{ type: 'section', text: { type: 'mrkdwn', text: line } }]
+    if (done) receiptBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '<https://tryselfmade.ai/reports|See it in the report> · <https://tryselfmade.ai/activity|activity log>' }] })
+    if (channel && ts) await slackUpdate(channel, ts, done ? `${task.title} · done` : `${task.title} · needs attention`, receiptBlocks, botToken)
     else await slackRespond(responseUrl, line)
     return NextResponse.json({ ok: true })
   }

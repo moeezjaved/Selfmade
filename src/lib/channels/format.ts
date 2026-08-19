@@ -29,7 +29,17 @@ function confidence(task: any): string | null {
   return null
 }
 
-/** A pending task → the founder-facing approval (money in the button; department in character). */
+/** A ▮▮▮/▮▮▯/▮▯▯ meter for money moves, from ROAS — visible uncertainty the founder learns to trust. */
+function meter(task: any): string | null {
+  const r = Number(task?.evidence?.roas)
+  if (task?.kind !== 'meta_scale' || !Number.isFinite(r)) return null
+  return r >= 2.5 ? '▮▮▮ high' : r >= 1.8 ? '▮▮▯ medium' : '▮▯▯ early'
+}
+
+/** A pending task → the founder-facing approval (money in the button; department in character). Money
+ *  moves get the full card: the budget delta in the headline, a confidence meter, a native Slack confirm
+ *  dialog so a spend can't be fat-fingered, and a "reversible for 24h" footer. The action_ids/value/
+ *  block_id are UNCHANGED so the existing interactivity handler executes it verbatim. */
 export function formatApproval(task: any): { text: string; slackBlocks: any[] } {
   const ev = task.evidence || {}
   const dept = departmentByKey(departmentForTaskKind(task.kind))
@@ -37,19 +47,42 @@ export function formatApproval(task: any): { text: string; slackBlocks: any[] } 
   const title = task.title || 'A decision for you'
   const why = task.why || ''
   const conf = confidence(task)
+  const mtr = meter(task)
   const budgeted = (task.kind === 'meta_scale' || task.kind === 'meta_audience' || task.kind === 'meta_placement') && ev.newBudget
-  const approveLabel = budgeted ? `Approve $${ev.newBudget}/day` : task.kind === 'meta_pause' ? 'Pause it' : 'Approve'
+  const isPause = task.kind === 'meta_pause'
+  const approveLabel = budgeted ? `Approve · $${ev.newBudget}/day` : isPause ? 'Pause it' : 'Approve'
 
-  const lines = [`*${who}*`, title]
-  if (why) lines.push(`_${why}_`)
-  if (conf) lines.push(`Confidence: ${conf}`)
-  const slackBlocks = [
-    { type: 'section', text: { type: 'mrkdwn', text: lines.join('\n') } },
+  // Headline carries the budget delta when we have both numbers ($40 → $48/day) — the founder sees the
+  // move without reading the body.
+  const delta = budgeted && ev.currentBudget ? `   $${ev.currentBudget} → *$${ev.newBudget}/day*` : ''
+  const detailBits = [why ? `_${why}_` : '', conf ? `Confidence: ${conf}${mtr ? `  ${mtr}` : ''}` : (mtr ? `Confidence: ${mtr}` : '')].filter(Boolean)
+  const section = [`*${who}*`, `${title}${delta}`, ...detailBits].join('\n')
+
+  // Money & pause moves get a native confirm dialog — no accidental spend from a mis-tap.
+  const approveBtn: any = { type: 'button', action_id: 'approve', style: 'primary', text: { type: 'plain_text', text: approveLabel }, value: task.id }
+  if (budgeted) {
+    approveBtn.confirm = {
+      title: { type: 'plain_text', text: `Scale to $${ev.newBudget}/day?` },
+      text: { type: 'mrkdwn', text: `Raises daily spend to *$${ev.newBudget}*. I can undo it on one tap for 24h.` },
+      confirm: { type: 'plain_text', text: 'Yes, scale it' }, deny: { type: 'plain_text', text: 'Wait' },
+    }
+  } else if (isPause) {
+    approveBtn.confirm = {
+      title: { type: 'plain_text', text: 'Pause this campaign?' },
+      text: { type: 'mrkdwn', text: 'Stops its spend now. You can resume it anytime.' },
+      confirm: { type: 'plain_text', text: 'Yes, pause it' }, deny: { type: 'plain_text', text: 'Wait' },
+    }
+  }
+
+  const slackBlocks: any[] = [
+    { type: 'section', text: { type: 'mrkdwn', text: section } },
     { type: 'actions', block_id: `task_${task.id}`, elements: [
-      { type: 'button', action_id: 'approve', style: 'primary', text: { type: 'plain_text', text: approveLabel }, value: task.id },
+      approveBtn,
       { type: 'button', action_id: 'skip', text: { type: 'plain_text', text: 'Not now' }, value: task.id },
     ] },
   ]
+  if (budgeted) slackBlocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '💸 Reversible for 24h · same approval as the web app' }] })
+
   const waActionHint = budgeted ? `Reply YES to approve $${ev.newBudget}/day, or NO to skip.` : 'Reply YES to approve, or NO to skip.'
   const waText = [`${who}`, title, why, conf ? `Confidence: ${conf}` : '', waActionHint].filter(Boolean).join('\n')
   return { text: waText, slackBlocks }
