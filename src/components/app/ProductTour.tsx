@@ -30,6 +30,8 @@ const STEPS: Step[] = [
     body: 'Every morning I read the night’s changes and hand you one page: what happened, what it means, and the few calls only you can make. Start here daily.' },
   { target: 'brief-composer', route: '/brief', placement: 'top', title: 'Talk to Mello anytime',
     body: 'Ask anything in plain language — “which ad is winning?”, “write me a hook”, “pause the losers” — and I answer (or act) from your real numbers.' },
+  { placement: 'center', title: 'How credits work',
+    body: 'One simple currency. Making things spends credits — roughly a few for an image, more for a video — while spying on rivals, reading reports and chatting with me are free. Your credits never expire, and you top up anytime, pay-as-you-go.' },
 
   // ── Act 2 · Spy a competitor ──
   { target: 'nav-library', route: '/discovery', placement: 'right', title: 'Now — let’s catch a competitor',
@@ -67,7 +69,13 @@ const STEPS: Step[] = [
   { target: 'm4-wizard', route: '/m4', placement: 'bottom', title: 'Launch, safely',
     body: 'Ready to go live? The M4 launcher walks you through pixel → creatives → audiences → budget → review, building your campaigns for you. Nothing spends until you confirm the budget.' },
 
-  // ── Act 6 · Close ──
+  // ── Act 6 · Set up (the two connections that switch everything on) ──
+  { target: 'connect-fb', route: '/connect/meta', placement: 'top', title: 'Connect your Facebook',
+    body: 'This is the one that switches everything on — link your Meta ad account and your real spend, ROAS, reports and one-tap launching all come alive. It’s one click, right here. Do this first.' },
+  { target: 'inbox-channels', route: '/inbox', placement: 'bottom', title: 'Connect your inbox',
+    body: 'Then hook up where your customers talk to you — Instagram or WhatsApp is the fastest start. Hit Connect on any channel and their messages start landing here for you to answer.' },
+
+  // ── Act 7 · Close ──
   { placement: 'center', title: 'That’s the whole company',
     body: 'It works while you sleep and pings you on Slack the moment something needs you. Spy, make, reply, launch — you’re running it now. Let’s go.' },
 ]
