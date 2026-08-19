@@ -116,6 +116,43 @@ export function formatBrainProposal(memory: any): { text: string; slackBlocks: a
 }
 
 /**
+ * A Slack-started video clone reached a milestone → DM the founder. `review` = the storyboard is ready
+ * to approve (nothing has spent yet); `done` = the finished ad rendered. Keeps the "Mello did the work,
+ * here's the result" loop alive without making the founder watch a progress bar.
+ */
+export function formatCloneReady(job: any, stage: 'review' | 'done', appUrl: string): { text: string; slackBlocks: any[] } {
+  const meta = job?.clone_meta || {}
+  const rival = job?.source_page_name || meta?.beat_sheet?.brand || 'that ad'
+  const kf = meta?.beat_sheet?.beats?.[0]?.preview || null
+  const scriptSnip = String(meta?.script || meta?.final_script || '').trim().replace(/\s+/g, ' ').slice(0, 140)
+
+  if (stage === 'review') {
+    const section: any = { type: 'section', text: { type: 'mrkdwn', text: `🎬 *Your version of ${rival} is ready to review.*\nI cloned the format and swapped in your product. ${scriptSnip ? `Opening line: _“${scriptSnip}${scriptSnip.length >= 140 ? '…' : ''}”_\n` : ''}Nothing has spent yet — approve the storyboard and I'll render it.` } }
+    if (kf && /^https?:\/\//i.test(String(kf))) section.accessory = { type: 'image', image_url: String(kf), alt_text: 'Your ad — first frame' }
+    const slackBlocks = [
+      section,
+      { type: 'actions', block_id: `clone_${job.id}`, elements: [
+        { type: 'button', action_id: 'clone_review', style: 'primary', text: { type: 'plain_text', text: 'Review & approve →' }, url: `${appUrl}/studio?job=${job.id}` },
+        { type: 'button', action_id: 'clone_dismiss', text: { type: 'plain_text', text: 'Not now' }, value: String(job.id) },
+      ] },
+      { type: 'context', elements: [{ type: 'mrkdwn', text: 'Creative · built by Studio · credits reserve only when you approve' }] },
+    ]
+    return { text: `Your version of ${rival} is ready to review`, slackBlocks }
+  }
+
+  // done
+  const section: any = { type: 'section', text: { type: 'mrkdwn', text: `✅ *Your ad is rendered and ready.*\nThe clone of ${rival} is done — with your product, in your format. Launch it when you're ready.` } }
+  if (job?.image_url && /^https?:\/\//i.test(String(job.image_url))) section.accessory = { type: 'image', image_url: String(job.image_url), alt_text: 'Finished ad' }
+  const slackBlocks = [
+    section,
+    { type: 'actions', block_id: `clonedone_${job.id}`, elements: [
+      { type: 'button', action_id: 'open_creative', style: 'primary', text: { type: 'plain_text', text: 'Watch & launch →' }, url: `${appUrl}/studio` },
+    ] },
+  ]
+  return { text: `Your ad is rendered and ready`, slackBlocks }
+}
+
+/**
  * A competitor ad worth answering → the founder card. "Make ours like this" (value = discovery ad_id)
  * kicks off the real video clone. The ad's poster rides as an image accessory so the thumbnail sits inline.
  */

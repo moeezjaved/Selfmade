@@ -126,6 +126,9 @@ export async function POST(req: NextRequest) {
     // Screencast applies to any NON-physical brand — 'app' most of all (it IS the app-demo source).
     screencast_url: ((body.productType === 'service' || body.productType === 'app') && typeof body.screencastKey === 'string' && body.screencastKey.trim())
       ? r2PublicUrl(body.screencastKey.trim()) : null,
+    // Where this clone was STARTED from → who to ping when it reaches review/done. 'slack' means the
+    // worker calls back to /api/channels/slack/notify-clone so Mello DMs the founder "ready to review".
+    notify_source: body.notifySlack === true ? 'slack' : null,
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({
