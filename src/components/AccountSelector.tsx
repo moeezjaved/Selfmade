@@ -24,21 +24,41 @@ export default function AccountSelector({ onAccountChange, initialAccountId }: P
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    fetch('/api/meta/accounts')
-      .then(r => r.json())
-      .then(d => {
-        const accs = d.accounts || []
-        setAccounts(accs)
-        const want = initialAccountId ? String(initialAccountId).replace(/^act_/, '') : ''
-        const wanted = want && accs.find((a: MetaAccount) => a.account_id === want)
-        const primary = wanted || accs.find((a: MetaAccount) => a.is_primary) || accs[0]
-        if (primary) {
-          setSelected(primary.account_id)
-          // Broadcast the RESOLVED account on mount so the page fetches for exactly the account shown
-          // here (a healthy connected one) — never the server's ambiguous org-primary.
-          onAccountChange(primary.account_id)
-        }
-      })
+    let cancelled = false
+    const load = () => {
+      // /api/meta/accounts is brand-filtered server-side (active sf_brand), so a re-fetch after a brand
+      // switch returns THAT brand's linked account — or an empty list when the brand has none.
+      fetch('/api/meta/accounts')
+        .then(r => r.json())
+        .then(d => {
+          if (cancelled) return
+          const accs = d.accounts || []
+          setAccounts(accs)
+          const want = initialAccountId ? String(initialAccountId).replace(/^act_/, '') : ''
+          const wanted = want && accs.find((a: MetaAccount) => a.account_id === want)
+          const primary = wanted || accs.find((a: MetaAccount) => a.is_primary) || accs[0]
+          if (primary) {
+            setSelected(primary.account_id)
+            // Broadcast the RESOLVED account so the page fetches for exactly the account shown here
+            // (a healthy connected one) — never the server's ambiguous org-primary.
+            onAccountChange(primary.account_id)
+          } else {
+            // Brand has NO linked account → clear selection and tell the page (empty '' → the report
+            // falls to the strict brand resolution and shows a "connect an account for this brand" state
+            // instead of silently reporting another brand's numbers).
+            setSelected('')
+            onAccountChange('')
+          }
+        })
+        .catch(() => {})
+    }
+    load()
+    // Follow the top ProjectSwitcher: it fires 'sf:brandchange' after writing the sf_brand cookie, so a
+    // brand switch re-resolves the reporting account here — the fix for "changing brand didn't change
+    // the report". Matches the pattern activity/page.tsx uses.
+    const onBrand = () => load()
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => { cancelled = true; window.removeEventListener('sf:brandchange', onBrand) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialAccountId])
 

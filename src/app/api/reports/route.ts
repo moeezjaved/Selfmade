@@ -21,17 +21,15 @@ export async function GET(request: NextRequest) {
     // otherwise fall back to the org-scoped primary.
     const wantAccount = (request.nextUrl.searchParams.get('account') || '').replace(/^act_/, '')
     let metaAccount: any = null
-    if (wantAccount) {
-      const { data } = await admin.from('meta_accounts').select('*')
-        .eq('user_id', user.id).eq('account_id', wantAccount).eq('status', 'active').maybeSingle()
-      metaAccount = data || null
-    }
-    // No explicit account → resolve by the ACTIVE BRAND (Aura → ROY 1), like the brief does. This
-    // respects meta_accounts.brand_id instead of an arbitrary is_primary row (the founder has several
-    // is_primary=true accounts; the org-primary picked Hair ResQ's PKR account for an Aura report).
-    // Falls back to the org primary only when the active brand has nothing linked.
-    if (!metaAccount) metaAccount = await resolveBrandScopedAccount(admin, user.id)
-    if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
+    // Validate an explicit ?account against the WORKSPACE pool (not just self) — a member reports on an
+    // account the OWNER connected, so `.eq(user_id,self)` would wrongly reject it.
+    if (wantAccount) metaAccount = await resolveScopedAccount(admin, user.id, wantAccount)
+    // No explicit account → resolve by the ACTIVE BRAND (Aura → ROY 1), like the brief does. STRICT: a
+    // brand with no linked account returns null (not the org primary), so switching to an unlinked brand
+    // shows a "connect an account for this brand" empty state instead of another brand's numbers — the
+    // report was silently staying on the previous account when the top switcher changed.
+    if (!metaAccount && !wantAccount) metaAccount = await resolveBrandScopedAccount(admin, user.id, null, { strict: true })
+    if (!metaAccount) return NextResponse.json({ noAccountForBrand: true })
 
     // Cache the whole report (many Graph calls) per (user, account, range) — the Reports page + its
     // tabs + Mello's opportunity fetch all hit this; caching kills the rate-limit blowout (error 17).

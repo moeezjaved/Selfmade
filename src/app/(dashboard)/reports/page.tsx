@@ -199,7 +199,14 @@ function ReportsPage() {
         </div>
       ) : error ? (
         <div style={{ background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', borderRadius: 16, padding: 24, color: '#c0392b' }}>{error}</div>
-      ) : data && (
+      ) : data?.noAccountForBrand ? (
+        <div style={{ ...CARD, padding: 48, textAlign: 'center' }}>
+          <div style={{ fontSize: 32, marginBottom: 12 }}>🔗</div>
+          <div style={{ fontSize: 16, fontWeight: 700, color: INK, marginBottom: 8 }}>No ad account linked to this brand yet</div>
+          <div style={{ fontSize: 13, color: MUTED, marginBottom: 16, maxWidth: 420, margin: '0 auto 16px' }}>Link this brand&apos;s Facebook ad account and its real spend, ROAS and results show up here — nothing from your other brands.</div>
+          <a href="/connect/meta" style={{ display: 'inline-block', background: '#ff5a2c', color: '#fff', textDecoration: 'none', padding: '10px 24px', borderRadius: 100, fontSize: 14, fontWeight: 800 }}>Connect an ad account →</a>
+        </div>
+      ) : data && !data.noAccountForBrand && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
 
           {/* Mello's debrief — the headlines on top ('What happened', 'How your account is performing')
