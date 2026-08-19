@@ -129,14 +129,21 @@ export default function ProductTour() {
     if (step.route && pathname !== step.route) router.push(step.route)
     if (!step.target) { setRect(null); return }
     const started = Date.now()
-    // Rail icons resolve instantly; page-content anchors (search bars, tab strips) appear after the route
-    // loads + fetches — so poll generously before falling back to a centered card.
+    let settleUntil = 0
+    // Rail icons resolve instantly; page-content anchors (search bars, channel rows) appear after the
+    // route loads + fetches AND can shift as content streams in — so once found, keep re-measuring for a
+    // short settle window so the spotlight tracks the element to its final position. Never found in time →
+    // centered fallback, tour still advances.
     const tick = () => {
       if (cancelled) return
       const el = document.querySelector(`[data-tour="${step.target}"]`)
-      if (el) { const r = measure(el); if (r.width > 0 && r.height > 0) { setRect(r); return } }
-      if (Date.now() - started < 4500) setTimeout(() => requestAnimationFrame(tick), 80)
-      else setRect(null)   // never found → centered fallback, tour still advances
+      if (el) {
+        const r = measure(el)
+        if (r.width > 0 && r.height > 0) { setRect(r); if (!settleUntil) settleUntil = Date.now() + 1000 }
+      }
+      const done = settleUntil ? Date.now() > settleUntil : Date.now() - started > 4500
+      if (!done) setTimeout(() => requestAnimationFrame(tick), 120)
+      else if (!settleUntil) setRect(null)
     }
     tick()
     return () => { cancelled = true }
