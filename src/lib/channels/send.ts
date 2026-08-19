@@ -4,7 +4,7 @@
  * replayed). Identity ↔ channel lookups all go through the admin client (service-role tables).
  */
 import { slackPost, whatsappSend, whatsappSelfTarget } from '@/lib/channels/providers'
-import { formatApproval, formatReport } from '@/lib/channels/format'
+import { formatApproval, formatReport, formatMorningBrief } from '@/lib/channels/format'
 import { decryptToken } from '@/lib/meta/client'
 import { computeCompanyStatus } from '@/lib/company/status'
 import { runMetaAudit } from '@/lib/meta/audit'
@@ -211,7 +211,11 @@ export async function sendReportToChannels(admin: any, userId: string, brief: an
   // The overnight-shift report is grounded in the live company status + the top pending decision.
   const { departments, tasks } = await computeCompanyStatus(admin, userId, opts.brandId)
   const pending = (tasks as any[]).find(t => t.status === 'suggested') || null
-  let { text, slackBlocks } = formatReport(brief, departments, pending)
+  // The flagship Morning Brief — what changed → what I did → what needs you, rendered from the same
+  // assembleBrief intelligence the web shows, with the top approval's real button embedded. (formatReport
+  // — the old bare roster — is kept for rollback.)
+  const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+  let { text, slackBlocks } = formatMorningBrief(brief, departments, tasks as any[], APP)
   // Per-brand delivery: label which brand this section is about (founders running multiple brands).
   if (opts.brandLabel) {
     text = `— ${opts.brandLabel} —\n${text}`

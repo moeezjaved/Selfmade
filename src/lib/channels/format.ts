@@ -284,3 +284,67 @@ export function formatReport(brief: any, departments: DeptView[] = [], pending?:
 
   return { text, slackBlocks: blocks }
 }
+
+// Time-aware greeting in the founder's tz (BRIEF_TZ). Shared by the Morning Brief.
+function greeting(): string {
+  try { const hr = Number(new Intl.DateTimeFormat('en-US', { hour: 'numeric', hour12: false, timeZone: process.env.BRIEF_TZ || 'Asia/Karachi' }).format(new Date())); return hr < 12 ? 'morning' : hr < 17 ? 'afternoon' : 'evening' } catch { return 'morning' }
+}
+const oneLine = (s: any, n = 170): string => { const t = String(s || '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t }
+
+/**
+ * THE MORNING BRIEF — the flagship. Renders the SAME assembled intelligence the web brief shows
+ * (assembleBrief items + live company status) into one composed DM: what changed → what I already did →
+ * what needs you, with the top approval's real button embedded. Replaces the bare "overnight shift"
+ * roster. Grounded entirely in real data — a section only appears if there's something true to say.
+ */
+export function formatMorningBrief(brief: any, departments: DeptView[] = [], tasks: any[] = [], appUrl = 'https://www.tryselfmade.ai'): { text: string; slackBlocks: any[] } {
+  const first = brief?.firstName ? `, ${brief.firstName}` : ''
+  const items: any[] = Array.isArray(brief?.items) ? brief.items : []
+  // WHAT CHANGED = the top curated items (assembleBrief already ranked them + wrote founder-facing copy);
+  // the cross-competitor playbook is deep analysis, not an overnight change, so it's excluded here.
+  const changes = items.filter(i => i && i.title && i.kind !== 'market_playbook').slice(0, 3)
+  const suggested = (tasks || []).filter((t: any) => t.status === 'suggested')
+  const pending = suggested[0] || null
+  const finished = (departments || []).filter(d => d.status === 'finished' && d.detail && !/nothing needs/i.test(d.detail))
+  const headline = brief?.headline
+
+  const blocks: any[] = []
+  const needN = suggested.length
+  const changeLine = changes.length ? `${changes.length} thing${changes.length === 1 ? '' : 's'} changed overnight` : 'Quiet night — nothing moved'
+  blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `☀️ *Good ${greeting()}${first}.* ${changeLine}${needN ? ` — ${needN} need${needN === 1 ? 's' : ''} you.` : '.'}` } })
+
+  if (changes.length) {
+    blocks.push({ type: 'divider' })
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '📊  *WHAT CHANGED*' }] })
+    for (const it of changes) {
+      const why = oneLine(it.why || it.body)
+      blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*${oneLine(it.title, 120)}*${why ? `\n${why}` : ''}` } })
+    }
+  }
+
+  // WHAT I ALREADY DID — finished department work + any creatives waiting (headline = creative_ready).
+  const did: string[] = []
+  if (headline?.title) did.push(oneLine(headline.title, 120))
+  for (const d of finished.slice(0, 3)) did.push(`${d.emoji} ${oneLine(d.detail, 120)}`)
+  if (did.length) {
+    blocks.push({ type: 'divider' })
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: '✅  *WHAT I ALREADY DID*' }] })
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: did.map(x => `• ${x}`).join('\n') } })
+  }
+
+  // WHAT NEEDS YOU — the top decision, with its real Approve button (same spine as the web).
+  blocks.push({ type: 'divider' })
+  if (pending) {
+    blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `🖐  *WHAT NEEDS YOU${needN > 1 ? ` · ${needN} decisions` : ''}*` }] })
+    blocks.push(...formatApproval(pending).slackBlocks)
+    if (needN > 1) blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `+${needN - 1} more waiting — <${appUrl}/brief|review all →>` }] })
+  } else {
+    blocks.push({ type: 'section', text: { type: 'mrkdwn', text: `*Nothing needs you${first}. 🌱*\nEverything's handled — I'll break the silence only if something real moves.` } })
+  }
+
+  const onShift = (departments || []).filter(d => d.live && (d.status === 'working' || d.status === 'finished' || d.status === 'waiting')).length
+  blocks.push({ type: 'context', elements: [{ type: 'mrkdwn', text: `🟢 ${onShift} on shift · <${appUrl}/brief|open the full brief →>` }] })
+
+  const text = [`Good ${greeting()}${first}.`, ...changes.map(c => `• ${oneLine(c.title, 90)}`), pending ? `Needs you: ${pending.title}` : 'Nothing needs you 🌱'].join('\n')
+  return { text, slackBlocks: blocks }
+}
