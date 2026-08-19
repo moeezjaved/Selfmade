@@ -5,10 +5,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { slackVerify, slackUpdate, slackRespond, slackOpenDm, slackPost } from '@/lib/channels/providers'
+import { slackVerify, slackUpdate, slackRespond, slackOpenDm, slackPost, slackOpenView } from '@/lib/channels/providers'
 import { redeemCode } from '@/lib/channels/link'
 import { runTask } from '@/lib/mello/run-task'
 import { decryptToken } from '@/lib/meta/client'
+import { confirmMemory } from '@/lib/brain'
+import { brainEditView } from '@/lib/channels/format'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -77,6 +79,25 @@ export async function POST(req: NextRequest) {
   const payloadRaw = params.get('payload')
   if (!payloadRaw) return NextResponse.json({ ok: true })
   const payload = JSON.parse(payloadRaw)
+
+  // ── Modal submit: the Brain "Correct it" edit dialog. private_metadata carries {id, channel, ts}. ──
+  if (payload.type === 'view_submission' && payload.view?.callback_id === 'brain_edit_save') {
+    const su = payload.user?.id
+    const { data: id2 } = await admin.from('channel_identities')
+      .select('user_id, meta').eq('provider', 'slack').eq('external_id', su).eq('active', true).maybeSingle()
+    if (id2) {
+      let meta: any = {}; try { meta = JSON.parse(payload.view.private_metadata || '{}') } catch { /* */ }
+      const newText = String(payload.view.state?.values?.content?.val?.value || '').trim()
+      if (meta.id && newText) {
+        // A correction is founder truth → store it and mark confirmed.
+        await admin.from('mello_memory').update({ content: newText, status: 'confirmed' }).eq('id', meta.id).eq('user_id', id2.user_id)
+        let bt: string | undefined; try { bt = (id2 as any).meta?.bot_token ? decryptToken((id2 as any).meta.bot_token) : undefined } catch { bt = undefined }
+        if (meta.channel && meta.ts) await slackUpdate(meta.channel, meta.ts, 'Memory corrected', [{ type: 'section', text: { type: 'mrkdwn', text: `🧠 *Corrected & saved.*\n> ${newText}\n_I'll treat this as true from now on._` } }], bt)
+      }
+    }
+    return NextResponse.json({ response_action: 'clear' })   // closes the modal
+  }
+
   if (payload.type !== 'block_actions') return NextResponse.json({ ok: true })
 
   const action = payload.actions?.[0]
@@ -84,6 +105,7 @@ export async function POST(req: NextRequest) {
   const responseUrl = payload.response_url
   const channel = payload.channel?.id
   const ts = payload.message?.ts
+  const triggerId = payload.trigger_id
   const taskId = action?.value
 
   // Resolve the Slack user → the linked account. No link → no action (security boundary).
@@ -93,6 +115,26 @@ export async function POST(req: NextRequest) {
   const userId = identity.user_id
   let botToken: string | undefined
   try { botToken = (identity as any).meta?.bot_token ? decryptToken((identity as any).meta.bot_token) : undefined } catch { botToken = undefined }
+
+  // ── Company Brain: confirm / correct / drop a proposed memory (value = mello_memory id). ──
+  if (action.action_id === 'brain_confirm' || action.action_id === 'brain_reject') {
+    const ok = await confirmMemory(admin, userId, String(taskId), action.action_id === 'brain_confirm' ? 'confirm' : 'reject')
+    const line = action.action_id === 'brain_confirm'
+      ? '🧠 *Locked in.* I’ll treat this as true — it’ll shape every brief, ad and rule from here.'
+      : '🧠 _Dropped — I won’t remember that._'
+    if (!ok) { await slackRespond(responseUrl, '⚠️ I can’t find that memory anymore.'); return NextResponse.json({ ok: true }) }
+    if (channel && ts) await slackUpdate(channel, ts, 'Company Brain updated', [{ type: 'section', text: { type: 'mrkdwn', text: line } }], botToken)
+    return NextResponse.json({ ok: true })
+  }
+  if (action.action_id === 'brain_edit') {
+    const { data: mem } = await admin.from('mello_memory').select('id, content').eq('id', String(taskId)).eq('user_id', userId).maybeSingle()
+    if (mem && triggerId) {
+      const view = brainEditView(mem)
+      view.private_metadata = JSON.stringify({ id: mem.id, channel, ts })   // so submit can update the card
+      await slackOpenView(triggerId, view, botToken)
+    }
+    return NextResponse.json({ ok: true })
+  }
 
   // Customer-message buttons (from a pushed inbox message) — approve/skip a customer reply from Slack.
   if (action.action_id === 'cust_approve' || action.action_id === 'cust_skip') {

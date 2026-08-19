@@ -37,6 +37,21 @@ export async function slackUpdate(channel: string, ts: string, text: string, blo
   } catch { return false }
 }
 
+/** Open a Slack modal from an interaction's trigger_id (views.open). Used for the Brain "Correct it"
+ *  edit dialog so the founder can fix a proposed memory without leaving Slack. */
+export async function slackOpenView(triggerId: string, view: any, botToken?: string): Promise<boolean> {
+  const token = botToken || process.env.SLACK_BOT_TOKEN
+  if (!token) return false
+  try {
+    const r = await fetch('https://slack.com/api/views.open', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json; charset=utf-8', authorization: `Bearer ${token}` },
+      body: JSON.stringify({ trigger_id: triggerId, view }),
+    }).then((x) => x.json())
+    return !!r?.ok
+  } catch { return false }
+}
+
 /** Post to a Slack response_url (used to reply to an interactive action / slash command). */
 export async function slackRespond(responseUrl: string, text: string, blocks?: any[], replaceOriginal = false): Promise<void> {
   try {
