@@ -89,6 +89,49 @@ export function formatApproval(task: any): { text: string; slackBlocks: any[] } 
 }
 
 /**
+ * A proposed Company Brain fact → the founder's confirm card. The founder RATIFIES memory before the
+ * company reasons over it as truth. Buttons carry the mello_memory id (mirrors how a task card carries
+ * task.id → `value`). Three moves: confirm (→ trusted), correct (opens an edit modal), drop (→ retired).
+ */
+export function formatBrainProposal(memory: any): { text: string; slackBlocks: any[] } {
+  const content = String(memory.content || 'I noticed a pattern in your business.').trim()
+  const catLine = memory.category ? `  ·  _${memory.category}_` : ''
+  const section = [
+    `*🧠 Company Brain*${catLine}`,
+    `I think I've learned something about your business:`,
+    `> ${content}`,
+    `If that's right, I'll treat it as fact — every future brief, ad and rule will lean on it.`,
+  ].join('\n')
+  const slackBlocks = [
+    { type: 'section', text: { type: 'mrkdwn', text: section } },
+    { type: 'actions', block_id: `brain_${memory.id}`, elements: [
+      { type: 'button', action_id: 'brain_confirm', style: 'primary', text: { type: 'plain_text', text: 'Yes — that’s us' }, value: memory.id },
+      { type: 'button', action_id: 'brain_edit', text: { type: 'plain_text', text: 'Correct it' }, value: memory.id },
+      { type: 'button', action_id: 'brain_reject', style: 'danger', text: { type: 'plain_text', text: 'No, drop it' }, value: memory.id },
+    ] },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Company Brain · you can change anything I remember' }] },
+  ]
+  const text = `Company Brain — is this true? “${content}”  ·  reply YES to confirm, NO to drop`
+  return { text, slackBlocks }
+}
+
+/** The "Correct it" modal (views.open). private_metadata carries the memory id back on submit. */
+export function brainEditView(memory: any): any {
+  return {
+    type: 'modal',
+    callback_id: 'brain_edit_save',
+    private_metadata: String(memory.id),
+    title: { type: 'plain_text', text: 'Correct the Brain' },
+    submit: { type: 'plain_text', text: 'Save to memory' },
+    close: { type: 'plain_text', text: 'Cancel' },
+    blocks: [
+      { type: 'input', block_id: 'content', label: { type: 'plain_text', text: 'What’s actually true?' },
+        element: { type: 'plain_text_input', action_id: 'val', multiline: true, initial_value: String(memory.content || '') } },
+    ],
+  }
+}
+
+/**
  * The overnight-shift report. departments = live status of the whole company; pending = the top
  * decision (rendered with its Approve button). Grounded entirely in real status — a department only
  * "speaks" if it actually did something.

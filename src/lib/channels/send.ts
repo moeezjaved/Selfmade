@@ -113,6 +113,34 @@ export async function sendApprovalToChannels(admin: any, userId: string, task: a
   return { sent }
 }
 
+/**
+ * Push a PROPOSED Company Brain fact to the founder's Slack for confirmation. The brain buttons
+ * (brain_confirm / brain_edit / brain_reject) carry the mello_memory id, and the interactivity handler
+ * calls confirmMemory() — the same confirm/reject path the web uses. Slack-only (the confirm card is
+ * button-native); WhatsApp founders get nothing here, keeping their line for urgent one-liners.
+ */
+export async function sendBrainProposalToChannels(admin: any, userId: string, memory: any): Promise<{ sent: number }> {
+  const { formatBrainProposal } = await import('@/lib/channels/format')
+  const ids = (await getIdentities(admin, userId, 'slack')).filter(isFounderChannel)
+  if (!ids.length) return { sent: 0 }
+  const { text, slackBlocks } = formatBrainProposal(memory)
+  const expires_at = new Date(Date.now() + APPROVAL_TTL_MS).toISOString()
+  let sent = 0
+  for (const id of ids) {
+    const channel = id.meta?.channel_id
+    if (!channel) continue
+    const r = await slackPost(channel, text, slackBlocks, botTokenFor(id))
+    if (r.ok) {
+      sent++
+      await admin.from('channel_messages').insert({
+        user_id: userId, provider: 'slack', external_id: r.ts, channel_ref: channel,
+        kind: 'brain_proposal', task_id: null, status: 'sent', expires_at,
+      }).then(() => {}, () => {})
+    }
+  }
+  return { sent }
+}
+
 /** Send a read-only report (brief) to every linked channel. */
 export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number; results?: Array<{ provider: string; kind?: string; ok: boolean; error?: string }> }> {
   // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a
