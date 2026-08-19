@@ -162,6 +162,40 @@ export async function sendCompetitorAdToChannels(admin: any, userId: string, ad:
   return { sent }
 }
 
+/** Push a finished creative to the founder's Slack with a launch deep-link. Slack-only. */
+export async function sendCreativeReadyToChannels(admin: any, userId: string, gen: any): Promise<{ sent: number }> {
+  const { formatCreativeReady } = await import('@/lib/channels/format')
+  const ids = (await getIdentities(admin, userId, 'slack')).filter(isFounderChannel)
+  if (!ids.length) return { sent: 0 }
+  const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+  const { text, slackBlocks } = formatCreativeReady(gen, APP)
+  let sent = 0
+  for (const id of ids) {
+    const channel = id.meta?.channel_id
+    if (!channel) continue
+    const r = await slackPost(channel, text, slackBlocks, botTokenFor(id))
+    if (r.ok) sent++
+  }
+  return { sent }
+}
+
+/** Push a customer-conversation trend to the founder's Slack (Support Lead). Slack-only. */
+export async function sendCustomerTrendToChannels(admin: any, userId: string, trend: { intent: string; count: number; ratio?: number; quote?: string }): Promise<{ sent: number }> {
+  const { formatCustomerTrend } = await import('@/lib/channels/format')
+  const ids = (await getIdentities(admin, userId, 'slack')).filter(isFounderChannel)
+  if (!ids.length) return { sent: 0 }
+  const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+  const { text, slackBlocks } = formatCustomerTrend(trend, APP)
+  let sent = 0
+  for (const id of ids) {
+    const channel = id.meta?.channel_id
+    if (!channel) continue
+    const r = await slackPost(channel, text, slackBlocks, botTokenFor(id))
+    if (r.ok) sent++
+  }
+  return { sent }
+}
+
 /** Send a read-only report (brief) to every linked channel. */
 export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number; results?: Array<{ provider: string; kind?: string; ok: boolean; error?: string }> }> {
   // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a

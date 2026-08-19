@@ -116,6 +116,50 @@ export function formatBrainProposal(memory: any): { text: string; slackBlocks: a
 }
 
 /**
+ * A finished creative → the founder card. "Launch my pick" (value = creative_generations id) hands the
+ * founder into the launcher preloaded with it (real ad spend → they set budget + confirm; never blind).
+ */
+export function formatCreativeReady(gen: any, appUrl: string): { text: string; slackBlocks: any[] } {
+  const isVideo = gen?.media_type === 'video'
+  const label = gen?.brand_name ? ` for *${gen.brand_name}*` : ''
+  const section: any = { type: 'section', text: { type: 'mrkdwn', text: `🎬 *Your new ${isVideo ? 'video ' : ''}ad is ready${label}.*\nLaunch it when you're ready — I'll load it into the launcher and you set the budget.` } }
+  if (!isVideo && gen?.image_url && /^https?:\/\//i.test(String(gen.image_url))) section.accessory = { type: 'image', image_url: String(gen.image_url), alt_text: 'Your ad' }
+  const slackBlocks = [
+    section,
+    { type: 'actions', block_id: `creative_${gen.id}`, elements: [
+      { type: 'button', action_id: 'creative_launch', style: 'primary', text: { type: 'plain_text', text: 'Launch my pick' }, value: String(gen.id) },
+      { type: 'button', action_id: 'open_studio', text: { type: 'plain_text', text: 'Open in Studio' }, url: `${appUrl}/studio` },
+    ] },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Creative · built by Studio · nothing launches until you set a budget and confirm' }] },
+  ]
+  return { text: 'Your new ad is ready to launch', slackBlocks }
+}
+
+/**
+ * A customer-conversation trend → the founder card (Support Lead). "Draft replies" surfaces the drafted
+ * replies for one-tap sending in the inbox; "Change promise" writes the fact to the Company Brain. A
+ * verbatim customer quote makes the trend human. Slack-only.
+ */
+export function formatCustomerTrend(trend: { intent: string; count: number; ratio?: number; quote?: string }, appUrl: string): { text: string; slackBlocks: any[] } {
+  const intent = trend.intent || 'shipping'
+  const n = trend.count || 0
+  const up = trend.ratio && trend.ratio >= 1.5 ? ` up *${trend.ratio.toFixed(1)}×*` : ''
+  const head = `*📨 ${intent.charAt(0).toUpperCase() + intent.slice(1)} questions are${up} — ${n} conversation${n === 1 ? '' : 's'} this week.*`
+  const quote = trend.quote ? `\n> “${String(trend.quote).slice(0, 160)}”` : ''
+  const elements: any[] = [
+    { type: 'button', action_id: 'draft_replies', style: 'primary', text: { type: 'plain_text', text: `Draft replies for all ${n}` }, value: `trend_${intent}_${n}` },
+  ]
+  if (intent === 'shipping') elements.push({ type: 'button', action_id: 'update_shipping_promise', text: { type: 'plain_text', text: 'Change promise to 3–7 days' }, value: '3-7' })
+  elements.push({ type: 'button', action_id: 'open_inbox', text: { type: 'plain_text', text: 'Read the chats' }, url: `${appUrl}/inbox` })
+  const slackBlocks = [
+    { type: 'section', text: { type: 'mrkdwn', text: `${head}${quote}\nMost are about *${intent === 'shipping' ? 'delivery timing' : intent}* — worth answering before it dents conversion.` } },
+    { type: 'actions', block_id: `trend_${intent}`, elements },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Support Lead · from the Customer Inbox · nothing sends without you' }] },
+  ]
+  return { text: `${intent} questions up this week — ${n} conversations`, slackBlocks }
+}
+
+/**
  * A Slack-started video clone reached a milestone → DM the founder. `review` = the storyboard is ready
  * to approve (nothing has spent yet); `done` = the finished ad rendered. Keeps the "Mello did the work,
  * here's the result" loop alive without making the founder watch a progress bar.
