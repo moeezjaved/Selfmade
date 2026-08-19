@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { workspaceMemberIds } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +18,14 @@ export async function GET(req: NextRequest) {
   const brandId = req.nextUrl.searchParams.get('brandId')
   const type = req.nextUrl.searchParams.get('type')
 
+  // Shared workspace: a team member sees the whole team's creative library, not just their own (empty)
+  // pool. Scoped to the ONE workspace org (workspaceMemberIds = self + the billing owner's org members),
+  // never a union across every org — so no cross-workspace creatives leak in.
+  const memberIds = await workspaceMemberIds(admin as any, user.id).catch(() => [user.id])
+
   let q = admin.from('creative_generations')
     .select('id, brand_id, source_ad_id, source_video_url, parent_id, type, tier, prompt, image_url, media_type, status, created_at, clone_meta')
-    .eq('user_id', user.id).order('created_at', { ascending: false }).limit(300)
+    .in('user_id', memberIds).order('created_at', { ascending: false }).limit(300)
   if (brandId) q = q.eq('brand_id', brandId)
   if (type) q = q.eq('type', type)
 

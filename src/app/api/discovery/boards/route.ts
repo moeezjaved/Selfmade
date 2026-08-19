@@ -31,11 +31,15 @@ export async function GET() {
   await admin.from('discovery_boards').update({ org_id: org.orgId, created_by: user.id }).eq('user_id', user.id).is('org_id', null)
   await admin.from('discovery_saved_ads').update({ org_id: org.orgId }).eq('user_id', user.id).is('org_id', null)
 
+  // ONE SHARED WORKSPACE: every board in the org is visible to every member — the owner's boards show
+  // for a teammate and vice-versa. We deliberately DROP the old `visibility.eq.team OR created_by=self`
+  // gate: boards defaulted to 'personal' and team-sharing was Pro-gated, so nothing was ever shared and
+  // a member saw an empty Boards page while the owner had many. Scope by org_id alone (still a single
+  // org — no cross-workspace leak). `visibility` is kept on the row but no longer hides shared boards.
   const { data: boards, error } = await admin
     .from('discovery_boards')
     .select('*')
     .eq('org_id', org.orgId)
-    .or(`visibility.eq.team,created_by.eq.${user.id}`)
     .order('created_at', { ascending: false })
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

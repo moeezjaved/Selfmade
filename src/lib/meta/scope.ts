@@ -53,7 +53,7 @@ export async function resolveScopedAccount(admin: SupabaseClient, userId: string
  * Hair ResQ's account while the campaign is created on Aura's primary, and Meta returns "The related
  * resource does not exist". Mirrors what meta/audit-summary + meta/opportunities already do.
  */
-export async function resolveBrandScopedAccount(admin: SupabaseClient, userId: string, explicitBrand?: string | null): Promise<any | null> {
+export async function resolveBrandScopedAccount(admin: SupabaseClient, userId: string, explicitBrand?: string | null, opts?: { strict?: boolean }): Promise<any | null> {
   try {
     const { resolveActiveBrandId } = await import('@/lib/brand/active')
     const brandId = await resolveActiveBrandId(admin, userId, explicitBrand).catch(() => null)
@@ -61,6 +61,12 @@ export async function resolveBrandScopedAccount(admin: SupabaseClient, userId: s
       const rows = await scopedMetaAccounts(admin, userId)
       const linked = rows.find(a => a.brand_id === brandId)
       if (linked) return linked
+      // A brand IS active but has NOTHING linked. In strict mode (read/report surfaces like the
+      // Campaigns page) return null so the UI shows an empty "connect an ad account for THIS brand"
+      // state instead of silently borrowing another brand's account — the "switched to new-spacemen
+      // but still saw Aura's campaigns" bug. Non-strict (write flow / brief seed) keeps the primary
+      // fallback so legacy accounts with no brand link still resolve.
+      if (opts?.strict) return null
     }
   } catch { /* fall through to primary */ }
   return resolveScopedAccount(admin, userId)
