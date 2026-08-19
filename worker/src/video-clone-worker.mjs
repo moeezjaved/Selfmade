@@ -2265,14 +2265,22 @@ async function generateJob(job) {
         ? `${productRef} is MY product. In every shot that shows a product, render MY product EXACTLY as the attached photo (same shape, cap/label, colours), at its true real-world size — get it big by moving the CAMERA close, never by enlarging it. Adapt the scenes, on-screen actions and spoken lines to MY product${meta.beat_sheet?.rejected_product ? `; keep the "${meta.beat_sheet.rejected_product}" (the thing being argued against) as-is and never turn it into my product` : ''}.`
         : ''
 
+      // CHARACTER LOCK: a clone drifts the presenter across a multi-cut 30s gen unless we pin it. Only
+      // make people DISTINCT when the SOURCE genuinely has ≥2 people (a multi-testimonial ad); default to
+      // ONE person and hard-lock their identity across every shot. Recast changes the look, NOT the count —
+      // it was wrongly forcing "distinct people" and producing a different face every scene on single-
+      // presenter clones.
+      const multiPerson = Array.isArray(meta.beat_sheet?.people) && meta.beat_sheet.people.length >= 2
       let prompt = [
         `A polished ${effSecs}-second vertical ${meta.aspect || '9:16'} social ad — ONE continuous piece, real people, authentic energy. Recreate the source ad's format, pacing and scene order as a fresh regenerated version (not a copy).`,
         shotList ? `SHOT LIST — hit each timestamp in order, cutting to a NEW scene at each one, so the finished ${effSecs}s ad moves through ALL of these shots:\n${shotList}` : '',
         isService ? 'This promotes a SERVICE / app — no physical product to hold; show a real person and, if provided, the app/screen, or a lifestyle moment.' : swapProduct,
         leadFrame ? `[Image1] is the opening frame — begin the FIRST shot from it and keep its look, framing and person.` : '',
-        recast ? `Recast the on-camera person(s) as ${meta.character_look} — keep everything else identical.` : '',
-        (recast || (Array.isArray(meta.beat_sheet?.people) && meta.beat_sheet.people.length >= 2)) ? 'Make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.' : '',
-        spoken ? `Spoken audio across the whole ad, clearly lip-synced by the on-camera person(s), in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
+        recast ? `Recast the on-camera presenter as ${meta.character_look}${multiPerson ? '' : ' — ONE single consistent recast person'}, keeping everything else identical.` : '',
+        multiPerson
+          ? 'This ad features SEVERAL different people (a multi-person testimonial) — make each on-camera person DISTINCT (different face/hair/build per scene) so it reads as several real people.'
+          : 'CRITICAL — ONE PERSON ONLY: the exact SAME presenter appears in EVERY shot from first frame to last — identical face, hair, age, skin tone, build and outfit across all cuts. NEVER swap, change, age, or replace the person between scenes; it is one continuous character throughout.',
+        spoken ? `Spoken audio across the whole ad, clearly lip-synced by the on-camera person${multiPerson ? '(s)' : ''}, in ${langN}: "${spoken.replace(/"/g, "'")}". Natural, confident delivery, real mouth movement in sync. Ambient sound only — NO background music.` : 'Ambient sound only, no music, no on-screen captions.',
       ].filter(Boolean).join('\n\n')
       prompt += STYLE_LOCK
       if (process.env.SEEDANCE_DIRECTOR !== 'off') prompt += DIRECTOR_STYLE
