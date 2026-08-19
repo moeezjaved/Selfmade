@@ -151,6 +151,43 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
+  // ── Competitor "Make ours like this" (value = a discovery ad_id, NOT a task). Starts the REAL video
+  //    clone as a DRAFT (status='analyzing' → worker → 'review') — charges nothing until the founder
+  //    approves the storyboard. Swaps in the founder's own product photos. ──
+  if (action.action_id === 'spy_remake') {
+    const adId = String(taskId)
+    // Pick a brand of the founder's that actually has product photos (Slack has no active-brand cookie;
+    // a clone with no product to swap in is pointless).
+    const { brandPoolUserIds } = await import('@/lib/org')
+    const poolIds = await brandPoolUserIds(admin, userId).catch(() => [userId])
+    const { data: brands } = await admin.from('brands').select('id, name, brand_type').in('user_id', poolIds).order('created_at', { ascending: false })
+    let chosen: any = null, productImages: string[] = [], productType = 'product'
+    for (const b of (brands || []) as any[]) {
+      const { data: prods } = await admin.from('brand_products').select('image_urls').eq('brand_id', b.id)
+      const imgs = (prods || []).flatMap((p: any) => Array.isArray(p.image_urls) ? p.image_urls : []).filter((s: any) => typeof s === 'string' && s.trim())
+      if (imgs.length) { chosen = b; productImages = imgs.slice(0, 9); productType = b.brand_type || 'product'; break }
+    }
+    const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+    if (!chosen) {
+      await slackRespond(responseUrl, `🎬 I can make our version — first add a product photo to a brand (<${APP}/brands|Brands>) so I can swap your product into the ad.`)
+      return NextResponse.json({ ok: true })
+    }
+    let started = false
+    try {
+      const r = await fetch(`${APP}/api/discovery/clone-video`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-autopilot-secret': process.env.AUTOPILOT_SECRET || '' },
+        body: JSON.stringify({ asUserId: userId, sourceAdId: adId, brandId: chosen.id, productImages, productType, characterLook: 'match' }),
+      })
+      started = r.ok
+    } catch { started = false }
+    const line = started
+      ? `🎬 *On it — making our version of that ad.*\n_Cloning it for *${chosen.name}* with your product. A storyboard will be ready to review in <${APP}/studio|Studio> in a few minutes — nothing spends until you approve it._`
+      : `⚠️ I couldn't start the remake here. Open it in <${APP}/discovery|Discovery> and hit *Remake ad*.`
+    await slackRespond(responseUrl, line)
+    return NextResponse.json({ ok: true })
+  }
+
   const { data: task } = await admin.from('mello_tasks').select('*').eq('id', String(taskId)).eq('user_id', userId).maybeSingle()
   if (!task) { await slackRespond(responseUrl, '⚠️ I can’t find that task anymore — it may have expired.'); return NextResponse.json({ ok: true }) }
 

@@ -26,13 +26,26 @@ async function toPublicUrl(userId: string, src: string, i: number): Promise<stri
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  // Burst guard (fail-open) — cap scripted generation floods.
-  if (await isRateLimited(user.id)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
-
   const body = await req.json().catch(() => ({}))
+  // Actor resolution: normal callers use their session. Server-to-server callers (the Slack "Make ours
+  // like this" button, the Daily Ad Autopilot) pass the shared secret + the user they're generating for,
+  // reusing the EXACT clone path (auth boundary only — nothing about the generation changes). Starting a
+  // video clone charges NOTHING (status='analyzing' → worker → 'review'); credits are reserved at approve.
+  const autopilotSecret = req.headers.get('x-autopilot-secret')
+  const isAutopilot = !!autopilotSecret && !!process.env.AUTOPILOT_SECRET && autopilotSecret === process.env.AUTOPILOT_SECRET
+  let uid: string
+  if (isAutopilot) {
+    if (typeof body.asUserId !== 'string' || !body.asUserId) return NextResponse.json({ error: 'asUserId required' }, { status: 400 })
+    uid = body.asUserId
+  } else {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    uid = user.id
+  }
+  // Burst guard (fail-open) — cap scripted generation floods. Server-paced callers are exempt.
+  if (!isAutopilot && await isRateLimited(uid)) return NextResponse.json({ error: 'rate_limited', message: 'Too many generations in a short time — please wait a moment and try again.' }, { status: 429 })
+
   const sourceAdId = String(body.sourceAdId || '').trim()
   // Extension-saved ("Saved from Web") videos have no discovery_ads_index row — the caller passes the
   // stored R2 mp4 directly as sourceVideoUrl so those can be cloned too.
@@ -42,7 +55,7 @@ export async function POST(req: NextRequest) {
   const rawImages: string[] = Array.isArray(body.productImages)
     ? body.productImages.filter((u: any) => typeof u === 'string').slice(0, 9)
     : []
-  const productImages = (await Promise.all(rawImages.map((s, i) => toPublicUrl(user.id, s, i)))).filter(Boolean) as string[]
+  const productImages = (await Promise.all(rawImages.map((s, i) => toPublicUrl(uid, s, i)))).filter(Boolean) as string[]
   if (productImages.length === 0) return NextResponse.json({ error: 'add at least one product image to swap in' }, { status: 400 })
 
   const tier = body.tier === 'fast' ? 'fast' : 'premium'
@@ -116,7 +129,7 @@ export async function POST(req: NextRequest) {
   }
 
   const { data: row, error } = await admin.from('creative_generations').insert({
-    user_id: user.id, brand_id: body.brandId || null, source_ad_id: sourceAdId || null,
+    user_id: uid, brand_id: body.brandId || null, source_ad_id: sourceAdId || null,
     type: 'video_clone', media_type: 'video', status: 'analyzing', tier: tier === 'fast' ? 'default' : 'pro',
     source_video_url: sourceVideo, clone_meta, prompt: 'video clone', image_url: null,
   }).select('id').single()

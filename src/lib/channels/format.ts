@@ -115,6 +115,30 @@ export function formatBrainProposal(memory: any): { text: string; slackBlocks: a
   return { text, slackBlocks }
 }
 
+/**
+ * A competitor ad worth answering → the founder card. "Make ours like this" (value = discovery ad_id)
+ * kicks off the real video clone. The ad's poster rides as an image accessory so the thumbnail sits inline.
+ */
+export function formatCompetitorAd(ad: any, appUrl: string): { text: string; slackBlocks: any[] } {
+  const who = ad.page_name || 'A competitor'
+  const days = Number(ad.days_running) || 0
+  const runLine = days >= 20 ? `Running *${days} days* — a proven winner they're scaling.` : days > 0 ? `Live ${days} days.` : `Just spotted in their feed.`
+  const section: any = { type: 'section', text: { type: 'mrkdwn', text: `*🎯 ${who} — an ad worth answering.*\n${runLine} This is the format to make ours before it saturates.` } }
+  if (ad.poster_url && /^https?:\/\//i.test(String(ad.poster_url))) {
+    section.accessory = { type: 'image', image_url: String(ad.poster_url), alt_text: `${who} ad` }
+  }
+  const slackBlocks = [
+    section,
+    { type: 'actions', block_id: `spy_${ad.ad_id}`, elements: [
+      { type: 'button', action_id: 'spy_remake', style: 'primary', text: { type: 'plain_text', text: 'Make ours like this' }, value: String(ad.ad_id) },
+      { type: 'button', action_id: 'open_spy', text: { type: 'plain_text', text: 'See their ads' }, url: `${appUrl}/discovery` },
+    ] },
+    { type: 'context', elements: [{ type: 'mrkdwn', text: 'Analyst · from your competitor watch · a remake is a free draft — nothing spends until you approve' }] },
+  ]
+  const text = `${who} has an ad worth answering — reply to make ours like it`
+  return { text, slackBlocks }
+}
+
 /** The "Correct it" modal (views.open). private_metadata carries the memory id back on submit. */
 export function brainEditView(memory: any): any {
   return {

@@ -141,6 +141,27 @@ export async function sendBrainProposalToChannels(admin: any, userId: string, me
   return { sent }
 }
 
+/**
+ * Push a competitor ad worth answering to the founder's Slack, as the Analyst. "Make ours like this"
+ * (spy_remake) starts the real video clone. Slack-only (image accessory + button-native).
+ */
+export async function sendCompetitorAdToChannels(admin: any, userId: string, ad: any): Promise<{ sent: number }> {
+  const { formatCompetitorAd } = await import('@/lib/channels/format')
+  const ids = (await getIdentities(admin, userId, 'slack')).filter(isFounderChannel)
+  if (!ids.length) return { sent: 0 }
+  const APP = (process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://www.tryselfmade.ai').replace(/\/$/, '')
+  const { text, slackBlocks } = formatCompetitorAd(ad, APP)
+  let sent = 0
+  for (const id of ids) {
+    const channel = id.meta?.channel_id
+    if (!channel) continue
+    // Post as the Analyst (per-message byline on the one app).
+    const r = await slackPost(channel, text, slackBlocks, botTokenFor(id))
+    if (r.ok) sent++
+  }
+  return { sent }
+}
+
 /** Send a read-only report (brief) to every linked channel. */
 export async function sendReportToChannels(admin: any, userId: string, brief: any, opts: { brandId?: string | null; brandLabel?: string } = {}): Promise<{ sent: number; results?: Array<{ provider: string; kind?: string; ok: boolean; error?: string }> }> {
   // Founder comms ONLY — the brief must reach the founder's own Slack/WhatsApp (founder_tool), NEVER a
