@@ -63,11 +63,19 @@ function LeaderboardPage() {
   }, [])
 
   useEffect(() => {
-    setLoading(true); setError(''); setAiText('')
-    fetch(`/api/leaderboard?spendThreshold=${threshold}`).then(r => r.json()).then(j => {
-      if (j.error && !j.leaderboard?.length) setError(j.error === 'no_account' ? 'Connect a Meta ad account to see your leaderboard.' : j.error)
-      setData(j)
-    }).catch(e => setError(e.message)).finally(() => setLoading(false))
+    const load = () => {
+      setLoading(true); setError(''); setAiText('')
+      fetch(`/api/leaderboard?spendThreshold=${threshold}`).then(r => r.json()).then(j => {
+        if (j.error && !j.leaderboard?.length) setError(j.error === 'no_account' ? 'No ad account linked to this brand yet — connect one to see its leaderboard.' : j.error)
+        setData(j)
+      }).catch(e => setError(e.message)).finally(() => setLoading(false))
+    }
+    load()
+    // Follow the top ProjectSwitcher: re-fetch on brand switch so the leaderboard re-resolves to the
+    // NEW brand's linked account (the route is brand-scoped server-side via sf_brand).
+    const onBrand = () => load()
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
   }, [threshold])
 
   const analyzeShifts = async () => {

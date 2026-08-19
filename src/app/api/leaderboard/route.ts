@@ -33,7 +33,9 @@ export async function GET(req: NextRequest) {
   // Scope to the ACTIVE BRAND (Aura → ROY 1), like the report/brief — an explicit ?account= wins.
   const lbAcct = sp.get('account')
   let metaAccount: any
-  try { metaAccount = lbAcct ? await resolveScopedAccount(admin, user.id, lbAcct.replace(/^act_/, '')) : await resolveBrandScopedAccount(admin, user.id) } catch { metaAccount = null }
+  // STRICT brand scope: a brand with no linked account gets the no_account empty state, never another
+  // brand's primary (kept the leaderboard on the previous brand after a switch).
+  try { metaAccount = lbAcct ? await resolveScopedAccount(admin, user.id, lbAcct.replace(/^act_/, '')) : await resolveBrandScopedAccount(admin, user.id, null, { strict: true }) } catch { metaAccount = null }
   if (!metaAccount?.account_id) return NextResponse.json({ error: 'no_account', shifts: null, leaderboard: [] }, { status: 200 })
   const token = decryptToken(metaAccount.access_token)
   const currency = metaAccount.currency || 'USD'

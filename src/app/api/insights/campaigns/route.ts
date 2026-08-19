@@ -19,11 +19,13 @@ export async function GET(request: NextRequest) {
     // Scope to the ACTIVE BRAND (Aura → ROY 1), like the report + brief — an explicit ?account= wins.
     // Using the org primary showed Hair ResQ's PKR account (PKR 0) on an Aura page.
     const acctParam = request.nextUrl.searchParams.get('account')
+    // STRICT brand scope: switching to a brand with no linked account returns null (not another brand's
+    // primary), so the page shows an empty/connect state instead of the previous brand's numbers.
     const metaAccount = acctParam
       ? await resolveScopedAccount(admin, user.id, acctParam.replace(/^act_/, ''))
-      : await resolveBrandScopedAccount(admin, user.id)
+      : await resolveBrandScopedAccount(admin, user.id, null, { strict: true })
 
-    if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
+    if (!metaAccount) return NextResponse.json({ noAccountForBrand: true, campaigns: [], totals: { spend: 0, revenue: 0, roas: 0, conversions: 0 } })
 
     const token = decryptToken(metaAccount.access_token)
     const adAccountId = "act_" + metaAccount.account_id
