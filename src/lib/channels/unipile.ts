@@ -78,6 +78,11 @@ export async function createHostedAuthLink(userId: string, provider: string, ret
     })
     const j = await res.json().catch(() => ({}))
     if (j?.url) return { url: j.url }
+    // Log the REAL Unipile response server-side (Vercel logs) so a failing connect is diagnosable — the
+    // friendly toast below deliberately hides schema dumps, but that also hid the actual reason (bad DSN,
+    // rotated API key, plan without hosted auth). No secret is in Unipile's response, so this is safe.
+    const raw = JSON.stringify(j).slice(0, 600)
+    console.error(`[unipile] hosted-link failed ${res.status} ${res.statusText} — ${raw}`)
     // Unipile can return a validation SCHEMA — sometimes an object, sometimes a giant JSON STRING (the
     // email/IMAP multi-provider request triggers this). Only surface short, human messages; anything
     // that looks like JSON or is too long → friendly fallback, so we never toast a raw schema dump.
@@ -88,8 +93,14 @@ export async function createHostedAuthLink(userId: string, provider: string, ret
       return t
     }
     const msg = clean(j?.detail) || clean(j?.message) || clean(j?.error)
-    return { error: msg || 'Could not start the connection. Please try again.' }
+    // A 401/403 from Unipile is almost always a stale/rotated API key or a DSN pointing at the wrong
+    // region for this key — the classic "I updated my subscription but connect still fails". Say so.
+    if (!msg && (res.status === 401 || res.status === 403)) {
+      return { error: 'The channel service rejected our credentials (check UNIPILE_API_KEY / UNIPILE_DSN — a new subscription usually issues a new key and region).' }
+    }
+    return { error: msg || `Could not start the connection (channel service returned ${res.status}). Please try again.` }
   } catch (e: any) {
+    console.error('[unipile] hosted-link threw:', e?.message)
     return { error: e?.message || 'Could not reach the channel service.' }
   }
 }
