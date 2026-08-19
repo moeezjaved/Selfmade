@@ -118,9 +118,13 @@ export default function SettingsPage() {
       const meta = (user.user_metadata || {}) as Record<string, string>
       setFullName(meta.full_name || meta.name || '')
       setLoading(false)
-      // Real Meta-connection status (was hardcoded "Connected ✓" even with nothing linked).
-      supabase.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', user.id).eq('status', 'active')
-        .then(({ count }) => { if (!cancelled) setMetaConnected((count || 0) > 0) })
+      // Real Meta-connection status — WORKSPACE-scoped: a team member must see the team's Meta as
+      // connected even though the OWNER connected it. The old browser-client `.eq(user_id, self)` check
+      // saw only the member's own (empty) rows → falsely showed "Connect →". /api/meta/accounts returns
+      // the whole workspace pool (workspaceMemberIds, single org — no cross-workspace leak).
+      fetch('/api/meta/accounts').then(r => r.json())
+        .then(j => { if (!cancelled) setMetaConnected(Array.isArray(j.workspaceAccounts) && j.workspaceAccounts.length > 0) })
+        .catch(() => { if (!cancelled) setMetaConnected(false) })
       // load notification prefs (non-blocking)
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
       // load daily-autopilot enrollments (non-blocking)
