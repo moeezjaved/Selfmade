@@ -64,14 +64,14 @@ export async function getUserEmail(userId) {
 
 /** Branded responsive shell — inline styles (email clients strip <style>). */
 export function emailShell({ heading, bodyHtml, ctaText, ctaPath }) {
-  const cta = ctaText ? `<a href="${APP}${ctaPath || ''}" style="display:inline-block;margin-top:18px;background:#1a3a1a;color:#dffe95;padding:12px 24px;border-radius:9px;text-decoration:none;font-weight:700;font-size:14px">${ctaText}</a>` : ''
-  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;background:#f4f7f2;padding:28px 12px;margin:0">
-  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e6ede2;border-radius:14px;padding:28px 26px">
-    <div style="font-size:22px;font-weight:800;color:#2d6a00;letter-spacing:-0.02em;margin-bottom:18px">Selfmade</div>
-    <div style="font-size:18px;font-weight:700;color:#1a2e1a;margin-bottom:12px">${heading}</div>
-    <div style="font-size:14px;line-height:1.6;color:#3a4a3a">${bodyHtml}</div>
+  const cta = ctaText ? `<a href="${APP}${ctaPath || ''}" style="display:inline-block;margin-top:18px;background:#ef4a1e;color:#ffffff;padding:12px 24px;border-radius:9px;text-decoration:none;font-weight:700;font-size:14px">${ctaText}</a>` : ''
+  return `<div style="font-family:-apple-system,Segoe UI,Arial,sans-serif;background:#f4f0e7;padding:28px 12px;margin:0">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #eae4d9;border-radius:14px;padding:28px 26px">
+    <div style="font-size:22px;font-weight:800;color:#ef4a1e;letter-spacing:-0.02em;margin-bottom:18px">Selfmade</div>
+    <div style="font-size:18px;font-weight:700;color:#17120e;margin-bottom:12px">${heading}</div>
+    <div style="font-size:14px;line-height:1.6;color:#4a453d">${bodyHtml}</div>
     ${cta}
-    <div style="margin-top:26px;font-size:12px;color:#9aaa9a;border-top:1px solid #eef2ec;padding-top:14px">
+    <div style="margin-top:26px;font-size:12px;color:#8a8177;border-top:1px solid #eae4d9;padding-top:14px">
       You're receiving this because you track brands on Selfmade.
       <a href="${APP}/settings" style="color:#6b7280">Manage email alerts</a>.
     </div>
@@ -100,15 +100,15 @@ export function autopilotDailyEmail({ brandName, imageUrl, kind, creditsLeft }) 
   const badge = kind === 'fresh' ? 'Fresh competitor angle · cloned with your product' : 'A new take on your ad'
   const left = Number.isFinite(creditsLeft) ? ` · ${creditsLeft.toLocaleString()} credits left` : ''
   const img = imageUrl
-    ? `<div style="margin:14px 0 4px"><img src="${imageUrl}" alt="Your daily ad" width="280" style="width:280px;max-width:100%;border-radius:12px;border:1px solid #e6ede2;display:block;margin:0 auto"></div>`
+    ? `<div style="margin:14px 0 4px"><img src="${imageUrl}" alt="Your daily ad" width="280" style="width:280px;max-width:100%;border-radius:12px;border:1px solid #eae4d9;display:block;margin:0 auto"></div>`
     : ''
   return {
     subject: `Today's ad for ${b} is ready`,
     html: emailShell({
       heading: `Today's ad for ${b}`,
-      bodyHtml: `<span style="display:inline-block;background:#eaf3de;color:#3b6d11;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:6px">${badge}</span>${img}
+      bodyHtml: `<span style="display:inline-block;background:#FDE6D6;color:#c2410c;font-size:12px;font-weight:700;padding:3px 10px;border-radius:20px;margin-bottom:6px">${badge}</span>${img}
         <div style="margin-top:10px">Your daily ad is ready — rebuilt around your real product. Download it, tweak the words, or launch it as-is.</div>
-        <div style="margin-top:10px;font-size:12px;color:#9aaa9a">$0.15 charged to your credits${left}</div>`,
+        <div style="margin-top:10px;font-size:12px;color:#8a8177">$0.15 charged to your credits${left}</div>`,
       ctaText: 'Download or edit this ad →',
       ctaPath: '/creative-studio',
     }),
@@ -124,9 +124,9 @@ export function newAdBundleEmail({ items }) {
     .map((i) => {
       // Tables (not flex) for image+text alignment — the only layout email clients render reliably.
       const thumbCell = i.thumb
-        ? `<td width="64" style="padding:8px 12px 8px 0;vertical-align:middle"><img src="${i.thumb}" width="52" height="52" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #e6ede2;display:block"></td>`
+        ? `<td width="64" style="padding:8px 12px 8px 0;vertical-align:middle"><img src="${i.thumb}" width="52" height="52" alt="" style="width:52px;height:52px;object-fit:cover;border-radius:8px;border:1px solid #eae4d9;display:block"></td>`
         : ''
-      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #f0f4ee"><tr>${thumbCell}<td style="padding:9px 0;font-size:14px;vertical-align:middle"><b style="color:#1a2e1a">${i.brandName || 'A brand you follow'}</b> <span style="color:#5a7a5a">— ${i.count} new ${i.count === 1 ? 'concept' : 'concepts'}</span></td></tr></table>`
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-bottom:1px solid #eae4d9"><tr>${thumbCell}<td style="padding:9px 0;font-size:14px;vertical-align:middle"><b style="color:#17120e">${i.brandName || 'A brand you follow'}</b> <span style="color:#8a8177">— ${i.count} new ${i.count === 1 ? 'concept' : 'concepts'}</span></td></tr></table>`
     }).join('')
   return {
     subject: `${nBrands} ${nBrands === 1 ? 'brand' : 'brands'} you follow launched ${totalAds} new ${totalAds === 1 ? 'ad' : 'ads'}`,
