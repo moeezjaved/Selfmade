@@ -30,6 +30,9 @@ export function stripEmailHtml(input: string): string {
     .replace(/<!\[endif\]>/gi, ' ')
     // Whole non-content blocks.
     .replace(/<(style|script|head|title|xml)[\s\S]*?<\/\1>/gi, ' ')
+    // Tracking / footer links — pull them BEFORE tag-stripping so the whole URL is still intact (once
+    // tags turn into spaces a long query string splits into unremovable gibberish).
+    .replace(/https?:\/\/[^\s<>"')]+/gi, ' ')
     // Structural tags → line breaks so sentences don't run together.
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/(p|div|tr|li|h[1-6]|table|blockquote)>/gi, '\n')
@@ -39,6 +42,12 @@ export function stripEmailHtml(input: string): string {
     .replace(/&#x([0-9a-f]+);/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)) } catch { return ' ' } })
     .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(parseInt(n, 10)) } catch { return ' ' } })
     .replace(/&([a-z]+);/gi, (m, name) => NAMED_ENTITIES[name.toLowerCase()] ?? m)
+    // Leftover email-footer noise: "key=value&key=value" tracking params, standalone long tracking
+    // tokens/ids, and ASCII divider rules (------- / ======= / •••). Emails carry these; real chat
+    // messages don't — and stripEmailHtml only runs on markup-bearing bodies anyway.
+    .replace(/[\w.+-]+=[\w%~:.@+/-]{6,}(?:&[\w.+-]+=[\w%~:.@+/-]+)*/g, ' ')
+    .replace(/\b[A-Za-z0-9_%~+/-]{24,}\b/g, ' ')
+    .replace(/(?:^|\s)[-–—_=*·•~]{3,}(?:\s|$)/g, ' ')
     // Tidy whitespace.
     .replace(/ /g, ' ')
     .replace(/[ \t]+/g, ' ')
