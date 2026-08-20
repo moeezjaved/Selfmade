@@ -26,6 +26,9 @@ export async function POST(req: NextRequest) {
       await admin.from('subscriptions').upsert({ owner_id: userId, plan, status: 'active' }, { onConflict: 'owner_id' })
     }
     await admin.rpc('apply_plan', { p_user: userId, p_plan: plan as PlanId, p_reset: null })
+    // Keep the profile's display status in sync with the grant so admin lists / UI don't show a stale
+    // "Trialing" after an upgrade (paid grant = active; a downgrade to free returns to the trial default).
+    await admin.from('user_profiles').update({ subscription_status: plan === 'free' ? 'trialing' : 'active' }).eq('user_id', userId)
   }
 
   if (typeof grantCredits === 'number' && grantCredits !== 0) {

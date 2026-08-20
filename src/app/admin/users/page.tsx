@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 
 interface User {
   id: string; email: string; full_name: string; subscription_status: string;
+  plan_id?: string; plan_label?: string;
   created_at: string; last_sign_in_at: string | null;
   meta_connected?: boolean; meta_accounts?: number;
 }
@@ -79,9 +80,18 @@ export default function UsersPage() {
                   )}
                 </td>
                 <td style={{ padding: '12px 16px' }}>
-                  <span style={{ padding: '2px 8px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', background: `${STATUS_COLOR[u.subscription_status] || '#9ca3af'}18`, color: STATUS_COLOR[u.subscription_status] || '#9ca3af', textTransform: 'capitalize' }}>
-                    {u.subscription_status}
-                  </span>
+                  {(() => {
+                    const paid = !!u.plan_id && u.plan_id !== 'free'
+                    const c = paid ? '#16a34a' : '#9ca3af'
+                    return (
+                      <span style={{ display: 'inline-flex', flexDirection: 'column', gap: 3, alignItems: 'flex-start' }}>
+                        <span style={{ padding: '2px 9px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', background: `${c}18`, color: c }}>
+                          {u.plan_label || 'Free'}
+                        </span>
+                        <span style={{ fontSize: '10px', color: STATUS_COLOR[u.subscription_status] || '#9ca3af', textTransform: 'capitalize' }}>{u.subscription_status}</span>
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td style={{ padding: '12px 16px', color: '#777' }}>{fmt(u.created_at)}</td>
                 <td style={{ padding: '12px 16px', color: '#777' }}>{fmt(u.last_sign_in_at)}</td>
