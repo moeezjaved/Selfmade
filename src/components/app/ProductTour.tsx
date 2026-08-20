@@ -31,7 +31,7 @@ const STEPS: Step[] = [
   { target: 'brief-composer', route: '/brief', placement: 'top', title: 'Talk to Mello anytime',
     body: 'Ask anything in plain language — “which ad is winning?”, “write me a hook”, “pause the losers” — and I answer (or act) from your real numbers.' },
   { placement: 'center', title: 'How credits work',
-    body: 'One simple currency. Making things spends credits — roughly a few for an image, more for a video — while spying on rivals, reading reports and chatting with me are free. Your credits never expire, and you top up anytime, pay-as-you-go.' },
+    body: 'One simple currency. The work spends credits — a few for an image ad, more for a video, a little to start spying a new rival or pull a deep report. Browsing what’s already loaded is free, your credits never expire, and you top up anytime — pay-as-you-go.' },
 
   // ── Act 2 · Spy a competitor ──
   { target: 'nav-library', route: '/discovery', placement: 'right', title: 'Now — let’s catch a competitor',
