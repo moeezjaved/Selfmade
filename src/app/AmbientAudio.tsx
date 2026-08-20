@@ -7,22 +7,20 @@
  *  - NEVER autoplays. It starts only on the first genuine *click* anywhere on the page —
  *    scrolling, hovering or moving the mouse must not start it (browsers block bare autoplay
  *    anyway, and a click is a real user gesture that satisfies the play() policy).
- *  - A round speaker button sits at the bottom-left; clicking it toggles sound on/off.
- *  - The on/off choice is remembered across visits (localStorage). If the visitor turned it
- *    off before, it stays silent and shows the muted icon.
+ *  - A round speaker button sits at the bottom-right; clicking it toggles sound on/off.
+ *  - The choice applies to the CURRENT visit only. We intentionally do NOT persist a "muted" flag:
+ *    a stored preference was blocking the click-to-play on every reload (the track only restarted
+ *    from the speaker button). Each fresh visit, the first real click plays it again.
  */
 import { useEffect, useRef, useState } from 'react'
 
 const SRC = '/paper-kite-drift.mp3'
 const VOLUME = 0.32
-const PREF_KEY = 'sf_ambient_muted' // '1' = user chose silence
 const MAX_PLAYS = 2 // play the track twice, then stop
 
 export default function AmbientAudio() {
   const audioRef = useRef<HTMLAudioElement | null>(null)
   const [playing, setPlaying] = useState(false)
-  // userMuted starts true so we never fight the browser before we know the pref; corrected on mount.
-  const mutedPrefRef = useRef(false)
   const playCountRef = useRef(0) // how many times the track has finished this run
 
   useEffect(() => {
@@ -30,12 +28,11 @@ export default function AmbientAudio() {
     if (!el) return
     el.volume = VOLUME
 
-    let muted = false
-    try { muted = localStorage.getItem(PREF_KEY) === '1' } catch {}
-    mutedPrefRef.current = muted
-
+    // First genuine click anywhere starts the music on EVERY visit. We deliberately do NOT read a
+    // persisted "muted" flag here — a stored preference was suppressing click-to-play on reload, so the
+    // track only ever restarted from the speaker button. The speaker button still stops it for the
+    // current visit; a fresh page load plus a real click means the visitor is engaging, so we play.
     const tryStart = () => {
-      if (mutedPrefRef.current) return
       const a = audioRef.current
       if (!a || !a.paused) return
       playCountRef.current = 0
@@ -78,13 +75,9 @@ export default function AmbientAudio() {
     const el = audioRef.current
     if (!el) return
     if (el.paused) {
-      mutedPrefRef.current = false
       playCountRef.current = 0 // turning it back on restarts the two-play run
-      try { localStorage.setItem(PREF_KEY, '0') } catch {}
       el.play().then(() => setPlaying(true)).catch(() => {})
     } else {
-      mutedPrefRef.current = true
-      try { localStorage.setItem(PREF_KEY, '1') } catch {}
       el.pause()
       setPlaying(false)
     }
