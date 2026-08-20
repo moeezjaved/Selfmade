@@ -78,53 +78,17 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
   )
 }
 
-// Inline confirm for the "Target them" / "Review placements" cards — the SAME approve→act loop as
-// Scale, but the copy is tuned to the best segment/placement. We DUPLICATE the winner (original never
-// touched, so no learning-phase reset) and the founder sets the new campaign's budget. Nothing spends
-// until they confirm.
-function TuneConfirm({ apply, camp, currency, cta, onDone }: { apply: ApplyPlan; camp: ScaleCampaign; currency: string; cta: string; onDone?: () => void }) {
-  const cur = (n: number) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)}` } }
-  const currentMajor = Math.max(1, Math.round((Number(camp.dailyBudget) || 0) / 100)) // dailyBudget is in cents
-  const [open, setOpen] = useState(false)
-  const [budget, setBudget] = useState<number>(Math.max(5, currentMajor))
-  const [state, setState] = useState<'idle' | 'busy' | 'done' | 'err'>('idle')
-  const [msg, setMsg] = useState('')
-  const [newName, setNewName] = useState('')
-
-  if (!camp.metaCampaignId) {
-    return <Link href={cta === 'Review placements' ? '/campaigns' : '/m4'} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
-  }
-  if (state === 'done') {
-    return <div style={{ marginTop: 4, fontSize: 12.5, fontWeight: 700, color: GOOD }}>✓ Launched “{newName}” at {cur(budget)}/day, focused on {apply.label}. Your winner keeps running untouched.</div>
-  }
-  if (!open) {
-    return <button onClick={() => setOpen(true)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', marginTop: 2 }}>{cta} →</button>
-  }
-
-  const run = () => {
-    setState('busy'); setMsg('')
-    fetch('/api/meta/tune', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ metaCampaignId: camp.metaCampaignId, apply, newDailyBudget: budget }) })
-      .then(r => r.json())
-      .then(j => { if (j?.ok) { setNewName(j.newCampaign || `Focus: ${apply.label}`); setState('done'); onDone?.() } else if (showUpsell(j)) { setState('idle') } else { setState('err'); setMsg(j?.error || 'Couldn’t apply it — try again.') } })
-      .catch(() => { setState('err'); setMsg('Couldn’t apply it — try again.') })
-  }
-
-  return (
-    <div style={{ marginTop: 6, width: '100%' }}>
-      <div style={{ fontSize: 12, color: MUTED, marginBottom: 6 }}>I'll duplicate your winner into a new campaign focused on <b>{apply.label}</b> — your original keeps running untouched. Its daily budget:</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-        <input type="number" min={1} value={budget} onChange={e => setBudget(Math.max(1, Math.round(Number(e.target.value) || 0)))} disabled={state === 'busy'}
-          style={{ width: 92, border: `1px solid ${LINE}`, borderRadius: 10, padding: '8px 10px', fontSize: 14, fontWeight: 700, fontFamily: 'inherit', color: INK }} />
-        <span style={{ fontSize: 12, color: MUTED }}>{currency}/day</span>
-        <button onClick={run} disabled={state === 'busy'} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 12.5, fontWeight: 800, cursor: state === 'busy' ? 'default' : 'pointer', fontFamily: 'inherit' }}>
-          {state === 'busy' ? 'Launching…' : `Launch at ${cur(budget)}/day`}
-        </button>
-        <button onClick={() => setOpen(false)} disabled={state === 'busy'} style={{ background: 'none', border: 'none', color: MUTED, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
-      </div>
-      {state === 'err' && <div style={{ marginTop: 6, fontSize: 12, color: '#c0392b' }}>{msg}</div>}
-      <div style={{ marginTop: 6, fontSize: 11.5, color: FAINT }}>A fresh campaign focused on {apply.label} — the original is never edited, so its learning stays intact.</div>
-    </div>
-  )
+// "Target them" / "Review placements" hand off to the Campaigns "Manage with Mello" assistant with the
+// exact move pre-filled, so the founder just reviews and taps Send to make it live on Meta (replaces the
+// old inline duplicate-confirm — the buttons were dead when the audit had no metaCampaignId).
+function TuneConfirm({ apply, camp, cta, onDone }: { apply: ApplyPlan; camp: ScaleCampaign; currency: string; cta: string; onDone?: () => void }) {
+  const seg = apply?.label || 'the best segment'
+  const cmd = cta === 'Review placements'
+    ? `Shift budget toward ${seg}: duplicate my winner into a new campaign focused on that placement.`
+    : `Duplicate my winner into a new campaign focused on ${seg}.`
+  const manage = String(camp?.metaCampaignId || camp?.name || '')
+  const href = manage ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}` : '/campaigns'
+  return <Link href={href} onClick={() => onDone?.()} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
 }
 
 export default function BriefOpportunities({ initial, onAct, accountId, initialAccountId, scaleCampaign, currency }: { initial?: Opportunity[]; onAct?: (o: Opportunity) => void; accountId?: string | null; initialAccountId?: string | null; scaleCampaign?: ScaleCampaign | null; currency?: string }) {

@@ -2,6 +2,7 @@
 import MetaGate from '@/components/MetaGate'
 import toast from 'react-hot-toast'
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { showUpsell } from '@/components/UpsellModal'
 import UpgradeGate from '@/components/UpgradeGate'
 
@@ -103,7 +104,15 @@ function CampaignsInner() {
   const chatBottomRef = useRef<HTMLDivElement>(null)
   const chatFileRef = useRef<HTMLInputElement>(null)
 
-  useEffect(() => { loadCampaigns() }, [dateRange])
+  // Re-fetch on date change AND on brand switch — the ProjectSwitcher fires 'sf:brandchange' after
+  // writing the sf_brand cookie, so campaigns must re-scope to the newly active brand (otherwise
+  // switching to a brand with no linked ad account still showed the previous brand's campaigns).
+  useEffect(() => {
+    loadCampaigns()
+    const onBrand = () => loadCampaigns()
+    window.addEventListener('sf:brandchange', onBrand)
+    return () => window.removeEventListener('sf:brandchange', onBrand)
+  }, [dateRange])
 
   const loadCampaigns = async () => {
     setLoading(true)
@@ -170,6 +179,9 @@ function CampaignsInner() {
     })
   }
 
+  const searchParams = useSearchParams()
+  const deepLinkHandled = useRef(false)
+
   const openChat = (camp: any) => {
     setChatCampaign(camp)
     // Restore existing history for this campaign, or show welcome message
@@ -180,6 +192,23 @@ function CampaignsInner() {
     }])
     setTimeout(() => chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
+
+  // Deep-link from the brief's "What Mello would do" cards:
+  //   /campaigns?manage=<campaignId|name>&do=<command>
+  // opens that campaign's "Manage with Mello" assistant and pre-fills the exact action, so the founder
+  // just reviews and hits Send to make it live. Runs once, after campaigns have loaded.
+  useEffect(() => {
+    if (deepLinkHandled.current) return
+    const manage = searchParams?.get('manage')
+    if (!manage || !campaigns.length) return
+    const camp = campaigns.find((c: any) => String(c.id) === String(manage) || c.name === manage)
+    if (!camp) return
+    deepLinkHandled.current = true
+    openChat(camp)
+    const doCmd = searchParams?.get('do')
+    if (doCmd) setChatInput(doCmd)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [campaigns, searchParams])
 
   const sendChat = async () => {
     const msg = chatInput.trim()
