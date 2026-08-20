@@ -725,7 +725,11 @@ export default function InterviewPage() {
               {/* Meta Ads — available now via the BYO connect wizard, so Media Buying starts with your history */}
               <div style={{ ...say, fontSize: 22 }}>Give Media Buying your ad account.</div>
               <p style={sub}>Connect Meta Ads and Media Buying sees what already worked — and builds on it from night one.</p>
-              <a href="/connect/meta" target="_blank" rel="noopener noreferrer" style={{ display: 'block', textAlign: 'left', background: '#fff', border: `1.5px solid ${SELBORDER}`, borderRadius: 14, padding: '15px 18px', textDecoration: 'none', maxWidth: 430, margin: '18px auto 0' }}>
+              {/* Opens connect in a NEW tab AND advances onboarding — otherwise a founder who tapped
+                  "Connect Meta Ads" here left the flow stuck at integrations and never reached the night
+                  step that creates the brand, crawls competitors and marks onboarding complete. Now the
+                  brand + competitors get created either way. */}
+              <a href="/connect/meta" target="_blank" rel="noopener noreferrer" onClick={() => setPhase('offer')} style={{ display: 'block', textAlign: 'left', background: '#fff', border: `1.5px solid ${SELBORDER}`, borderRadius: 14, padding: '15px 18px', textDecoration: 'none', maxWidth: 430, margin: '18px auto 0' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <b style={{ fontSize: 14.5, color: INK }}>Connect Meta Ads →</b>
                   <span style={{ fontSize: 9, fontWeight: 900, letterSpacing: '.08em', background: '#ef4a1e', color: '#fff', borderRadius: 6, padding: '3px 8px' }}>AVAILABLE</span>

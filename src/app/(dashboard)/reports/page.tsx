@@ -1,5 +1,6 @@
 'use client'
 import MetaGate from '@/components/MetaGate'
+import UpgradeGate from '@/components/UpgradeGate'
 import AdsTabs from '@/components/ads/AdsTabs'
 import { useState, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -748,8 +749,13 @@ function ReportCard({ title, subtitle, sectionKey, expanded, toggle, currency, s
   )
 }
 
-// ── Gate: needs a connected Meta ad account. MetaGate keys off the connection (BYO or OAuth),
-// not the old META_LIVE flag — connected users get the surface, everyone else a connect prompt. ──
+// ── Gate order matters: PLAN first, then connection. A Free user must see "Reports is a Creator
+// feature → upgrade" (UpgradeGate), NOT the "Connect your Facebook ads" prompt (which dead-ended a
+// free user who has no paid Meta surface). Creator users then hit MetaGate → connect or the surface. ──
 export default function ReportsPageGate() {
-  return <MetaGate feature="Reports"><ReportsPage /></MetaGate>
+  return (
+    <UpgradeGate feature="campaigns" name="Reports">
+      <MetaGate feature="Reports"><ReportsPage /></MetaGate>
+    </UpgradeGate>
+  )
 }

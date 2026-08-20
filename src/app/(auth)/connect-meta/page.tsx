@@ -9,11 +9,25 @@ function ConnectMetaContent() {
   const params = useSearchParams()
   const [state, setState] = useState<'idle'|'connecting'|'success'|'error'>('idle')
   const [errorMsg, setErrorMsg] = useState('')
+  // Meta is a Creator (paid) feature — a Free user must not reach the connect flow (it OAuth'd then
+  // dead-ended on an empty home). Gate on the plan's `launch` entitlement, same source of truth as
+  // /connect/meta and the /reports + /m4 UpgradeGate, and send Free users to billing instead.
+  const [gate, setGate] = useState<'checking'|'ok'|'locked'>('checking')
 
   useEffect(() => {
     if (params.get('success')) setState('success')
     if (params.get('error')) { setState('error'); setErrorMsg(decodeURIComponent(params.get('error')!)) }
   }, [params])
+
+  useEffect(() => {
+    fetch('/api/credits/balance').then(r => r.ok ? r.json() : null)
+      .then(async j => {
+        const { planEntitlements } = await import('@/lib/plans')
+        if (planEntitlements(j?.plan).launch) setGate('ok')
+        else { setGate('locked'); router.replace('/billing?feature=meta') }
+      })
+      .catch(() => setGate('ok'))   // on error, don't block a paying user
+  }, [router])
 
   const handleConnect = () => {
     setState('connecting')
@@ -22,6 +36,12 @@ function ConnectMetaContent() {
     const scopes = 'ads_management,ads_read,business_management,pages_read_engagement,pages_show_list,instagram_basic,instagram_content_publish'
     const url = `https://www.facebook.com/v20.0/dialog/oauth?client_id=${appId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scopes}&response_type=code`
     window.location.href = '/api/meta/init'
+  }
+
+  // Don't flash the connect screen to a Free user (or before the plan check resolves) — the effect
+  // above redirects them to billing. Only the post-connect 'success' state bypasses the gate.
+  if (gate !== 'ok' && state !== 'success') {
+    return <div style={{minHeight:'100vh',background:'#10211f',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)',fontSize:14,fontWeight:700,fontFamily:'-apple-system,Segoe UI,sans-serif'}}>{gate==='locked' ? 'Meta is a Creator feature — taking you to upgrade…' : 'Loading…'}</div>
   }
 
   return (
