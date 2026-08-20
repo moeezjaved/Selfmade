@@ -131,11 +131,19 @@ export async function orgAdAccounts(admin: SupabaseClient, orgId: string): Promi
  */
 export async function allowedAdAccountIds(admin: SupabaseClient, userId: string): Promise<{ all: boolean; ids: string[] }> {
   const db = admin as any
-  const { data: m } = await db.from('org_members')
-    .select('org_id, role').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).maybeSingle()
-  if (!m?.org_id || m.role === 'owner' || m.role === 'admin') return { all: true, ids: [] }
-  const { data: rows } = await db.from('org_member_ad_accounts').select('account_id').eq('org_id', m.org_id).eq('user_id', userId)
-  const assigned = (rows || []).map((r: any) => r.account_id as string)
+  // Consider ALL of the user's memberships — not just the most-recent one. Almost every user also OWNS
+  // their own org (created at signup), so a `.limit(1)` on created_at could pick that owner row and
+  // return all:true, silently bypassing the ad-account scoping the workspace owner set for them (the
+  // "check/uncheck does nothing — the member still sees every account" bug).
+  const { data: mems } = await db.from('org_members').select('org_id, role').eq('user_id', userId)
+  const memberOrgIds = ((mems || []) as any[])
+    .filter(m => m.role !== 'owner' && m.role !== 'admin')
+    .map(m => m.org_id).filter(Boolean)
+  // Not a scoped member anywhere (owner/admin, or no memberships) → sees all.
+  if (!memberOrgIds.length) return { all: true, ids: [] }
+  const { data: rows } = await db.from('org_member_ad_accounts')
+    .select('account_id').in('org_id', memberOrgIds).eq('user_id', userId)
+  const assigned = Array.from(new Set(((rows || []) as any[]).map(r => r.account_id as string)))
   if (!assigned.length) return { all: true, ids: [] }   // no explicit assignment → sees all (default-all)
   return { all: false, ids: assigned }
 }
