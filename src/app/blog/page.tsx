@@ -9,7 +9,7 @@ import { getPublishedPosts, SITE_URL } from '@/lib/blog'
 import { coverStyle, catStyle, categoryOf } from './_style'
 
 export const revalidate = 300
-const BG = '#0a0d0c', LIME = '#ff5a2c', CARD = '#121614'
+const BG = '#faf7f1', LIME = '#ef4a1e', CARD = '#ffffff'
 
 export const metadata: Metadata = {
   title: { absolute: 'Blog — Winning Meta Ad Strategies & Teardowns | Selfmade' },
@@ -30,24 +30,26 @@ export default async function BlogIndex() {
   } : null
 
   return (
-    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(255,90,44,.05) 1.1px, transparent 1.1px), radial-gradient(1000px 520px at 12% -8%, rgba(255,90,44,.12), transparent 58%), radial-gradient(820px 460px at 97% 0%, rgba(34,197,94,.14), transparent 58%), radial-gradient(700px 600px at 55% 120%, rgba(125,211,120,.06), transparent 60%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat, no-repeat', color: '#f4f7f4', minHeight: '100vh' }}>
+    <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#faf7f1', backgroundImage: `radial-gradient(1000px 480px at 12% -10%, rgba(239,74,30,.07), transparent 55%), radial-gradient(820px 420px at 98% -4%, rgba(239,74,30,.05), transparent 55%)`, backgroundRepeat: 'no-repeat, no-repeat', color: '#1c1611', minHeight: '100vh' }}>
       {ld && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />}
-      <nav style={{ borderBottom: '1px solid rgba(255,255,255,.07)', position: 'sticky', top: 0, background: 'rgba(10,13,12,.8)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&display=swap" />
+      <nav style={{ borderBottom: '1px solid rgba(28,22,17,.08)', position: 'sticky', top: 0, background: 'rgba(250,247,241,.85)', backdropFilter: 'blur(12px)', zIndex: 50 }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '15px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0) invert(1)' }} /></Link>
-          <Link href="/signup" style={{ background: LIME, color: '#0a0d0c', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
+          <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
+          <Link href="/signup" style={{ background: LIME, color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
         </div>
       </nav>
 
       <header style={{ maxWidth: 1160, margin: '0 auto', padding: '54px 24px 30px' }}>
         <div style={{ fontSize: 13, fontWeight: 800, color: LIME, textTransform: 'uppercase', letterSpacing: '.1em' }}>The Selfmade Blog</div>
-        <h1 style={{ fontSize: 'clamp(36px,6vw,62px)', fontWeight: 800, letterSpacing: '-.03em', margin: '12px 0 10px', lineHeight: 1.02, color: '#ffffff' }}>What makes Meta ads win</h1>
-        <p style={{ fontSize: 18, color: '#9aa39c', lineHeight: 1.6, maxWidth: 620 }}>Playbooks, teardowns, and data from inside a 3M+ ad library. Steal what works.</p>
+        <h1 style={{ fontFamily: "'Fraunces',Georgia,serif", fontSize: 'clamp(38px,6vw,64px)', fontWeight: 700, letterSpacing: '-.02em', margin: '12px 0 10px', lineHeight: 1.0, color: '#1c1611' }}>What makes Meta ads win</h1>
+        <p style={{ fontSize: 18, color: '#8a7f73', lineHeight: 1.6, maxWidth: 620 }}>Playbooks, teardowns, and data from inside a 3M+ ad library. Steal what works.</p>
       </header>
 
       {posts.length === 0 ? (
         <section style={{ maxWidth: 1160, margin: '0 auto', padding: '10px 24px 90px' }}>
-          <div style={{ background: CARD, border: '1px solid rgba(255,255,255,.07)', borderRadius: 18, padding: 28, color: '#9aa39c', fontSize: 16 }}>
+          <div style={{ background: CARD, border: '1px solid rgba(28,22,17,.08)', borderRadius: 18, padding: 28, color: '#8a7f73', fontSize: 16 }}>
             Fresh posts are on the way. In the meantime, <Link href="/signup" style={{ color: LIME, fontWeight: 700 }}>start free</Link> and explore 3M+ winning ads yourself.
           </div>
         </section>
@@ -55,12 +57,12 @@ export default async function BlogIndex() {
         <>
           {/* hero */}
           <section style={{ maxWidth: 1160, margin: '0 auto', padding: '4px 24px 8px' }}>
-            <Link href={`/blog/${hero.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%),1fr))', gap: 30, alignItems: 'center', border: '1px solid rgba(255,255,255,.08)', borderRadius: 22, overflow: 'hidden', background: CARD }}>
+            <Link href={`/blog/${hero.slug}`} style={{ textDecoration: 'none', color: 'inherit', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(300px,100%),1fr))', gap: 30, alignItems: 'center', border: '1px solid rgba(28,22,17,.10)', borderRadius: 22, overflow: 'hidden', background: CARD }}>
               <div style={{ position: 'relative', aspectRatio: '16/10', ...coverStyle(hero) }}>{!hero.cover_image_url && <CoverText title={hero.title} />}</div>
               <div style={{ padding: '10px 30px 12px 4px' }}>
                 <span style={catStyle(hero)}>{categoryOf(hero)}</span>
                 <h2 style={{ fontSize: 'clamp(24px,3vw,34px)', fontWeight: 800, letterSpacing: '-.02em', margin: '12px 0 10px', lineHeight: 1.14 }}>{hero.title}</h2>
-                <p style={{ fontSize: 16, color: '#9aa39c', lineHeight: 1.6, margin: '0 0 12px' }}>{hero.excerpt}</p>
+                <p style={{ fontSize: 16, color: '#8a7f73', lineHeight: 1.6, margin: '0 0 12px' }}>{hero.excerpt}</p>
                 <div style={{ fontSize: 13, color: '#6b746c' }}>{hero.author || 'Selfmade'} · {fmt(hero.published_at)}</div>
               </div>
             </Link>
@@ -70,7 +72,7 @@ export default async function BlogIndex() {
           <section style={{ maxWidth: 1160, margin: '0 auto', padding: '30px 24px 90px' }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(310px,100%),1fr))', gap: 26 }}>
               {rest.map((p) => (
-                <Link key={p.slug} href={`/blog/${p.slug}`} style={{ textDecoration: 'none', color: 'inherit', border: '1px solid rgba(255,255,255,.08)', borderRadius: 18, overflow: 'hidden', background: CARD, display: 'flex', flexDirection: 'column' }}>
+                <Link key={p.slug} href={`/blog/${p.slug}`} style={{ textDecoration: 'none', color: 'inherit', border: '1px solid rgba(28,22,17,.10)', borderRadius: 18, overflow: 'hidden', background: CARD, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ position: 'relative', aspectRatio: '16/9', ...coverStyle(p) }}>{!p.cover_image_url && <CoverText title={p.title} small />}</div>
                   <div style={{ padding: '15px 17px 19px', flex: 1, display: 'flex', flexDirection: 'column' }}>
                     <span style={catStyle(p)}>{categoryOf(p)}</span>
