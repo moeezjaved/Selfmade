@@ -57,24 +57,47 @@ export default async function BlogPost({ params }: { params: { slug: string } })
   return (
     <div style={{ fontFamily: "'Inter',-apple-system,sans-serif", backgroundColor: '#070a09', backgroundImage: `radial-gradient(rgba(255,90,44,.045) 1.1px, transparent 1.1px), radial-gradient(1100px 560px at 10% -8%, rgba(255,90,44,.10), transparent 58%), radial-gradient(860px 460px at 98% 0%, rgba(34,197,94,.11), transparent 58%)`, backgroundSize: '22px 22px, 100% 100%, 100% 100%', backgroundRepeat: 'repeat, no-repeat, no-repeat', color: '#e8ece7', minHeight: '100vh' }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(ld) }} />
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Newsreader:opsz,ital,wght@6..72,0,400;6..72,0,500;6..72,0,600;6..72,1,400&family=JetBrains+Mono:wght@500&display=swap" />
+      <div className="sf-progress" aria-hidden />
       <style>{`
-        .prose{font-size:18px;line-height:1.8;color:#c7cdc6}
-        .prose h2{font-size:28px;font-weight:800;letter-spacing:-.02em;margin:42px 0 14px;color:#f4f7f4}
-        .prose h3{font-size:22px;font-weight:800;margin:32px 0 10px;color:#f4f7f4}
-        .prose h4{font-size:18px;font-weight:800;margin:26px 0 8px;color:#f4f7f4}
-        .prose p{margin:0 0 22px}
-        .prose a{color:${LIME};text-decoration:underline;text-underline-offset:2px}
-        .prose ul,.prose ol{margin:0 0 22px;padding-left:24px}
-        .prose li{margin:7px 0}
-        .prose strong{color:#f4f7f4}
-        .prose blockquote{margin:26px 0;padding:10px 22px;border-left:4px solid ${LIME};background:#121614;color:#e8ece7;font-style:italic;font-size:20px;border-radius:0 10px 10px 0}
-        .prose code{background:#1a201d;padding:2px 6px;border-radius:6px;font-size:.9em;font-family:ui-monospace,monospace;color:#ff5a2c}
-        .prose pre{background:#050706;border:1px solid rgba(255,255,255,.08);color:#e5e7eb;padding:18px 20px;border-radius:12px;overflow-x:auto;margin:0 0 22px}
-        .prose pre code{background:none;padding:0;color:inherit}
-        .prose img{max-width:100%;border-radius:14px;margin:8px 0}
-        .prose figure{margin:26px 0}
-        .prose figcaption{font-size:14px;color:#6b746c;text-align:center;margin-top:8px}
-        .prose hr{border:none;border-top:1px solid rgba(255,255,255,.08);margin:38px 0}
+        /* Scroll progress — pure CSS, no JS. Hidden where scroll-timeline is unsupported. */
+        @keyframes sf-prog{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+        .sf-progress{position:fixed;top:0;left:0;height:3px;width:100%;transform:scaleX(0);transform-origin:0 50%;background:linear-gradient(90deg,${LIME},#ffb08a);z-index:60;animation:sf-prog auto linear;animation-timeline:scroll(root)}
+        @supports not (animation-timeline:scroll()){.sf-progress{display:none}}
+
+        /* Editorial body: serif measure, warm off-white on the dark ground. */
+        .prose{font-family:'Newsreader',Georgia,'Times New Roman',serif;font-size:20px;line-height:1.72;color:#d4d0c7;letter-spacing:.002em}
+        .prose>p:first-of-type{font-size:22px;color:#e7e3da}
+        .prose>p:first-of-type::first-letter{float:left;font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:78px;line-height:.72;padding:8px 14px 0 0;color:${LIME}}
+        .prose h2{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:700;letter-spacing:-.01em;line-height:1.15;margin:54px 0 16px;color:#f4f2ec}
+        .prose h3{font-family:'Fraunces',Georgia,serif;font-size:24px;font-weight:600;margin:38px 0 10px;color:#f4f2ec}
+        .prose h4{font-size:20px;font-weight:600;margin:28px 0 8px;color:#f4f2ec}
+        .prose p{margin:0 0 24px}
+        .prose a{color:${LIME};text-decoration:none;border-bottom:1px solid rgba(255,90,44,.42);transition:border-color .15s}
+        .prose a:hover{border-color:${LIME}}
+        .prose ul,.prose ol{margin:0 0 24px;padding-left:26px}
+        .prose li{margin:9px 0}
+        .prose li::marker{color:${LIME}}
+        .prose strong{color:#f4f2ec;font-weight:600}
+        .prose em{color:#e7e3da}
+        /* blockquote → pull-quote callout */
+        .prose blockquote{margin:34px 0;padding:24px 28px 22px;border:1px solid rgba(255,90,44,.22);background:linear-gradient(180deg,rgba(255,90,44,.06),rgba(255,90,44,.015));color:#efece4;font-family:'Fraunces',Georgia,serif;font-style:normal;font-size:23px;line-height:1.42;border-radius:16px;position:relative}
+        .prose blockquote::before{content:'\\201C';position:absolute;top:2px;left:16px;font-family:'Fraunces',serif;font-size:56px;color:rgba(255,90,44,.35);line-height:1}
+        .prose blockquote p{margin:0}
+        .prose code{font-family:'JetBrains Mono',ui-monospace,monospace;background:#191f1c;padding:2px 7px;border-radius:6px;font-size:.8em;color:#ff7a4d}
+        .prose pre{background:#08100c;border:1px solid rgba(255,255,255,.08);color:#e5e7eb;padding:18px 20px;border-radius:14px;overflow-x:auto;margin:0 0 24px;font-size:14.5px}
+        .prose pre code{background:none;padding:0;color:inherit;font-size:inherit}
+        /* PREMIUM SCREENSHOT FRAME — every figure gets faux browser chrome + a soft lifted shadow so
+           product captures read like real app shots. */
+        .prose figure{margin:40px 0;border-radius:16px;overflow:hidden;border:1px solid rgba(255,255,255,.10);background:#12100e;box-shadow:0 34px 80px -34px rgba(0,0,0,.9);padding-top:40px;position:relative}
+        .prose figure::before{content:'';position:absolute;top:0;left:0;right:0;height:40px;background:#1b1815;border-bottom:1px solid rgba(255,255,255,.06)}
+        .prose figure::after{content:'';position:absolute;top:16px;left:20px;width:10px;height:10px;border-radius:50%;background:#ff5f57;box-shadow:18px 0 0 #febc2e,36px 0 0 #28c840}
+        .prose figure img{display:block;width:100%;margin:0;border-radius:0}
+        .prose figcaption{font-family:'Newsreader',Georgia,serif;font-style:italic;font-size:15px;color:#8d8a81;text-align:center;padding:13px 18px;background:#12100e;margin:0}
+        /* inline (non-figure) images stay simple */
+        .prose img{max-width:100%;border-radius:12px;margin:10px 0}
+        .prose hr{border:none;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.14),transparent);margin:48px 0}
       `}</style>
 
       <nav style={{ borderBottom: '1px solid rgba(255,255,255,.07)' }}>
