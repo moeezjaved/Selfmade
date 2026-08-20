@@ -22,7 +22,7 @@
  */
 import React, { useMemo, useState } from 'react'
 import Link from 'next/link'
-import { computeOpportunities, oppColor } from '@/lib/meta/opportunities'
+import { computeOpportunities, oppColor, opportunityHref } from '@/lib/meta/opportunities'
 
 const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#141d15', LIME = '#ff5a2c'
 const SERIF = "'Instrument Serif', Georgia, serif"
@@ -324,7 +324,9 @@ export default function ReportsNarrative({ data, ca, currency, days }: { data: a
                   <span style={{ fontSize: 12.5, fontWeight: 800, color: oppColor(r.tone) }}>{r.impact}</span>
                   <Confidence level={r.level} />
                 </div>
-                <Link href={r.href} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
+                {/* Tune moves (Target them / Review placements) hand off to Campaigns "Manage with
+                    Mello" with the command queued — same as the brief; never /m4. Others keep r.href. */}
+                <Link href={opportunityHref(r)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>
               </div>
             ))}
           </div>

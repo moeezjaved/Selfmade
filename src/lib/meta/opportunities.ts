@@ -35,6 +35,34 @@ export type OppInput = {
 /** Map a tone to a hex; renderers call this so color lives with the UI, not the data. */
 export const oppColor = (t: OppTone) => (t === 'good' ? '#2f7d3a' : t === 'warn' ? '#b7791f' : '#c0392b')
 
+// The "tune" moves — Target them / Review placements — hand off to the Campaigns "Manage with Mello"
+// assistant with the exact instruction pre-filled (never the /m4 wizard). Both the Brief and the Reports
+// narrative render the SAME cards, so the hand-off lives here to keep the two surfaces identical.
+const TUNE_CTAS = new Set(['Target them', 'Review placements'])
+export const isTuneCta = (cta: string) => TUNE_CTAS.has(cta)
+
+/** The instruction we queue into the campaign assistant for a tune move. */
+export function tuneCommand(cta: string, apply?: ApplyPlan): string {
+  const seg = apply?.label || 'the best segment'
+  return cta === 'Review placements'
+    ? `Shift budget toward ${seg}: duplicate my winner into a new campaign focused on that placement.`
+    : `Duplicate my winner into a new campaign focused on ${seg}.`
+}
+
+/**
+ * Where a card's button goes. Tune moves → /campaigns with the command queued (deep-linked to a specific
+ * winner when we know it, else the top/active campaign is opened by the campaigns page). Everything else
+ * keeps its own href. Used by BOTH BriefOpportunities and ReportsNarrative so the surfaces never drift.
+ */
+export function opportunityHref(r: Opportunity, camp?: { metaCampaignId?: string | null; name?: string } | null): string {
+  if (!isTuneCta(r.cta)) return r.href
+  const cmd = tuneCommand(r.cta, r.apply)
+  const manage = String(camp?.metaCampaignId || camp?.name || '')
+  return manage
+    ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}`
+    : `/campaigns?do=${encodeURIComponent(cmd)}`
+}
+
 export function computeOpportunities(o: OppInput, fmt: (n: number) => string): Opportunity[] {
   const recs: Opportunity[] = []
   const daysN = Math.max(1, o.days)

@@ -7,7 +7,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { oppColor, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
+import { oppColor, opportunityHref, type Opportunity, type ApplyPlan } from '@/lib/meta/opportunities'
 import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', FOREST = '#141d15', LIME = '#ff5a2c', FAINT = '#9aa79a'
@@ -84,14 +84,10 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
 // audience codes (`apply`/`camp` are optional enrichment, NOT gates). If we know the winner campaign we
 // deep-link straight into its assistant; otherwise we still land on Campaigns with the command queued.
 function TuneConfirm({ apply, camp, cta, onDone }: { apply?: ApplyPlan; camp?: ScaleCampaign | null; currency?: string; cta: string; onDone?: () => void }) {
-  const seg = apply?.label || 'the best segment'
-  const cmd = cta === 'Review placements'
-    ? `Shift budget toward ${seg}: duplicate my winner into a new campaign focused on that placement.`
-    : `Duplicate my winner into a new campaign focused on ${seg}.`
-  const manage = String(camp?.metaCampaignId || camp?.name || '')
-  const href = manage
-    ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}`
-    : `/campaigns?do=${encodeURIComponent(cmd)}`
+  // Delegates to the shared opportunityHref so the brief and the Reports narrative build the exact same
+  // /campaigns hand-off. Deep-links into `camp` (the winner) when known; else the campaigns page opens
+  // its top/active campaign with the command queued.
+  const href = opportunityHref({ cta, apply } as Opportunity, camp)
   return <Link href={href} onClick={() => onDone?.()} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
 }
 
