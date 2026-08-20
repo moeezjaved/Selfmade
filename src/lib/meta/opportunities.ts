@@ -77,7 +77,10 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
       ? `Your highest-revenue segment. Tightening targeting cuts wasted reach.`
       : `Where most of your reach and budget land — your core audience so far. Tightening toward it cuts wasted spend while you find what converts.`
     const label = `${o.bestGender.label === 'female' ? 'women' : o.bestGender.label === 'male' ? 'men' : o.bestGender.label} ${o.bestAge.label}`
-    recs.push({ title: `Lean into ${label}`, why, impact: o.segmentEarns ? 'lower CPA' : 'less wasted spend', level: o.segmentEarns && conv >= 10 ? 2 : 1, href: '/m4', cta: 'Target them', tone: 'good',
+    // href → /campaigns (NOT /m4): "Target them" hands off to the Campaigns "Manage with Mello"
+    // assistant. The brief renders this via TuneConfirm regardless of `apply`, but pin the href too so a
+    // fallback link can never bounce the founder to the M4 wizard.
+    recs.push({ title: `Lean into ${label}`, why, impact: o.segmentEarns ? 'lower CPA' : 'less wasted spend', level: o.segmentEarns && conv >= 10 ? 2 : 1, href: '/campaigns', cta: 'Target them', tone: 'good',
       apply: (o.bestGenderCode && o.bestAgeRange) ? { kind: 'audience', genders: [o.bestGenderCode], ageMin: o.bestAgeRange.min, ageMax: o.bestAgeRange.max, label } : undefined })
   }
   if (winners[0]) {
