@@ -253,16 +253,20 @@ export default function InboxPage() {
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {CH.map(c => {
-                // Connected FOR THIS BRAND: the provider is connected AND (in All-brands view) or it's
-                // assigned to the active brand. Aura's Instagram → "Connect" under Hair ResQ.
-                const on = channels.includes(c.k) && (!activeBrand || chanBrand[c.k] === activeBrand)
+                // Connected FOR THIS BRAND: the provider is connected AND it's either unassigned
+                // ("Any brand" — an account-level line that serves every brand) or assigned to the
+                // active brand. Only a channel pinned to a DIFFERENT brand shows "Connect" here (so you
+                // can add this brand's own line). Previously an unassigned but connected channel (e.g.
+                // account-level WhatsApp) wrongly showed "Connect" under every specific brand.
+                const assigned = chanBrand[c.k]
+                const on = channels.includes(c.k) && (!activeBrand || !assigned || assigned === activeBrand)
                 return (
                   <div key={c.k} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${on ? '#cfe6b8' : LINE}`, background: on ? '#f6fbef' : '#fff', borderRadius: 100, padding: '6px 10px 6px 9px' }}>
                     <span style={{ display: 'inline-flex' }}><ChannelLogo provider={c.k} size={17} /></span>
                     <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>{c.label}</span>
                     {on ? (
                       <>
-                        <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓</span>
+                        <span style={{ fontSize: 11.5, fontWeight: 800, color: '#3b6d11' }}>✓ Connected</span>
                         {brands.length > 1 && (
                           <select value={chanBrand[c.k] || ''} onChange={e => assignChannel(c.k, e.target.value)}
                             title="Which brand does this channel serve?"
