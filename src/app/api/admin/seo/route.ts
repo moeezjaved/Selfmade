@@ -82,6 +82,37 @@ export async function GET(req: NextRequest) {
   ])
   const gsc = await fetchGSC().catch(() => ({ configured: false as const }))
 
+  // Rank movement over time — from the seo_rank_history snapshots (populated by the daily snapshot cron).
+  // For each tracked keyword we return its latest position, the delta vs its earliest capture in the
+  // window (positive delta = position number went DOWN = ranking improved), and the raw position series
+  // for a sparkline. Sorted best-position first, capped at 40.
+  let rank_history: any = { tracked: 0, has_data: false, movers: [] as any[] }
+  try {
+    const since = new Date(Date.now() - 45 * 864e5).toISOString().slice(0, 10)
+    const { data: hist } = await admin.from('seo_rank_history')
+      .select('captured_on, keyword, page, position, clicks, impressions')
+      .gte('captured_on', since).order('captured_on', { ascending: true })
+    type Pt = { p: number; clicks: number; impr: number }
+    type Ser = { page: string | null; pts: Pt[] }
+    const series = new Map<string, Ser>()
+    for (const h of (hist || []) as any[]) {
+      const s: Ser = series.get(h.keyword) || { page: h.page ?? null, pts: [] }
+      s.page = h.page || s.page
+      s.pts.push({ p: Number(h.position), clicks: h.clicks, impr: h.impressions })
+      series.set(h.keyword, s)
+    }
+    const movers = Array.from(series.entries()).map(([keyword, s]) => {
+      const first = s.pts[0], last = s.pts[s.pts.length - 1]
+      return {
+        keyword, page: s.page, position: last.p,
+        delta: first ? Math.round((first.p - last.p) * 100) / 100 : 0,
+        clicks: last.clicks, impressions: last.impr,
+        points: s.pts.map((p: Pt) => p.p), captures: s.pts.length,
+      }
+    }).sort((a, b) => a.position - b.position).slice(0, 40)
+    rank_history = { tracked: series.size, has_data: (hist || []).length > 0, movers }
+  } catch { /* table not migrated yet → empty */ }
+
   return NextResponse.json({
     min_ads: MIN_ADS,
     coverage: {
@@ -92,5 +123,6 @@ export async function GET(req: NextRequest) {
     },
     sitemap_url: `${(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')}/sitemap.xml`,
     gsc,
+    rank_history,
   })
 }
