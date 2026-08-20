@@ -7,6 +7,7 @@
  */
 import type { Metadata } from 'next'
 import LandingV2 from './LandingV2'
+import AmbientAudio from './AmbientAudio'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const TITLE = 'Selfmade — The Company That Runs Itself'
@@ -41,6 +42,7 @@ export default function Page() {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <LandingV2 />
+      <AmbientAudio />
     </>
   )
 }
