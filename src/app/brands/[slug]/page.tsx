@@ -9,6 +9,7 @@
 import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { cleanCopy } from '@/lib/cleanCopy'
 import {
   resolveSlug, getBrandPage, getIndexableBrands, relatedBrands,
   SITE_URL, type BrandAd,
@@ -152,7 +153,12 @@ export default async function BrandSeoPage({ params }: { params: { slug: string 
                   {a.is_active && <span style={{ position: 'absolute', top: 8, left: 8, background: '#10b981', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 999 }}>ACTIVE</span>}
                   {(a.days_running ?? 0) >= 30 && <span style={{ position: 'absolute', top: 8, right: 8, background: 'rgba(17,17,17,0.82)', color: '#fff', fontSize: 10, fontWeight: 700, padding: '3px 7px', borderRadius: 6 }}>{a.days_running}d</span>}
                 </div>
-                {a.body && <div style={{ padding: '10px 12px', fontSize: 12, color: '#4b5563', height: 56, overflow: 'hidden', lineHeight: 1.4 }}>{a.body}</div>}
+                {(() => {
+                  // Meta dynamic-creative bodies are raw templates ("{{product.brand}}"); strip the
+                  // mustache tokens so the card never shows literal placeholders. Empty → render nothing.
+                  const copy = cleanCopy(a.body)
+                  return copy ? <div style={{ padding: '10px 12px', fontSize: 12, color: '#4b5563', height: 56, overflow: 'hidden', lineHeight: 1.4 }}>{copy}</div> : null
+                })()}
               </article>
             )
           })}
