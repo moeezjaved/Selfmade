@@ -69,9 +69,74 @@ export default function AdminSeo() {
         </>
       )}
 
+      <RankMovement d={d} />
       <ProgrammaticSeo />
     </div>
   )
+}
+
+/** Rank movement over time — reads the seo_rank_history snapshots and shows position + delta + sparkline. */
+function RankMovement({ d }: { d: any }) {
+  const rh = d.rank_history || { movers: [], has_data: false, tracked: 0 }
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState('')
+  const capture = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const r = await fetch('/api/admin/seo/snapshot', { method: 'POST' })
+      const j = await r.json()
+      setMsg(r.ok ? `Captured ${j.keywords} keywords for ${j.captured_on}. Movement builds as more days accrue.` : (j.error || 'Snapshot failed'))
+    } catch { setMsg('Snapshot failed') }
+    setBusy(false)
+  }
+  const cols = '1fr 84px 78px 108px 76px'
+  return (
+    <div style={{ marginTop: 32, borderTop: '1px solid #eee', paddingTop: 24 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+        <div>
+          <h2 style={{ fontSize: 17, fontWeight: 800, color: '#141d15', margin: '0 0 4px' }}>Rank movement (tracked over time)</h2>
+          <div style={{ fontSize: 13, color: '#6b7280' }}>{rh.tracked} keywords tracked · <b style={{ color: '#16a34a' }}>green = improved</b> (position rose), red = slipped. Sparkline is position over ~6 weeks.</div>
+        </div>
+        <button onClick={capture} disabled={busy} style={{ background: '#141d15', color: '#fff', border: 'none', borderRadius: 10, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Capturing…' : 'Capture snapshot now'}</button>
+      </div>
+      {msg && <div style={{ marginTop: 10, fontSize: 12.5, color: '#374151', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '8px 12px', borderRadius: 8 }}>{msg}</div>}
+      {!rh.has_data ? (
+        <div style={{ marginTop: 14, fontSize: 13, color: '#4b5563', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '14px 16px', borderRadius: 10, lineHeight: 1.6 }}>
+          <b>No snapshots yet.</b> Movement builds once (1) Search Console is connected above and (2) a snapshot has run. Hit <b>Capture snapshot now</b> to record today, then schedule <code>POST /api/admin/seo/snapshot</code> daily (Vercel cron or the droplet) with header <code>x-cron-secret: $SEO_CRON_SECRET</code> so a trend accrues automatically.
+        </div>
+      ) : (
+        <div style={{ marginTop: 14, border: '1px solid #e6e6e6', borderRadius: 10, overflow: 'hidden' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 10, padding: '8px 12px', fontSize: 11, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: 0.4, background: '#fafafa', borderBottom: '1px solid #eee' }}>
+            <span>Keyword</span><span>Position</span><span>Δ</span><span>Trend</span><span>Clicks</span>
+          </div>
+          {rh.movers.map((m: any, i: number) => (
+            <div key={i} style={{ display: 'grid', gridTemplateColumns: cols, gap: 10, alignItems: 'center', padding: '8px 12px', fontSize: 12.5, borderBottom: '1px solid #f1f5f9', background: i % 2 ? '#fafafa' : '#fff' }}>
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {m.page ? <a href={m.page} target="_blank" rel="noreferrer" style={{ color: '#374151', textDecoration: 'none' }} title={m.page}>{m.keyword}</a> : m.keyword}
+              </span>
+              <span style={{ fontWeight: 700 }}>#{m.position.toFixed(1)}</span>
+              <span style={{ fontWeight: 700, color: m.delta > 0 ? '#16a34a' : m.delta < 0 ? '#dc2626' : '#9ca3af' }}>{m.delta > 0 ? '▲' : m.delta < 0 ? '▼' : '–'} {Math.abs(m.delta).toFixed(1)}</span>
+              <Sparkline points={m.points} />
+              <span style={{ color: '#6b7280' }}>{m.clicks}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** Tiny inline position sparkline. Lower position = better, drawn so a rising line means improving. */
+function Sparkline({ points }: { points: number[] }) {
+  if (!points || points.length < 2) return <span style={{ fontSize: 11, color: '#9ca3af' }}>—</span>
+  const w = 100, h = 24, min = Math.min(...points), max = Math.max(...points), rng = (max - min) || 1
+  const path = points.map((p, i) => {
+    const x = (i / (points.length - 1)) * w
+    const y = ((p - min) / rng) * (h - 4) + 2 // smaller position → smaller y → top
+    return `${x.toFixed(1)},${y.toFixed(1)}`
+  }).join(' ')
+  const improved = points[points.length - 1] <= points[0]
+  return <svg width={w} height={h} style={{ display: 'block' }} aria-hidden><polyline points={path} fill="none" stroke={improved ? '#16a34a' : '#dc2626'} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round" /></svg>
 }
 
 /** Coverage for the programmatic /ads + /alternatives pages (live vs thin, ad counts). */
