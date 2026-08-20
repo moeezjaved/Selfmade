@@ -194,18 +194,24 @@ function CampaignsInner() {
   }
 
   // Deep-link from the brief's "What Mello would do" cards:
-  //   /campaigns?manage=<campaignId|name>&do=<command>
-  // opens that campaign's "Manage with Mello" assistant and pre-fills the exact action, so the founder
-  // just reviews and hits Send to make it live. Runs once, after campaigns have loaded.
+  //   /campaigns?manage=<campaignId|name>&do=<command>   → that exact campaign
+  //   /campaigns?do=<command>                            → the top/active campaign (brief couldn't
+  //                                                         resolve a specific winner, e.g. "Target them")
+  // opens the "Manage with Mello" assistant and pre-fills the action, so the founder just reviews and
+  // hits Send to make it live. Runs once, after campaigns have loaded. Never bounces to /m4.
   useEffect(() => {
     if (deepLinkHandled.current) return
+    if (!campaigns.length) return
     const manage = searchParams?.get('manage')
-    if (!manage || !campaigns.length) return
-    const camp = campaigns.find((c: any) => String(c.id) === String(manage) || c.name === manage)
+    const doCmd = searchParams?.get('do')
+    if (!manage && !doCmd) return
+    const isActive = (c: any) => /active/i.test(String(c?.status ?? c?.effective_status ?? c?.delivery ?? ''))
+    const camp = (manage && campaigns.find((c: any) => String(c.id) === String(manage) || c.name === manage))
+      || campaigns.find(isActive)   // no match / no `manage` → the first active campaign
+      || campaigns[0]               // …or just the top campaign
     if (!camp) return
     deepLinkHandled.current = true
     openChat(camp)
-    const doCmd = searchParams?.get('do')
     if (doCmd) setChatInput(doCmd)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [campaigns, searchParams])

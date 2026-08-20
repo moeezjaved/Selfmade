@@ -79,15 +79,19 @@ function ScaleConfirm({ camp, currency }: { camp: ScaleCampaign; currency: strin
 }
 
 // "Target them" / "Review placements" hand off to the Campaigns "Manage with Mello" assistant with the
-// exact move pre-filled, so the founder just reviews and taps Send to make it live on Meta (replaces the
-// old inline duplicate-confirm — the buttons were dead when the audit had no metaCampaignId).
-function TuneConfirm({ apply, camp, cta, onDone }: { apply: ApplyPlan; camp: ScaleCampaign; currency: string; cta: string; onDone?: () => void }) {
+// exact move pre-filled, so the founder just reviews and taps Send to make it live on Meta. This ALWAYS
+// routes to /campaigns — never /m4 — and works whether or not the audit resolved a specific campaign or
+// audience codes (`apply`/`camp` are optional enrichment, NOT gates). If we know the winner campaign we
+// deep-link straight into its assistant; otherwise we still land on Campaigns with the command queued.
+function TuneConfirm({ apply, camp, cta, onDone }: { apply?: ApplyPlan; camp?: ScaleCampaign | null; currency?: string; cta: string; onDone?: () => void }) {
   const seg = apply?.label || 'the best segment'
   const cmd = cta === 'Review placements'
     ? `Shift budget toward ${seg}: duplicate my winner into a new campaign focused on that placement.`
     : `Duplicate my winner into a new campaign focused on ${seg}.`
   const manage = String(camp?.metaCampaignId || camp?.name || '')
-  const href = manage ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}` : '/campaigns'
+  const href = manage
+    ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}`
+    : `/campaigns?do=${encodeURIComponent(cmd)}`
   return <Link href={href} onClick={() => onDone?.()} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{cta} →</Link>
 }
 
@@ -173,11 +177,14 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
               <span style={{ fontSize: 12.5, fontWeight: 800, color: oppColor(r.tone) }}>{r.impact}</span>
               <Confidence level={r.level} />
             </div>
-            {/* The "Scale it" card ACTS — inline budget-confirm → scales on Meta. Every other card
-                still links to where the founder finishes the move. */}
+            {/* The "Scale it" card ACTS — inline budget-confirm → scales on Meta. The "tune" moves
+                (Target them / Review placements) ALWAYS hand off to the Campaigns "Manage with Mello"
+                assistant with the move pre-filled — routed by CTA type, NOT by whether the audit
+                resolved audience codes or a campaign (that condition sent "Target them" to /m4 whenever
+                the codes were unresolved). Every other card links to where the move is finished. */}
             {r.cta === 'Scale it' && scaleCampaign
               ? <ScaleConfirm camp={scaleCampaign} currency={currency || 'USD'} />
-              : r.apply && scaleCampaign
+              : (r.cta === 'Target them' || r.cta === 'Review placements')
               ? <TuneConfirm apply={r.apply} camp={scaleCampaign} currency={currency || 'USD'} cta={r.cta} onDone={() => onAct?.(r)} />
               : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
           </div>
