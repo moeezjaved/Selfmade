@@ -244,7 +244,8 @@ export default function InboxPage() {
         const CH = [
           { k: 'instagram', label: 'Instagram' },
           { k: 'whatsapp', label: 'WhatsApp' },
-          { k: 'messenger', label: 'Messenger' },
+          // Messenger hidden for now — Unipile deprecated the Facebook Messenger provider ("no longer
+          // maintained"), so its connect flow dead-ends. Re-add here when Unipile restores it.
           { k: 'telegram', label: 'Telegram' },
           { k: 'linkedin', label: 'LinkedIn' },
           { k: 'x', label: 'X' },
