@@ -82,7 +82,16 @@ export async function GET(req: NextRequest) {
   const { data: won } = await wonQ
   const sales = (won || []).length
   const revenue = (won || []).reduce((s: number, t: any) => s + (Number(t.sale_value) || 0), 0)
-  const stats = { handled: handled || 0, sales, revenue }
+  // Currency for the attribution figure = the brand's ad-account currency (PKR, USD, EUR…), resolved
+  // the same way Reports/Brief do — NOT a hardcoded euro. Falls back to the workspace primary account,
+  // then USD when no Meta account is connected.
+  let currency = 'USD'
+  try {
+    const { resolveBrandScopedAccount } = await import('@/lib/meta/scope')
+    const acct = await resolveBrandScopedAccount(admin, user.id, brandId)
+    if (acct?.currency) currency = String(acct.currency)
+  } catch { /* keep USD */ }
+  const stats = { handled: handled || 0, sales, revenue, currency }
 
   // Outbound proposals awaiting the founder's approval (Mello wants to reach out first).
   const { data: outMsgs } = await admin.from('customer_messages').select('*')

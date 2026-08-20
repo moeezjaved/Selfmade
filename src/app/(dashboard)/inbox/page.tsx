@@ -16,6 +16,12 @@ import { showUpsell } from '@/components/UpsellModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LINE = 'rgba(0,0,0,0.07)', FOREST = '#141d15', LIME = '#ff5a2c', MUTED = '#6b6b6b'
 const card: React.CSSProperties = { background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: '0 1px 2px rgba(17,37,28,.04), 0 10px 30px -20px rgba(17,37,28,.10)' }
+// Format the attribution revenue in the brand's real ad-account currency (PKR, USD, EUR…), not a
+// hardcoded euro. Intl handles the symbol/placement (Rs, $, €) per currency code.
+const fmtMoney = (n: number, currency?: string) => {
+  try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: currency || 'USD', maximumFractionDigits: 0 }).format(n || 0) }
+  catch { return `${Math.round(n || 0).toLocaleString()} ${currency || ''}`.trim() }
+}
 
 type Msg = { id: string; body: string; intent?: string; priority?: string; suggested_reply?: string; status: string }
 type Thread = { id: string; contact_name?: string; contact_ref?: string; channel: string; priority: 'high' | 'med' | 'low'; intent?: string; status: string; last_message_at: string; latest: Msg | null; brand_id?: string | null; brand_name?: string | null }
@@ -55,7 +61,7 @@ export default function InboxPage() {
   const [threads, setThreads] = useState<Thread[]>([])
   const [outbound, setOutbound] = useState<Outbound[]>([])
   const [rollup, setRollup] = useState<Record<string, number>>({})
-  const [stats, setStats] = useState<{ handled: number; sales: number; revenue: number } | null>(null)
+  const [stats, setStats] = useState<{ handled: number; sales: number; revenue: number; currency?: string } | null>(null)
   const [loading, setLoading] = useState(true)
   const [locked, setLocked] = useState(false)   // Free plan → inbox is Creator-only; show an upgrade panel
   const [drafts, setDrafts] = useState<Record<string, string>>({})   // keyed by message id
@@ -227,7 +233,7 @@ export default function InboxPage() {
           </span>
           {stats.sales > 0 && (
             <span style={{ display: 'inline-flex', alignItems: 'baseline', gap: 6, background: '#eaf3de', color: '#3b6d11', borderRadius: 12, padding: '8px 14px', fontSize: 13, fontWeight: 700 }}>
-              <b style={{ fontSize: 15 }}>{stats.sales}</b> led to sales{stats.revenue > 0 ? ` · €${Math.round(stats.revenue).toLocaleString()}` : ''} 💰
+              <b style={{ fontSize: 15 }}>{stats.sales}</b> led to sales{stats.revenue > 0 ? ` · ${fmtMoney(stats.revenue, stats.currency)}` : ''} 💰
             </span>
           )}
         </div>
