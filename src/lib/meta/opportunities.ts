@@ -12,7 +12,10 @@ export type OppTone = 'good' | 'warn' | 'bad'
 export type ApplyPlan =
   | { kind: 'audience'; genders: number[]; ageMin: number; ageMax: number; label: string }
   | { kind: 'placement'; platform: string; label: string }
-export type Opportunity = { title: string; why: string; impact: string; level: 1 | 2 | 3; href: string; cta: string; tone: OppTone; apply?: ApplyPlan }
+export type Opportunity = { title: string; why: string; impact: string; level: 1 | 2 | 3; href: string; cta: string; tone: OppTone; apply?: ApplyPlan;
+  // The exact existing campaign this card acts on (Pause/Scale), by name — so the button can deep-link
+  // straight into that campaign's "Manage with Mello" assistant with the command queued.
+  target?: string }
 
 export type OppCampaign = { label: string; roas: number; spend: number; conversions: number }
 export type OppPlacement = { label: string; roas: number; spend: number }
@@ -55,12 +58,17 @@ export function tuneCommand(cta: string, apply?: ApplyPlan): string {
  * keeps its own href. Used by BOTH BriefOpportunities and ReportsNarrative so the surfaces never drift.
  */
 export function opportunityHref(r: Opportunity, camp?: { metaCampaignId?: string | null; name?: string } | null): string {
-  if (!isTuneCta(r.cta)) return r.href
-  const cmd = tuneCommand(r.cta, r.apply)
-  const manage = String(camp?.metaCampaignId || camp?.name || '')
-  return manage
+  const link = (manage: string, cmd: string) => manage
     ? `/campaigns?manage=${encodeURIComponent(manage)}&do=${encodeURIComponent(cmd)}`
     : `/campaigns?do=${encodeURIComponent(cmd)}`
+  // Pause / Scale act on a SPECIFIC existing campaign (r.target) → deep-link straight into its assistant
+  // with the command queued, so the founder just hits Send. The name is in the command too, so it still
+  // reads right if the campaigns page has to fall back to another campaign.
+  if (r.cta === 'Pause it' && r.target) return link(r.target, `Pause “${r.target}”.`)
+  if (r.cta === 'Scale it' && r.target) return link(r.target, `Scale “${r.target}” by +20% — duplicate it into a new campaign at +20% daily budget and leave the original running.`)
+  // Tune moves (Target them / Review placements) duplicate the winner toward a segment/placement.
+  if (isTuneCta(r.cta)) return link(String(camp?.metaCampaignId || camp?.name || ''), tuneCommand(r.cta, r.apply))
+  return r.href
 }
 
 export function computeOpportunities(o: OppInput, fmt: (n: number) => string): Opportunity[] {
@@ -82,11 +90,11 @@ export function computeOpportunities(o: OppInput, fmt: (n: number) => string): O
 
   if (losers[0]) {
     const monthly = (losers[0].spend / daysN) * 30 * (1 - losers[0].roas)
-    recs.push({ title: `Pause “${losers[0].label}”`, why: `${fmt(losers[0].spend)} spent → ${losers[0].roas.toFixed(2)}x. Every day it runs, money leaks.`, impact: `saves ~${fmt(monthly)}/mo`, level: losers[0].spend > spend * 0.15 ? 3 : 2, href: '/campaigns', cta: 'Pause it', tone: 'bad' })
+    recs.push({ title: `Pause “${losers[0].label}”`, why: `${fmt(losers[0].spend)} spent → ${losers[0].roas.toFixed(2)}x. Every day it runs, money leaks.`, impact: `saves ~${fmt(monthly)}/mo`, level: losers[0].spend > spend * 0.15 ? 3 : 2, href: '/campaigns', cta: 'Pause it', tone: 'bad', target: losers[0].label })
   }
   if (winners[0] && winners[0].roas >= 1.5) {
     const extra = (winners[0].spend / daysN) * 30 * 0.2 * winners[0].roas
-    recs.push({ title: `Scale “${winners[0].label}” +20%`, why: `${winners[0].roas.toFixed(2)}x vs ${roas.toFixed(2)}x account average — your proven winner has room.`, impact: `~+${fmt(extra)}/mo revenue`, level: winners[0].conversions >= 5 ? 3 : 2, href: '/campaigns', cta: 'Scale it', tone: 'good' })
+    recs.push({ title: `Scale “${winners[0].label}” +20%`, why: `${winners[0].roas.toFixed(2)}x vs ${roas.toFixed(2)}x account average — your proven winner has room.`, impact: `~+${fmt(extra)}/mo revenue`, level: winners[0].conversions >= 5 ? 3 : 2, href: '/campaigns', cta: 'Scale it', tone: 'good', target: winners[0].label })
   }
   if (o.bestPl && o.worstPl && o.bestPl.label !== o.worstPl.label && o.bestPl.roas > o.worstPl.roas * 1.5) {
     const shift = o.worstPl.spend * 0.5

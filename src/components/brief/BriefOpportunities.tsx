@@ -182,7 +182,7 @@ export default function BriefOpportunities({ initial, onAct, accountId, initialA
               ? <ScaleConfirm camp={scaleCampaign} currency={currency || 'USD'} />
               : (r.cta === 'Target them' || r.cta === 'Review placements')
               ? <TuneConfirm apply={r.apply} camp={scaleCampaign} currency={currency || 'USD'} cta={r.cta} onDone={() => onAct?.(r)} />
-              : <Link href={r.href} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
+              : <Link href={opportunityHref(r, scaleCampaign)} onClick={() => onAct?.(r)} style={{ alignSelf: 'flex-start', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 12.5, fontWeight: 800, textDecoration: 'none', marginTop: 2 }}>{r.cta} →</Link>}
           </div>
         ))}
       </div>
