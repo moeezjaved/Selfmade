@@ -101,6 +101,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .prose .sf-cta{background:radial-gradient(120% 130% at 15% 0%, #2a2016 0%, #1c1611 55%);border:1px solid rgba(239,74,30,.28);border-radius:20px;padding:32px 28px;margin:44px 0;text-align:center;box-shadow:0 26px 60px -32px rgba(0,0,0,.55)}
         .prose .sf-cta-h{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:27px;line-height:1.12;color:#fff;letter-spacing:-.01em;margin:0 0 8px}
         .prose .sf-cta-s{font-family:'Inter',sans-serif;color:rgba(255,255,255,.94);font-size:16px;line-height:1.5;margin:0 0 20px}
+        .prose .sf-cta-s strong{color:#ff9f7a;font-weight:800}
         .prose a.sf-cta-b{display:inline-block;background:${LIME};color:#fff;padding:14px 28px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:15px;text-decoration:none;border:none}
         .prose a.sf-cta-b:hover{border:none;opacity:.92}
         /* Designed steps card (:::steps) */
