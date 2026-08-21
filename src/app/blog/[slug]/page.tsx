@@ -110,6 +110,24 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .prose .sf-step-b b{font-family:'Inter',sans-serif;color:#fff;font-size:15.5px;font-weight:800;display:block;margin-bottom:4px}
         .prose .sf-step-b p{font-family:'Inter',sans-serif;color:#a99f92;font-size:13.5px;line-height:1.45;margin:0}
         @media (max-width:640px){.prose .sf-steps{grid-template-columns:1fr;gap:20px}}
+        /* Sticky sidebar CTA — pinned beside the article on desktop, hidden on mobile & when dismissed */
+        .sf-read{max-width:760px;margin:0 auto;padding:0 24px}
+        .sf-main{min-width:0}
+        .sf-side{display:none}
+        #sf-hide:checked ~ .sf-read .sf-side{display:none}
+        @media (min-width:1120px){
+          .sf-read{max-width:1094px;display:grid;grid-template-columns:250px minmax(0,760px);gap:44px;justify-content:center;align-items:start}
+          .sf-side{display:block;position:sticky;top:92px;align-self:start}
+        }
+        .sf-side .card{background:#fff;border:1px solid rgba(28,22,17,.12);border-radius:18px;padding:20px 18px 18px;box-shadow:0 22px 55px -30px rgba(28,22,17,.45);position:relative}
+        .sf-side .k{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${LIME};margin:0 0 7px}
+        .sf-side h4{font-family:'Fraunces',Georgia,serif;font-size:19px;font-weight:700;color:#1c1611;line-height:1.14;margin:0 0 15px}
+        .sf-side ul{list-style:none;margin:0 0 16px;padding:0}
+        .sf-side li{display:flex;gap:9px;font-family:'Inter',sans-serif;font-size:13px;line-height:1.4;color:#574f47;margin:0 0 11px;font-weight:500}
+        .sf-side li span{color:${LIME};font-weight:900;flex:none}
+        .sf-side a.b{display:block;text-align:center;background:#1c1611;color:#fff;padding:12px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:14px;text-decoration:none}
+        .sf-side a.b:hover{opacity:.92}
+        .sf-side .x{position:absolute;top:10px;right:13px;color:#b8afa4;font-size:18px;line-height:1;cursor:pointer;font-family:sans-serif}
       `}</style>
 
       <nav style={{ borderBottom: '1px solid rgba(28,22,17,.08)' }}>
@@ -119,7 +137,24 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         </div>
       </nav>
 
-      <article style={{ maxWidth: 760, margin: '0 auto', padding: '46px 24px 20px' }}>
+      <input type="checkbox" id="sf-hide" style={{ display: 'none' }} aria-hidden />
+      <div className="sf-read">
+        <aside className="sf-side">
+          <div className="card">
+            <label htmlFor="sf-hide" className="x" aria-label="Dismiss">×</label>
+            <div className="k">Selfmade</div>
+            <h4>Your marketing, on autopilot</h4>
+            <ul>
+              <li><span>✓</span>Spies on competitors &amp; clones their winning ads</li>
+              <li><span>✓</span>Launches &amp; manages your campaigns</li>
+              <li><span>✓</span>Kills losers, scales winners — 24/7</li>
+              <li><span>✓</span>One morning brief; you approve, it acts</li>
+            </ul>
+            <Link href="/signup" className="b">Start free →</Link>
+          </div>
+        </aside>
+        <div className="sf-main">
+      <article style={{ padding: '40px 0 18px' }}>
         <Link href="/blog" style={{ fontSize: 13.5, fontWeight: 700, color: LIME, textDecoration: 'none' }}>← All posts</Link>
         <div style={{ margin: '18px 0 0' }}><span style={catStyle(post)}>{categoryOf(post)}</span></div>
         <h1 style={{ fontFamily: "'Fraunces',Georgia,serif", fontSize: 'clamp(32px,4.8vw,52px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.06, margin: '12px 0 16px', color: '#1c1611' }}>{post.title}</h1>
@@ -128,7 +163,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         </div>
       </article>
 
-      <div style={{ maxWidth: 980, margin: '14px auto 0', padding: '0 24px' }}>
+      <div style={{ margin: '14px 0 0' }}>
         <div style={{ position: 'relative', width: '100%', aspectRatio: '16/9', borderRadius: 20, overflow: 'hidden', ...coverStyle(post) }}>
           {!post.cover_image_url && (
             <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'flex-end', padding: 36 }}>
@@ -138,9 +173,9 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         </div>
       </div>
 
-      <div className="prose" style={{ maxWidth: 760, margin: '0 auto', padding: '38px 24px 24px' }} dangerouslySetInnerHTML={{ __html: html }} />
+      <div className="prose" style={{ padding: '34px 0 20px' }} dangerouslySetInnerHTML={{ __html: html }} />
 
-      <section style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px 44px' }}>
+      <section style={{ padding: '18px 0 40px' }}>
         <div style={{ background: 'radial-gradient(120% 130% at 15% 0%, #2a2016 0%, #1c1611 55%)', border: '1px solid rgba(239,74,30,.28)', borderRadius: 24, padding: '38px 34px', boxShadow: '0 30px 70px -34px rgba(0,0,0,.6)' }}>
           <h2 style={{ fontFamily: "'Fraunces',Georgia,serif", fontSize: 'clamp(24px,3.8vw,34px)', fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.1, margin: '0 0 20px', color: '#fff' }}>Or skip the setup — your marketing, on autopilot.</h2>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, margin: '0 0 26px' }}>
@@ -163,6 +198,8 @@ export default async function BlogPost({ params }: { params: { slug: string } })
           </div>
         </div>
       </section>
+        </div>
+      </div>
 
       {related.length > 0 && (
         <section style={{ maxWidth: 1160, margin: '0 auto', padding: '10px 24px 80px', borderTop: '1px solid rgba(28,22,17,.08)' }}>
