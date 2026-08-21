@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { FullDnaResult, Tally } from '@/lib/dna/engine'
+import { videoShotList, type CreativeBrief } from '@/lib/dna/creative'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#ef4a1e', PAPER = '#fbf4e2'
 const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
@@ -13,7 +14,7 @@ const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
 type Brand = { pageId: string; name: string; adCount?: number; industry?: string | null }
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
 type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string }
-type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean }
+type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean; briefs?: CreativeBrief[]; rivalToRemake?: { adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null } | null }
 
 const STEPS0: Step[] = [
   { id: 'ads', label: 'Reading your ads', status: 'pending' },
@@ -27,7 +28,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const REVEAL_CSS = `
 @keyframes sf-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 .sf-rise{animation:sf-rise .5s cubic-bezier(.2,.7,.2,1) both}
-@media (prefers-reduced-motion:reduce){.sf-rise{animation:none}}
+@keyframes sf-shim{0%{background-position:-200% 0}100%{background-position:200% 0}}
+.sf-shim{background:linear-gradient(90deg,#efe8da 25%,#f7f1e5 37%,#efe8da 63%);background-size:200% 100%;animation:sf-shim 1.3s ease-in-out infinite}
+@media (prefers-reduced-motion:reduce){.sf-rise{animation:none}.sf-shim{animation:none}}
 `
 const rise = (i = 0): CSSProperties => ({ animationDelay: `${i * 70}ms` })
 
@@ -181,7 +184,7 @@ export default function ScanTheater() {
         )}
         {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
         {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
-        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : <ScoreAct res={res} />)}
+        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : <><ScoreAct res={res} /><TheFix res={res} /></>)}
       </main>
     </div>
   )
@@ -430,6 +433,112 @@ function ScoreAct({ res }: { res: ScanResult }) {
             ))}
           </div>
           <a href="/signup" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Let Selfmade make these →</a>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── ACT 5 — "The fix" payoff: live free ads, scripted video, gated CTA + rival remake ──
+type CreativeState = { status: 'loading' | 'ready' | 'error'; imageUrl?: string }
+function FixCard({ brief, brandName, niche, i }: { brief: CreativeBrief; brandName: string; niche: string | null; i: number }) {
+  const [st, setSt] = useState<CreativeState>({ status: 'loading' })
+  useEffect(() => {
+    let alive = true
+    setSt({ status: 'loading' })
+    fetch('/api/scan/creative', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brief, brandName, niche }) })
+      .then(async (r) => {
+        if (!r.ok) throw new Error(String(r.status))
+        const j = await r.json()
+        if (!j?.imageUrl) throw new Error('no image')
+        if (alive) setSt({ status: 'ready', imageUrl: j.imageUrl as string })
+      })
+      .catch(() => { if (alive) setSt({ status: 'error' }) })
+    return () => { alive = false }
+  }, [brief.key]) // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
+      <div style={{ position: 'relative', aspectRatio: '1 / 1', background: '#efe8da' }}>
+        {st.status === 'loading' && <div className="sf-shim" style={{ position: 'absolute', inset: 0 }} />}
+        {st.status === 'ready' && st.imageUrl && (
+          <>
+            <img src={st.imageUrl} alt={brief.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <span style={{ transform: 'rotate(-20deg)', fontFamily: 'ui-monospace,monospace', fontWeight: 800, letterSpacing: '.35em', fontSize: 'clamp(26px,7vw,44px)', color: 'rgba(255,255,255,.5)', textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>PREVIEW</span>
+            </div>
+          </>
+        )}
+        {st.status === 'error' && (
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 20px' }}>
+            <div style={{ fontSize: 13, color: SUB, textAlign: 'center', lineHeight: 1.5 }}>Our studio is busy — sign up and we&rsquo;ll render these to your account.</div>
+          </div>
+        )}
+      </div>
+      <div style={{ padding: '12px 14px 14px' }}>
+        <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#c8410f', background: `${ORANGE}14`, border: `1px solid ${ORANGE}33`, borderRadius: 100, padding: '3px 10px' }}>Fills: {brief.gapLabel}</span>
+        <div style={{ fontSize: 14, color: INK, fontWeight: 700, marginTop: 8, lineHeight: 1.35 }}>{brief.headline}</div>
+      </div>
+    </div>
+  )
+}
+function TheFix({ res }: { res: ScanResult }) {
+  if (!res.briefs?.length) return null
+  const briefs = res.briefs.slice(0, 2)
+  const script = videoShotList(res.briefs[0], res.brand.name, res.brand.niche)
+  const rival = res.rivalToRemake
+  return (
+    <div style={{ marginTop: 40 }}>
+      <h2 style={h2}>The fix — ads we&rsquo;d run <span style={{ color: ORANGE }}>for you</span></h2>
+      <p style={sub}>Not a to-do list. Real ads, generated from the winning DNA you&rsquo;re missing.</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 16, marginTop: 22 }}>
+        {briefs.map((b, i) => <FixCard key={b.key} brief={b} brandName={res.brand.name} niche={res.brand.niche} i={i} />)}
+      </div>
+
+      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>Your {script.totalSeconds}-second video, scripted</div>
+      <p style={{ ...sub, fontSize: 15 }}>{script.title} — beat by beat, ready to shoot.</p>
+      <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
+        {script.beats.map((beat, i) => (
+          <div key={i} className="sf-rise" style={{ ...rise(i), display: 'flex', gap: 14, alignItems: 'baseline', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px' }}>
+            <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: ORANGE, flex: 'none', minWidth: 78 }}>{beat.t}</span>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 14, color: INK, fontWeight: 700, lineHeight: 1.35 }}>{beat.onScreen}</div>
+              <div style={{ fontSize: 13, color: SUB, marginTop: 3, lineHeight: 1.45 }}>{beat.vo}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{ marginTop: 18 }}>
+        <div aria-disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(26,20,16,.14)', color: '#7c7266', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, cursor: 'not-allowed', userSelect: 'none' }}>
+          <span>🎬 Generate this video →</span>
+          <span style={{ fontSize: 11.5, fontWeight: 700, background: 'rgba(26,20,16,.1)', borderRadius: 100, padding: '3px 10px' }}>Included in your trial</span>
+        </div>
+        <div style={{ fontSize: 12, color: MUT, marginTop: 8 }}>🔒 Unlocks when you start your trial.</div>
+      </div>
+
+      {rival && (
+        <div style={{ marginTop: 36 }}>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '0 0 4px' }}>Your rival&rsquo;s best ad — <span style={{ color: ORANGE }}>remade as yours</span></div>
+          <p style={{ ...sub, fontSize: 15 }}>Running {rival.daysRunning} days for {rival.brand}. Here&rsquo;s the same idea in your brand.</p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px,100%),1fr))', gap: 16, marginTop: 16 }}>
+            <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ aspectRatio: '1 / 1', background: `#f1ece2 ${rival.thumb ? `url(${rival.thumb}) center/cover` : ''}` }} />
+              <div style={{ padding: '11px 14px 13px' }}>
+                <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>Their ad · {rival.daysRunning}d</div>
+                <div style={{ fontSize: 13, color: INK, lineHeight: 1.35, marginTop: 3, maxHeight: 46, overflow: 'hidden' }}>{rival.hook || rival.brand}</div>
+              </div>
+            </div>
+            <div style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
+              <div style={{ aspectRatio: '1 / 1', background: rival.thumb ? `#f1ece2 url(${rival.thumb}) center/cover` : 'linear-gradient(135deg,#ff5a2e,#e02f06)', filter: 'blur(14px)', transform: 'scale(1.1)' }} />
+              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 20px', background: 'rgba(28,22,17,.28)' }}>
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
+                  <div style={{ fontSize: 13.5, color: '#fff', fontWeight: 800, lineHeight: 1.4, textShadow: '0 2px 10px rgba(0,0,0,.4)' }}>Start free trial to see it in your brand</div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>
