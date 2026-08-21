@@ -69,6 +69,27 @@ function topKeywords(ads: { body?: string | null; title?: string | null }[], exc
   return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([w]) => w)
 }
 
+export type RivalVideo = { adId: string; brand: string; daysRunning: number; hook: string; angle: string | null; hookType: string | null; videoUrl: string; posterUrl: string | null }
+
+// The best rival VIDEO to remake — a proven (long-running) competitor ad that is actually a playable
+// video, in the same writing system as the brand. Null if none of the rivals run video we can play.
+async function bestRivalVideo(admin: ReturnType<typeof createAdminClient>, pageIds: string[], brandName: string): Promise<RivalVideo | null> {
+  if (!pageIds.length) return null
+  const want = scriptOf(brandName)
+  const { data } = await admin.from('discovery_ads_index')
+    .select('ad_id, page_name, body, title, days_running, hook_type, angle, discovery_creatives(asset_type, r2_url, poster_url, position)')
+    .in('page_id', pageIds).eq('has_creative', true).gte('days_running', 45)
+    .order('days_running', { ascending: false }).limit(50)
+  for (const r of (data || []) as any[]) {
+    const cre = (r.discovery_creatives || []).find((c: any) => c.asset_type === 'video' && c.r2_url)
+    if (!cre) continue
+    const hook = String(r.body || r.title || '').replace(/\{\{[^}]*\}\}/g, ' ').replace(/\s+/g, ' ').trim().split('\n')[0].slice(0, 160)
+    if (want !== 'other' && scriptOf(`${r.page_name || ''} ${hook}`) !== want) continue
+    return { adId: String(r.ad_id), brand: String(r.page_name || ''), daysRunning: Number(r.days_running) || 0, hook, angle: r.angle || null, hookType: r.hook_type || null, videoUrl: String(cre.r2_url), posterUrl: cre.poster_url || null }
+  }
+  return null
+}
+
 // Pull a Meta page id out of an Ad Library link (view_all_page_id=… / page_id=… / …/<id>) or a bare id.
 function extractPageId(s: string): string | null {
   const t = (s || '').trim()
@@ -160,6 +181,7 @@ export async function POST(req: NextRequest) {
     // longest-running example if none match.
     const briefs = creativeBriefs(result, brandName, niche, 2)
     const rivalToRemake = pickRival(result.winners.examples, brandName)
+    const rivalVideo = await bestRivalVideo(admin, competitorPageIds, brandName)
 
     // Your ads aren't in our index yet → kick off a PRIORITY (full-archive) crawl of your page so the
     // own-ad audit fills in within minutes. Same mechanism Brand Spy uses (priority 9). Best-effort.
@@ -176,7 +198,7 @@ export async function POST(req: NextRequest) {
     // Nothing to show yet (your ads not indexed AND no rival data) → the UI shows a "building" state
     // instead of a meaningless score. The crawl we just kicked off fills this in within minutes.
     const building = !result.own.found && result.winners.sampleSize === 0
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, ...result })
+    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, rivalVideo, ...result })
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }

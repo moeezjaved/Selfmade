@@ -96,6 +96,41 @@ export function videoShotList(brief: CreativeBrief, brandName: string, niche: st
   }
 }
 
+// A REMAKE of a specific rival's proven winning video — same beat arc that's already working for them,
+// with the user's product swapped in. Deterministic (no LLM), seeded from the rival's DNA.
+export type RivalRef = { brand: string; hook: string; angle: string | null; hookType: string | null; daysRunning: number }
+export function remakeScript(rival: RivalRef, brandName: string, niche: string | null): VideoScript {
+  const product = brandName
+  const nicheTag = niche ? ` (${niche})` : ''
+  const angle = (rival.angle || rival.hookType || 'the transformation').toString()
+  const hookLine = (rival.hook || rival.hookType || 'Stop scrolling').toString().slice(0, 90)
+  const durations = [3, 4, 5, 5, 4, 4]
+
+  const raw: Array<Omit<ShotBeat, 't'>> = [
+    { beat: 'Hook — their proven opener', onScreen: hookLine, vo: `Open on the same beat ${rival.brand} hooks with — then it's all you.` },
+    { beat: 'Problem', onScreen: `The problem ${product} solves${nicheTag}`, vo: `${angle}. The same tension their winning video rides.` },
+    { beat: 'Product reveal', onScreen: `${product} in hand`, vo: `Cut to ${product} — your product in their proven structure.` },
+    { beat: 'Mechanism / proof', onScreen: `${product} close-up, how it works`, vo: `Show why ${product} works — the ${angle} payoff.` },
+    { beat: 'Social proof', onScreen: 'Real people, real results', vo: `Their version has run ${rival.daysRunning} days — proof this arc converts.` },
+    { beat: 'CTA', onScreen: `Get ${product}`, vo: `Close on ${product}. Tap to try.` },
+  ]
+
+  let cursor = 0
+  const beats: ShotBeat[] = raw.map((b, i) => {
+    const start = cursor
+    const end = cursor + durations[i]
+    cursor = end
+    return { t: `${fmt(start)}–${fmt(end)}`, ...b }
+  })
+
+  return {
+    title: `${brandName} — remake of ${rival.brand}'s winner`,
+    totalSeconds: durations.reduce((a, b) => a + b, 0),
+    product,
+    beats,
+  }
+}
+
 export function creativeBriefs(
   result: FullDnaResult,
   brandName: string,
