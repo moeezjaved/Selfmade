@@ -237,11 +237,54 @@ Return JSON: {findings:[{type,title,detail}], prescriptions:[{title,hook,angle,p
   }
 }
 
+// ── Ad Presence Score — deterministic, honest. Subscores with missing signals are null (excluded),
+// never faked ("real or silent"). ──
+export type Subscore = { key: string; label: string; value: number | null; note: string }
+export type Score = { total: number; band: 'Poor' | 'Needs work' | 'Fair' | 'Strong'; subscores: Subscore[] }
+
+const distinct = (d: DnaDist, ...keys: DimKey[]) => {
+  const s = new Set<string>()
+  for (const k of keys) for (const t of d[k] || []) s.add(t.label.toLowerCase())
+  return s
+}
+
+export function scoreDna(own: OwnDna, winners: WinnerDna, gaps: Gap[]): Score {
+  const subs: Subscore[] = []
+
+  // Coverage — are you even in the game (absolute, honest bands on active ads)
+  const a = own.activeAds
+  const coverage = !own.found ? 0 : a >= 20 ? 95 : a >= 11 ? 80 : a >= 6 ? 60 : a >= 3 ? 40 : a >= 1 ? 20 : 0
+  subs.push({ key: 'coverage', label: 'Coverage', value: coverage, note: own.found ? `${a} active ad${a === 1 ? '' : 's'}.` : "You're running no ads we can see." })
+
+  // Format mix — of the formats winners use, how many do you? (null if you run nothing)
+  if (own.found) {
+    const wF = new Set((winners.dist.format_style || []).map((t) => t.label.toLowerCase()))
+    const oF = new Set((own.dist.format_style || []).map((t) => t.label.toLowerCase()))
+    const overlap = wF.size ? Array.from(wF).filter((f) => oF.has(f)).length / wF.size : 0
+    subs.push({ key: 'format', label: 'Format mix', value: Math.round(overlap * 100), note: `You use ${oF.size} of the ${wF.size} formats winners run.` })
+  } else subs.push({ key: 'format', label: 'Format mix', value: null, note: 'No ads to compare.' })
+
+  // Angle diversity — distinct hooks+angles you run vs winners
+  if (own.found) {
+    const w = distinct(winners.dist, 'hook_type', 'angle').size || 1
+    const o = distinct(own.dist, 'hook_type', 'angle').size
+    subs.push({ key: 'angles', label: 'Angle diversity', value: Math.min(100, Math.round((o / w) * 100)), note: `${o} distinct angles vs ${w} among winners.` })
+  } else subs.push({ key: 'angles', label: 'Angle diversity', value: null, note: 'No ads to compare.' })
+
+  // Opportunity — inverse of the gap count (always available)
+  subs.push({ key: 'gaps', label: 'Playbook coverage', value: Math.max(0, 100 - gaps.length * 8), note: `${gaps.length} winning tactic${gaps.length === 1 ? '' : 's'} you're missing.` })
+
+  const scored = subs.filter((s) => s.value != null) as (Subscore & { value: number })[]
+  const total = scored.length ? Math.round(scored.reduce((n, s) => n + s.value, 0) / scored.length) : 0
+  const band: Score['band'] = total < 40 ? 'Poor' : total < 60 ? 'Needs work' : total < 80 ? 'Fair' : 'Strong'
+  return { total, band, subscores: subs }
+}
+
 // ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. ──
 const cacheKey = (pageIds: string[], ownPage: string | null) =>
   `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '')).digest('hex').slice(0, 24)}.json`
 
-export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; cached: boolean }
+export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cached: boolean }
 
 export async function runDnaEngine(opts: {
   brandName: string; competitorPageIds: string[]; ownPageId?: string | null; niche?: string | null; force?: boolean
@@ -260,7 +303,8 @@ export async function runDnaEngine(opts: {
   const [winners, own] = await Promise.all([winnerDna(competitorPageIds, niche), ownDna(ownPageId)])
   const gaps = dnaDiff(own, winners)
   const report = await synthesize({ brandName, niche, own, winners, gaps })
-  const result: FullDnaResult = { winners, own, gaps, report, cached: false }
+  const score = scoreDna(own, winners, gaps)
+  const result: FullDnaResult = { winners, own, gaps, report, score, cached: false }
 
   try { await uploadBufferToR2(Buffer.from(JSON.stringify(result)), key, 'application/json') } catch { /* cache best-effort */ }
   return result
