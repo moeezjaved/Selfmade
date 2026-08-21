@@ -169,7 +169,7 @@ git commit -m "feat(scan): videoShotList() — deterministic timestamped shot li
 
 **Interfaces:**
 - Consumes: POST body `{ brief: CreativeBrief; brandName: string; niche?: string|null; productImageUrl?: string|null }`.
-- Produces: `{ imageUrl: string; watermarked: true }` on success; `{ error, retryAfter? }` on cap/failure. NEVER 500 into a retry loop — cap hits return `429`, misconfig returns `503`.
+- Produces: `{ imageUrl: string; preview: true }` on success; `{ error, retryAfter? }` on cap/failure. NEVER 500 into a retry loop — cap hits return `429`, misconfig returns `503`. The stored image is CLEAN; the "PREVIEW" watermark is a CSS overlay applied by the UI (Task 5) — no server-side compositing (no sharp/canvas in deps; don't add one). Reuse the existing lib `@/lib/gemini/image` (`generateImage`, `geminiEnabled`) — a LIB, not an endpoint, so no live code path is touched.
 
 - [ ] **Step 1: Write the failing test (endpoint contract via curl script)**
 
@@ -198,8 +198,8 @@ Create `src/app/api/scan/creative/route.ts` (`export const runtime='nodejs'`, `m
 3. Validate `brief.prompt` + `brandName`; missing → `400`.
 4. If `!process.env.GEMINI_API_KEY` → `503 { error:'not_configured' }`.
 5. Render via a **self-contained** Gemini call in this route (or a NEW `src/lib/creative/scanRender.ts` used ONLY by this route). **Do NOT modify `generate-ad` or any existing studio endpoint** — read its code for reference only; duplicate the minimal render call here. This keeps every live code path byte-identical (production-safety constraint). Render at `2K`, product image optional (if none, text/graphic ad).
-6. Composite a diagonal **"SELFMADE · PREVIEW"** watermark before upload (canvas/sharp already in deps via `@remotion`/image libs; if not, overlay via the model prompt is NOT acceptable — use a server-side image composite util; add `sharp` only if already present, else draw the watermark with the existing R2/image path).
-7. Upload to R2 (`uploadBufferToR2` + `r2PublicUrl`, already used by the DNA engine cache) under `scan-previews/<hash>.png`; return `{ imageUrl, watermarked:true }`.
+6. NO server-side watermark compositing (no sharp/canvas in deps). Store the clean render; the UI overlays a CSS "PREVIEW" mark in Task 5.
+7. Upload to R2 (`uploadBufferToR2(buf, key, mime)` from `@/lib/r2` + `r2PublicUrl`, already used by the DNA engine cache) under `scan-previews/<hash>.png`; return `{ imageUrl, preview:true }`.
 8. Wrap everything so any downstream throw returns `503 { error:'render_failed' }`, never an unhandled 500.
 
 - [ ] **Step 4: Verify**
@@ -351,7 +351,7 @@ git commit -m "feat(scan): cinema+ polish — gauge sweep, competitor fly-in, st
 
 **Type consistency:** `CreativeBrief`, `VideoScript`/`ShotBeat`, `WinnerExample` names match across Tasks 1,2,4,5. `/api/scan/creative` request/response shape matches Task 5's fetch. ✓
 
-**Open risk carried to execution:** watermark compositing util — Task 3 must confirm an image-composite path exists (R2 upload util is known; the compositing lib is not). If none exists, the fallback is to return the render unwatermarked but **only after** Phase 2 gates the reveal behind sign-up — flag to the reviewer at Task 3.
+**Resolved during execution:** no image-composite lib in deps (and we won't add native `sharp` to Vercel) → the stored render is clean and the "PREVIEW" watermark is a CSS overlay in the UI (Task 5). True pixel-watermark + sign-up-gated clean reveal lands in Phase 2. Production-safety confirmed: the public route reuses the `@/lib/gemini/image` LIB, so no live endpoint is modified.
 
 ---
 
