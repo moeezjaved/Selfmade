@@ -7,6 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { runDnaEngine } from '@/lib/dna/engine'
+import { creativeBriefs } from '@/lib/dna/creative'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -80,6 +81,10 @@ export async function POST(req: NextRequest) {
 
     const result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
 
+    // Payoff act inputs: concrete briefs the visitor can act on + the single longest-running rival ad to remake.
+    const briefs = creativeBriefs(result, brandName, niche, 2)
+    const rivalToRemake = result.winners.examples[0] || null
+
     // Your ads aren't in our index yet → kick off a PRIORITY (full-archive) crawl of your page so the
     // own-ad audit fills in within minutes. Same mechanism Brand Spy uses (priority 9). Best-effort.
     let ownPending = false
@@ -95,7 +100,7 @@ export async function POST(req: NextRequest) {
     // Nothing to show yet (your ads not indexed AND no rival data) → the UI shows a "building" state
     // instead of a meaningless score. The crawl we just kicked off fills this in within minutes.
     const building = !result.own.found && result.winners.sampleSize === 0
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, ...result })
+    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, ...result })
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }
