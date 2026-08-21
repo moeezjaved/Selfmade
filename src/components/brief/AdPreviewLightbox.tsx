@@ -38,22 +38,22 @@ export default function AdPreviewLightbox({ ad, onClose }: { ad: PreviewAd; onCl
 
   return (
     <div onClick={onClose} role="dialog" aria-modal
-      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,12,10,.84)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(13,12,10,.9)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
       <div onClick={(e) => e.stopPropagation()}
-        style={{ position: 'relative', width: 'min(92vw, 400px)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        style={{ position: 'relative', width: 'min(92vw, 380px)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
         {/* CLOSE — always visible, inside the frame */}
         <button onClick={onClose} aria-label="Close"
           style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, background: 'rgba(13,12,10,.72)', color: '#fff', border: '1.5px solid rgba(255,255,255,.5)', borderRadius: '50%', width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
 
-        {/* the creative — a real playing video (controls + autoplay), image otherwise */}
-        <div style={{ width: '100%', aspectRatio: '4 / 5', maxHeight: '74vh', borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
+        {/* the creative — caps at 70vh so the buttons below are ALWAYS visible (never pushed off / behind) */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
           {videoSrc
             ? <video src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} controls autoPlay loop playsInline
-                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
+                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', background: '#000', display: 'block' }} />
             : ad.image
               /* eslint-disable-next-line @next/next/no-img-element */
-              ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-              : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#f3ece0', fontSize: 14 }}>{ad.brand || 'Ad'}</div>}
+              ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', display: 'block' }} />
+              : <div style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: '#f3ece0', fontSize: 14 }}>{ad.brand || 'Ad'}</div>}
         </div>
 
         {/* actions — mirror Discovery: remake it, or jump to the brand's full library (always available) */}
