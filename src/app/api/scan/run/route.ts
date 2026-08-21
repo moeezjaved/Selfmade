@@ -52,16 +52,21 @@ function pickRival<T extends { brand: string; hook: string }>(examples: T[], bra
 // Distinctive keywords from a brand's own ad copy — the words that actually define its product/category
 // (nicotine, quit, mattress, mango…), so we can find brands that talk about the SAME things, not just the
 // same coarse industry. Drops stopwords + the brand's own name tokens.
-const STOPWORDS = new Set('the and for you your with that this are our from have get all can now out not but they their what when more just how why who was will has off new one only use make made into over than then them some any been about after before best free shop buy today order also here like most much such very want kit set try day off get more love feel need help time your'.split(/\s+/))
+// Common words + generic commerce/ad filler that DON'T discriminate a category (a nicotine brand and a
+// mattress brand both say "product", "shop", "quality"). Removing them lets the distinctive terms lead.
+const STOPWORDS = new Set(('the and for you your with that this are our from have get all can now out not but they their what when more just how why who was will has off new one only use make made into over than then them some any been about after before best free shop buy today order also here like most much such very want kit set try day love feel need help time '
+  + 'product products brand brands start shop store official collection sale discount code click link learn save price prices premium quality offer offers deal deals limited exclusive shipping order orders online website site check checkout cart bundle bundles pack size color colours available available now more info details bio profile follow comment dm message tag share post reel video watch swipe').split(/\s+/))
 function topKeywords(ads: { body?: string | null; title?: string | null }[], exclude: Set<string>): string[] {
   const freq: Record<string, number> = {}
   for (const a of ads) {
-    for (const w of `${a.body || ''} ${a.title || ''}`.toLowerCase().split(/[^a-z]+/)) {
+    // strip Meta {{product.brand}} placeholders first so "product"/"brand" don't leak in as keywords
+    const text = `${a.body || ''} ${a.title || ''}`.replace(/\{\{[^}]*\}\}/g, ' ').toLowerCase()
+    for (const w of text.split(/[^a-z]+/)) {
       if (w.length < 4 || STOPWORDS.has(w) || exclude.has(w)) continue
       freq[w] = (freq[w] || 0) + 1
     }
   }
-  return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([w]) => w)
+  return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([w]) => w)
 }
 
 // Pull a Meta page id out of an Ad Library link (view_all_page_id=… / page_id=… / …/<id>) or a bare id.
