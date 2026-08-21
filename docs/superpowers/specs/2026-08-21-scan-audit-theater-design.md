@@ -31,11 +31,22 @@ Never ask for money until they've felt the product work. Two free wins, then a l
 | 2. Free image ads + video script | nothing | free | Win #1 — they hold real creative |
 | 3. Sign up (1-click Google) | email | free | Low ask *after* value; saves their audit, attributes the user |
 | 4. Connect Meta (read-only) | permission | free | Win #2 — real numbers, wasted spend revealed |
-| 5. Subscribe / payment | 💳 | **paid** | Only now — to ACT: generate the scripted video, launch, weekly ads, rival monitoring |
+| 5. Subscribe / payment | 💳 **$1 now** | trial→paid | Only now — to ACT: generate the scripted video, launch, weekly ads, rival monitoring |
 
 **Payment lands at step 5 only** — when they want us to DO the work (generate the video they already saw scripted; fix the gaps they already saw named). Everything before is proof, not product.
 
-Sub-decisions for the plan: (a) first video generation may be a free trial credit so they cross the paying threshold having *received* something (ties to pricing model v2 — credits, Creator $49 / Agency $149, no trial); (b) put the "rival remade as yours" wow *at the payment gate* — show it watermarked → "Subscribe to export and launch."
+### Checkout model (approved 2026-08-21) — mirrors Ryze `reports.get-ryze.ai/.../checkout`
+
+**$1 setup charge now → 3-day trial → auto-convert to Creator $49/mo. Single tier. Cancel anytime.**
+The $1 charge captures the card and filters tire-kickers, so trial→paid converts far higher than a free trial. **This overrides the "no trial" stance in pricing model v2** for the /scan funnel (Creator price $49/mo is retained; Agency $149 is not offered at this checkout — single-tier to keep the decision trivial).
+
+Checkout page copy/structure to adopt from the Ryze reference:
+- **"Fix all N gaps on [brand]"** headline + "First videos in minutes. You approve every ad before it launches."
+- **"Priced like hiring it out"** value grid — frame the plan against agency cost: e.g. "$X/mo of ad creative", "a media buyer watching your rivals", "$0 risk — $1 for 3 days, cancel anytime". Makes $49 feel tiny.
+- **The "rival remade as yours" wow sits AT the gate** — show it watermarked/half-rendered → "Start trial to export & launch."
+- Social proof row (founder quotes) below the fold.
+
+Sub-decision for the plan: first video generation is included in the trial so they receive a real deliverable inside the 3 days (crossing the value threshold before the first $49 bill).
 
 ## The film — 5-act emotional arc (Tension → Verdict → Payoff)
 
@@ -86,7 +97,7 @@ Most of Acts 1–5 already exist (`ScanTheater`, `runDnaEngine`, benchmark, stag
 
 ## Open questions / risks (resolve during planning)
 
-- **Pricing/offer at Ask 2** — trial vs credits vs plan? (defer to existing pricing model v2.)
+- **Pricing/offer at Ask 2** — RESOLVED: $1 setup now → 3-day trial → Creator $49/mo, single tier (Ryze-style checkout). Plan must wire the $1 charge + trial + auto-convert through the existing PayPal rail; confirm PayPal supports a nominal setup charge + delayed subscription start (or emulate via a $1 capture + subscription created with a 3-day trial period).
 - **Meta read-only scope** — which token/permission path for an anonymous, not-yet-signed-up visitor? Connecting Meta likely requires account creation first — sequence needs care (may become "sign up free → connect Meta").
 - **Video-gen cost control** — gated, but confirm per-generation economics.
 - **Anonymous → identified handoff** — RESOLVED: 1-click Google sign-up slots in at step 3 (after the two free wins, before Meta connect). Free scan stays anonymous; sign-up only to save the audit + connect Meta. Plan must persist the anonymous scan result and re-attach it to the new account on sign-up.
