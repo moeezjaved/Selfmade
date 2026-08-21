@@ -573,7 +573,7 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
   const headline = lost <= 0
     ? `Here’s where your ads stand`
     : gaps > 0
-      ? `You could be losing ~$${lost.toLocaleString()}/yr to ${gaps} gap${gaps === 1 ? '' : 's'}`
+      ? `Close ${gaps} gap${gaps === 1 ? '' : 's'} to add ~$${lost.toLocaleString()}/yr`
       : `~$${lost.toLocaleString()}/yr of upside left on the table`
   return (
     <div className="sf-rise" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '10px 0 40px' }}>
@@ -596,40 +596,70 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
 }
 
 // ── The FULL REPORT — everything stacked, scrollable, nothing hidden ──
-function FullReport({ res, own, winners }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners'] }) {
+// The REPORT is deliberately compact (Ryze-sized): the rich DNA panels + ad grids + side-by-side live in
+// the THEATER (the reveal acts). Here we show only the distilled result — score, the gaps that matter, the
+// upside (gated on connecting Meta), the fixes, and the door.
+function FullReport({ res }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners'] }) {
   return (
     <div>
-      <StageAct stage="ads" res={res} own={own} winners={winners} />
-      <div style={{ marginTop: 44 }}><StageAct stage="rivals" res={res} own={own} winners={winners} /></div>
-      <div style={{ marginTop: 44 }}><StageAct stage="gaps" res={res} own={own} winners={winners} /></div>
-      <div style={{ marginTop: 44 }}><CostCard cost={res.cost} gaps={res.gaps.length} /></div>
-      <div style={{ marginTop: 44 }}><ScoreAct res={res} /></div>
-      <div style={{ marginTop: 44 }}><TheFix res={res} /></div>
-      <div style={{ marginTop: 44 }}><ForwardCta /></div>
+      <ScoreAct res={res} />
+      <div style={{ marginTop: 40 }}><TopGaps gaps={res.gaps} /></div>
+      <div style={{ marginTop: 40 }}><UpsideTeaser cost={res.cost} gaps={res.gaps.length} /></div>
+      <div style={{ marginTop: 40 }}><TheFix res={res} /></div>
+      <div style={{ marginTop: 40 }}><ForwardCta /></div>
     </div>
   )
 }
 
-// ── "What it costs you" — an honest, transparent estimate (Ryze-style) ──
-function CostCard({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }) {
-  const lost = cost.lostPerYear
+// The winning moves you're not running — the distilled you-vs-winners, Ryze-style "N problems" list.
+function TopGaps({ gaps }: { gaps: ScanResult['gaps'] }) {
+  if (!gaps.length) return (
+    <div>
+      <h2 style={h2}>No gaps — you&rsquo;re running the winners&rsquo; playbook</h2>
+      <p style={sub}>You already run the tactics winning brands rely on. The edge now is volume, velocity and creative quality.</p>
+    </div>
+  )
   return (
     <div>
-      <h2 style={h2}>What it costs you</h2>
-      {lost > 0 ? (
-        <>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,7vw,64px)', color: ORANGE, lineHeight: 1, margin: '10px 0 14px' }}>~$<Count n={lost} dur={1200} />/yr</div>
-          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 18px', fontFamily: 'ui-monospace,monospace', fontSize: 13.5, color: INK, lineHeight: 1.6, maxWidth: 620 }}>
-            {cost.activeAds} active ads × ~${cost.monthlyPerAd}/mo industry avg × {cost.leakPct}% leaking from missing tactics
+      <h2 style={h2}>{gaps.length} winning move{gaps.length === 1 ? '' : 's'} you&rsquo;re <span style={{ color: ORANGE }}>not running</span></h2>
+      <p style={sub}>The tactics proven rivals lean on that you don&rsquo;t — biggest first.</p>
+      <div style={{ marginTop: 18 }}>
+        {gaps.slice(0, 6).map((g, i) => (
+          <div key={i} className="sf-rise" style={{ ...rise(i), display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '13px 16px', marginBottom: 8 }}>
+            <span style={{ color: ORANGE, fontWeight: 900, fontSize: 18, flex: 'none' }}>→</span>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{g.dimension}: {g.label}</div>
+              <div style={{ fontSize: 13, color: SUB }}>{g.winnerPct}% of winners use it — you&rsquo;re at {g.yourPct}%.</div>
+            </div>
+            <span style={{ flex: 'none', fontSize: 11, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', color: '#0a7d4b', background: 'rgba(10,125,75,.1)', border: '1px solid rgba(10,125,75,.25)', borderRadius: 100, padding: '4px 11px' }}>Agent can make this</span>
           </div>
-          <p style={{ color: MUT, fontSize: 13, marginTop: 14, maxWidth: 620, lineHeight: 1.5 }}>Estimated — we can&rsquo;t see your real spend from outside. Connect Meta for your exact number.</p>
-        </>
-      ) : (
-        <>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', color: INK, lineHeight: 1.15, margin: '10px 0 4px', maxWidth: 620 }}>We can&rsquo;t size this without active ads — connect Meta to see the full picture.</div>
-          <p style={{ color: MUT, fontSize: 13, marginTop: 12, maxWidth: 620, lineHeight: 1.5 }}>{gaps} gap{gaps === 1 ? '' : 's'} found — the cost shows up once you&rsquo;re running ads against them.</p>
-        </>
-      )}
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// The money — POSITIVE upside framing, and the REAL number is gated behind connecting Meta (we can't see
+// spend/revenue from outside). Before connect: the potential-sales-lift teaser + the connect CTA.
+function UpsideTeaser({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }) {
+  const upside = cost.lostPerYear
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '26px 28px' }}>
+      <h2 style={{ ...h2, margin: '0 0 6px' }}>How much could this add?</h2>
+      <p style={{ ...sub, fontSize: 15.5 }}>Brands that close gaps like these typically lift ROAS <b style={{ color: INK }}>15–30%</b>. {gaps > 0 ? `On your volume, that's real money.` : `Volume and velocity are your next lever.`}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginTop: 18 }}>
+        {upside > 0 && (
+          <div style={{ flex: 'none' }}>
+            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(34px,6vw,52px)', color: '#0a7d4b', lineHeight: 1 }}>+$<Count n={upside} dur={1200} />/yr</div>
+            <div style={{ fontSize: 12, color: MUT, marginTop: 4 }}>estimated potential — from your ad volume + benchmarks</div>
+          </div>
+        )}
+        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+          {/* TODO(phase-3): wire Meta connect */}
+          <button style={{ ...btn, padding: '14px 26px', fontSize: 15.5 }}>Connect Meta to see your real number →</button>
+          <p style={{ color: MUT, fontSize: 12.5, marginTop: 9, lineHeight: 1.5 }}>Read-only, ~30 seconds. We&rsquo;ll replace this estimate with your true numbers — real revenue at risk and the exact lift from fixing it.</p>
+        </div>
+      </div>
     </div>
   )
 }
