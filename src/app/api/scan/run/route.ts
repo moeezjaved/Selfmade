@@ -24,6 +24,31 @@ function limited(ip: string): boolean {
   h.n++; return h.n > MAX
 }
 
+// Dominant writing system of a string — so we don't hand a Latin-script brand a Cyrillic/CJK "peer".
+function scriptOf(s: string): 'latin' | 'cyrillic' | 'cjk' | 'arabic' | 'other' {
+  const counts = { latin: 0, cyrillic: 0, cjk: 0, arabic: 0 }
+  for (const ch of s || '') {
+    const c = ch.codePointAt(0) || 0
+    if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || (c >= 0xc0 && c <= 0x24f)) counts.latin++
+    else if (c >= 0x400 && c <= 0x4ff) counts.cyrillic++
+    else if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3040 && c <= 0x30ff) || (c >= 0xac00 && c <= 0xd7af)) counts.cjk++
+    else if (c >= 0x600 && c <= 0x6ff) counts.arabic++
+  }
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+  return top && top[1] > 0 ? (top[0] as 'latin' | 'cyrillic' | 'cjk' | 'arabic') : 'other'
+}
+
+// Prefer a rival example whose brand+hook is in the SAME script as the user's brand; else the first.
+function pickRival<T extends { brand: string; hook: string }>(examples: T[], brandName: string): T | null {
+  if (!examples?.length) return null
+  const want = scriptOf(brandName)
+  if (want !== 'other') {
+    const match = examples.find((e) => scriptOf(`${e.brand} ${e.hook}`) === want)
+    if (match) return match
+  }
+  return examples[0]
+}
+
 // Pull a Meta page id out of an Ad Library link (view_all_page_id=… / page_id=… / …/<id>) or a bare id.
 function extractPageId(s: string): string | null {
   const t = (s || '').trim()
@@ -107,9 +132,12 @@ export async function POST(req: NextRequest) {
 
     const result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
 
-    // Payoff act inputs: concrete briefs the visitor can act on + the single longest-running rival ad to remake.
+    // Payoff act inputs: concrete briefs the visitor can act on + a rival ad to remake. Pick a rival in the
+    // SAME writing system as the brand — a Cyrillic/CJK store is not a believable "peer" for a Latin-script
+    // brand even inside the same niche (country data is too sparse to rely on alone). Fall back to the
+    // longest-running example if none match.
     const briefs = creativeBriefs(result, brandName, niche, 2)
-    const rivalToRemake = result.winners.examples[0] || null
+    const rivalToRemake = pickRival(result.winners.examples, brandName)
 
     // Your ads aren't in our index yet → kick off a PRIORITY (full-archive) crawl of your page so the
     // own-ad audit fills in within minutes. Same mechanism Brand Spy uses (priority 9). Best-effort.
