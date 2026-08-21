@@ -100,41 +100,50 @@ export default function ScanTheater() {
   // ── IDLE — audit framing + brand picker (or ad-library link) ──
   if (phase === 'idle') {
     return (
-      <div style={{ minHeight: '100vh', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <div style={{ maxWidth: 600, width: '100%', textAlign: 'center' }}>
-          <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: '#c8410f', fontSize: 20, marginBottom: 8 }}>free · 90 seconds · no login</div>
-          <h1 style={{ fontFamily: 'Fraunces,Georgia,serif', fontSize: 'clamp(38px,7vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: INK, margin: '0 0 16px' }}>Audit your ads.</h1>
-          <p style={{ color: SUB, fontSize: 18, margin: '0 0 26px' }}>See exactly where your ads stand — your presence, your gaps, and what your rivals are winning with.</p>
+      <div style={{ minHeight: '100vh', background: 'radial-gradient(125% 100% at 82% 2%, #ff5a2e 0%, #f4380d 48%, #e02f06 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', color: '#fff' }}>
+        <div style={{ width: '100%', maxWidth: 1040, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 44, alignItems: 'center' }}>
+          {/* left — the pitch + brand picker */}
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 90 seconds · no login</div>
+            <h1 style={{ fontFamily: 'Fraunces,Georgia,serif', fontSize: 'clamp(40px,6.4vw,64px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your ads.</h1>
+            <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 460 }}>See exactly where your ads stand — your presence, your gaps, and what your rivals are winning with.</p>
 
-          {!showLink ? (
-            <div style={{ position: 'relative', maxWidth: 460, margin: '0 auto', textAlign: 'left' }}>
-              <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your brand…" autoFocus
-                style={{ width: '100%', padding: '15px 18px', borderRadius: results.length ? '16px 16px 0 0' : 100, border: `1.5px solid ${LINE}`, fontSize: 16, background: '#fff', color: INK, outline: 'none' }} />
-              {results.length > 0 && (
-                <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: `1.5px solid ${LINE}`, borderTop: 'none', borderRadius: '0 0 16px 16px', overflow: 'hidden', zIndex: 5, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
-                  {results.map((b) => (
-                    <button key={b.pageId} onClick={() => run({ pageId: b.pageId })}
-                      style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
-                      <span style={{ fontWeight: 700, fontSize: 15, color: INK }}>{b.name}</span>
-                      <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
-                    </button>
-                  ))}
+            {!showLink ? (
+              <div style={{ position: 'relative', maxWidth: 460 }}>
+                <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your brand…" autoFocus
+                  style={{ width: '100%', padding: '16px 18px', borderRadius: results.length ? '16px 16px 0 0' : 100, border: 'none', fontSize: 16, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
+                {results.length > 0 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', borderRadius: '0 0 16px 16px', overflow: 'hidden', zIndex: 5, boxShadow: '0 24px 44px -18px rgba(0,0,0,.5)' }}>
+                    {results.map((b) => (
+                      <button key={b.pageId} onClick={() => run({ pageId: b.pageId })}
+                        style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
+                        <span style={{ fontWeight: 700, fontSize: 15, color: INK }}>{b.name}</span>
+                        <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <div style={{ marginTop: 16, fontSize: 14, color: 'rgba(255,255,255,.85)' }}>
+                  Can&rsquo;t find it? <button onClick={() => setShowLink(true)} style={{ background: 'none', border: 'none', color: '#fff', fontWeight: 800, cursor: 'pointer', fontSize: 14, textDecoration: 'underline', textUnderlineOffset: 3 }}>Paste your Meta Ad Library link →</button>
                 </div>
-              )}
-              <div style={{ textAlign: 'center', marginTop: 16, fontSize: 14, color: SUB }}>
-                Can&rsquo;t find it? <button onClick={() => setShowLink(true)} style={{ background: 'none', border: 'none', color: ORANGE, fontWeight: 700, cursor: 'pointer', fontSize: 14 }}>Paste your Meta Ad Library link →</button>
               </div>
-            </div>
-          ) : (
-            <div style={{ maxWidth: 480, margin: '0 auto' }}>
-              <div style={{ display: 'flex', gap: 10 }}>
-                <input value={adLink} onChange={(e) => setAdLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && adLink.trim() && run({ adLibraryUrl: adLink.trim() })} placeholder="facebook.com/ads/library/?…view_all_page_id=…" autoFocus
-                  style={{ flex: 1, padding: '14px 16px', borderRadius: 100, border: `1.5px solid ${LINE}`, fontSize: 14, background: '#fff', color: INK, outline: 'none' }} />
-                <button onClick={() => adLink.trim() && run({ adLibraryUrl: adLink.trim() })} style={{ background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '14px 24px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }}>Audit →</button>
+            ) : (
+              <div style={{ maxWidth: 480 }}>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <input value={adLink} onChange={(e) => setAdLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && adLink.trim() && run({ adLibraryUrl: adLink.trim() })} placeholder="facebook.com/ads/library/?…view_all_page_id=…" autoFocus
+                    style={{ flex: 1, minWidth: 0, padding: '15px 16px', borderRadius: 100, border: 'none', fontSize: 14, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
+                  <button onClick={() => adLink.trim() && run({ adLibraryUrl: adLink.trim() })} style={{ background: '#fff', color: ORANGE, border: 'none', borderRadius: 100, padding: '15px 24px', fontSize: 15, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}>Audit →</button>
+                </div>
+                <button onClick={() => setShowLink(false)} style={{ marginTop: 14, background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 14, cursor: 'pointer' }}>← Search by brand name instead</button>
               </div>
-              <button onClick={() => setShowLink(false)} style={{ marginTop: 14, background: 'none', border: 'none', color: SUB, fontSize: 14, cursor: 'pointer' }}>← Search by brand name instead</button>
-            </div>
-          )}
+            )}
+          </div>
+
+          {/* right — the hero film, framed so it stays legible on orange */}
+          <div style={{ minWidth: 0, borderRadius: 22, overflow: 'hidden', border: '1px solid rgba(255,255,255,.28)', boxShadow: '0 40px 90px -30px rgba(0,0,0,.55)', aspectRatio: '16 / 10', background: 'rgba(0,0,0,.2)' }}>
+            <video src="/hero.mp4" autoPlay muted loop playsInline
+              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          </div>
         </div>
       </div>
     )
