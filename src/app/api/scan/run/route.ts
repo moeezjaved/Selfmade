@@ -47,9 +47,10 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
     // Resolve the brand + its niche. Prefer the directory; fall back to the brand's OWN crawled ads
     // (page_name + most-common niche) so a brand that's crawled but not in the 611K catalog still resolves.
-    const { data: brand } = await admin.from('brand_directory').select('name, industry').eq('page_id', pageId).maybeSingle()
+    const { data: brand } = await admin.from('brand_directory').select('name, industry, country').eq('page_id', pageId).maybeSingle()
     let brandName = (brand?.name as string) || ''
     let niche = (brand?.industry as string) || null
+    let brandCountry = (brand?.country as string) || null
     if (!brandName || !niche) {
       const { data: mine } = await admin.from('discovery_ads_index').select('page_name, niche').eq('page_id', pageId).limit(80)
       const rows = (mine || []) as { page_name?: string; niche?: string }[]
@@ -62,19 +63,44 @@ export async function POST(req: NextRequest) {
     }
     if (!brandName) brandName = 'your brand'
 
-    // Rivals = highest-volume OTHER brands in the same niche. Try the directory first, then the live ad
-    // index (brands actually running ads in this niche) so competitors exist even off-catalog.
+    // Region signal for RELEVANT rivals — a $1M Bulgarian store is not a peer of a US brand. If the
+    // directory has no country, infer the brand's dominant ad country from its own ads' `countries[]`.
+    if (!brandCountry) {
+      const { data: mc } = await admin.from('discovery_ads_index').select('countries').eq('page_id', pageId).limit(120)
+      const cc: Record<string, number> = {}
+      for (const r of (mc || []) as { countries?: string[] }[]) for (const c of (r.countries || [])) { const k = String(c).trim().toUpperCase(); if (k) cc[k] = (cc[k] || 0) + 1 }
+      brandCountry = Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+    }
+
+    // Rivals = highest-volume OTHER brands in the same niche. We PREFER same-country rivals (a real peer,
+    // same language/market) and relax to niche-wide only if that pool is too thin, so the "make it yours"
+    // comparison isn't a foreign-language store. Directory first, then the live ad index (off-catalog).
     let competitorPageIds: string[] = []
     if (niche) {
-      const { data: rivals } = await admin.from('brand_directory')
-        .select('page_id').eq('industry', niche).neq('page_id', pageId)
-        .gt('source_ad_count', 0).order('source_ad_count', { ascending: false }).limit(10)
-      competitorPageIds = (rivals || []).map((r: any) => String(r.page_id))
+      const pickRivals = async (useCountry: boolean): Promise<string[]> => {
+        let q = admin.from('brand_directory').select('page_id').eq('industry', niche).neq('page_id', pageId).gt('source_ad_count', 0)
+        if (useCountry && brandCountry) q = q.eq('country', brandCountry)
+        const { data } = await q.order('source_ad_count', { ascending: false }).limit(10)
+        return (data || []).map((r: any) => String(r.page_id))
+      }
+      const push = (arr: string[]) => { const seen = new Set(competitorPageIds); for (const p of arr) if (!seen.has(p)) { seen.add(p); competitorPageIds.push(p) } }
+
+      // 1) same-country directory rivals (only if we know the country)
+      if (brandCountry) push(await pickRivals(true))
+      // 2) relax to niche-wide directory rivals if the country pool is thin (country matches stay first)
+      if (competitorPageIds.length < 5) push(await pickRivals(false))
+      competitorPageIds = competitorPageIds.slice(0, 10)
+
+      // 3) live ad-index fallback — prefer same-country ads, then relax
       if (competitorPageIds.length < 3) {
-        const { data: live } = await admin.from('discovery_ads_index')
-          .select('page_id').eq('niche', niche).eq('has_creative', true).neq('page_id', pageId).limit(400)
-        const seen = new Set(competitorPageIds)
-        for (const r of (live || []) as { page_id: string }[]) { const p = String(r.page_id); if (!seen.has(p)) { seen.add(p); competitorPageIds.push(p) } }
+        let lq = admin.from('discovery_ads_index').select('page_id').eq('niche', niche).eq('has_creative', true).neq('page_id', pageId)
+        if (brandCountry) lq = lq.contains('countries', [brandCountry])
+        const { data: live } = await lq.limit(400)
+        push((live || []).map((r: any) => String(r.page_id)))
+        if (competitorPageIds.length < 3) {
+          const { data: live2 } = await admin.from('discovery_ads_index').select('page_id').eq('niche', niche).eq('has_creative', true).neq('page_id', pageId).limit(400)
+          push((live2 || []).map((r: any) => String(r.page_id)))
+        }
         competitorPageIds = competitorPageIds.slice(0, 10)
       }
     }
