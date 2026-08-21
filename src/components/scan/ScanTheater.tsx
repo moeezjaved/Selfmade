@@ -90,13 +90,15 @@ export default function ScanTheater() {
       // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
       // instead of staging empty acts + a meaningless score.
       if (data.building) { setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
-      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'no ads found'); setStage('ads'); setPct(34); await sleep(1100)
-      setStage('rivals'); setStep('rivals', 'active'); await sleep(300)
-      setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60); await sleep(1100)
-      setStage('gaps'); setStep('gaps', 'active'); await sleep(300)
-      setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82); await sleep(900)
-      setStage('score'); setStep('score', 'active'); await sleep(300)
-      setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(500)
+      // Paced so a first-time viewer can actually READ each act (reading your ads → the rivals → the
+      // gaps) before it advances. The full report stays on the page afterwards to scroll back through.
+      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'no ads found'); setStage('ads'); setPct(34); await sleep(3200)
+      setStage('rivals'); setStep('rivals', 'active'); await sleep(600)
+      setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60); await sleep(3200)
+      setStage('gaps'); setStep('gaps', 'active'); await sleep(600)
+      setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82); await sleep(2800)
+      setStage('score'); setStep('score', 'active'); await sleep(600)
+      setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(900)
       setPhase('done'); running.current = false
     } catch (e) {
       setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
