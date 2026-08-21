@@ -6,7 +6,6 @@
  */
 import { useEffect } from 'react'
 import Link from 'next/link'
-import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
 export type PreviewAd = {
   image?: string | null; videoUrl?: string | null; brand?: string | null
@@ -46,10 +45,11 @@ export default function AdPreviewLightbox({ ad, onClose }: { ad: PreviewAd; onCl
         <button onClick={onClose} aria-label="Close"
           style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, background: 'rgba(13,12,10,.72)', color: '#fff', border: '1.5px solid rgba(255,255,255,.5)', borderRadius: '50%', width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
 
-        {/* the creative — Discovery player for video (white scrub line), image otherwise */}
+        {/* the creative — a real playing video (controls + autoplay), image otherwise */}
         <div style={{ width: '100%', aspectRatio: '4 / 5', maxHeight: '74vh', borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
           {videoSrc
-            ? <HoverScrubVideo src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} />
+            ? <video src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} controls autoPlay loop playsInline
+                style={{ width: '100%', height: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
             : ad.image
               /* eslint-disable-next-line @next/next/no-img-element */
               ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
