@@ -29,8 +29,9 @@ export type CreativeStrategy = {
   v?: number   // schema version — bump to invalidate stale cached strategies (e.g. old empty studioHrefs)
 }
 // Bump when the SHAPE/behaviour of ideas changes so cached strategies self-invalidate. v2: own-winner
-// ideas now seed the Studio with your creative (was an empty create form).
-export const STRATEGY_VERSION = 2
+// ideas seed the Studio with your creative. v3: winner images seeded at full res (image_url, not the
+// blurry thumbnail).
+export const STRATEGY_VERSION = 3
 
 /** The Studio deep-link. When the idea is a faithful rebuild of a rival ad we seed that ad (the remake
  *  flow, same as "Make it mine"). Otherwise we open the studio FRESH but carry the idea's angle so it's
