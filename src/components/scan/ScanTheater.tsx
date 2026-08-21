@@ -570,9 +570,11 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
   useEffect(() => { const t = setTimeout(() => setDrawn(true), 80); return () => clearTimeout(t) }, [])
   const lost = res.cost.lostPerYear
   const gaps = res.gaps.length
-  const headline = lost > 0
-    ? `You could be losing ~$${lost.toLocaleString()}/yr to ${gaps} gap${gaps === 1 ? '' : 's'}`
-    : `Here’s where your ads stand`
+  const headline = lost <= 0
+    ? `Here’s where your ads stand`
+    : gaps > 0
+      ? `You could be losing ~$${lost.toLocaleString()}/yr to ${gaps} gap${gaps === 1 ? '' : 's'}`
+      : `~$${lost.toLocaleString()}/yr of upside left on the table`
   return (
     <div className="sf-rise" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '10px 0 40px' }}>
       <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 26px' }}>

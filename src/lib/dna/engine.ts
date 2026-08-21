@@ -74,6 +74,24 @@ function rollup(rows: AdRow[]): DnaDist {
   return out
 }
 
+// Strip Meta dynamic-template placeholders ({{product.brand}} etc.) + collapse whitespace, so ad hooks
+// read like real copy, not raw template source.
+const cleanText = (s: string): string => (s || '').replace(/\{\{[^}]*\}\}/g, '').replace(/\s+/g, ' ').trim()
+
+// Dominant writing system of a string — used to keep rivals in the same language as the brand.
+function scriptOf(s: string): 'latin' | 'cyrillic' | 'cjk' | 'arabic' | 'other' {
+  const counts = { latin: 0, cyrillic: 0, cjk: 0, arabic: 0 }
+  for (const ch of s || '') {
+    const c = ch.codePointAt(0) || 0
+    if ((c >= 0x41 && c <= 0x5a) || (c >= 0x61 && c <= 0x7a) || (c >= 0xc0 && c <= 0x24f)) counts.latin++
+    else if (c >= 0x400 && c <= 0x4ff) counts.cyrillic++
+    else if ((c >= 0x4e00 && c <= 0x9fff) || (c >= 0x3040 && c <= 0x30ff) || (c >= 0xac00 && c <= 0xd7af)) counts.cjk++
+    else if (c >= 0x600 && c <= 0x6ff) counts.arabic++
+  }
+  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]
+  return top && top[1] > 0 ? (top[0] as 'latin' | 'cyrillic' | 'cjk' | 'arabic') : 'other'
+}
+
 const thumbOf = (a: AdRow): string | null => {
   const imgs = a.raw_image_urls as string[] | null
   const u = (a.thumbnail_url as string) || imgs?.[0] || null
@@ -107,7 +125,7 @@ export type WinnerDna = {
 }
 
 // ── L1: Winner DNA — the DNA of ads that survive (days_running ≥ 90) across these pages/niche ──
-export async function winnerDna(pageIds: string[], niche?: string | null): Promise<WinnerDna> {
+export async function winnerDna(pageIds: string[], niche?: string | null, brandName?: string | null): Promise<WinnerDna> {
   const db = createAdminClient()
   let rows: AdRow[] = []
 
@@ -131,6 +149,18 @@ export async function winnerDna(pageIds: string[], niche?: string | null): Promi
     rows = (data as AdRow[]) || []
   }
 
+  // Relevance: keep rivals in the SAME writing system as the brand (a Cyrillic/CJK store is not a
+  // believable peer for a Latin-script brand). Broad niches like "Health & Wellness" otherwise surface
+  // whatever foreign brand has the most/longest-running ads. Fall back to all rows if the same-language
+  // pool is too thin to describe a playbook.
+  if (brandName) {
+    const want = scriptOf(brandName)
+    if (want !== 'other') {
+      const same = rows.filter((r) => scriptOf(cleanText(String((r.body as string) || (r.title as string) || ''))) === want)
+      if (same.length >= 15) rows = same
+    }
+  }
+
   const winners = rows.filter((r) => (r.days_running as number) >= WINNER_DAYS)
   // Prefer examples that actually have a thumbnail so the rivals grid is full of real ads, not blanks.
   const withThumb = rows.filter((r) => thumbOf(r))
@@ -138,7 +168,7 @@ export async function winnerDna(pageIds: string[], niche?: string | null): Promi
     adId: String(a.ad_id),
     brand: String(a.page_name || ''),
     daysRunning: (a.days_running as number) || 0,
-    hook: ((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
+    hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
     format: (a.format_style as string) || (a.format as string) || null,
     thumb: thumbOf(a),
   }))
@@ -190,7 +220,7 @@ export async function ownDna(pageId: string | null): Promise<OwnDna> {
     adId: String(a.ad_id),
     brand: String(a.page_name || ''),
     daysRunning: (a.days_running as number) || 0,
-    hook: ((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
+    hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
     format: (a.format_style as string) || (a.format as string) || null,
     thumb: thumbOf(a),
   }))
@@ -349,7 +379,7 @@ export function estimateCost(own: OwnDna, gaps: Gap[], score: Score): CostEstima
 // ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. `v2` =
 // added own.examples (ad thumbnails) + cost; bumping the key bypasses caches that predate those fields. ──
 const cacheKey = (pageIds: string[], ownPage: string | null) =>
-  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v2').digest('hex').slice(0, 24)}.json`
+  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v3').digest('hex').slice(0, 24)}.json`
 
 export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cost: CostEstimate; cached: boolean }
 
@@ -367,7 +397,7 @@ export async function runDnaEngine(opts: {
     } catch { /* miss → compute */ }
   }
 
-  const [winners, own] = await Promise.all([winnerDna(competitorPageIds, niche), ownDna(ownPageId)])
+  const [winners, own] = await Promise.all([winnerDna(competitorPageIds, niche, brandName), ownDna(ownPageId)])
   const gaps = dnaDiff(own, winners)
   const report = await synthesize({ brandName, niche, own, winners, gaps })
   const score = scoreDna(own, winners, gaps)
