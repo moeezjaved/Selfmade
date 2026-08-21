@@ -85,7 +85,12 @@ export default function ScanTheater() {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
-    setRes(null); setRevealed(false); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(10)
+    setRes(null); setRevealed(false); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(5)
+    // Smooth, time-based progress creep (Ryze-style "13%… 57%…") — independent of the findings, so the
+    // bar always drifts up instead of jumping. Cleared on every exit path.
+    let prog = 5
+    const progIv = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
+    const stopProg = () => clearInterval(progIv)
     try {
       const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
@@ -93,53 +98,63 @@ export default function ScanTheater() {
       setRes(data)
       // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
       // instead of staging empty acts + a meaningless score.
-      if (data.building) { setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
-      // Ryze-style: each step opens sub-findings that tick in one by one, telling the viewer what we
-      // NOTICED — fast, but slow enough to read. `note` reveals a finding then pauses.
-      const note = async (id: StepId, text: string, bad?: boolean, ms = 620) => { addFinding(id, text, bad); await sleep(ms) }
+      if (data.building) { stopProg(); setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
+
+      // THE THEATER. Each step opens sub-findings that tick in slowly, one at a time, telling the viewer
+      // exactly what we NOTICED — a real investigation, not a progress bar. Deliberately unhurried.
+      const note = async (id: StepId, text: string, bad?: boolean, ms = 2000) => { addFinding(id, text, bad); await sleep(ms) }
+      const openStage = async (id: StepId) => { setStage(id); setStep(id, 'active'); await sleep(1500) }
       const topLabel = (d: Record<string, Tally[]>, k: string) => (d[k] || [])[0]?.label
       const ownD = data.own.dist as Record<string, Tally[]>, winD = data.winners.dist as Record<string, Tally[]>
 
       // ── Reading your ads ──
+      await sleep(900)
       if (data.own.found) {
-        await note('ads', `Read ${data.own.totalAds.toLocaleString()} ads · ${data.own.activeAds} active now`)
-        if (data.own.media.length) await note('ads', data.own.media.slice(0, 3).map((m) => `${m.label} ${m.pct}%`).join(' · '))
-        if (topLabel(ownD, 'hook_type')) await note('ads', `Your top hook: ${topLabel(ownD, 'hook_type')}`)
-        await note('ads', `${(ownD.persona || []).length} personas · ${(ownD.angle || []).length} angles in play`)
+        await note('ads', `Opened ${data.own.totalAds.toLocaleString()} ads — reading every one`)
+        await note('ads', `${data.own.activeAds} live right now`)
+        if (data.own.media.length) await note('ads', `Format mix: ${data.own.media.slice(0, 3).map((m) => `${m.label} ${m.pct}%`).join(' · ')}`)
+        if (topLabel(ownD, 'hook_type')) await note('ads', `Your signature hook: ${topLabel(ownD, 'hook_type')}`)
+        if (topLabel(ownD, 'angle')) await note('ads', `Your lead angle: ${topLabel(ownD, 'angle')}`)
+        await note('ads', `Speaking to ${(ownD.persona || []).length} personas across ${(ownD.angle || []).length} angles`)
+        if (topLabel(ownD, 'emotion')) await note('ads', `Strongest emotion you pull: ${topLabel(ownD, 'emotion')}`)
       } else {
-        await note('ads', 'No ads running that we can see', true)
+        await note('ads', 'No live ads we can see — that’s gap #1', true)
       }
-      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'none'); setPct(34)
+      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'none')
 
       // ── Spying on your rivals ──
-      setStage('rivals'); setStep('rivals', 'active')
-      await note('rivals', `${data.winners.winnerCount.toLocaleString()} rival ads running 90+ days`)
-      if (topLabel(winD, 'angle')) await note('rivals', `Their go-to angle: ${topLabel(winD, 'angle')}`)
-      if (topLabel(winD, 'hook_type')) await note('rivals', `Their go-to hook: ${topLabel(winD, 'hook_type')}`)
-      if (data.winners.media[0]) await note('rivals', `Leaning on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`)
-      if (data.winners.examples[0]?.daysRunning) await note('rivals', `Longest winner: ${data.winners.examples[0].daysRunning} days live`)
-      setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60)
+      await openStage('rivals')
+      await note('rivals', `Pulled ${data.winners.winnerCount.toLocaleString()} rival ads still running after 90 days`)
+      if (topLabel(winD, 'angle')) await note('rivals', `Their favourite angle: ${topLabel(winD, 'angle')}`)
+      if (topLabel(winD, 'hook_type')) await note('rivals', `Their favourite hook: ${topLabel(winD, 'hook_type')}`)
+      if (data.winners.media[0]) await note('rivals', `They lean on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`)
+      if (topLabel(winD, 'persona')) await note('rivals', `Persona they chase: ${topLabel(winD, 'persona')}`)
+      if (topLabel(winD, 'usp')) await note('rivals', `Their strongest promise: ${topLabel(winD, 'usp')}`)
+      if (data.winners.examples[0]?.daysRunning) await note('rivals', `Longest-running winner: ${data.winners.examples[0].daysRunning} days live`)
+      setStep('rivals', 'done', `${data.winners.winnerCount} winners`)
 
       // ── Finding your gaps ──
-      setStage('gaps'); setStep('gaps', 'active')
+      await openStage('gaps')
+      await note('gaps', 'Lining your DNA up against theirs…')
       if (data.gaps.length) {
-        await note('gaps', `${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you're missing`, true)
-        for (const g of data.gaps.slice(0, 4)) await note('gaps', `Missing: ${g.dimension} — ${g.label}`, true)
+        await note('gaps', `${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you’re not running`, true)
+        for (const g of data.gaps.slice(0, 5)) await note('gaps', `Missing: ${g.dimension} — ${g.label}`, true)
       } else {
-        await note('gaps', "You're running the winners' playbook")
+        await note('gaps', 'You’re already running the winners’ playbook')
       }
-      setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82)
+      setStep('gaps', 'done', `${data.gaps.length} gaps`)
 
       // ── Scoring ──
-      setStage('score'); setStep('score', 'active')
+      await openStage('score')
       for (const sc of data.score.subscores) {
         if (sc.value == null) continue
-        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 480)
+        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 1500)
       }
-      setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(700)
+      await note('score', `Final ad-presence score: ${data.score.total}/100`, false, 1200)
+      stopProg(); setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(800)
       setPhase('done'); running.current = false
     } catch (e) {
-      setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
+      stopProg(); setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
     }
   }, [setStep, addFinding])
 
