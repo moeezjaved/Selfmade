@@ -538,12 +538,12 @@ function ScoreAct({ res }: { res: ScanResult }) {
 
 // ── ACT 5 — "The fix" payoff: live free ads, scripted video, gated CTA + rival remake ──
 type CreativeState = { status: 'loading' | 'ready' | 'error'; imageUrl?: string }
-function FixCard({ brief, brandName, niche, i }: { brief: CreativeBrief; brandName: string; niche: string | null; i: number }) {
+function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief; brandName: string; niche: string | null; pageId: string; i: number }) {
   const [st, setSt] = useState<CreativeState>({ status: 'loading' })
   useEffect(() => {
     let alive = true
     setSt({ status: 'loading' })
-    fetch('/api/scan/creative', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brief, brandName, niche }) })
+    fetch('/api/scan/creative', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brief, brandName, niche, pageId }) })
       .then(async (r) => {
         if (!r.ok) throw new Error(String(r.status))
         const j = await r.json()
@@ -589,7 +589,7 @@ function TheFix({ res }: { res: ScanResult }) {
       <p style={sub}>Not a to-do list. Real ads, generated from the winning DNA you&rsquo;re missing.</p>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 16, marginTop: 22 }}>
-        {briefs.map((b, i) => <FixCard key={b.key} brief={b} brandName={res.brand.name} niche={res.brand.niche} i={i} />)}
+        {briefs.map((b, i) => <FixCard key={b.key} brief={b} brandName={res.brand.name} niche={res.brand.niche} pageId={res.brand.pageId} i={i} />)}
       </div>
 
       <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>Your {script.totalSeconds}-second video, scripted</div>
