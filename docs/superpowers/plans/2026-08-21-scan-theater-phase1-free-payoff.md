@@ -197,7 +197,7 @@ Create `src/app/api/scan/creative/route.ts` (`export const runtime='nodejs'`, `m
 2. Global daily budget guard: an in-memory counter `{ day: string; n: number }` reset when the UTC date string changes; **hard cap `SCAN_CREATIVE_DAILY_MAX` (env, default 300)**; over cap → `429 { error:'busy', retryAfter: 3600 }`.
 3. Validate `brief.prompt` + `brandName`; missing → `400`.
 4. If `!process.env.GEMINI_API_KEY` → `503 { error:'not_configured' }`.
-5. Call the SAME Gemini render helper `generate-ad` uses (import the shared function; if it's inline there, extract it to `src/lib/creative/render.ts` in this task and have BOTH call it — note this modifies `generate-ad` only to import the extracted helper, no behavior change). Render at `2K`, product image optional (if none, text/graphic ad).
+5. Render via a **self-contained** Gemini call in this route (or a NEW `src/lib/creative/scanRender.ts` used ONLY by this route). **Do NOT modify `generate-ad` or any existing studio endpoint** — read its code for reference only; duplicate the minimal render call here. This keeps every live code path byte-identical (production-safety constraint). Render at `2K`, product image optional (if none, text/graphic ad).
 6. Composite a diagonal **"SELFMADE · PREVIEW"** watermark before upload (canvas/sharp already in deps via `@remotion`/image libs; if not, overlay via the model prompt is NOT acceptable — use a server-side image composite util; add `sharp` only if already present, else draw the watermark with the existing R2/image path).
 7. Upload to R2 (`uploadBufferToR2` + `r2PublicUrl`, already used by the DNA engine cache) under `scan-previews/<hash>.png`; return `{ imageUrl, watermarked:true }`.
 8. Wrap everything so any downstream throw returns `503 { error:'render_failed' }`, never an unhandled 500.
@@ -214,7 +214,7 @@ Expected: step 1 → `400`; step 2 → `200` JSON with `imageUrl` (or a clean `4
 - [ ] **Step 5: Commit**
 
 ```bash
-git add src/app/api/scan/creative/route.ts scripts/scan-creative-endpoint-check.sh src/lib/creative/render.ts src/app/api/discovery/generate-ad/route.ts
+git add src/app/api/scan/creative/route.ts scripts/scan-creative-endpoint-check.sh src/lib/creative/scanRender.ts
 git commit -m "feat(scan): public capped watermarked image render for anonymous audit payoff"
 ```
 
