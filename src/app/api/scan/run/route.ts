@@ -44,18 +44,38 @@ export async function POST(req: NextRequest) {
 
   try {
     const admin = createAdminClient()
-    // Resolve the brand + its niche (for competitor selection + the engine's niche fallback).
+    // Resolve the brand + its niche. Prefer the directory; fall back to the brand's OWN crawled ads
+    // (page_name + most-common niche) so a brand that's crawled but not in the 611K catalog still resolves.
     const { data: brand } = await admin.from('brand_directory').select('name, industry').eq('page_id', pageId).maybeSingle()
-    const brandName = (brand?.name as string) || 'your brand'
-    const niche = (brand?.industry as string) || null
+    let brandName = (brand?.name as string) || ''
+    let niche = (brand?.industry as string) || null
+    if (!brandName || !niche) {
+      const { data: mine } = await admin.from('discovery_ads_index').select('page_name, niche').eq('page_id', pageId).limit(80)
+      const rows = (mine || []) as { page_name?: string; niche?: string }[]
+      if (!brandName) brandName = rows.find((r) => r.page_name)?.page_name || ''
+      if (!niche) {
+        const c: Record<string, number> = {}
+        for (const r of rows) { const n = (r.niche || '').trim(); if (n) c[n] = (c[n] || 0) + 1 }
+        niche = Object.entries(c).sort((a, b) => b[1] - a[1])[0]?.[0] || null
+      }
+    }
+    if (!brandName) brandName = 'your brand'
 
-    // Rivals = the highest-volume OTHER brands in the same niche (they're the ones running the most ads).
+    // Rivals = highest-volume OTHER brands in the same niche. Try the directory first, then the live ad
+    // index (brands actually running ads in this niche) so competitors exist even off-catalog.
     let competitorPageIds: string[] = []
     if (niche) {
       const { data: rivals } = await admin.from('brand_directory')
         .select('page_id').eq('industry', niche).neq('page_id', pageId)
         .gt('source_ad_count', 0).order('source_ad_count', { ascending: false }).limit(10)
       competitorPageIds = (rivals || []).map((r: any) => String(r.page_id))
+      if (competitorPageIds.length < 3) {
+        const { data: live } = await admin.from('discovery_ads_index')
+          .select('page_id').eq('niche', niche).eq('has_creative', true).neq('page_id', pageId).limit(400)
+        const seen = new Set(competitorPageIds)
+        for (const r of (live || []) as { page_id: string }[]) { const p = String(r.page_id); if (!seen.has(p)) { seen.add(p); competitorPageIds.push(p) } }
+        competitorPageIds = competitorPageIds.slice(0, 10)
+      }
     }
 
     const result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
@@ -72,7 +92,10 @@ export async function POST(req: NextRequest) {
       } catch { /* enqueue best-effort */ }
     }
 
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, ...result })
+    // Nothing to show yet (your ads not indexed AND no rival data) → the UI shows a "building" state
+    // instead of a meaningless score. The crawl we just kicked off fills this in within minutes.
+    const building = !result.own.found && result.winners.sampleSize === 0
+    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, ...result })
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }
