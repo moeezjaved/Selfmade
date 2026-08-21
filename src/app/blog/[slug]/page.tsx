@@ -97,6 +97,19 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         /* inline (non-figure) images stay simple */
         .prose img{max-width:100%;border-radius:12px;margin:10px 0}
         .prose hr{border:none;height:1px;background:linear-gradient(90deg,transparent,rgba(28,22,17,.16),transparent);margin:48px 0}
+        /* Designed CTA card (:::cta) */
+        .prose .sf-cta{background:linear-gradient(135deg,${LIME},#ff8a4d);border-radius:20px;padding:32px 28px;margin:44px 0;text-align:center;box-shadow:0 24px 60px -30px rgba(239,74,30,.6)}
+        .prose .sf-cta-h{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:27px;line-height:1.12;color:#fff;letter-spacing:-.01em;margin:0 0 8px}
+        .prose .sf-cta-s{font-family:'Inter',sans-serif;color:rgba(255,255,255,.94);font-size:16px;line-height:1.5;margin:0 0 20px}
+        .prose a.sf-cta-b{display:inline-block;background:#1c1611;color:#fff;padding:14px 28px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:15px;text-decoration:none;border:none}
+        .prose a.sf-cta-b:hover{border:none;opacity:.92}
+        /* Designed steps card (:::steps) */
+        .prose .sf-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:44px 0;background:#211a13;border-radius:20px;padding:30px 26px}
+        .prose .sf-step{display:flex;gap:13px;align-items:flex-start}
+        .prose .sf-step-n{flex:none;width:32px;height:32px;border-radius:50%;background:${LIME};color:#fff;font-family:'Inter',sans-serif;font-weight:800;font-size:15px;display:flex;align-items:center;justify-content:center}
+        .prose .sf-step-b b{font-family:'Inter',sans-serif;color:#fff;font-size:15.5px;font-weight:800;display:block;margin-bottom:4px}
+        .prose .sf-step-b p{font-family:'Inter',sans-serif;color:#a99f92;font-size:13.5px;line-height:1.45;margin:0}
+        @media (max-width:640px){.prose .sf-steps{grid-template-columns:1fr;gap:20px}}
       `}</style>
 
       <nav style={{ borderBottom: '1px solid rgba(28,22,17,.08)' }}>
@@ -128,10 +141,26 @@ export default async function BlogPost({ params }: { params: { slug: string } })
       <div className="prose" style={{ maxWidth: 760, margin: '0 auto', padding: '38px 24px 24px' }} dangerouslySetInnerHTML={{ __html: html }} />
 
       <section style={{ maxWidth: 760, margin: '0 auto', padding: '20px 24px 44px' }}>
-        <div style={{ background: `linear-gradient(135deg,${LIME},#ff8a4d)`, borderRadius: 22, padding: '34px 30px', textAlign: 'center', boxShadow: '0 24px 60px -28px rgba(239,74,30,.6)' }}>
-          <h2 style={{ fontFamily: "'Fraunces',Georgia,serif", fontSize: 'clamp(22px,3.5vw,30px)', fontWeight: 700, letterSpacing: '-.01em', margin: '0 0 8px', color: '#fff' }}>Put this into practice</h2>
-          <p style={{ color: 'rgba(255,255,255,.9)', margin: '0 0 18px', fontSize: 16 }}>Find a proven winner in your niche and make it yours — free to start.</p>
-          <Link href="/signup" style={{ background: '#1c1611', color: '#fff', padding: '13px 26px', borderRadius: 100, fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Start for free →</Link>
+        <div style={{ background: 'radial-gradient(120% 130% at 15% 0%, #2a2016 0%, #1c1611 55%)', border: '1px solid rgba(239,74,30,.28)', borderRadius: 24, padding: '38px 34px', boxShadow: '0 30px 70px -34px rgba(0,0,0,.6)' }}>
+          <h2 style={{ fontFamily: "'Fraunces',Georgia,serif", fontSize: 'clamp(24px,3.8vw,34px)', fontWeight: 700, letterSpacing: '-.015em', lineHeight: 1.1, margin: '0 0 20px', color: '#fff' }}>Or skip the setup — your marketing, on autopilot.</h2>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, margin: '0 0 26px' }}>
+            {['Runs the whole 50-agent stack for you, 24/7', 'Spies, clones & launches ads automatically', 'You approve — it acts'].map((t) => (
+              <div key={t} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', color: 'rgba(255,255,255,.86)', fontSize: 14.5, lineHeight: 1.4 }}>
+                <span style={{ color: LIME, fontWeight: 900, flex: 'none' }}>✓</span>{t}
+              </div>
+            ))}
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 20, justifyContent: 'space-between' }}>
+            <Link href="/signup" style={{ background: `linear-gradient(135deg,${LIME},#ff8a4d)`, color: '#fff', padding: '15px 30px', borderRadius: 100, fontSize: 16, fontWeight: 800, textDecoration: 'none', boxShadow: '0 16px 36px -14px rgba(239,74,30,.7)' }}>Start free →</Link>
+            <div style={{ display: 'flex', gap: 26 }}>
+              {[['3M+', 'ads spied'], ['50', 'AI agents'], ['minutes', 'to launch']].map(([n, l]) => (
+                <div key={l}>
+                  <div style={{ fontFamily: "'Fraunces',Georgia,serif", fontWeight: 700, fontSize: 22, color: '#fff', lineHeight: 1 }}>{n}</div>
+                  <div style={{ fontSize: 12, color: 'rgba(255,255,255,.55)', marginTop: 4 }}>{l}</div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       </section>
 

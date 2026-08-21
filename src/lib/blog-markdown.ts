@@ -30,6 +30,24 @@ function inline(t: string): string {
     .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
 }
 
+// ── Designed blocks (Ryze-style) — authored as :::cta / :::steps fences, rendered to a fixed,
+// safe HTML shape (all values escaped). Lets posts drop rich CTA/step cards inline without raw HTML.
+function renderCta(buf: string[]): string {
+  const kv: Record<string, string> = {}
+  for (const l of buf) { const m = l.match(/^(\w+):\s*(.*)$/); if (m) kv[m[1].toLowerCase()] = m[2].trim() }
+  const h = esc(kv.heading || ''); const s = kv.sub ? inline(esc(kv.sub)) : ''
+  const b = esc(kv.button || 'Start free'); const href = kv.href || '/signup'
+  const ext = /^https?:\/\//.test(href) && !href.includes('tryselfmade')
+  return `<div class="sf-cta"><div class="sf-cta-h">${h}</div>${s ? `<p class="sf-cta-s">${s}</p>` : ''}<a class="sf-cta-b" href="${esc(href)}"${ext ? ' target="_blank" rel="noopener nofollow"' : ''}>${b} →</a></div>`
+}
+function renderSteps(buf: string[]): string {
+  const items = buf.map((l) => l.trim()).filter(Boolean).map((l, idx) => {
+    const [t, ...d] = l.split('|'); const title = esc((t || '').trim()); const desc = d.length ? inline(esc(d.join('|').trim())) : ''
+    return `<div class="sf-step"><span class="sf-step-n">${idx + 1}</span><div class="sf-step-b"><b>${title}</b>${desc ? `<p>${desc}</p>` : ''}</div></div>`
+  }).join('')
+  return `<div class="sf-steps">${items}</div>`
+}
+
 export function renderMarkdown(md: string): string {
   const lines = (md || '').replace(/\r\n/g, '\n').split('\n')
   const out: string[] = []
@@ -45,6 +63,14 @@ export function renderMarkdown(md: string): string {
       while (i < lines.length && !/^```/.test(lines[i])) { code.push(lines[i]); i++ }
       i++
       out.push(`<pre><code>${esc(code.join('\n'))}</code></pre>`); continue
+    }
+    const dir = line.match(/^:::(cta|steps)\s*$/)
+    if (dir) {
+      flushPara(); i++
+      const buf: string[] = []
+      while (i < lines.length && !/^:::\s*$/.test(lines[i])) { buf.push(lines[i]); i++ }
+      i++ // consume closing :::
+      out.push(dir[1] === 'cta' ? renderCta(buf) : renderSteps(buf)); continue
     }
     const h = line.match(/^(#{1,4})\s+(.*)$/)
     if (h) { flushPara(); const lvl = h[1].length + 1; out.push(`<h${lvl}>${inline(esc(h[2].trim()))}</h${lvl}>`); i++; continue }
