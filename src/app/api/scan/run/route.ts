@@ -176,7 +176,7 @@ export async function POST(req: NextRequest) {
     // Nothing to show yet (your ads not indexed AND no rival data) → the UI shows a "building" state
     // instead of a meaningless score. The crawl we just kicked off fills this in within minutes.
     const building = !result.own.found && result.winners.sampleSize === 0
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, _kw: kw, ownPending, building, briefs, rivalToRemake, ...result })
+    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, ...result })
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }
