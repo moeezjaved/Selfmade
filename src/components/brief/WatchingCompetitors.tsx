@@ -25,7 +25,7 @@ const LABEL: Record<Row['status'], (n: number) => string> = {
 }
 const COLOR: Record<Row['status'], string> = { live: GREEN, crawling: '#b7791f', queued: '#b7791f', empty: '#a7b0a5' }
 
-function Thumbs({ ads }: { ads: Ad[] }) {
+function Thumbs({ ads, pageId, brand }: { ads: Ad[]; pageId: string; brand: string }) {
   const [preview, setPreview] = useState<PreviewAd>(null)
   if (!ads.length) return null
   return (
@@ -33,7 +33,7 @@ function Thumbs({ ads }: { ads: Ad[] }) {
       <AdPreviewLightbox ad={preview} onClose={() => setPreview(null)} />
       {ads.slice(0, 4).map(a => (
         // Tap the ad to VIEW it right here (image/video) instead of bouncing to Brand Spy.
-        <button key={a.adId} onClick={() => setPreview({ image: a.image, videoUrl: a.videoUrl })} title="View ad"
+        <button key={a.adId} onClick={() => setPreview({ image: a.image, videoUrl: a.videoUrl, isVideo: a.isVideo, adId: a.adId, pageId, brand })} title="View ad"
           style={{ display: 'block', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', background: '#eef2ec', position: 'relative', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' }}>
           {a.image
             /* eslint-disable-next-line @next/next/no-img-element */
@@ -125,7 +125,7 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
                   <span style={{ fontSize: 12, fontWeight: 700, color: COLOR[r.status], whiteSpace: 'nowrap' }}>{LABEL[r.status](r.adCount)}</span>
                 </div>
                 {hasNew && <div style={{ fontSize: 12, color: '#9a6a12', fontWeight: 750, marginTop: 6 }}>{r.brand} launched {r.newAds!.length === 1 ? 'a new ad' : `${r.newAds!.length} new ads`} 👀</div>}
-                <Thumbs ads={ads} />
+                <Thumbs ads={ads} pageId={r.pageId} brand={r.brand} />
               </div>
             )
           })}

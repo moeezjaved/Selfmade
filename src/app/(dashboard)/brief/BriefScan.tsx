@@ -337,7 +337,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                           <span className="bsx-shots" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                             {c.media.slice(0, 3).map((m, k) => (
                               // Tap the ad → view it here (image/video), don't navigate to Brand Spy.
-                              <span key={k} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreview({ image: m.image, videoUrl: m.videoUrl, brand: name }) }} style={{ cursor: 'pointer', display: 'inline-block' }}>
+                              <span key={k} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreview({ image: m.image, videoUrl: m.videoUrl, brand: name, adId: m.adId, isVideo: !!(m.videoUrl || (m.image && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(m.image))), pageId: c.cta_href?.match(/\/(?:brand-spy|brand)\/(\d+)/)?.[1] || null }) }} style={{ cursor: 'pointer', display: 'inline-block' }}>
                                 <Shot image={m.image} videoUrl={m.videoUrl} w={42} h={53} />
                               </span>
                             ))}
