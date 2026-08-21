@@ -6,8 +6,8 @@ import type { Metadata } from 'next'
 import ScanTheater from '@/components/scan/ScanTheater'
 
 export const metadata: Metadata = {
-  title: { absolute: 'Free ad scan — spy on your competitors | Selfmade' },
-  description: "See what's winning in your market in 90 seconds — your rivals' proven ads, your gaps, and ads made for you.",
+  title: { absolute: 'Free ad audit — how do your ads stack up? | Selfmade' },
+  description: "Audit your ads in 90 seconds — your ad presence, your gaps, and what your rivals are winning with. No login.",
   robots: { index: false },   // preview: keep it out of search until productionized
 }
 
