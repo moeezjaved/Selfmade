@@ -298,9 +298,18 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     return match?.thumbnail_url || ownAds.find((a: any) => a.thumbnail_url)?.thumbnail_url || null
   }
   ideas = ideas.map(i => {
-    if (i.reference && i.reference.kind === 'ours' && !i.reference.image) {
-      const img = adThumbFor(i.reference.label) || ownVisual
-      if (img) return { ...i, reference: { ...i.reference, image: img } }
+    if (i.reference && i.reference.kind === 'ours') {
+      const img = i.reference.image || adThumbFor(i.reference.label) || ownVisual
+      if (img) {
+        // Seed the Studio with YOUR OWN winning creative so "Make it →" opens with your ad loaded to
+        // riff on — not a blank create form. Uses the asset-remake path (src=asset+img), the same
+        // reference-seeded flow the competitor "Make it mine" uses, but pointed at your own creative.
+        const angle = new URLSearchParams((i.studioHref.split('?')[1] || '')).get('angle') || ''
+        const q = new URLSearchParams({ src: 'asset', img })
+        if (brand) q.set('brand', brand)
+        if (angle) q.set('angle', angle)
+        return { ...i, reference: { ...i.reference, image: img }, studioHref: `/studio?${q.toString()}` }
+      }
     }
     return i
   })

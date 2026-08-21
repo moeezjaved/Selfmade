@@ -105,7 +105,12 @@ function grade(campaigns: any[]): AuditResult {
     let tier: Graded['grade'] = 'hold'
     if (avgRoas > 0 && roas >= avgRoas * g.graduate.roas_above_avg_pct && spend >= avgSpend * g.graduate.min_spend_pct && conv >= g.graduate.min_conversions) tier = 'graduate'
     else if ((ctr >= avgCtr * g.catchy_not_converting.ctr_above_avg_multiplier || spend >= avgSpend * g.catchy_not_converting.spend_above_avg_multiplier) && (avgRoas === 0 || roas < avgRoas * g.catchy_not_converting.roas_below_avg_pct)) tier = 'catchy'
-    else if (spend < avgSpend * g.pause_poor.spend_below_avg_pct && (avgRoas === 0 || roas < avgRoas * g.pause_poor.roas_below_avg_pct)) tier = 'pause'
+    // PAUSE ("burning budget") = low spend AND genuinely-known-poor ROAS AND not actually converting.
+    // Guardrails vs the old rule (which flagged any low-spend campaign as poor whenever value/ROAS data
+    // was missing — falsely tagging efficient retargeting with real conversions as "burning budget"):
+    //  · require avgRoas > 0 (we can only call something a bleeder when we actually measure return), and
+    //  · never pause a campaign that's converting (conv >= graduate.min_conversions).
+    else if (spend < avgSpend * g.pause_poor.spend_below_avg_pct && avgRoas > 0 && roas < avgRoas * g.pause_poor.roas_below_avg_pct && conv < g.graduate.min_conversions) tier = 'pause'
     return { campaignId: c.id, metaCampaignId: c.meta_campaign_id, name: c.name, grade: tier, spend, roas, ctr, conversions: conv, impressions: Number(i.impressions || 0), clicks: Number(i.clicks || 0), dailyBudget: c.daily_budget != null ? Number(c.daily_budget) : null, active: isActive(c) }
   })
   // The Scale / Watch / Pause buckets ONLY show currently-DELIVERING campaigns — you can't scale, watch,

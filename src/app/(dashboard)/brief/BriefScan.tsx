@@ -31,6 +31,7 @@ import CreativeStrategistCard from '@/components/brief/CreativeStrategistCard'
 import WatchingCompetitors from '@/components/brief/WatchingCompetitors'
 import BrandGuardianCard from '@/components/brief/BrandGuardianCard'
 import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
+import AdPreviewLightbox, { type PreviewAd } from '@/components/brief/AdPreviewLightbox'
 
 const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
 
@@ -153,6 +154,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
   // that's true both when nothing is connected AND when it's connected-but-not-audited. Read the real
   // per-brand connection (source of truth) so a not-connected user sees "Connect Meta", not "Run ads".
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
+  const [preview, setPreview] = useState<PreviewAd>(null)   // tap a competitor ad → view it here, not Brand Spy
   useEffect(() => {
     if (!canLaunch) { setMetaConnected(false); return }
     let cancelled = false
@@ -173,6 +175,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
 
   return (
     <div className="bsx" style={{ marginTop: 20 }}>
+      <AdPreviewLightbox ad={preview} onClose={() => setPreview(null)} />
       {/* ── ARRIVAL — the brief doesn't "load", it was PREPARED. One calm sequence: the status row
           states the night's work → the hero settles into place → the rest of the desk follows → the
           sidebar last. Pure CSS (runs without JS, honors prefers-reduced-motion); ~1s total, nothing
@@ -333,7 +336,10 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                         {!!c.media?.length && (
                           <span className="bsx-shots" style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
                             {c.media.slice(0, 3).map((m, k) => (
-                              <Shot key={k} image={m.image} videoUrl={m.videoUrl} w={42} h={53} />
+                              // Tap the ad → view it here (image/video), don't navigate to Brand Spy.
+                              <span key={k} onClick={(e) => { e.preventDefault(); e.stopPropagation(); setPreview({ image: m.image, videoUrl: m.videoUrl, brand: name }) }} style={{ cursor: 'pointer', display: 'inline-block' }}>
+                                <Shot image={m.image} videoUrl={m.videoUrl} w={42} h={53} />
+                              </span>
                             ))}
                           </span>
                         )}

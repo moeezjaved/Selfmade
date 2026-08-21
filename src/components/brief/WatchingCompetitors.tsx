@@ -8,6 +8,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
+import AdPreviewLightbox, { type PreviewAd } from '@/components/brief/AdPreviewLightbox'
 
 const INK = '#141d15', GREEN = '#ef4a1e', LINE = 'rgba(0,0,0,0.08)', FOREST = '#141d15', LIME = '#ff5a2c'
 
@@ -24,18 +25,22 @@ const LABEL: Record<Row['status'], (n: number) => string> = {
 }
 const COLOR: Record<Row['status'], string> = { live: GREEN, crawling: '#b7791f', queued: '#b7791f', empty: '#a7b0a5' }
 
-function Thumbs({ ads, pageId }: { ads: Ad[]; pageId: string }) {
+function Thumbs({ ads }: { ads: Ad[] }) {
+  const [preview, setPreview] = useState<PreviewAd>(null)
   if (!ads.length) return null
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+      <AdPreviewLightbox ad={preview} onClose={() => setPreview(null)} />
       {ads.slice(0, 4).map(a => (
-        <Link key={a.adId} href={`/discovery/brand-spy/${pageId}`} style={{ display: 'block', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', background: '#eef2ec', position: 'relative', flexShrink: 0 }}>
+        // Tap the ad to VIEW it right here (image/video) instead of bouncing to Brand Spy.
+        <button key={a.adId} onClick={() => setPreview({ image: a.image, videoUrl: a.videoUrl })} title="View ad"
+          style={{ display: 'block', width: 62, height: 62, borderRadius: 8, overflow: 'hidden', background: '#eef2ec', position: 'relative', flexShrink: 0, border: 'none', padding: 0, cursor: 'pointer' }}>
           {a.image
             /* eslint-disable-next-line @next/next/no-img-element */
             ? <img src={a.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} />
             : <span style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', fontSize: 18 }}>🎬</span>}
           {a.isVideo && <span style={{ position: 'absolute', bottom: 3, right: 3, fontSize: 8.5, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 3, padding: '0 4px', lineHeight: '13px' }}>▶</span>}
-        </Link>
+        </button>
       ))}
     </div>
   )
@@ -120,7 +125,7 @@ export default function WatchingCompetitors({ brandId, brandName }: { brandId?: 
                   <span style={{ fontSize: 12, fontWeight: 700, color: COLOR[r.status], whiteSpace: 'nowrap' }}>{LABEL[r.status](r.adCount)}</span>
                 </div>
                 {hasNew && <div style={{ fontSize: 12, color: '#9a6a12', fontWeight: 750, marginTop: 6 }}>{r.brand} launched {r.newAds!.length === 1 ? 'a new ad' : `${r.newAds!.length} new ads`} 👀</div>}
-                <Thumbs ads={ads} pageId={r.pageId} />
+                <Thumbs ads={ads} />
               </div>
             )
           })}
