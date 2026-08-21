@@ -30,7 +30,10 @@ const REVEAL_CSS = `
 .sf-rise{animation:sf-rise .5s cubic-bezier(.2,.7,.2,1) both}
 @keyframes sf-shim{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .sf-shim{background:linear-gradient(90deg,#efe8da 25%,#f7f1e5 37%,#efe8da 63%);background-size:200% 100%;animation:sf-shim 1.3s ease-in-out infinite}
-@media (prefers-reduced-motion:reduce){.sf-rise{animation:none}.sf-shim{animation:none}}
+.sf-gauge{transition:stroke-dashoffset 1s cubic-bezier(.4,0,.2,1)}
+@keyframes sf-glow{0%{box-shadow:0 0 0 0 rgba(224,47,6,.0)}30%{box-shadow:0 0 0 4px rgba(224,47,6,.28)}100%{box-shadow:0 0 0 0 rgba(224,47,6,0)}}
+.sf-glow{animation:sf-glow 1.6s ease-out 1 both}
+@media (prefers-reduced-motion:reduce){.sf-rise{animation:none}.sf-shim{animation:none}.sf-gauge{transition:none}.sf-glow{animation:none}}
 `
 const rise = (i = 0): CSSProperties => ({ animationDelay: `${i * 70}ms` })
 
@@ -352,7 +355,7 @@ function BenchSection({ bench, systemScore }: { bench: BenchAxis[]; systemScore:
                 <span style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{a.label} <span style={{ color: t.c, fontWeight: 800 }}>· {t.l}</span></span>
                 <span style={{ fontSize: 12.5, color: SUB }}><b style={{ color: INK }}><Count n={a.you} /></b> {a.unit} · <span style={{ color: MUT }}>{a.target}</span></span>
               </div>
-              <div style={{ height: 8, background: 'rgba(26,20,16,.08)', borderRadius: 100, overflow: 'hidden' }}>
+              <div className={on && a.tier === 'starter' ? 'sf-glow' : undefined} style={{ height: 8, background: 'rgba(26,20,16,.08)', borderRadius: 100, overflow: 'hidden' }}>
                 <div style={{ height: 8, width: on ? `${Math.max(3, a.pct)}%` : '0%', background: t.c, borderRadius: 100, transition: 'width 1s cubic-bezier(.4,0,.2,1)' }} />
               </div>
             </div>
@@ -399,7 +402,7 @@ function ScoreAct({ res }: { res: ScanResult }) {
         <div style={{ position: 'relative', width: 180, height: 180, flex: 'none' }}>
           <svg width="180" height="180" viewBox="0 0 180 180">
             <circle cx="90" cy="90" r="78" fill="none" stroke="rgba(26,20,16,.1)" strokeWidth="12" />
-            <circle cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)' }} />
+            <circle className="sf-gauge" cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
             <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
