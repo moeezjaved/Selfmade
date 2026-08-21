@@ -1,4 +1,4 @@
-import { creativeBriefs } from '../src/lib/dna/creative'
+import { creativeBriefs, videoShotList } from '../src/lib/dna/creative'
 import type { FullDnaResult } from '../src/lib/dna/engine'
 
 function assert(cond: boolean, msg: string) { if (!cond) { console.error('FAIL:', msg); process.exit(1) } }
@@ -27,3 +27,10 @@ assert(b2.length >= 1, 'gaps fallback yields at least one brief')
 assert(b2[0].gapLabel === 'Video', 'brief targets the missing gap')
 
 console.log('PASS scan-creative-tests')
+
+const script = videoShotList(b1[0], 'Füm', 'Health & Wellness')
+assert(script.beats.length >= 5, 'shot list has >=5 beats')
+assert(script.beats.every(x => /\d:\d\d/.test(x.t)), 'every beat has a timestamp')
+assert(script.beats.some(x => (x.onScreen + x.vo).toLowerCase().includes('füm')), 'product appears in the script')
+assert(script.totalSeconds > 0 && script.totalSeconds <= 30, 'total <= 30s')
+console.log('PASS videoShotList')

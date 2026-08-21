@@ -28,6 +28,74 @@ const topLabel = (result: FullDnaResult, key: keyof FullDnaResult['winners']['di
 const buildPrompt = (brandName: string, niche: string | null, headline: string, angle: string, persona: string): string =>
   `${brandName}${niche ? ' ' + niche : ''} ad. ${headline}. ${angle}. Clean product-forward composition, high-contrast, mobile-first. Persona: ${persona}.`.trim()
 
+export type ShotBeat = { t: string; beat: string; onScreen: string; vo: string } // t = "0:00–0:03"
+export type VideoScript = { title: string; totalSeconds: number; product: string; beats: ShotBeat[] }
+
+// Format a second-count as "M:SS" (e.g. 3 → "0:03", 72 → "1:12").
+const fmt = (s: number): string => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`
+
+/**
+ * videoShotList() — deterministic ARC-style timestamped shot list for one brief.
+ * Pure: no LLM, no Date, no Math.random. Free + testable.
+ *
+ * Beat arc: hook → problem → product reveal → mechanism/proof → offer → CTA.
+ * Every beat references the product on-screen (product = the brand's product).
+ */
+export function videoShotList(brief: CreativeBrief, brandName: string, niche: string | null): VideoScript {
+  const product = brandName
+  const nicheTag = niche ? ` (${niche})` : ''
+  // Fixed per-beat durations summing to 25s (≤30). Six beats.
+  const durations = [3, 4, 5, 5, 4, 4]
+
+  const raw: Array<Omit<ShotBeat, 't'>> = [
+    {
+      beat: 'Hook',
+      onScreen: `${brief.hook}`,
+      vo: `${brief.hook}`,
+    },
+    {
+      beat: 'Problem',
+      onScreen: `The problem ${product} solves${nicheTag}`,
+      vo: `${brief.angle}. That's the gap most people live with.`,
+    },
+    {
+      beat: 'Product reveal',
+      onScreen: `${product} in hand`,
+      vo: `Meet ${product} — ${brief.headline}.`,
+    },
+    {
+      beat: 'Mechanism / proof',
+      onScreen: `${product} close-up, how it works`,
+      vo: `Here's why ${product} works: ${brief.angle}.`,
+    },
+    {
+      beat: 'Offer',
+      onScreen: `${brief.offer} on ${product}`,
+      vo: `${brief.offer} — today only.`,
+    },
+    {
+      beat: 'CTA',
+      onScreen: `Get ${product}`,
+      vo: `Tap to try ${product}. ${brief.headline}.`,
+    },
+  ]
+
+  let cursor = 0
+  const beats: ShotBeat[] = raw.map((b, i) => {
+    const start = cursor
+    const end = cursor + durations[i]
+    cursor = end
+    return { t: `${fmt(start)}–${fmt(end)}`, ...b }
+  })
+
+  return {
+    title: `${brandName} — ${brief.gapLabel}`,
+    totalSeconds: durations.reduce((a, b) => a + b, 0),
+    product,
+    beats,
+  }
+}
+
 export function creativeBriefs(
   result: FullDnaResult,
   brandName: string,
