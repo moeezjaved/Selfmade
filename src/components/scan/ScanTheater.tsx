@@ -59,6 +59,7 @@ export default function ScanTheater() {
   const [stage, setStage] = useState<StepId>('ads')
   const [pct, setPct] = useState(0)
   const [res, setRes] = useState<ScanResult | null>(null)
+  const [revealed, setRevealed] = useState(false)
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -81,7 +82,7 @@ export default function ScanTheater() {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
-    setRes(null); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(10)
+    setRes(null); setRevealed(false); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(10)
     try {
       const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
@@ -189,7 +190,7 @@ export default function ScanTheater() {
         )}
         {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
         {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
-        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : <><ScoreAct res={res} /><TheFix res={res} /></>)}
+        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : revealed ? <FullReport res={res} own={own!} winners={winners!} /> : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
       </main>
     </div>
   )
@@ -274,6 +275,16 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
         {own.found ? (
           <>
             <p style={sub}>Everything on your page, decoded — your presence and your creative DNA.</p>
+            {own.examples.length > 0 && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10, margin: '18px 0 4px' }}>
+                {own.examples.slice(0, 24).map((ex, i) => (
+                  <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 12)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+                    <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
+                    <div style={{ padding: '7px 9px 9px', fontSize: 11, color: SUB, lineHeight: 1.3, maxHeight: 44, overflow: 'hidden' }}>{ex.format || ex.hook || '—'}</div>
+                  </div>
+                ))}
+              </div>
+            )}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 4px' }}>
               {([['Total ads', own.totalAds], ['Active', own.activeAds], ['Video %', vid]] as [string, number][]).map(([l, v], i) => (
                 <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 120px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
@@ -298,13 +309,13 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
     <div>
       <h2 style={h2}>What your rivals are <span style={{ color: ORANGE }}>winning</span> with</h2>
       <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers. Their playbook:</p>
-      <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '18px 0 8px' }}>
-        {winners.examples.map((ex, i) => (
-          <div key={ex.adId} className="sf-rise" style={{ ...rise(i), flex: '0 0 150px', width: 150, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
-            <div style={{ height: 108, background: `#f1ece2 ${ex.thumb ? `url(${ex.thumb}) center/cover` : ''}` }} />
-            <div style={{ padding: '9px 10px 11px' }}>
-              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>{ex.daysRunning}d running</div>
-              <div style={{ fontSize: 11.5, color: INK, lineHeight: 1.3, marginTop: 3, maxHeight: 46, overflow: 'hidden' }}>{ex.hook || ex.brand}</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10, padding: '18px 0 8px' }}>
+        {winners.examples.slice(0, 18).map((ex, i) => (
+          <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 12)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+            <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
+            <div style={{ padding: '7px 9px 9px' }}>
+              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10.5, fontWeight: 700, color: ORANGE }}>{ex.daysRunning}d running</div>
+              <div style={{ fontSize: 11, color: INK, lineHeight: 1.3, marginTop: 3, maxHeight: 44, overflow: 'hidden' }}>{ex.hook || ex.brand}</div>
             </div>
           </div>
         ))}
@@ -546,6 +557,91 @@ function TheFix({ res }: { res: ScanResult }) {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ── Scan-complete SUMMARY — the click gate before the full report ──
+function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void }) {
+  const s = res.score
+  const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
+  const C = 2 * Math.PI * 78
+  const [drawn, setDrawn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setDrawn(true), 80); return () => clearTimeout(t) }, [])
+  const lost = res.cost.lostPerYear
+  const gaps = res.gaps.length
+  const headline = lost > 0
+    ? `You could be losing ~$${lost.toLocaleString()}/yr to ${gaps} gap${gaps === 1 ? '' : 's'}`
+    : `Here’s where your ads stand`
+  return (
+    <div className="sf-rise" style={{ maxWidth: 640, margin: '0 auto', textAlign: 'center', padding: '10px 0 40px' }}>
+      <div style={{ position: 'relative', width: 180, height: 180, margin: '0 auto 26px' }}>
+        <svg width="180" height="180" viewBox="0 0 180 180">
+          <circle cx="90" cy="90" r="78" fill="none" stroke="rgba(26,20,16,.1)" strokeWidth="12" />
+          <circle className="sf-gauge" cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" />
+        </svg>
+        <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
+          <div style={{ fontSize: 11, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
+        </div>
+      </div>
+      <div style={{ display: 'inline-block', background: `${color}18`, color, fontWeight: 800, fontSize: 13, padding: '6px 14px', borderRadius: 100, marginBottom: 18 }}>{s.band}</div>
+      <h2 style={{ ...h2, margin: '0 0 12px' }}>{headline}</h2>
+      <p style={{ ...sub, margin: '0 auto 26px', textAlign: 'center' }}>One score across your ads, your rivals, and the winning tactics you&rsquo;re missing.</p>
+      <button onClick={onUnlock} style={{ ...btn, padding: '15px 32px', fontSize: 16 }}>Unlock your full report →</button>
+    </div>
+  )
+}
+
+// ── The FULL REPORT — everything stacked, scrollable, nothing hidden ──
+function FullReport({ res, own, winners }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners'] }) {
+  return (
+    <div>
+      <StageAct stage="ads" res={res} own={own} winners={winners} />
+      <div style={{ marginTop: 44 }}><StageAct stage="rivals" res={res} own={own} winners={winners} /></div>
+      <div style={{ marginTop: 44 }}><StageAct stage="gaps" res={res} own={own} winners={winners} /></div>
+      <div style={{ marginTop: 44 }}><CostCard cost={res.cost} gaps={res.gaps.length} /></div>
+      <div style={{ marginTop: 44 }}><ScoreAct res={res} /></div>
+      <div style={{ marginTop: 44 }}><TheFix res={res} /></div>
+      <div style={{ marginTop: 44 }}><ForwardCta /></div>
+    </div>
+  )
+}
+
+// ── "What it costs you" — an honest, transparent estimate (Ryze-style) ──
+function CostCard({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }) {
+  const lost = cost.lostPerYear
+  return (
+    <div>
+      <h2 style={h2}>What it costs you</h2>
+      {lost > 0 ? (
+        <>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,7vw,64px)', color: ORANGE, lineHeight: 1, margin: '10px 0 14px' }}>~$<Count n={lost} dur={1200} />/yr</div>
+          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 18px', fontFamily: 'ui-monospace,monospace', fontSize: 13.5, color: INK, lineHeight: 1.6, maxWidth: 620 }}>
+            {cost.activeAds} active ads × ~${cost.monthlyPerAd}/mo industry avg × {cost.leakPct}% leaking from missing tactics
+          </div>
+          <p style={{ color: MUT, fontSize: 13, marginTop: 14, maxWidth: 620, lineHeight: 1.5 }}>Estimated — we can&rsquo;t see your real spend from outside. Connect Meta for your exact number.</p>
+        </>
+      ) : (
+        <>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', color: INK, lineHeight: 1.15, margin: '10px 0 4px', maxWidth: 620 }}>We can&rsquo;t size this without active ads — connect Meta to see the full picture.</div>
+          <p style={{ color: MUT, fontSize: 13, marginTop: 12, maxWidth: 620, lineHeight: 1.5 }}>{gaps} gap{gaps === 1 ? '' : 's'} found — the cost shows up once you&rsquo;re running ads against them.</p>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ── The forward door — Phase-2 wires real auth; for now a safe no-op ──
+function ForwardCta() {
+  const [noted, setNoted] = useState(false)
+  return (
+    <div style={{ background: DARK, borderRadius: 20, padding: '34px 32px', color: CREAM }}>
+      <h2 style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', letterSpacing: '-.02em', lineHeight: 1.1, color: '#fff', margin: '0 0 10px' }}>Ready to run these?</h2>
+      <p style={{ color: MUT, fontSize: 15.5, margin: '0 0 22px', maxWidth: 560, lineHeight: 1.5 }}>Start free — we&rsquo;ll generate these ads to your account and you approve every one before it launches.</p>
+      {/* TODO(phase-2): wire Google sign-up here */}
+      <button onClick={() => setNoted(true)} style={{ ...btn, padding: '15px 32px', fontSize: 16 }}>Start free → unlock your ads</button>
+      {noted && <div style={{ marginTop: 14, fontSize: 13.5, color: '#ff9f7a', fontWeight: 700 }}>🚀 Coming in your account — sign-in is being wired up.</div>}
     </div>
   )
 }
