@@ -52,8 +52,12 @@ export async function GET(req: NextRequest) {
     const cres = Array.isArray(a.discovery_creatives) ? a.discovery_creatives : (a.discovery_creatives ? [a.discovery_creatives] : [])
     const vid = cres.find((c: any) => c?.asset_type === 'video' && c?.r2_url)
     const img = cres.find((c: any) => c?.asset_type !== 'video' && c?.r2_url)
-    const isVideo = !!vid && !img
-    return { adId: String(a.ad_id), image: isVideo ? (vid?.poster_url || null) : (img?.r2_url || vid?.poster_url || null), isVideo, videoUrl: isVideo ? (vid?.r2_url || null) : null }
+    // A video ad is a video whenever it has a playable video creative — even if it ALSO has a poster
+    // image creative (most do). The old `!img` guard misclassified those as images, dropping videoUrl
+    // so the ad showed a dead poster that never played. Prefer the video; use its poster (else the
+    // image) as the thumbnail.
+    const isVideo = !!vid
+    return { adId: String(a.ad_id), image: vid?.poster_url || img?.r2_url || null, isVideo, videoUrl: vid?.r2_url || null }
   }
   const SEL = 'ad_id, discovery_creatives(asset_type, r2_url, poster_url, position)'
 
