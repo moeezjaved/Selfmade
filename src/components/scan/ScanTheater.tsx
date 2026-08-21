@@ -13,7 +13,7 @@ const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
 type Brand = { pageId: string; name: string; adCount?: number; industry?: string | null }
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
 type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string }
-type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number }
+type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean }
 
 const STEPS0: Step[] = [
   { id: 'ads', label: 'Reading your ads', status: 'pending' },
@@ -173,6 +173,38 @@ function DnaPanels({ dist }: { dist: Record<string, Tally[]> }) {
     </div>
   )
 }
+const pill = (hot: boolean): CSSProperties => ({ fontSize: 12.5, background: hot ? ORANGE : PAPER, color: hot ? '#fff' : INK, border: `1px solid ${hot ? ORANGE : LINE}`, borderRadius: 100, padding: '4px 10px' })
+// YOU vs WINNERS, dimension by dimension. Orange pill on the winners' side = a winning move you don't run.
+function VsPanels({ own, winners }: { own: Record<string, Tally[]>; winners: Record<string, Tally[]> }) {
+  const rows = PANELS.map(([k, label]) => ({ k, label, o: own[k] || [], w: winners[k] || [] })).filter((r) => r.w.length || r.o.length)
+  if (!rows.length) return null
+  return (
+    <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
+      {rows.map(({ k, label, o, w }) => {
+        const oSet = new Set(o.map((t) => t.label.toLowerCase()))
+        return (
+          <div key={k} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: SUB, marginBottom: 6 }}>You</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {o.length ? o.slice(0, 5).map((t, i) => <span key={i} style={pill(false)}>{t.label}</span>) : <span style={{ fontSize: 12.5, color: MUT }}>—</span>}
+                </div>
+              </div>
+              <div>
+                <div style={{ fontSize: 11.5, fontWeight: 700, color: '#c8410f', marginBottom: 6 }}>Winners</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {w.slice(0, 5).map((t, i) => { const missing = !oSet.has(t.label.toLowerCase()); return <span key={i} style={pill(missing)}>{t.label} <b style={{ color: missing ? '#fff' : SUB }}>{t.pct}%</b></span> })}
+                </div>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 const MEDIA_COLOR: Record<string, string> = { Video: '#3b6df0', 'Carousel/DCO': ORANGE, Image: '#1e7a4f' }
 function MediaBar({ media }: { media: Tally[] }) {
   if (!media.length) return null
@@ -208,6 +240,11 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
             <MediaBar media={own.media} />
             <DnaPanels dist={own.dist as Record<string, Tally[]>} />
           </>
+        ) : res.ownPending ? (
+          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px', marginTop: 4 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>⏳ Pulling your ads now…</div>
+            <p style={{ ...sub, marginTop: 6 }}>You weren&rsquo;t in our index yet, so we just started a <b style={{ color: INK }}>priority crawl</b> of your ad library. Your own-ad breakdown fills in within a few minutes — re-run then. Meanwhile, here&rsquo;s your market ↓</p>
+          </div>
         ) : <p style={sub}>We couldn&rsquo;t find ads for your page — you may not be running any (that&rsquo;s the first gap). Here&rsquo;s what winning looks like in your market…</p>}
       </div>
     )
@@ -233,17 +270,23 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
   )
   if (stage === 'gaps') return (
     <div>
-      <h2 style={h2}>Where you&rsquo;re falling behind</h2>
-      <p style={sub}>Winning tactics your rivals lean on that you&rsquo;re not running.</p>
-      <div style={{ marginTop: 16 }}>
-        {res.gaps.slice(0, 8).map((g, i) => (
-          <div key={i} style={{ display: 'flex', gap: 12, padding: '11px 0', borderBottom: `1px solid ${LINE}` }}>
-            <span style={{ color: ORANGE, fontWeight: 900 }}>→</span>
-            <div><b style={{ color: INK, fontSize: 14.5 }}>{g.dimension}: {g.label}</b>
-              <div style={{ color: SUB, fontSize: 13 }}>{g.winnerPct}% of winners use it — you&rsquo;re at {g.yourPct}%.</div></div>
+      <h2 style={h2}>You vs the <span style={{ color: ORANGE }}>winners</span></h2>
+      <p style={sub}>Your ad DNA next to your rivals&rsquo;, dimension by dimension. <b style={{ color: '#c8410f' }}>Orange</b> = a winning move you&rsquo;re not running.</p>
+      <VsPanels own={own.dist as Record<string, Tally[]>} winners={winners.dist as Record<string, Tally[]>} />
+      {res.gaps.length > 0 && (
+        <>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, margin: '26px 0 4px' }}>Biggest gaps</div>
+          <div>
+            {res.gaps.slice(0, 6).map((g, i) => (
+              <div key={i} style={{ display: 'flex', gap: 12, padding: '11px 0', borderBottom: `1px solid ${LINE}` }}>
+                <span style={{ color: ORANGE, fontWeight: 900 }}>→</span>
+                <div><b style={{ color: INK, fontSize: 14.5 }}>{g.dimension}: {g.label}</b>
+                  <div style={{ color: SUB, fontSize: 13 }}>{g.winnerPct}% of winners use it — you&rsquo;re at {g.yourPct}%.</div></div>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </>
+      )}
     </div>
   )
   return null

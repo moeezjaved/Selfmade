@@ -14,6 +14,7 @@ export const maxDuration = 60
 
 // Best-effort in-memory IP limiter (no Redis in this stack). Per warm instance; fine for a top-of-funnel
 // audit — abuse is bounded and the heavy spend (LLM) is cached in R2 by the engine anyway.
+const COUNTRIES = ['US', 'GB', 'CA', 'AU', 'DE', 'FR', 'IT', 'ES', 'NL', 'SE', 'PL', 'MX', 'BR', 'IN', 'JP', 'SG', 'AE', 'ZA']
 const HITS = new Map<string, { n: number; t: number }>()
 const WINDOW = 3600_000, MAX = 30
 function limited(ip: string): boolean {
@@ -58,7 +59,20 @@ export async function POST(req: NextRequest) {
     }
 
     const result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ...result })
+
+    // Your ads aren't in our index yet → kick off a PRIORITY (full-archive) crawl of your page so the
+    // own-ad audit fills in within minutes. Same mechanism Brand Spy uses (priority 9). Best-effort.
+    let ownPending = false
+    if (!result.own.found) {
+      try {
+        const { data: ex } = await admin.from('discovery_crawl_terms').select('page_id').eq('page_id', pageId).maybeSingle()
+        if (ex) await admin.from('discovery_crawl_terms').update({ is_active: true, last_crawled_at: null, priority: 9 }).eq('page_id', pageId)
+        else await admin.from('discovery_crawl_terms').insert({ term: brandName, page_id: pageId, term_type: 'brand', category: 'General', is_active: true, priority: 9, last_crawled_at: null, countries: COUNTRIES })
+        ownPending = true
+      } catch { /* enqueue best-effort */ }
+    }
+
+    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, ...result })
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }
