@@ -13,7 +13,7 @@ const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
 type Brand = { pageId: string; name: string; adCount?: number; industry?: string | null }
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
 type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string }
-type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean }
+type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean }
 
 const STEPS0: Step[] = [
   { id: 'ads', label: 'Reading your ads', status: 'pending' },
@@ -56,6 +56,7 @@ export default function ScanTheater() {
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string }>({})
 
   useEffect(() => {
     if (phase !== 'idle') return
@@ -73,12 +74,16 @@ export default function ScanTheater() {
   const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string }) => {
     if (running.current) return
     running.current = true
-    setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(10)
+    lastPayload.current = payload
+    setRes(null); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(10)
     try {
       const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
       const data: ScanResult = await r.json()
       setRes(data)
+      // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
+      // instead of staging empty acts + a meaningless score.
+      if (data.building) { setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
       setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'no ads found'); setStage('ads'); setPct(34); await sleep(1100)
       setStage('rivals'); setStep('rivals', 'active'); await sleep(300)
       setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60); await sleep(1100)
@@ -86,7 +91,7 @@ export default function ScanTheater() {
       setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82); await sleep(900)
       setStage('score'); setStep('score', 'active'); await sleep(300)
       setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(500)
-      setPhase('done')
+      setPhase('done'); running.current = false
     } catch (e) {
       setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
     }
@@ -167,7 +172,7 @@ export default function ScanTheater() {
         )}
         {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
         {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
-        {phase === 'done' && res && <ScoreAct res={res} />}
+        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : <ScoreAct res={res} />)}
       </main>
     </div>
   )
@@ -343,6 +348,26 @@ function BenchSection({ bench, systemScore }: { bench: BenchAxis[]; systemScore:
         })}
       </div>
       <p style={{ color: MUT, fontSize: 12.5, marginTop: 16, lineHeight: 1.5 }}>The invisible half: we can&rsquo;t see your CAC, LTV, subscriptions or AOV from the outside — but $1M brands obsess over them. If every customer is worth more, you can afford to spend more to win them.</p>
+    </div>
+  )
+}
+
+function BuildingScreen({ res, onRerun }: { res: ScanResult; onRerun: () => void }) {
+  const named = res.brand.name && res.brand.name !== 'your brand'
+  return (
+    <div style={{ maxWidth: 640 }}>
+      <h2 style={h2}>⏳ Building your audit…</h2>
+      <p style={sub}>{named ? <><b style={{ color: INK }}>{res.brand.name}</b> isn&rsquo;t</> : 'Your brand isn&rsquo;t'} in our index yet — so we just kicked off a <b style={{ color: INK }}>priority crawl</b> of your ad library. This usually takes a few minutes.</p>
+      <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 22px', marginTop: 18 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>What happens next</div>
+        <ol style={{ margin: 0, paddingLeft: 18, color: '#4a4038', fontSize: 14.5, lineHeight: 1.8 }}>
+          <li>We pull every ad on your page, plus your niche rivals.</li>
+          <li>We decode the DNA — hooks, angles, personas, formats, offers.</li>
+          <li>Re-run in a few minutes for your full audit, gaps &amp; score.</li>
+        </ol>
+        <button onClick={onRerun} style={{ ...btn, marginTop: 18 }}>↻ Re-run now</button>
+      </div>
+      <p style={{ color: MUT, fontSize: 13, marginTop: 14 }}>Tip: big brands are usually indexed already — try one to see a full audit instantly.</p>
     </div>
   )
 }
