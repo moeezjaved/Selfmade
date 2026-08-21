@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateCreativeStrategy, type CreativeStrategy } from '@/lib/creative/strategist'
+import { generateCreativeStrategy, STRATEGY_VERSION, type CreativeStrategy } from '@/lib/creative/strategist'
 import { readStrategyCache, writeStrategyCache } from '@/lib/creative/cache'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 
@@ -28,14 +28,15 @@ export async function GET(req: NextRequest) {
   const key = `${user.id}:${accountId || 'primary'}:${brandId || 'all'}`
   const fresh = req.nextUrl.searchParams.get('fresh') === '1'
   const hit = cache.get(key)
-  if (hit && Date.now() - hit.at < TTL && !fresh) return NextResponse.json(hit.data)
+  if (hit && Date.now() - hit.at < TTL && hit.data.v === STRATEGY_VERSION && !fresh) return NextResponse.json(hit.data)
 
   // Precomputed by the nightly cron (mig 151) → a fast table read, NOT a live scan + LLM call. This is
   // the steady state: the card fills instantly. Only a brand the cron hasn't reached yet (or ?fresh=1)
   // falls through to the live compute below, which then write-throughs so it's cached next time.
   if (!fresh) {
     const cached = await readStrategyCache(admin, user.id, brandId)
-    if (cached && cached.ideas?.length) { cache.set(key, { at: Date.now(), data: cached }); return NextResponse.json(cached) }
+    // Ignore stale-schema cache (e.g. old empty studioHrefs) — recompute live once, then write-through v2.
+    if (cached && cached.ideas?.length && cached.v === STRATEGY_VERSION) { cache.set(key, { at: Date.now(), data: cached }); return NextResponse.json(cached) }
   }
 
   try {

@@ -26,7 +26,11 @@ export type CreativeStrategy = {
   ideas: CreativeIdea[]
   reasoned: boolean
   generatedAt: string
+  v?: number   // schema version — bump to invalidate stale cached strategies (e.g. old empty studioHrefs)
 }
+// Bump when the SHAPE/behaviour of ideas changes so cached strategies self-invalidate. v2: own-winner
+// ideas now seed the Studio with your creative (was an empty create form).
+export const STRATEGY_VERSION = 2
 
 /** The Studio deep-link. When the idea is a faithful rebuild of a rival ad we seed that ad (the remake
  *  flow, same as "Make it mine"). Otherwise we open the studio FRESH but carry the idea's angle so it's
@@ -337,5 +341,5 @@ export async function generateCreativeStrategy(admin: any, userId: string, opts:
     ? (rivals.length === 0 ? 'Spy a competitor or two and connect your ad account — then I’ll tell you exactly what to make next.' : 'Nothing urgent to make right now — your account looks steady.')
     : `${ideas.length} idea${ideas.length === 1 ? '' : 's'} for what to make next, from your ad performance${rivals.length ? ' + what rivals are winning with' : ''}.`
 
-  return { summary, ideas, reasoned: !!reasoned, generatedAt: new Date().toISOString() }
+  return { summary, ideas, reasoned: !!reasoned, generatedAt: new Date().toISOString(), v: STRATEGY_VERSION }
 }

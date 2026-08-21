@@ -1,40 +1,70 @@
 'use client'
 /**
- * AdPreviewLightbox — a tap-to-view overlay for a competitor ad on the brief. Clicking an ad thumbnail
- * used to navigate to Brand Spy; now it opens the creative right here (image large, or the video playing).
- * Shared by BriefScan (competitor rows) and WatchingCompetitors (the watched-brand ad grid).
+ * AdPreviewLightbox — tap a competitor ad on the brief to VIEW it (Discovery-style: hover-scrub video
+ * with the white progress line, or the image), with a clear close and a "Make it mine →" remake CTA —
+ * instead of navigating away to Brand Spy. Shared by BriefScan + WatchingCompetitors.
  */
 import { useEffect } from 'react'
+import Link from 'next/link'
+import HoverScrubVideo from '@/components/discovery/HoverScrubVideo'
 
-export type PreviewAd = { image?: string | null; videoUrl?: string | null; brand?: string | null } | null
+export type PreviewAd = {
+  image?: string | null; videoUrl?: string | null; brand?: string | null
+  adId?: string | null; pageId?: string | null; isVideo?: boolean
+} | null
 
 const isVid = (u?: string | null) => !!u && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u)
+
+function mineHref(ad: NonNullable<PreviewAd>): string | null {
+  if (!ad.adId) return null
+  const q = new URLSearchParams({ ad: ad.adId })
+  if (ad.brand) q.set('brand', ad.brand)
+  if (ad.image && !isVid(ad.image)) q.set('img', ad.image)
+  if (ad.isVideo || ad.videoUrl || isVid(ad.image)) { q.set('type', 'video'); if (ad.videoUrl) q.set('vid', ad.videoUrl) }
+  return `/studio?${q.toString()}`
+}
 
 export default function AdPreviewLightbox({ ad, onClose }: { ad: PreviewAd; onClose: () => void }) {
   useEffect(() => {
     if (!ad) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
+    const prev = document.body.style.overflow; document.body.style.overflow = 'hidden'
+    return () => { window.removeEventListener('keydown', onKey); document.body.style.overflow = prev }
   }, [ad, onClose])
   if (!ad) return null
 
-  const videoSrc = ad.videoUrl || (isVid(ad.image) ? ad.image : null)
+  const videoSrc = ad.videoUrl || (isVid(ad.image) ? ad.image! : null)
+  const make = mineHref(ad)
+
   return (
     <div onClick={onClose} role="dialog" aria-modal
-      style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(13,12,10,.82)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', maxWidth: 'min(92vw,520px)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-        <button onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: -40, right: 0, background: 'rgba(255,255,255,.14)', color: '#fff', border: 'none', borderRadius: '50%', width: 32, height: 32, fontSize: 18, cursor: 'pointer', lineHeight: 1 }}>×</button>
-        {videoSrc ? (
-          <video src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} controls autoPlay loop playsInline
-            style={{ maxWidth: '100%', maxHeight: '86vh', borderRadius: 14, background: '#000', display: 'block' }} />
-        ) : ad.image ? (
-          /* eslint-disable-next-line @next/next/no-img-element */
-          <img src={ad.image} alt={ad.brand || 'ad'} style={{ maxWidth: '100%', maxHeight: '86vh', borderRadius: 14, display: 'block', objectFit: 'contain', background: '#0d120e' }} />
-        ) : (
-          <div style={{ color: '#fff', fontSize: 14 }}>No preview available.</div>
-        )}
-        {ad.brand && <div style={{ color: 'rgba(255,255,255,.72)', fontSize: 13, marginTop: 12, fontWeight: 600 }}>{ad.brand}</div>}
+      style={{ position: 'fixed', inset: 0, zIndex: 1000, background: 'rgba(13,12,10,.84)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      <div onClick={(e) => e.stopPropagation()}
+        style={{ position: 'relative', width: 'min(92vw, 400px)', maxHeight: '92vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* CLOSE — always visible, inside the frame */}
+        <button onClick={onClose} aria-label="Close"
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, background: 'rgba(13,12,10,.72)', color: '#fff', border: '1.5px solid rgba(255,255,255,.5)', borderRadius: '50%', width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
+
+        {/* the creative — Discovery player for video (white scrub line), image otherwise */}
+        <div style={{ width: '100%', aspectRatio: '4 / 5', maxHeight: '74vh', borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
+          {videoSrc
+            ? <HoverScrubVideo src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} />
+            : ad.image
+              /* eslint-disable-next-line @next/next/no-img-element */
+              ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
+              : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#f3ece0', fontSize: 14 }}>{ad.brand || 'Ad'}</div>}
+        </div>
+
+        {/* actions — mirror Discovery: remake it, or see the brand's full library */}
+        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+          {make && (
+            <Link href={make} style={{ flex: 1, textAlign: 'center', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '12px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Make it mine →</Link>
+          )}
+          {ad.pageId && (
+            <Link href={`/discovery/brand-spy/${ad.pageId}`} style={{ background: 'rgba(255,255,255,.12)', color: '#fff', borderRadius: 100, padding: '12px 16px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>See their ads</Link>
+          )}
+        </div>
       </div>
     </div>
   )
