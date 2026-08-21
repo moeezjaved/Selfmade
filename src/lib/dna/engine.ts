@@ -46,7 +46,7 @@ type AdRow = Record<string, unknown>
 
 const SELECT =
   'ad_id, page_id, page_name, format, days_running, is_active, has_creative, performance_score, ' +
-  'body, title, thumbnail_url, raw_image_urls, snapshot_url, ' +
+  'body, title, thumbnail_url, raw_image_urls, snapshot_url, start_date, link_url, ' +
   DIMS.map((d) => d.key).join(', ')
 
 // ── rollup: rows → distribution per dimension (single + array columns) ──
@@ -144,17 +144,45 @@ export async function winnerDna(pageIds: string[], niche?: string | null): Promi
   return { dist: rollup(rows), media: mediaMix(rows), sampleSize: rows.length, winnerCount: winners.length, examples }
 }
 
-export type OwnDna = { dist: DnaDist; media: Tally[]; totalAds: number; activeAds: number; found: boolean }
+// ── The $100k → $1M maturity model. A $100k brand runs ads; a $1M brand builds a creative+conversion
+// SYSTEM (high ad volume, weekly creative velocity, every format, a persona per avatar, a PDP per angle).
+// We score each measurable axis starter → scaling → elite from data we already hold. ──
+export type BenchAxis = { key: string; label: string; you: number; unit: string; tier: 'starter' | 'scaling' | 'elite'; pct: number; target: string }
+const HOSTS_SKIP = /facebook|instagram|fb\.me|fb\.com/
+function benchmark(rows: AdRow[], dist: DnaDist): { axes: BenchAxis[]; systemScore: number } {
+  const active = rows.filter((r) => r.is_active === true).length
+  const now = Date.now()
+  const newLast30 = rows.filter((r) => { const d = Date.parse(String(r.start_date || '')); return !!d && (now - d) < 30 * 864e5 }).length
+  const landings = new Set<string>()
+  for (const r of rows) { const m = String(r.link_url || '').match(/^(?:https?:\/\/)?(?:www\.)?([a-z0-9.-]+\.[a-z]{2,})(\/[^?#]*)?/i); if (m && !HOSTS_SKIP.test(m[1])) landings.add(m[1].toLowerCase() + (m[2] || '').replace(/\/$/, '')) }
+  const formats = new Set([...(dist.format_style || []), ...(dist.visual_style || [])].map((t) => t.label.toLowerCase())).size
+  const personas = (dist.persona || []).length
+  const angles = new Set([...(dist.angle || []), ...(dist.hook_type || [])].map((t) => t.label.toLowerCase())).size
+  const mk = (key: string, label: string, you: number, unit: string, scaleAt: number, eliteAt: number, target: string): BenchAxis =>
+    ({ key, label, you, unit, tier: you >= eliteAt ? 'elite' : you >= scaleAt ? 'scaling' : 'starter', pct: Math.min(100, Math.round((you / eliteAt) * 100)), target })
+  const axes = [
+    mk('volume', 'Ad volume', active, 'active ads', 50, 300, '$1M brands run 300–750 active'),
+    mk('velocity', 'Creative velocity', newLast30, 'new / 30d', 8, 40, '$1M brands ship 50+ a week'),
+    mk('formats', 'Format diversity', formats, 'formats', 4, 8, '$1M brands run every format'),
+    mk('personas', 'Persona breadth', personas, 'personas', 3, 6, '$1M brands build one per persona'),
+    mk('angles', 'Angle diversity', angles, 'angles', 4, 8, '$1M brands run 8+ angles'),
+    mk('funnel', 'Funnel depth', landings.size, 'landing pages', 2, 5, '$1M brands build a PDP per angle'),
+  ]
+  return { axes, systemScore: Math.round(axes.reduce((s, a) => s + a.pct, 0) / axes.length) }
+}
+
+export type OwnDna = { dist: DnaDist; media: Tally[]; totalAds: number; activeAds: number; found: boolean; bench: BenchAxis[]; systemScore: number }
 
 // ── the visitor's own DNA (their public ads live in the same index → no Meta connection needed) ──
 export async function ownDna(pageId: string | null): Promise<OwnDna> {
-  if (!pageId) return { dist: {}, media: [], totalAds: 0, activeAds: 0, found: false }
+  if (!pageId) return { dist: {}, media: [], totalAds: 0, activeAds: 0, found: false, bench: [], systemScore: 0 }
   const db = createAdminClient()
   const { data } = await db.from('discovery_ads_index').select(SELECT)
     .eq('page_id', pageId).limit(1000)
   const rows = (data as AdRow[]) || []
   const active = rows.filter((r) => r.is_active === true).length
-  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0 }
+  const b = benchmark(rows, rollup(rows))
+  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0, bench: b.axes, systemScore: b.systemScore }
 }
 
 export type Gap = { dimension: string; label: string; winnerPct: number; yourPct: number; kind: 'missing' | 'underweight' | 'overused' }

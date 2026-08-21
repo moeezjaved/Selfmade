@@ -315,6 +315,38 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
   return null
 }
 
+const TIER: Record<string, { c: string; l: string }> = { starter: { c: '#c0281a', l: 'Starter' }, scaling: { c: '#b7791f', l: 'Scaling' }, elite: { c: '#1e7a4f', l: 'Elite' } }
+type BenchAxis = { key: string; label: string; you: number; unit: string; tier: string; pct: number; target: string }
+function BenchSection({ bench, systemScore }: { bench: BenchAxis[]; systemScore: number }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setOn(true), 90); return () => clearTimeout(t) }, [])
+  if (!bench.length) return null
+  const verdict = systemScore >= 70 ? 'You&rsquo;re building a system.' : systemScore >= 40 ? 'You&rsquo;re starting to build a system.' : 'Right now, you&rsquo;re running ads.'
+  return (
+    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '26px 28px', margin: '0 0 28px' }}>
+      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 26, color: INK, lineHeight: 1.15 }}>$100k → $1M: are you running ads, or building a <span style={{ color: ORANGE }}>system</span>?</div>
+      <p style={{ color: SUB, fontSize: 15, margin: '8px 0 2px' }} dangerouslySetInnerHTML={{ __html: `<b style="color:${INK}">${verdict}</b> A $100k brand runs ads; a $1M brand builds a creative + conversion system. Here&rsquo;s where you sit on each axis.` }} />
+      <div style={{ display: 'grid', gap: 14, marginTop: 18 }}>
+        {bench.map((a, i) => {
+          const t = TIER[a.tier] || TIER.starter
+          return (
+            <div key={a.key} className="sf-rise" style={rise(i)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 10, marginBottom: 6, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 14.5, fontWeight: 700, color: INK }}>{a.label} <span style={{ color: t.c, fontWeight: 800 }}>· {t.l}</span></span>
+                <span style={{ fontSize: 12.5, color: SUB }}><b style={{ color: INK }}><Count n={a.you} /></b> {a.unit} · <span style={{ color: MUT }}>{a.target}</span></span>
+              </div>
+              <div style={{ height: 8, background: 'rgba(26,20,16,.08)', borderRadius: 100, overflow: 'hidden' }}>
+                <div style={{ height: 8, width: on ? `${Math.max(3, a.pct)}%` : '0%', background: t.c, borderRadius: 100, transition: 'width 1s cubic-bezier(.4,0,.2,1)' }} />
+              </div>
+            </div>
+          )
+        })}
+      </div>
+      <p style={{ color: MUT, fontSize: 12.5, marginTop: 16, lineHeight: 1.5 }}>The invisible half: we can&rsquo;t see your CAC, LTV, subscriptions or AOV from the outside — but $1M brands obsess over them. If every customer is worth more, you can afford to spend more to win them.</p>
+    </div>
+  )
+}
+
 function ScoreAct({ res }: { res: ScanResult }) {
   const s = res.score
   const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
@@ -323,6 +355,7 @@ function ScoreAct({ res }: { res: ScanResult }) {
   useEffect(() => { const t = setTimeout(() => setDrawn(true), 80); return () => clearTimeout(t) }, [])
   return (
     <div>
+      {res.own.found && <BenchSection bench={res.own.bench} systemScore={res.own.systemScore} />}
       <h2 style={h2}>Your ad-presence score</h2>
       <p style={sub}>Across coverage, format mix, angles, and the winning tactics you&rsquo;re missing.</p>
       <div style={{ display: 'flex', gap: 40, flexWrap: 'wrap', alignItems: 'center', margin: '26px 0' }}>
