@@ -123,18 +123,15 @@ export async function POST(req: NextRequest) {
     const brandTokens = new Set(brandName.toLowerCase().split(/[^a-z]+/).filter(Boolean))
     const kw = topKeywords((myAds || []) as { body?: string | null; title?: string | null }[], brandTokens)
 
-    // 2) rank same-niche brands by how many of those keywords appear in their copy (longevity-weighted sample)
-    if (niche && kw.length) {
-      const { data: cand } = await admin.from('discovery_ads_index')
-        .select('page_id, body, title').eq('niche', niche).eq('has_creative', true).neq('page_id', pageId)
-        .order('days_running', { ascending: false }).limit(1800)
-      const score: Record<string, number> = {}
-      for (const r of (cand || []) as { page_id: string; body?: string | null; title?: string | null }[]) {
-        const text = `${r.body || ''} ${r.title || ''}`.toLowerCase()
-        let s = 0; for (const k of kw) if (text.includes(k)) s++
-        if (s > 0) { const p = String(r.page_id); score[p] = (score[p] || 0) + s }
-      }
-      competitorPageIds = Object.entries(score).sort((a, b) => b[1] - a[1]).map(([p]) => p).slice(0, 12)
+    // 2) FAST ranked keyword search (search_ads_v2 RPC, mig 099 — indexed, ~1s) → brands whose ads match
+    // the brand's own keywords, ranked by how many of their ads hit. This is what surfaces real peers.
+    if (kw.length) {
+      try {
+        const { data: hits } = await admin.rpc('search_ads_v2', { p_q: kw.slice(0, 6).join(' '), p_tags: [], p_sort: 'recommended', p_lim: 500, p_off: 0 })
+        const score: Record<string, number> = {}
+        for (const h of (hits || []) as { page_id?: string }[]) { const p = String(h.page_id || ''); if (p && p !== pageId) score[p] = (score[p] || 0) + 1 }
+        competitorPageIds = Object.entries(score).sort((a, b) => b[1] - a[1]).map(([p]) => p).slice(0, 12)
+      } catch { /* RPC missing/slow → fall back below */ }
     }
 
     // 3) fallback — too few content matches → highest-volume same-niche brands (directory, then live index)
