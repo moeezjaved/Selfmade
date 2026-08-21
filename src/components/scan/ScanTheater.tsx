@@ -23,6 +23,26 @@ const STEPS0: Step[] = [
 ]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Live animation: staggered reveal + reduced-motion guard.
+const REVEAL_CSS = `
+@keyframes sf-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.sf-rise{animation:sf-rise .5s cubic-bezier(.2,.7,.2,1) both}
+@media (prefers-reduced-motion:reduce){.sf-rise{animation:none}}
+`
+const rise = (i = 0): CSSProperties => ({ animationDelay: `${i * 70}ms` })
+
+// A number that ticks up from 0 (Ryze-style). Respects reduced-motion.
+function Count({ n, dur = 900 }: { n: number; dur?: number }) {
+  const [v, setV] = useState(0)
+  useEffect(() => {
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion:reduce)').matches) { setV(n); return }
+    let raf = 0; const t0 = performance.now()
+    const tick = (t: number) => { const p = Math.min(1, (t - t0) / dur); setV(Math.round(n * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf)
+  }, [n, dur])
+  return <>{v.toLocaleString()}</>
+}
+
 export default function ScanTheater() {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Brand[]>([])
@@ -120,6 +140,7 @@ export default function ScanTheater() {
 
   return (
     <div style={{ minHeight: '100vh', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
+      <style>{REVEAL_CSS}</style>
       <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: '#fff' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
         <div style={{ color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
@@ -162,8 +183,8 @@ function DnaPanels({ dist }: { dist: Record<string, Tally[]> }) {
   if (!has.length) return null
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 14, marginTop: 20 }}>
-      {has.map(([k, label]) => (
-        <div key={k} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+      {has.map(([k, label], i) => (
+        <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
             {(dist[k] || []).slice(0, 6).map((t, i) => <span key={i} style={{ fontSize: 12.5, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '4px 10px', color: INK }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
@@ -180,10 +201,10 @@ function VsPanels({ own, winners }: { own: Record<string, Tally[]>; winners: Rec
   if (!rows.length) return null
   return (
     <div style={{ display: 'grid', gap: 12, marginTop: 18 }}>
-      {rows.map(({ k, label, o, w }) => {
+      {rows.map(({ k, label, o, w }, ri) => {
         const oSet = new Set(o.map((t) => t.label.toLowerCase()))
         return (
-          <div key={k} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+          <div key={k} className="sf-rise" style={{ ...rise(ri), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
             <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
               <div>
@@ -207,11 +228,13 @@ function VsPanels({ own, winners }: { own: Record<string, Tally[]>; winners: Rec
 }
 const MEDIA_COLOR: Record<string, string> = { Video: '#3b6df0', 'Carousel/DCO': ORANGE, Image: '#1e7a4f' }
 function MediaBar({ media }: { media: Tally[] }) {
+  const [on, setOn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setOn(true), 60); return () => clearTimeout(t) }, [])
   if (!media.length) return null
   return (
     <div style={{ marginTop: 16 }}>
       <div style={{ display: 'flex', height: 12, borderRadius: 100, overflow: 'hidden', background: '#e7e0d0' }}>
-        {media.map((m, i) => <div key={i} style={{ width: `${m.pct}%`, background: MEDIA_COLOR[m.label] || '#bbb' }} title={`${m.label} ${m.pct}%`} />)}
+        {media.map((m, i) => <div key={i} style={{ width: on ? `${m.pct}%` : '0%', background: MEDIA_COLOR[m.label] || '#bbb', transition: 'width .9s cubic-bezier(.4,0,.2,1)' }} title={`${m.label} ${m.pct}%`} />)}
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 9 }}>
         {media.map((m, i) => <span key={i} style={{ fontSize: 12.5, color: SUB, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: MEDIA_COLOR[m.label] || '#bbb' }} /><b style={{ color: INK }}>{m.label}</b> {m.count} · {m.pct}%</span>)}
@@ -230,9 +253,9 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
           <>
             <p style={sub}>Everything on your page, decoded — your presence and your creative DNA.</p>
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 4px' }}>
-              {[['Total ads', own.totalAds], ['Active', own.activeAds], ['Video', `${vid}%`]].map(([l, v]) => (
-                <div key={l as string} style={{ flex: '1 1 120px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
-                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 28, color: INK, lineHeight: 1 }}>{typeof v === 'number' ? v.toLocaleString() : v}</div>
+              {([['Total ads', own.totalAds], ['Active', own.activeAds], ['Video %', vid]] as [string, number][]).map(([l, v], i) => (
+                <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 120px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 28, color: INK, lineHeight: 1 }}><Count n={v} />{l === 'Video %' ? '%' : ''}</div>
                   <div style={{ fontSize: 12, color: SUB, marginTop: 3 }}>{l}</div>
                 </div>
               ))}
@@ -254,8 +277,8 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
       <h2 style={h2}>What your rivals are <span style={{ color: ORANGE }}>winning</span> with</h2>
       <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers. Their playbook:</p>
       <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '18px 0 8px' }}>
-        {winners.examples.map((ex) => (
-          <div key={ex.adId} style={{ flex: '0 0 150px', width: 150, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+        {winners.examples.map((ex, i) => (
+          <div key={ex.adId} className="sf-rise" style={{ ...rise(i), flex: '0 0 150px', width: 150, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ height: 108, background: `#f1ece2 ${ex.thumb ? `url(${ex.thumb}) center/cover` : ''}` }} />
             <div style={{ padding: '9px 10px 11px' }}>
               <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>{ex.daysRunning}d running</div>
@@ -296,6 +319,8 @@ function ScoreAct({ res }: { res: ScanResult }) {
   const s = res.score
   const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
   const C = 2 * Math.PI * 78
+  const [drawn, setDrawn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setDrawn(true), 80); return () => clearTimeout(t) }, [])
   return (
     <div>
       <h2 style={h2}>Your ad-presence score</h2>
@@ -304,10 +329,10 @@ function ScoreAct({ res }: { res: ScanResult }) {
         <div style={{ position: 'relative', width: 180, height: 180, flex: 'none' }}>
           <svg width="180" height="180" viewBox="0 0 180 180">
             <circle cx="90" cy="90" r="78" fill="none" stroke="rgba(26,20,16,.1)" strokeWidth="12" />
-            <circle cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={C * (1 - s.total / 100)} transform="rotate(-90 90 90)" />
+            <circle cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" style={{ transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)' }} />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}>{s.total}</div>
+            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
             <div style={{ fontSize: 11, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
           </div>
         </div>
@@ -316,7 +341,7 @@ function ScoreAct({ res }: { res: ScanResult }) {
           {s.subscores.map((ss) => (
             <div key={ss.key} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '9px 0' }}>
               <span style={{ width: 120, fontSize: 13, color: SUB }}>{ss.label}</span>
-              <div style={{ flex: 1, height: 6, background: 'rgba(26,20,16,.08)', borderRadius: 100 }}>{ss.value != null && <div style={{ height: 6, width: `${ss.value}%`, background: ORANGE, borderRadius: 100 }} />}</div>
+              <div style={{ flex: 1, height: 6, background: 'rgba(26,20,16,.08)', borderRadius: 100 }}>{ss.value != null && <div style={{ height: 6, width: drawn ? `${ss.value}%` : '0%', background: ORANGE, borderRadius: 100, transition: 'width 1s cubic-bezier(.4,0,.2,1)' }} />}</div>
               <span style={{ width: 52, textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontSize: 12, color: ss.value != null ? INK : MUT }}>{ss.value != null ? ss.value : 'n/a'}</span>
             </div>
           ))}
