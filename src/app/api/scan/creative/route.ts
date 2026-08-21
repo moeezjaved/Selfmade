@@ -97,8 +97,12 @@ export async function POST(req: NextRequest) {
 
   const brief = body?.brief || {}
   const brandName = body?.brandName
-  const headline = (brief.headline || '').trim()
-  if (!brandName || typeof brandName !== 'string' || (!headline && !brief.prompt)) {
+  // The brief's `headline`/`hook` are META (a prescription TITLE like "Testimonial-Driven Ad" and a hook
+  // TYPE like "Testimonial") — never stamp those as the on-image headline. The real message is the offer;
+  // we hand that to the model as direction and let the Studio pipeline write the actual headline copy.
+  const offer = (brief.offer || '').trim()
+  const persona = (brief.persona || '').trim()
+  if (!brandName || typeof brandName !== 'string' || (!offer && !brief.hook && !brief.prompt)) {
     return NextResponse.json({ error: 'bad_request' }, { status: 400 })
   }
   if (!geminiEnabled) return NextResponse.json({ error: 'not_configured' }, { status: 503 })
@@ -129,12 +133,15 @@ export async function POST(req: NextRequest) {
       if (ni) insights = { topHooks: ni.topHooks, topAngles: ni.topAngles, topFormats: ni.topFormats, topEmotions: ni.topEmotions, topCtas: ni.topCtas }
     } catch { /* insights optional */ }
 
-    // 3) the Studio Pro prompt + call (order MUST be [inspirations…, product?] to match the index math)
-    const prompt = buildStudioPrompt({
-      brandName, newHeadline: headline || undefined, aspectRatio: ASPECT, hasLogo: false,
+    // 3) the Studio Pro prompt + call. We DON'T pass newHeadline — the pipeline writes the headline copy
+    // itself (it's good at it); we steer it with the offer/persona/angle so the headline fits the fix.
+    let prompt = buildStudioPrompt({
+      brandName, aspectRatio: ASPECT, hasLogo: false,
       numInspirations: inspImgs.length, numProducts: product ? 1 : 0,
       styleTags: styleTags.slice(0, 8), insights, angle: brief.angle || undefined, isService: !product,
-    }) || brief.prompt || `${brandName} ad. ${headline}.`
+    }) || brief.prompt || `${brandName} ad.`
+    if (offer) prompt += ` Write a short, punchy headline that lands this message: "${offer}"${persona ? `, speaking to ${persona}` : ''}. Do not write the words "ad", "testimonial", "pain point" or the ad type as the headline — write real marketing copy a shopper would see.`
+    // order MUST be [inspirations…, product?] to match the prompt's image-index math
     const genImages: ImageInput[] = [...inspImgs, ...(product ? [product] : [])]
 
     let gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: ASPECT, imageSize: '2K' })
@@ -143,7 +150,7 @@ export async function POST(req: NextRequest) {
     if (!gen.ok) return NextResponse.json({ error: 'render_failed' }, { status: 503 })
 
     const buf = Buffer.from(gen.dataB64, 'base64')
-    const hash = crypto.createHash('sha1').update(`${brandName}|${headline}|${brief.gapLabel || ''}|${prompt.length}`).digest('hex')
+    const hash = crypto.createHash('sha1').update(`${brandName}|${offer}|${brief.gapLabel || ''}|${brief.angle || ''}`).digest('hex')
     const key = 'scan-previews/' + hash + '.png'
     const url = await uploadBufferToR2(buf, key, gen.mimeType || 'image/png') || r2PublicUrl(key)
     if (!url) return NextResponse.json({ error: 'render_failed' }, { status: 503 })
