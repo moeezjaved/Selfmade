@@ -132,7 +132,9 @@ export async function winnerDna(pageIds: string[], niche?: string | null): Promi
   }
 
   const winners = rows.filter((r) => (r.days_running as number) >= WINNER_DAYS)
-  const examples: WinnerExample[] = rows.slice(0, 6).map((a) => ({
+  // Prefer examples that actually have a thumbnail so the rivals grid is full of real ads, not blanks.
+  const withThumb = rows.filter((r) => thumbOf(r))
+  const examples: WinnerExample[] = (withThumb.length ? withThumb : rows).slice(0, 24).map((a) => ({
     adId: String(a.ad_id),
     brand: String(a.page_name || ''),
     daysRunning: (a.days_running as number) || 0,
@@ -171,18 +173,28 @@ function benchmark(rows: AdRow[], dist: DnaDist): { axes: BenchAxis[]; systemSco
   return { axes, systemScore: Math.round(axes.reduce((s, a) => s + a.pct, 0) / axes.length) }
 }
 
-export type OwnDna = { dist: DnaDist; media: Tally[]; totalAds: number; activeAds: number; found: boolean; bench: BenchAxis[]; systemScore: number }
+export type OwnDna = { dist: DnaDist; media: Tally[]; totalAds: number; activeAds: number; found: boolean; bench: BenchAxis[]; systemScore: number; examples: WinnerExample[] }
 
 // ── the visitor's own DNA (their public ads live in the same index → no Meta connection needed) ──
 export async function ownDna(pageId: string | null): Promise<OwnDna> {
-  if (!pageId) return { dist: {}, media: [], totalAds: 0, activeAds: 0, found: false, bench: [], systemScore: 0 }
+  if (!pageId) return { dist: {}, media: [], totalAds: 0, activeAds: 0, found: false, bench: [], systemScore: 0, examples: [] }
   const db = createAdminClient()
   const { data } = await db.from('discovery_ads_index').select(SELECT)
-    .eq('page_id', pageId).limit(1000)
+    .eq('page_id', pageId).eq('has_creative', true).order('days_running', { ascending: false }).limit(1000)
   const rows = (data as AdRow[]) || []
   const active = rows.filter((r) => r.is_active === true).length
   const b = benchmark(rows, rollup(rows))
-  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0, bench: b.axes, systemScore: b.systemScore }
+  // Their real ad thumbnails — for the "reading your ads" grid + the you-vs-winners strip. Prefer ones
+  // that actually have an image so the grid isn't full of blanks.
+  const examples: WinnerExample[] = rows.filter((r) => thumbOf(r)).slice(0, 24).map((a) => ({
+    adId: String(a.ad_id),
+    brand: String(a.page_name || ''),
+    daysRunning: (a.days_running as number) || 0,
+    hook: ((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
+    format: (a.format_style as string) || (a.format as string) || null,
+    thumb: thumbOf(a),
+  }))
+  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0, bench: b.axes, systemScore: b.systemScore, examples }
 }
 
 export type Gap = { dimension: string; label: string; winnerPct: number; yourPct: number; kind: 'missing' | 'underweight' | 'overused' }
@@ -321,11 +333,25 @@ export function scoreDna(own: OwnDna, winners: WinnerDna, gaps: Gap[]): Score {
   return { total, band, subscores: subs }
 }
 
-// ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. ──
-const cacheKey = (pageIds: string[], ownPage: string | null) =>
-  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '')).digest('hex').slice(0, 24)}.json`
+// ── "What it costs you" — an HONEST estimate (we can't see spend from outside; that's the invisible half
+// the benchmark names). We model annual spend from active-ad count × an industry-average per-ad spend,
+// then the fraction leaking because winning tactics are missing. Flagged estimated + needsMeta so the UI
+// says "connect Meta for your real number." ──
+export type CostEstimate = { lostPerYear: number; activeAds: number; monthlyPerAd: number; leakPct: number; estimated: true; needsMeta: true }
+export function estimateCost(own: OwnDna, gaps: Gap[], score: Score): CostEstimate {
+  const monthlyPerAd = 400 // conservative industry-average spend per active creative / month
+  const activeAds = own.activeAds
+  const annualSpend = activeAds * monthlyPerAd * 12
+  const leak = Math.min(0.4, gaps.length * 0.03 + (Math.max(0, 100 - score.total) / 100) * 0.15)
+  return { lostPerYear: Math.round(annualSpend * leak), activeAds, monthlyPerAd, leakPct: Math.round(leak * 100), estimated: true, needsMeta: true }
+}
 
-export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cached: boolean }
+// ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. `v2` =
+// added own.examples (ad thumbnails) + cost; bumping the key bypasses caches that predate those fields. ──
+const cacheKey = (pageIds: string[], ownPage: string | null) =>
+  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v2').digest('hex').slice(0, 24)}.json`
+
+export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cost: CostEstimate; cached: boolean }
 
 export async function runDnaEngine(opts: {
   brandName: string; competitorPageIds: string[]; ownPageId?: string | null; niche?: string | null; force?: boolean
@@ -345,7 +371,8 @@ export async function runDnaEngine(opts: {
   const gaps = dnaDiff(own, winners)
   const report = await synthesize({ brandName, niche, own, winners, gaps })
   const score = scoreDna(own, winners, gaps)
-  const result: FullDnaResult = { winners, own, gaps, report, score, cached: false }
+  const cost = estimateCost(own, gaps, score)
+  const result: FullDnaResult = { winners, own, gaps, report, score, cost, cached: false }
 
   try { await uploadBufferToR2(Buffer.from(JSON.stringify(result)), key, 'application/json') } catch { /* cache best-effort */ }
   return result
