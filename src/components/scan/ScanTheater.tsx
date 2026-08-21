@@ -13,14 +13,15 @@ const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
 
 type Brand = { pageId: string; name: string; adCount?: number; industry?: string | null }
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
-type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string }
+type Finding = { text: string; bad?: boolean }   // bad → red dot (a gap/problem), else green (a good signal)
+type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string; findings: Finding[] }
 type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean; briefs?: CreativeBrief[]; rivalToRemake?: { adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null } | null }
 
 const STEPS0: Step[] = [
-  { id: 'ads', label: 'Reading your ads', status: 'pending' },
-  { id: 'rivals', label: 'Spying on your rivals', status: 'pending' },
-  { id: 'gaps', label: 'Finding your gaps', status: 'pending' },
-  { id: 'score', label: 'Scoring your ad presence', status: 'pending' },
+  { id: 'ads', label: 'Reading your ads', status: 'pending', findings: [] },
+  { id: 'rivals', label: 'Spying on your rivals', status: 'pending', findings: [] },
+  { id: 'gaps', label: 'Finding your gaps', status: 'pending', findings: [] },
+  { id: 'score', label: 'Scoring your ad presence', status: 'pending', findings: [] },
 ]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
@@ -77,6 +78,8 @@ export default function ScanTheater() {
 
   const setStep = useCallback((id: StepId, status: Step['status'], metric?: string) =>
     setSteps((s) => s.map((x) => (x.id === id ? { ...x, status, metric: metric ?? x.metric } : x))), [])
+  const addFinding = useCallback((id: StepId, text: string, bad?: boolean) =>
+    setSteps((s) => s.map((x) => (x.id === id ? { ...x, findings: [...x.findings, { text, bad }] } : x))), [])
 
   const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string }) => {
     if (running.current) return
@@ -91,20 +94,54 @@ export default function ScanTheater() {
       // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
       // instead of staging empty acts + a meaningless score.
       if (data.building) { setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
-      // Paced so a first-time viewer can actually READ each act (reading your ads → the rivals → the
-      // gaps) before it advances. The full report stays on the page afterwards to scroll back through.
-      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'no ads found'); setStage('ads'); setPct(34); await sleep(3200)
-      setStage('rivals'); setStep('rivals', 'active'); await sleep(600)
-      setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60); await sleep(3200)
-      setStage('gaps'); setStep('gaps', 'active'); await sleep(600)
-      setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82); await sleep(2800)
-      setStage('score'); setStep('score', 'active'); await sleep(600)
-      setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(900)
+      // Ryze-style: each step opens sub-findings that tick in one by one, telling the viewer what we
+      // NOTICED — fast, but slow enough to read. `note` reveals a finding then pauses.
+      const note = async (id: StepId, text: string, bad?: boolean, ms = 620) => { addFinding(id, text, bad); await sleep(ms) }
+      const topLabel = (d: Record<string, Tally[]>, k: string) => (d[k] || [])[0]?.label
+      const ownD = data.own.dist as Record<string, Tally[]>, winD = data.winners.dist as Record<string, Tally[]>
+
+      // ── Reading your ads ──
+      if (data.own.found) {
+        await note('ads', `Read ${data.own.totalAds.toLocaleString()} ads · ${data.own.activeAds} active now`)
+        if (data.own.media.length) await note('ads', data.own.media.slice(0, 3).map((m) => `${m.label} ${m.pct}%`).join(' · '))
+        if (topLabel(ownD, 'hook_type')) await note('ads', `Your top hook: ${topLabel(ownD, 'hook_type')}`)
+        await note('ads', `${(ownD.persona || []).length} personas · ${(ownD.angle || []).length} angles in play`)
+      } else {
+        await note('ads', 'No ads running that we can see', true)
+      }
+      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'none'); setPct(34)
+
+      // ── Spying on your rivals ──
+      setStage('rivals'); setStep('rivals', 'active')
+      await note('rivals', `${data.winners.winnerCount.toLocaleString()} rival ads running 90+ days`)
+      if (topLabel(winD, 'angle')) await note('rivals', `Their go-to angle: ${topLabel(winD, 'angle')}`)
+      if (topLabel(winD, 'hook_type')) await note('rivals', `Their go-to hook: ${topLabel(winD, 'hook_type')}`)
+      if (data.winners.media[0]) await note('rivals', `Leaning on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`)
+      if (data.winners.examples[0]?.daysRunning) await note('rivals', `Longest winner: ${data.winners.examples[0].daysRunning} days live`)
+      setStep('rivals', 'done', `${data.winners.winnerCount} winners`); setPct(60)
+
+      // ── Finding your gaps ──
+      setStage('gaps'); setStep('gaps', 'active')
+      if (data.gaps.length) {
+        await note('gaps', `${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you're missing`, true)
+        for (const g of data.gaps.slice(0, 4)) await note('gaps', `Missing: ${g.dimension} — ${g.label}`, true)
+      } else {
+        await note('gaps', "You're running the winners' playbook")
+      }
+      setStep('gaps', 'done', `${data.gaps.length} gaps`); setPct(82)
+
+      // ── Scoring ──
+      setStage('score'); setStep('score', 'active')
+      for (const sc of data.score.subscores) {
+        if (sc.value == null) continue
+        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 480)
+      }
+      setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(700)
       setPhase('done'); running.current = false
     } catch (e) {
       setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
     }
-  }, [setStep])
+  }, [setStep, addFinding])
 
   // ── IDLE — audit framing + brand picker (or ad-library link) ──
   if (phase === 'idle') {
@@ -167,7 +204,7 @@ export default function ScanTheater() {
       <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: '#fff' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
         <div style={{ color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {steps.map((s) => (
             <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -175,6 +212,16 @@ export default function ScanTheater() {
                 <span style={{ fontSize: 14.5, fontWeight: s.status === 'active' ? 800 : 600, color: s.status === 'pending' ? MUT : '#fff' }}>{s.label}</span>
                 {s.metric && <span style={{ marginLeft: 'auto', fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: ORANGE }}>{s.metric}</span>}
               </div>
+              {s.findings.length > 0 && (
+                <div style={{ margin: '7px 0 2px', paddingLeft: 28, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  {s.findings.map((f, i) => (
+                    <div key={i} className="sf-rise" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 12.5, lineHeight: 1.35, color: 'rgba(255,255,255,.82)' }}>
+                      <span style={{ flex: 'none', width: 6, height: 6, borderRadius: 6, marginTop: 5, background: f.bad ? '#ff6a3d' : '#3fbf7f' }} />
+                      <span>{f.text}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
