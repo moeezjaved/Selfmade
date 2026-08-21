@@ -6,7 +6,7 @@
  */
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
 import type { FullDnaResult, Tally } from '@/lib/dna/engine'
-import { videoShotList, type CreativeBrief } from '@/lib/dna/creative'
+import { videoShotList, remakeScript, type CreativeBrief } from '@/lib/dna/creative'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#ef4a1e', PAPER = '#fbf4e2'
 const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
@@ -15,7 +15,8 @@ type Brand = { pageId: string; name: string; adCount?: number; industry?: string
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
 type Finding = { text: string; bad?: boolean }   // bad → red dot (a gap/problem), else green (a good signal)
 type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string; findings: Finding[] }
-type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean; briefs?: CreativeBrief[]; rivalToRemake?: { adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null } | null }
+type RivalVideo = { adId: string; brand: string; daysRunning: number; hook: string; angle: string | null; hookType: string | null; videoUrl: string; posterUrl: string | null }
+type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean; briefs?: CreativeBrief[]; rivalToRemake?: { adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null } | null; rivalVideo?: RivalVideo | null }
 
 const STEPS0: Step[] = [
   { id: 'ads', label: 'Reading your ads', status: 'pending', findings: [] },
@@ -581,7 +582,9 @@ function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief;
 function TheFix({ res }: { res: ScanResult }) {
   if (!res.briefs?.length) return null
   const briefs = res.briefs.slice(0, 2)
-  const script = videoShotList(res.briefs[0], res.brand.name, res.brand.niche)
+  const rv = res.rivalVideo || null
+  // If a rival has a proven VIDEO, we script a remake of THAT (and show it playing); else a fresh template.
+  const script = rv ? remakeScript(rv, res.brand.name, res.brand.niche) : videoShotList(res.briefs[0], res.brand.name, res.brand.niche)
   const rival = res.rivalToRemake
   return (
     <div style={{ marginTop: 40 }}>
@@ -592,18 +595,34 @@ function TheFix({ res }: { res: ScanResult }) {
         {briefs.map((b, i) => <FixCard key={b.key} brief={b} brandName={res.brand.name} niche={res.brand.niche} pageId={res.brand.pageId} i={i} />)}
       </div>
 
-      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>Your {script.totalSeconds}-second video, scripted</div>
-      <p style={{ ...sub, fontSize: 15 }}>{script.title} — beat by beat, ready to shoot.</p>
-      <div style={{ display: 'grid', gap: 8, marginTop: 16 }}>
-        {script.beats.map((beat, i) => (
-          <div key={i} className="sf-rise" style={{ ...rise(i), display: 'flex', gap: 14, alignItems: 'baseline', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px' }}>
-            <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: ORANGE, flex: 'none', minWidth: 78 }}>{beat.t}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 14, color: INK, fontWeight: 700, lineHeight: 1.35 }}>{beat.onScreen}</div>
-              <div style={{ fontSize: 13, color: SUB, marginTop: 3, lineHeight: 1.45 }}>{beat.vo}</div>
+      {/* Rival-video remake: play their proven winner, script it beat-by-beat for the user's product */}
+      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>
+        {rv ? <>Steal this winning video — <span style={{ color: ORANGE }}>remade as yours</span></> : <>Your {script.totalSeconds}-second video, scripted</>}
+      </div>
+      <p style={{ ...sub, fontSize: 15 }}>{rv ? `${rv.brand}'s video has run ${rv.daysRunning} days. Here's the same ${script.totalSeconds}s arc, shot for ${res.brand.name}.` : `${script.title} — beat by beat, ready to shoot.`}</p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: rv ? 'minmax(0, 260px) minmax(0, 1fr)' : '1fr', gap: 20, marginTop: 16, alignItems: 'start' }}>
+        {rv && (
+          <div style={{ background: '#000', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', position: 'sticky', top: 16 }}>
+            <video src={rv.videoUrl} poster={rv.posterUrl || undefined} controls muted playsInline loop preload="metadata"
+              style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block', background: '#000' }} />
+            <div style={{ padding: '10px 12px', background: DARK, color: CREAM }}>
+              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>Their winner · {rv.daysRunning}d live</div>
+              <div style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.35, maxHeight: 52, overflow: 'hidden' }}>{rv.hook || rv.brand}</div>
             </div>
           </div>
-        ))}
+        )}
+        <div style={{ display: 'grid', gap: 8 }}>
+          {script.beats.map((beat, i) => (
+            <div key={i} className="sf-rise" style={{ ...rise(i), display: 'flex', gap: 14, alignItems: 'baseline', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px' }}>
+              <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: ORANGE, flex: 'none', minWidth: 78 }}>{beat.t}</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 14, color: INK, fontWeight: 700, lineHeight: 1.35 }}>{beat.onScreen}</div>
+                <div style={{ fontSize: 13, color: SUB, marginTop: 3, lineHeight: 1.45 }}>{beat.vo}</div>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={{ marginTop: 18 }}>
@@ -614,7 +633,8 @@ function TheFix({ res }: { res: ScanResult }) {
         <div style={{ fontSize: 12, color: MUT, marginTop: 8 }}>🔒 Unlocks when you start your trial.</div>
       </div>
 
-      {rival && (
+      {/* Fallback image-remake teaser — only when there's no rival VIDEO to show above */}
+      {!rv && rival && (
         <div style={{ marginTop: 36 }}>
           <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '0 0 4px' }}>Your rival&rsquo;s best ad — <span style={{ color: ORANGE }}>remade as yours</span></div>
           <p style={{ ...sub, fontSize: 15 }}>Running {rival.daysRunning} days for {rival.brand}. Here&rsquo;s the same idea in your brand.</p>
