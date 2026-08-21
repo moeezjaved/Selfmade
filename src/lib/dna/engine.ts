@@ -86,8 +86,21 @@ export type WinnerExample = {
   adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null
 }
 
+// Media mix (Video / Carousel / Image) from the raw `format` column — the headline bar on Brand Spy.
+function mediaMix(rows: AdRow[]): Tally[] {
+  const counts: Record<string, number> = {}
+  for (const r of rows) {
+    const f = String(r.format || '').trim(); if (!f) continue
+    const k = /video/i.test(f) ? 'Video' : /carousel|dco|dpa/i.test(f) ? 'Carousel/DCO' : /image|static/i.test(f) ? 'Image' : f
+    counts[k] = (counts[k] || 0) + 1
+  }
+  const tot = rows.length || 1
+  return Object.entries(counts).sort((a, b) => b[1] - a[1]).map(([label, count]) => ({ label, count, pct: Math.round((count / tot) * 100) }))
+}
+
 export type WinnerDna = {
   dist: DnaDist
+  media: Tally[]
   sampleSize: number
   winnerCount: number
   examples: WinnerExample[]   // longest-running, for the LLM + UI
@@ -128,20 +141,20 @@ export async function winnerDna(pageIds: string[], niche?: string | null): Promi
     thumb: thumbOf(a),
   }))
 
-  return { dist: rollup(rows), sampleSize: rows.length, winnerCount: winners.length, examples }
+  return { dist: rollup(rows), media: mediaMix(rows), sampleSize: rows.length, winnerCount: winners.length, examples }
 }
 
-export type OwnDna = { dist: DnaDist; totalAds: number; activeAds: number; found: boolean }
+export type OwnDna = { dist: DnaDist; media: Tally[]; totalAds: number; activeAds: number; found: boolean }
 
 // ── the visitor's own DNA (their public ads live in the same index → no Meta connection needed) ──
 export async function ownDna(pageId: string | null): Promise<OwnDna> {
-  if (!pageId) return { dist: {}, totalAds: 0, activeAds: 0, found: false }
+  if (!pageId) return { dist: {}, media: [], totalAds: 0, activeAds: 0, found: false }
   const db = createAdminClient()
   const { data } = await db.from('discovery_ads_index').select(SELECT)
     .eq('page_id', pageId).limit(1000)
   const rows = (data as AdRow[]) || []
   const active = rows.filter((r) => r.is_active === true).length
-  return { dist: rollup(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0 }
+  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0 }
 }
 
 export type Gap = { dimension: string; label: string; winnerPct: number; yourPct: number; kind: 'missing' | 'underweight' | 'overused' }
