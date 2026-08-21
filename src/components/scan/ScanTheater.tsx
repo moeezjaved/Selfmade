@@ -61,6 +61,7 @@ export default function ScanTheater() {
   const [pct, setPct] = useState(0)
   const [res, setRes] = useState<ScanResult | null>(null)
   const [revealed, setRevealed] = useState(false)
+  const [verdict, setVerdict] = useState<{ text: string; sub?: string; bad?: boolean } | null>(null)
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -85,7 +86,7 @@ export default function ScanTheater() {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
-    setRes(null); setRevealed(false); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(5)
+    setRes(null); setRevealed(false); setVerdict(null); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(5)
     // Smooth, time-based progress creep (Ryze-style "13%… 57%…") — independent of the findings, so the
     // bar always drifts up instead of jumping. Cleared on every exit path.
     let prog = 5
@@ -100,12 +101,14 @@ export default function ScanTheater() {
       // instead of staging empty acts + a meaningless score.
       if (data.building) { stopProg(); setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
 
-      // THE THEATER. Each step opens sub-findings that tick in slowly, one at a time, telling the viewer
-      // exactly what we NOTICED — a real investigation, not a progress bar. Deliberately unhurried.
-      const note = async (id: StepId, text: string, bad?: boolean, ms = 2000) => { addFinding(id, text, bad); await sleep(ms) }
-      const openStage = async (id: StepId) => { setStage(id); setStep(id, 'active'); await sleep(1500) }
+      // THE THEATER. Each step slowly ticks in what we NOTICED (sidebar), the panel shows the evidence,
+      // and the step ENDS on a big plain-English VERDICT — the payoff — before moving on. ~30s a step.
+      const note = async (id: StepId, text: string, bad?: boolean, ms = 2800) => { addFinding(id, text, bad); await sleep(ms) }
+      const verdictBeat = async (text: string, sub: string, bad?: boolean, ms = 6000) => { setVerdict({ text, sub, bad }); await sleep(ms) }
+      const openStage = async (id: StepId) => { setVerdict(null); setStage(id); setStep(id, 'active'); await sleep(1800) }
       const topLabel = (d: Record<string, Tally[]>, k: string) => (d[k] || [])[0]?.label
       const ownD = data.own.dist as Record<string, Tally[]>, winD = data.winners.dist as Record<string, Tally[]>
+      const vidPct = data.own.media.find((m) => /video/i.test(m.label))?.pct ?? 0
 
       // ── Reading your ads ──
       await sleep(900)
@@ -117,8 +120,11 @@ export default function ScanTheater() {
         if (topLabel(ownD, 'angle')) await note('ads', `Your lead angle: ${topLabel(ownD, 'angle')}`)
         await note('ads', `Speaking to ${(ownD.persona || []).length} personas across ${(ownD.angle || []).length} angles`)
         if (topLabel(ownD, 'emotion')) await note('ads', `Strongest emotion you pull: ${topLabel(ownD, 'emotion')}`)
+        await verdictBeat(`You're present — ${data.own.totalAds.toLocaleString()} ads, ${vidPct}% video`,
+          `Leaning on ${topLabel(ownD, 'hook_type') || 'a narrow set of'} hooks and ${topLabel(ownD, 'angle') || 'few'} angles across ${(ownD.persona || []).length} personas.`)
       } else {
         await note('ads', 'No live ads we can see — that’s gap #1', true)
+        await verdictBeat(`You're invisible right now`, 'No ads we can find — the first fix is simply showing up.', true)
       }
       setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'none')
 
@@ -131,6 +137,8 @@ export default function ScanTheater() {
       if (topLabel(winD, 'persona')) await note('rivals', `Persona they chase: ${topLabel(winD, 'persona')}`)
       if (topLabel(winD, 'usp')) await note('rivals', `Their strongest promise: ${topLabel(winD, 'usp')}`)
       if (data.winners.examples[0]?.daysRunning) await note('rivals', `Longest-running winner: ${data.winners.examples[0].daysRunning} days live`)
+      await verdictBeat(`Your rivals have a formula`,
+        `${data.winners.winnerCount.toLocaleString()} ads running 90+ days — built on ${topLabel(winD, 'angle') || 'proven'} angles and ${topLabel(winD, 'hook_type') || 'sharp'} hooks.`)
       setStep('rivals', 'done', `${data.winners.winnerCount} winners`)
 
       // ── Finding your gaps ──
@@ -139,8 +147,11 @@ export default function ScanTheater() {
       if (data.gaps.length) {
         await note('gaps', `${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you’re not running`, true)
         for (const g of data.gaps.slice(0, 5)) await note('gaps', `Missing: ${g.dimension} — ${g.label}`, true)
+        await verdictBeat(`${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you're missing`,
+          `The tactics your proven rivals rely on that you don't run yet — each one is fixable.`, true)
       } else {
         await note('gaps', 'You’re already running the winners’ playbook')
+        await verdictBeat(`You're running the winners' playbook`, 'No missing tactics — your edge now is volume, velocity and creative quality.')
       }
       setStep('gaps', 'done', `${data.gaps.length} gaps`)
 
@@ -148,10 +159,11 @@ export default function ScanTheater() {
       await openStage('score')
       for (const sc of data.score.subscores) {
         if (sc.value == null) continue
-        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 1500)
+        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 1800)
       }
-      await note('score', `Final ad-presence score: ${data.score.total}/100`, false, 1200)
-      stopProg(); setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(800)
+      await verdictBeat(`${data.score.total}/100 · ${data.score.band}`,
+        `That's your ad-presence score across coverage, format mix, angles and the tactics you're missing.`, data.score.total < 60, 4500)
+      stopProg(); setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(700)
       setPhase('done'); running.current = false
     } catch (e) {
       stopProg(); setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
@@ -249,6 +261,13 @@ export default function ScanTheater() {
       <main style={{ padding: 'clamp(28px,5vw,64px)', maxWidth: 900 }}>
         {phase === 'error' && (
           <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
+        )}
+        {phase === 'running' && verdict && (
+          <div key={verdict.text} className="sf-rise" style={{ position: 'sticky', top: 16, zIndex: 5, marginBottom: 26, background: verdict.bad ? '#2a1712' : DARK, color: '#fff', borderRadius: 18, padding: '22px 26px', boxShadow: '0 24px 50px -24px rgba(0,0,0,.5)', border: verdict.bad ? '1px solid rgba(255,106,61,.4)' : '1px solid rgba(255,255,255,.08)' }}>
+            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: verdict.bad ? '#ff8a5f' : ORANGE, marginBottom: 8 }}>What we found</div>
+            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(24px,3.4vw,34px)', lineHeight: 1.1, letterSpacing: '-.01em' }}>{verdict.text}</div>
+            {verdict.sub && <p style={{ color: 'rgba(255,255,255,.75)', fontSize: 15, lineHeight: 1.5, margin: '10px 0 0', maxWidth: 620 }}>{verdict.sub}</p>}
+          </div>
         )}
         {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
         {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
