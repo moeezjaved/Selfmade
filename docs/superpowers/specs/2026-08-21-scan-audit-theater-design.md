@@ -1,0 +1,82 @@
+# /scan Audit Theater → Subscription — Design Spec
+
+**Date:** 2026-08-21
+**Status:** Design approved in brainstorm; awaiting spec review before implementation planning.
+**Surface:** `tryselfmade.ai/scan` (public, no login, noindex, unlinked). Standalone "Audit your ads" funnel — NEVER wired into main onboarding.
+
+## Goal
+
+Turn the free, anonymous Facebook ad audit into a cinematic experience that (a) delivers real value before any ask, and (b) converts the viewer into a paying Selfmade subscriber. The product being sold is **"fix it for me"** — the AI marketing company generates the exact ads the audit says they're missing.
+
+## Conversion spine — a 3-rung value ladder
+
+Each rung answers the question the previous rung raised, so every ask feels earned, never salesy.
+
+1. **Free scan** (public Meta Ad Library, via brand pick or ad-library link).
+   Output: their ad DNA + competitor comparison + gaps + the $100k→$1M benchmark + **1–2 fully-rendered image ads** + a **timestamped video script with their product written in**.
+2. **Connect Meta** (free, read-only, ~30s), positioned immediately after the scan.
+   Output: "awesome reports" that fill in the *invisible half* the free audit explicitly named — real ROAS, wasted spend, true winners/losers. Completion psychology, not a sale. Also a data moat + retention hook.
+3. **Subscribe to act.**
+   Unlocks **video generation** (the script from rung 1, rendered), ongoing done-for-you creative, and rival monitoring.
+
+**Give vs gate:** Free = 1–2 image ads + full video script. Gated = video generation + the Meta-powered reports' ongoing/action layer.
+
+## The film — 5-act emotional arc (Tension → Verdict → Payoff)
+
+Lean-back "cinema+": richer auto-reveal (tickers, gauge sweeps, ads flying in, score assembling) — NOT an interactive form. ~90 seconds.
+
+| Act | Beat | What plays | Emotion | Data source |
+|---|---|---|---|---|
+| 1. "This is you" | Read their ads | Their ads fly in; counters ("1,000 ads read"); hooks/personas assemble into a portrait | Recognition | `ownDna` (discovery_ads_index) |
+| 2. "This is them" | Spy on rivals | Competitor winners slide in beside theirs ("435 winners running 90+ days") | Tension / FOMO | `winnerDna` (days_running≥90) |
+| 3. "The gap" | Find gaps | Side-by-side lights the missing moves (e.g. "0 formats" glows red vs rivals' full mix) | Sting | `dnaDiff` |
+| 4. "The verdict" | $100k→$1M | Benchmark assembles axis-by-axis, lands on score + tier verdict | Clarity / ambition | `benchmark()`, `scoreDna` |
+| 5. "The fix" | Payoff | 1–2 image ads render live; video script types itself out, product inside | Relief / desire | ad studio + script generator |
+
+Act 4's existing line — *"the invisible half: we can't see your CAC/LTV/AOV from outside"* — is the deliberate setup for the Meta connect CTA. The film names the hole, then offers to fill it.
+
+## Value drops (aha before every ask)
+
+- **Drop 1 (free, Act 1):** "We read N of your ads — here's your DNA." Most founders have never seen this. Pure gift.
+- **Drop 2 (free, Act 5):** 1–2 real image ads + timestamped video script with their product. Downloadable. Worth more than most paid audits.
+- **Drop 3 (free, post-scan):** Meta report reveals wasted spend + true winners → subscribe becomes emotional, not rational.
+
+## Where the money asks land
+
+- **Ask 1 — Connect Meta** (free, read-only), right after Act 5. Framing: *"Your audit is ~60% complete. The other 40% is inside your account — connect Meta (read-only, 30s) to see your real numbers."*
+- **Ask 2 — Subscribe**, after the Meta report. Framing: *"You've seen the gaps and the fixes. Want us to build and run them? Generate this video, get new ads weekly, and we watch your rivals for you."* The already-scripted video is the concrete first deliverable.
+
+## Conversion mechanics (baked into copy)
+
+- Named, personal, specific — always "[Brand], you run 0 video formats while 8 rivals run all of them."
+- Staleness hook — "This snapshot is true today; your rivals shipped 20 new ads this month" → makes *ongoing* the obvious answer.
+- Loss framing over gain — "leaving these angles on the table" > "you could try these angles."
+- One ad they can hold — the free rendered ad is the demo; the paywall is "keep going," not "see anything."
+
+## v1 "wow" multiplier — Rival ad remade as yours
+
+Take a competitor's top winner and show it restyled in the viewer's brand — the single most visceral "I need this" moment. Reuses the existing Discovery "Make it mine" / studio clone path. (Shareable social scorecard: **deferred** to a later version.)
+
+## Build slice (smallest-first) — for the implementation plan
+
+Most of Acts 1–5 already exist (`ScanTheater`, `runDnaEngine`, benchmark, staged reveal). New work, in order:
+
+1. **Act 5 free creative** — render 1–2 image ads live from the top gaps (reuse ad studio / inspiration + industry DNA path).
+2. **Video-script generator** — timestamped ARC-style shot list with the product; render a gated "Generate this video" button (video gen behind paywall).
+3. **"Rival remade as yours"** — pull a competitor winner → restyle in-brand (reuse studio clone).
+4. **Meta-connect bridge** — post-scan CTA → read-only connect → the reports view (real ROAS / wasted spend / winners).
+5. **Paywall + subscribe** — after the Meta report; ties to existing plan/billing.
+6. **cinema+ polish** — tickers, gauge sweeps, ad fly-ins layered over existing acts (reduced-motion safe).
+
+## Open questions / risks (resolve during planning)
+
+- **Pricing/offer at Ask 2** — trial vs credits vs plan? (defer to existing pricing model v2.)
+- **Meta read-only scope** — which token/permission path for an anonymous, not-yet-signed-up visitor? Connecting Meta likely requires account creation first — sequence needs care (may become "sign up free → connect Meta").
+- **Video-gen cost control** — gated, but confirm per-generation economics.
+- **Anonymous → identified handoff** — the scan is anonymous; connecting Meta / subscribing needs an account. Where does sign-up slot in without killing the "no login" magic of the free scan?
+- **Rate/abuse limits** on live image generation in a public, no-login theater.
+
+## Constraints (standing)
+
+- `/scan` stays purely additive and isolated from production onboarding; verify on production (keys live there), keep noindex + unlinked until Moeez adds the landing link.
+- Reuse existing engine + studio paths; no new DDL without the pause-before-migration rule.
