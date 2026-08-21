@@ -56,14 +56,13 @@ export default function AdPreviewLightbox({ ad, onClose }: { ad: PreviewAd; onCl
               : <div style={{ display: 'grid', placeItems: 'center', height: '100%', color: '#f3ece0', fontSize: 14 }}>{ad.brand || 'Ad'}</div>}
         </div>
 
-        {/* actions — mirror Discovery: remake it, or see the brand's full library */}
+        {/* actions — mirror Discovery: remake it, or jump to the brand's full library (always available) */}
         <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
           {make && (
             <Link href={make} style={{ flex: 1, textAlign: 'center', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '12px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Make it mine →</Link>
           )}
-          {ad.pageId && (
-            <Link href={`/discovery/brand-spy/${ad.pageId}`} style={{ background: 'rgba(255,255,255,.12)', color: '#fff', borderRadius: 100, padding: '12px 16px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>See their ads</Link>
-          )}
+          <Link href={ad.pageId ? `/discovery/brand-spy/${ad.pageId}` : '/discovery/brand-spy'}
+            style={{ flex: make ? 'none' : 1, textAlign: 'center', background: 'rgba(255,255,255,.14)', color: '#fff', borderRadius: 100, padding: '12px 18px', fontSize: 13.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>See all ads →</Link>
         </div>
       </div>
     </div>

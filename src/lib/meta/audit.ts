@@ -376,7 +376,9 @@ export async function auditAccount(admin: any, userId: string, accountId?: strin
         const batch = await graph(`?ids=${ids.join(',')}&fields=creative{thumbnail_url,image_url}`, token)
         for (const a of ads) {
           const cre = batch?.[a.adId]?.creative
-          a.thumbnail_url = cre?.thumbnail_url || cre?.image_url || null
+          // Prefer the full-res image_url over the tiny thumbnail_url — the thumbnail looks blurry when
+          // shown large (e.g. seeded as the "winner" on the Studio remake canvas + the strategist card).
+          a.thumbnail_url = cre?.image_url || cre?.thumbnail_url || null
         }
       }
     } catch { /* thumbnails best-effort — the 🎬 fallback still renders */ }
