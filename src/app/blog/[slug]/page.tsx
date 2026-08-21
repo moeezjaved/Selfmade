@@ -10,7 +10,7 @@ import { getPostBySlug, getPublishedPosts, renderMarkdown, readingTimeMin, SITE_
 import { coverStyle, catStyle, categoryOf } from '../_style'
 
 export const revalidate = 300
-const BG = '#1c1611', LIME = '#ef4a1e', CARD = '#ffffff'
+const LIME = '#ef4a1e', CARD = '#ffffff'
 
 const fmt = (d: string | null) => d ? new Date(d).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }) : ''
 function img(url: string, w = 1200) {
@@ -98,10 +98,10 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .prose img{max-width:100%;border-radius:12px;margin:10px 0}
         .prose hr{border:none;height:1px;background:linear-gradient(90deg,transparent,rgba(28,22,17,.16),transparent);margin:48px 0}
         /* Designed CTA card (:::cta) */
-        .prose .sf-cta{background:linear-gradient(135deg,${LIME},#ff8a4d);border-radius:20px;padding:32px 28px;margin:44px 0;text-align:center;box-shadow:0 24px 60px -30px rgba(239,74,30,.6)}
+        .prose .sf-cta{background:radial-gradient(120% 130% at 15% 0%, #2a2016 0%, #1c1611 55%);border:1px solid rgba(239,74,30,.28);border-radius:20px;padding:32px 28px;margin:44px 0;text-align:center;box-shadow:0 26px 60px -32px rgba(0,0,0,.55)}
         .prose .sf-cta-h{font-family:'Fraunces',Georgia,serif;font-weight:700;font-size:27px;line-height:1.12;color:#fff;letter-spacing:-.01em;margin:0 0 8px}
         .prose .sf-cta-s{font-family:'Inter',sans-serif;color:rgba(255,255,255,.94);font-size:16px;line-height:1.5;margin:0 0 20px}
-        .prose a.sf-cta-b{display:inline-block;background:#1c1611;color:#fff;padding:14px 28px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:15px;text-decoration:none;border:none}
+        .prose a.sf-cta-b{display:inline-block;background:${LIME};color:#fff;padding:14px 28px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:15px;text-decoration:none;border:none}
         .prose a.sf-cta-b:hover{border:none;opacity:.92}
         /* Designed steps card (:::steps) */
         .prose .sf-steps{display:grid;grid-template-columns:repeat(3,1fr);gap:18px;margin:44px 0;background:#211a13;border-radius:20px;padding:30px 26px}
@@ -116,8 +116,8 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .sf-side{display:none}
         #sf-hide:checked ~ .sf-read .sf-side{display:none}
         @media (min-width:1120px){
-          .sf-read{max-width:1094px;display:grid;grid-template-columns:250px minmax(0,760px);gap:44px;justify-content:center;align-items:start}
-          .sf-side{display:block;position:sticky;top:92px;align-self:start}
+          .sf-read{max-width:1560px;display:grid;grid-template-columns:minmax(250px,1fr) minmax(0,760px) minmax(0,1fr);column-gap:40px;align-items:start}
+          .sf-side{display:block;position:sticky;top:92px;justify-self:start;width:250px;align-self:start}
         }
         .sf-side .card{background:#fff;border:1px solid rgba(28,22,17,.12);border-radius:18px;padding:20px 18px 18px;box-shadow:0 22px 55px -30px rgba(28,22,17,.45);position:relative}
         .sf-side .k{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:${LIME};margin:0 0 7px}
@@ -125,7 +125,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
         .sf-side ul{list-style:none;margin:0 0 16px;padding:0}
         .sf-side li{display:flex;gap:9px;font-family:'Inter',sans-serif;font-size:13px;line-height:1.4;color:#574f47;margin:0 0 11px;font-weight:500}
         .sf-side li span{color:${LIME};font-weight:900;flex:none}
-        .sf-side a.b{display:block;text-align:center;background:#1c1611;color:#fff;padding:12px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:14px;text-decoration:none}
+        .sf-side a.b{display:block;text-align:center;background:${LIME};color:#fff;padding:12px;border-radius:100px;font-family:'Inter',sans-serif;font-weight:800;font-size:14px;text-decoration:none}
         .sf-side a.b:hover{opacity:.92}
         .sf-side .x{position:absolute;top:10px;right:13px;color:#b8afa4;font-size:18px;line-height:1;cursor:pointer;font-family:sans-serif}
       `}</style>
@@ -133,7 +133,7 @@ export default async function BlogPost({ params }: { params: { slug: string } })
       <nav style={{ borderBottom: '1px solid rgba(28,22,17,.08)' }}>
         <div style={{ maxWidth: 1160, margin: '0 auto', padding: '15px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <Link href="/">{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
-          <Link href="/signup" style={{ background: LIME, color: BG, padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
+          <Link href="/signup" style={{ background: LIME, color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Start for free</Link>
         </div>
       </nav>
 
