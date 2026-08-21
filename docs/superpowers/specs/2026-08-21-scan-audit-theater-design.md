@@ -21,6 +21,22 @@ Each rung answers the question the previous rung raised, so every ask feels earn
 
 **Give vs gate:** Free = 1–2 image ads + full video script. Gated = video generation + the Meta-powered reports' ongoing/action layer.
 
+### Full flow with the sign-up + payment gates (approved 2026-08-21)
+
+Never ask for money until they've felt the product work. Two free wins, then a low-friction sign-up, then payment only to *act*.
+
+| Step | Ask | Cost | Why here |
+|---|---|---|---|
+| 1. Anonymous scan | nothing | free | Zero-friction full audit — the magic |
+| 2. Free image ads + video script | nothing | free | Win #1 — they hold real creative |
+| 3. Sign up (1-click Google) | email | free | Low ask *after* value; saves their audit, attributes the user |
+| 4. Connect Meta (read-only) | permission | free | Win #2 — real numbers, wasted spend revealed |
+| 5. Subscribe / payment | 💳 | **paid** | Only now — to ACT: generate the scripted video, launch, weekly ads, rival monitoring |
+
+**Payment lands at step 5 only** — when they want us to DO the work (generate the video they already saw scripted; fix the gaps they already saw named). Everything before is proof, not product.
+
+Sub-decisions for the plan: (a) first video generation may be a free trial credit so they cross the paying threshold having *received* something (ties to pricing model v2 — credits, Creator $49 / Agency $149, no trial); (b) put the "rival remade as yours" wow *at the payment gate* — show it watermarked → "Subscribe to export and launch."
+
 ## The film — 5-act emotional arc (Tension → Verdict → Payoff)
 
 Lean-back "cinema+": richer auto-reveal (tickers, gauge sweeps, ads flying in, score assembling) — NOT an interactive form. ~90 seconds.
@@ -73,7 +89,7 @@ Most of Acts 1–5 already exist (`ScanTheater`, `runDnaEngine`, benchmark, stag
 - **Pricing/offer at Ask 2** — trial vs credits vs plan? (defer to existing pricing model v2.)
 - **Meta read-only scope** — which token/permission path for an anonymous, not-yet-signed-up visitor? Connecting Meta likely requires account creation first — sequence needs care (may become "sign up free → connect Meta").
 - **Video-gen cost control** — gated, but confirm per-generation economics.
-- **Anonymous → identified handoff** — the scan is anonymous; connecting Meta / subscribing needs an account. Where does sign-up slot in without killing the "no login" magic of the free scan?
+- **Anonymous → identified handoff** — RESOLVED: 1-click Google sign-up slots in at step 3 (after the two free wins, before Meta connect). Free scan stays anonymous; sign-up only to save the audit + connect Meta. Plan must persist the anonymous scan result and re-attach it to the new account on sign-up.
 - **Rate/abuse limits** on live image generation in a public, no-login theater.
 
 ## Constraints (standing)
