@@ -37,27 +37,31 @@ export default function AdPreviewLightbox({ ad, onClose }: { ad: PreviewAd; onCl
   const make = mineHref(ad)
 
   return (
+    // Backdrop: full-screen, its OWN scroll if ever needed, centered.
     <div onClick={onClose} role="dialog" aria-modal
-      style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(13,12,10,.9)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+      style={{ position: 'fixed', inset: 0, zIndex: 2147483000, background: 'rgba(13,12,10,.9)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', overflowY: 'auto' }}>
+      {/* Inner: capped to the viewport; a flex column where the MEDIA shrinks (flex:1, minHeight:0) and
+          the buttons never shrink (flex:none) — so the video can never push the buttons off-screen and
+          the top can never clip. */}
       <div onClick={(e) => e.stopPropagation()}
-        style={{ position: 'relative', width: 'min(92vw, 380px)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {/* CLOSE — always visible, inside the frame */}
+        style={{ position: 'relative', width: 'min(92vw, 380px)', height: 'auto', maxHeight: 'calc(100vh - 32px)', display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {/* CLOSE — floats over the media, always visible */}
         <button onClick={onClose} aria-label="Close"
-          style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, background: 'rgba(13,12,10,.72)', color: '#fff', border: '1.5px solid rgba(255,255,255,.5)', borderRadius: '50%', width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
+          style={{ position: 'absolute', top: 8, right: 8, zIndex: 3, background: 'rgba(13,12,10,.78)', color: '#fff', border: '1.5px solid rgba(255,255,255,.55)', borderRadius: '50%', width: 34, height: 34, fontSize: 20, lineHeight: 1, cursor: 'pointer', display: 'grid', placeItems: 'center' }}>×</button>
 
-        {/* the creative — caps at 70vh so the buttons below are ALWAYS visible (never pushed off / behind) */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: 0, borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
+        {/* MEDIA — fills the space left after the buttons, contained (never overflows, never clips) */}
+        <div style={{ flex: '1 1 auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 16, overflow: 'hidden', background: '#0d120e' }}>
           {videoSrc
             ? <video src={videoSrc} poster={!isVid(ad.image) && ad.image ? ad.image : undefined} controls autoPlay loop playsInline
-                style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', background: '#000', display: 'block' }} />
+                style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', background: '#000', display: 'block' }} />
             : ad.image
               /* eslint-disable-next-line @next/next/no-img-element */
-              ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ maxWidth: '100%', maxHeight: '70vh', objectFit: 'contain', display: 'block' }} />
+              ? <img src={ad.image} alt={ad.brand || 'ad'} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', display: 'block' }} />
               : <div style={{ display: 'grid', placeItems: 'center', minHeight: 200, color: '#f3ece0', fontSize: 14 }}>{ad.brand || 'Ad'}</div>}
         </div>
 
-        {/* actions — mirror Discovery: remake it, or jump to the brand's full library (always available) */}
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+        {/* ACTIONS — never shrink, always visible below the media */}
+        <div style={{ flex: '0 0 auto', display: 'flex', gap: 10, alignItems: 'center' }}>
           {make && (
             <Link href={make} style={{ flex: 1, textAlign: 'center', background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '12px 18px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Make it mine →</Link>
           )}
