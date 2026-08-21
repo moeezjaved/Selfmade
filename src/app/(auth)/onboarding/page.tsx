@@ -21,11 +21,12 @@ import { createClient } from '@/lib/supabase/client'
 import MelloFace, { type MelloState } from '@/components/MelloFace'
 import { ChannelLogo } from '@/components/brand/logos'
 import { planEntitlements } from '@/lib/plans'
+import DnaReveal from '@/components/onboarding/DnaReveal'
 
 const INK = '#161c17', MUTED = '#6f6d5a', LINE = '#efece2', FOREST = '#141d15', LIME = '#ff5a2c'
 const GREEN = '#ef4a1e', SELBG = '#f4fbe6', SELBORDER = '#a8cf6f', PAPER = '#fffdf4', PAPERLINE = '#efe9c8'
 
-type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'questions' | 'culture' | 'integrations' | 'offer' | 'night' | 'plan'
+type Phase = 'welcome' | 'homework' | 'guess' | 'competitors' | 'gap' | 'questions' | 'culture' | 'integrations' | 'offer' | 'night' | 'plan'
 type Note = { kind: string; content: string }
 type Comp = { pageId: string; name: string; avatar?: string | null; adCount?: number | null; country?: string | null }
 
@@ -369,7 +370,9 @@ export default function InterviewPage() {
   const confirmCompetitors = () => {
     if (markets.length) note('fact', `Markets: ${markets.map(m => COUNTRIES.find(c => c[0] === m)?.[1] || m).join(', ')}.`)
     if (picks.length) note('fact', `Competitors to watch: ${picks.map(p => p.name).join(', ')}.`)
-    setPhase('questions'); setQi(0); setFreeText('')
+    // If we have real competitors, reveal the winning-ad DNA gap first (the onboarding wow).
+    // No competitors → skip straight to the questions.
+    setPhase(picks.length ? 'gap' : 'questions'); setQi(0); setFreeText('')
   }
 
   // ── Beat 4: the questions only a human can answer — each with its WHY ──
@@ -656,6 +659,16 @@ export default function InterviewPage() {
                 </button>
               </div>
             </div>
+          )}
+
+          {/* ── BEAT 3.5 · THE GAP (DNA reveal) ── */}
+          {phase === 'gap' && (
+            <DnaReveal
+              comps={picks.map(p => ({ pageId: p.pageId, name: p.name }))}
+              brand={gName || analysis?.name || 'your brand'}
+              niche={analysis?.niche || null}
+              onDone={() => { setPhase('questions'); setQi(0); setFreeText('') }}
+            />
           )}
 
           {/* ── BEAT 4 · THE QUESTIONS ── */}
