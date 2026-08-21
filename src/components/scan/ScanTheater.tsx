@@ -152,30 +152,70 @@ export default function ScanTheater() {
   )
 }
 
-function chips(dist: Record<string, Tally[]>, keys: string[], n = 5) {
-  const out: Tally[] = []
-  for (const k of keys) for (const t of (dist[k] || [])) out.push(t)
-  return out.sort((a, b) => b.pct - a.pct).slice(0, n)
+// The full Brand-Spy depth: one panel per DNA dimension.
+const PANELS: [string, string][] = [
+  ['persona', 'Personas'], ['angle', 'Ad angles'], ['usp', 'USPs'],
+  ['desire', 'Desires'], ['emotion', 'Emotions'], ['themes', 'Themes'], ['hook_type', 'Hooks'],
+]
+function DnaPanels({ dist }: { dist: Record<string, Tally[]> }) {
+  const has = PANELS.filter(([k]) => (dist[k] || []).length)
+  if (!has.length) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 14, marginTop: 20 }}>
+      {has.map(([k, label]) => (
+        <div key={k} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {(dist[k] || []).slice(0, 6).map((t, i) => <span key={i} style={{ fontSize: 12.5, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '4px 10px', color: INK }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+const MEDIA_COLOR: Record<string, string> = { Video: '#3b6df0', 'Carousel/DCO': ORANGE, Image: '#1e7a4f' }
+function MediaBar({ media }: { media: Tally[] }) {
+  if (!media.length) return null
+  return (
+    <div style={{ marginTop: 16 }}>
+      <div style={{ display: 'flex', height: 12, borderRadius: 100, overflow: 'hidden', background: '#e7e0d0' }}>
+        {media.map((m, i) => <div key={i} style={{ width: `${m.pct}%`, background: MEDIA_COLOR[m.label] || '#bbb' }} title={`${m.label} ${m.pct}%`} />)}
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 9 }}>
+        {media.map((m, i) => <span key={i} style={{ fontSize: 12.5, color: SUB, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: MEDIA_COLOR[m.label] || '#bbb' }} /><b style={{ color: INK }}>{m.label}</b> {m.count} · {m.pct}%</span>)}
+      </div>
+    </div>
+  )
 }
 
 function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners'] }) {
-  if (stage === 'ads') return (
-    <div>
-      <h2 style={h2}>Your ads, read</h2>
-      {own.found
-        ? <>
-            <p style={sub}>You&rsquo;re running <b style={{ color: INK }}>{own.totalAds}</b> ad{own.totalAds === 1 ? '' : 's'} ({own.activeAds} active). Here&rsquo;s your creative DNA:</p>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 16 }}>
-              {chips(own.dist as Record<string, Tally[]>, ['hook_type', 'angle', 'format_style'], 6).map((t, i) => <span key={i} style={chip}>{t.label} <b style={{ color: ORANGE }}>{t.pct}%</b></span>)}
+  if (stage === 'ads') {
+    const vid = own.media.find((m) => m.label === 'Video')?.pct ?? 0
+    return (
+      <div>
+        <h2 style={h2}>Your ads, read</h2>
+        {own.found ? (
+          <>
+            <p style={sub}>Everything on your page, decoded — your presence and your creative DNA.</p>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 4px' }}>
+              {[['Total ads', own.totalAds], ['Active', own.activeAds], ['Video', `${vid}%`]].map(([l, v]) => (
+                <div key={l as string} style={{ flex: '1 1 120px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
+                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 28, color: INK, lineHeight: 1 }}>{typeof v === 'number' ? v.toLocaleString() : v}</div>
+                  <div style={{ fontSize: 12, color: SUB, marginTop: 3 }}>{l}</div>
+                </div>
+              ))}
             </div>
+            <MediaBar media={own.media} />
+            <DnaPanels dist={own.dist as Record<string, Tally[]>} />
           </>
-        : <p style={sub}>We couldn&rsquo;t find ads for your page — you may not be running any (that&rsquo;s the first gap). Here&rsquo;s what winning looks like in your market…</p>}
-    </div>
-  )
+        ) : <p style={sub}>We couldn&rsquo;t find ads for your page — you may not be running any (that&rsquo;s the first gap). Here&rsquo;s what winning looks like in your market…</p>}
+      </div>
+    )
+  }
   if (stage === 'rivals') return (
     <div>
       <h2 style={h2}>What your rivals are <span style={{ color: ORANGE }}>winning</span> with</h2>
-      <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers.</p>
+      <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers. Their playbook:</p>
       <div style={{ display: 'flex', gap: 12, overflowX: 'auto', padding: '18px 0 8px' }}>
         {winners.examples.map((ex) => (
           <div key={ex.adId} style={{ flex: '0 0 150px', width: 150, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
@@ -187,9 +227,8 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
           </div>
         ))}
       </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
-        {chips(winners.dist as Record<string, Tally[]>, ['hook_type', 'format_style', 'angle'], 6).map((t, i) => <span key={i} style={chip}>{t.label} <b style={{ color: ORANGE }}>{t.pct}%</b></span>)}
-      </div>
+      <MediaBar media={winners.media} />
+      <DnaPanels dist={winners.dist as Record<string, Tally[]>} />
     </div>
   )
   if (stage === 'gaps') return (
@@ -264,5 +303,4 @@ function ScoreAct({ res }: { res: ScanResult }) {
 
 const h2: CSSProperties = { fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, fontSize: 'clamp(28px,4vw,40px)', letterSpacing: '-.02em', lineHeight: 1.05, color: INK, margin: '0 0 10px' }
 const sub: CSSProperties = { color: SUB, fontSize: 17, maxWidth: 620, margin: 0, lineHeight: 1.5 }
-const chip: CSSProperties = { fontSize: 12.5, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 13px', color: INK }
 const btn: CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }
