@@ -401,11 +401,18 @@ export async function runDnaEngine(opts: {
   const { brandName, competitorPageIds, ownPageId = null, niche = null, force = false } = opts
   const key = cacheKey(competitorPageIds, ownPageId)
 
+  // A cold brand's FIRST scan returns own.found=false (ads not crawled/drained yet). We must NOT let that
+  // "not found" freeze in the cache — once the crawl + creative drain land, the next scan has to recompute
+  // and see the ads. So: ignore a cached result whose own audit is empty, and only WRITE the cache once the
+  // own audit is real. Brands with a genuine ownPage that stays empty just recompute cheaply each time.
   const publicUrl = r2PublicUrl(key)
   if (!force && publicUrl) {
     try {
       const r = await fetch(publicUrl, { cache: 'no-store' })
-      if (r.ok) return { ...(await r.json()), cached: true }
+      if (r.ok) {
+        const cachedResult = await r.json()
+        if (!ownPageId || cachedResult?.own?.found) return { ...cachedResult, cached: true }
+      }
     } catch { /* miss → compute */ }
   }
 
@@ -416,6 +423,9 @@ export async function runDnaEngine(opts: {
   const cost = estimateCost(own, gaps, score)
   const result: FullDnaResult = { winners, own, gaps, report, score, cost, cached: false }
 
-  try { await uploadBufferToR2(Buffer.from(JSON.stringify(result)), key, 'application/json') } catch { /* cache best-effort */ }
+  // Only persist a COMPLETE result — never freeze a pending "not found" own audit (see above).
+  if (!ownPageId || own.found) {
+    try { await uploadBufferToR2(Buffer.from(JSON.stringify(result)), key, 'application/json') } catch { /* cache best-effort */ }
+  }
   return result
 }
