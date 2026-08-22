@@ -56,6 +56,12 @@ export default function ScanTheater() {
   const [results, setResults] = useState<Brand[]>([])
   const [showLink, setShowLink] = useState(false)
   const [adLink, setAdLink] = useState('')
+  // After a brand is picked we ask for competitors BEFORE running, so the audit compares against the
+  // right rivals from the start (not auto-guessed then corrected at the end).
+  const [picked, setPicked] = useState<{ pageId?: string; adLibraryUrl?: string; name: string } | null>(null)
+  const [comps, setComps] = useState<{ pageId: string; name: string }[]>([])
+  const [cq, setCq] = useState('')
+  const [cresults, setCresults] = useState<Brand[]>([])
   const [phase, setPhase] = useState<'idle' | 'running' | 'done' | 'error'>('idle')
   const [steps, setSteps] = useState<Step[]>(STEPS0)
   const [stage, setStage] = useState<StepId>('ads')
@@ -77,6 +83,24 @@ export default function ScanTheater() {
         .then((j) => setResults(Array.isArray(j.results) ? j.results.slice(0, 8) : [])).catch(() => setResults([]))
     }, 220)
   }, [q, phase])
+
+  // Competitor search (the upfront "add your rivals" step).
+  useEffect(() => {
+    if (!picked) return
+    if (cq.trim().length < 2) { setCresults([]); return }
+    const t = setTimeout(() => {
+      fetch(`/api/scan/brands?q=${encodeURIComponent(cq.trim())}`).then((r) => r.json())
+        .then((j) => setCresults(Array.isArray(j.results) ? j.results.slice(0, 6) : [])).catch(() => setCresults([]))
+    }, 220)
+    return () => clearTimeout(t)
+  }, [cq, picked])
+
+  const startAudit = useCallback(() => {
+    if (!picked) return
+    const base = picked.pageId ? { pageId: picked.pageId } : { adLibraryUrl: picked.adLibraryUrl }
+    const competitors = comps.map((c) => c.pageId)
+    run(competitors.length ? { ...base, competitors } : base)
+  }, [picked, comps])
 
   const setStep = useCallback((id: StepId, status: Step['status'], metric?: string) =>
     setSteps((s) => s.map((x) => (x.id === id ? { ...x, status, metric: metric ?? x.metric } : x))), [])
@@ -182,14 +206,52 @@ export default function ScanTheater() {
             <h1 style={{ fontFamily: 'Fraunces,Georgia,serif', fontSize: 'clamp(40px,6.4vw,64px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your ads.</h1>
             <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 460 }}>See exactly where your ads stand — your presence, your gaps, and what your rivals are winning with.</p>
 
-            {!showLink ? (
+            {picked ? (
+              /* STEP 2 — add competitors before we run (or skip → auto-detect) */
+              <div style={{ maxWidth: 480 }}>
+                <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.95)', fontSize: 20, marginBottom: 6 }}>Auditing {picked.name}</div>
+                <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.5, margin: '0 0 16px' }}>Add the competitors you want to be measured against — or skip and we&rsquo;ll find them for you.</p>
+                <div style={{ position: 'relative' }}>
+                  <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Add a competitor brand…" autoFocus
+                    style={{ width: '100%', padding: '14px 16px', borderRadius: cresults.length ? '14px 14px 0 0' : 100, border: 'none', fontSize: 15, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
+                  {cresults.length > 0 && (
+                    <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', borderRadius: '0 0 14px 14px', overflow: 'hidden', zIndex: 5, boxShadow: '0 24px 44px -18px rgba(0,0,0,.5)' }}>
+                      {cresults.map((b) => (
+                        <button key={b.pageId} onClick={() => { if (b.pageId !== picked.pageId && !comps.some((c) => c.pageId === b.pageId)) setComps((s) => [...s, { pageId: b.pageId, name: b.name }]); setCq(''); setCresults([]) }}
+                          style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 15px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
+                          <span style={{ fontWeight: 700, fontSize: 14.5, color: INK }}>{b.name}</span>
+                          <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {comps.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+                    {comps.map((c) => (
+                      <span key={c.pageId} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.3)', borderRadius: 100, padding: '6px 8px 6px 14px', fontSize: 13.5, fontWeight: 700, color: '#fff' }}>
+                        {c.name}
+                        <button onClick={() => setComps((s) => s.filter((x) => x.pageId !== c.pageId))} aria-label="Remove" style={{ border: 'none', background: 'rgba(255,255,255,.25)', borderRadius: 100, width: 20, height: 20, cursor: 'pointer', color: '#fff', fontWeight: 800, lineHeight: 1 }}>×</button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', marginTop: 18 }}>
+                  <button onClick={startAudit} style={{ background: '#fff', color: ORANGE, border: 'none', borderRadius: 100, padding: '15px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer' }}>
+                    {comps.length ? `Audit vs ${comps.length} rival${comps.length === 1 ? '' : 's'} →` : 'Start audit →'}
+                  </button>
+                  {comps.length > 0 && <button onClick={() => { setComps([]); run(picked.pageId ? { pageId: picked.pageId } : { adLibraryUrl: picked.adLibraryUrl }) }} style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 14, cursor: 'pointer' }}>skip — find them for me</button>}
+                </div>
+                <button onClick={() => { setPicked(null); setComps([]); setCq('') }} style={{ marginTop: 16, background: 'none', border: 'none', color: 'rgba(255,255,255,.75)', fontSize: 13.5, cursor: 'pointer' }}>← change brand</button>
+              </div>
+            ) : !showLink ? (
               <div style={{ position: 'relative', maxWidth: 460 }}>
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your brand…" autoFocus
                   style={{ width: '100%', padding: '16px 18px', borderRadius: results.length ? '16px 16px 0 0' : 100, border: 'none', fontSize: 16, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
                 {results.length > 0 && (
                   <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', borderRadius: '0 0 16px 16px', overflow: 'hidden', zIndex: 5, boxShadow: '0 24px 44px -18px rgba(0,0,0,.5)' }}>
                     {results.map((b) => (
-                      <button key={b.pageId} onClick={() => run({ pageId: b.pageId })}
+                      <button key={b.pageId} onClick={() => { setPicked({ pageId: b.pageId, name: b.name }); setQ(''); setResults([]) }}
                         style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: INK }}>{b.name}</span>
                         <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
@@ -204,9 +266,9 @@ export default function ScanTheater() {
             ) : (
               <div style={{ maxWidth: 480 }}>
                 <div style={{ display: 'flex', gap: 10 }}>
-                  <input value={adLink} onChange={(e) => setAdLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && adLink.trim() && run({ adLibraryUrl: adLink.trim() })} placeholder="facebook.com/ads/library/?…view_all_page_id=…" autoFocus
+                  <input value={adLink} onChange={(e) => setAdLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && adLink.trim() && setPicked({ adLibraryUrl: adLink.trim(), name: 'your brand' })} placeholder="facebook.com/ads/library/?…view_all_page_id=…" autoFocus
                     style={{ flex: 1, minWidth: 0, padding: '15px 16px', borderRadius: 100, border: 'none', fontSize: 14, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
-                  <button onClick={() => adLink.trim() && run({ adLibraryUrl: adLink.trim() })} style={{ background: '#fff', color: ORANGE, border: 'none', borderRadius: 100, padding: '15px 24px', fontSize: 15, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}>Audit →</button>
+                  <button onClick={() => adLink.trim() && setPicked({ adLibraryUrl: adLink.trim(), name: 'your brand' })} style={{ background: '#fff', color: ORANGE, border: 'none', borderRadius: 100, padding: '15px 24px', fontSize: 15, fontWeight: 900, cursor: 'pointer', whiteSpace: 'nowrap' }}>Next →</button>
                 </div>
                 <button onClick={() => setShowLink(false)} style={{ marginTop: 14, background: 'none', border: 'none', color: 'rgba(255,255,255,.85)', fontSize: 14, cursor: 'pointer' }}>← Search by brand name instead</button>
               </div>
@@ -292,7 +354,7 @@ function DnaPanels({ dist }: { dist: Record<string, Tally[]> }) {
         <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(dist[k] || []).slice(0, 6).map((t, i) => <span key={i} style={{ fontSize: 12.5, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '4px 10px', color: INK }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
+            {(dist[k] || []).slice(0, 3).map((t, i) => <span key={i} style={{ fontSize: 12.5, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '4px 10px', color: INK }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
           </div>
         </div>
       ))}
@@ -357,25 +419,26 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
         {own.found ? (
           <>
             <p style={sub}>Everything on your page, decoded — your presence and your creative DNA.</p>
+            {/* BIG glanceable numbers first — read the headline without scrolling. */}
+            <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '20px 0 6px' }}>
+              {([['Total ads', own.totalAds, ''], ['Active now', own.activeAds, ''], ['Video', vid, '%']] as [string, number, string][]).map(([l, v, suf], i) => (
+                <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 150px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '20px 24px' }}>
+                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,6.5vw,58px)', color: INK, lineHeight: .95, letterSpacing: '-.02em' }}><Count n={v} />{suf}</div>
+                  <div style={{ fontSize: 13.5, color: SUB, marginTop: 6, fontWeight: 600 }}>{l}</div>
+                </div>
+              ))}
+            </div>
+            <MediaBar media={own.media} />
             {own.examples.length > 0 && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10, margin: '18px 0 4px' }}>
-                {own.examples.slice(0, 24).map((ex, i) => (
-                  <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 12)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10, margin: '22px 0 4px' }}>
+                {own.examples.slice(0, 12).map((ex, i) => (
+                  <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 10)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
                     <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
                     <div style={{ padding: '7px 9px 9px', fontSize: 11, color: SUB, lineHeight: 1.3, maxHeight: 44, overflow: 'hidden' }}>{ex.format || ex.hook || '—'}</div>
                   </div>
                 ))}
               </div>
             )}
-            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', margin: '18px 0 4px' }}>
-              {([['Total ads', own.totalAds], ['Active', own.activeAds], ['Video %', vid]] as [string, number][]).map(([l, v], i) => (
-                <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 120px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
-                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 28, color: INK, lineHeight: 1 }}><Count n={v} />{l === 'Video %' ? '%' : ''}</div>
-                  <div style={{ fontSize: 12, color: SUB, marginTop: 3 }}>{l}</div>
-                </div>
-              ))}
-            </div>
-            <MediaBar media={own.media} />
             <DnaPanels dist={own.dist as Record<string, Tally[]>} />
           </>
         ) : res.ownPending ? (
@@ -387,12 +450,26 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
       </div>
     )
   }
-  if (stage === 'rivals') return (
+  if (stage === 'rivals') {
+    const rivalBrands = Array.from(new Set(winners.examples.map((e) => e.brand).filter(Boolean)))
+    return (
     <div>
       <h2 style={h2}>What your rivals are <span style={{ color: ORANGE }}>winning</span> with</h2>
-      <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers. Their playbook:</p>
+      <p style={sub}>Of {winners.sampleSize.toLocaleString()} rival ads, {winners.winnerCount.toLocaleString()} have run 90+ days — proven money-makers.</p>
+      {/* WHO we're scanning — name the rivals + let them correct it. */}
+      {rivalBrands.length > 0 && (
+        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '16px 18px', margin: '18px 0 4px' }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 9 }}>Scanning your rivals</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {rivalBrands.slice(0, 8).map((b, i) => (
+              <span key={i} className="sf-rise" style={{ ...rise(i), fontSize: 14, fontWeight: 700, color: INK, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 14px' }}>{b}</span>
+            ))}
+          </div>
+          <div style={{ fontSize: 13, color: SUB, marginTop: 12 }}>Not who you compete with? <b style={{ color: ORANGE }}>You can swap in your own competitors in the report ↓</b></div>
+        </div>
+      )}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(110px,1fr))', gap: 10, padding: '18px 0 8px' }}>
-        {winners.examples.slice(0, 18).map((ex, i) => (
+        {winners.examples.slice(0, 12).map((ex, i) => (
           <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 12)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
             <div style={{ padding: '7px 9px 9px' }}>
@@ -405,7 +482,8 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
       <MediaBar media={winners.media} />
       <DnaPanels dist={winners.dist as Record<string, Tally[]>} />
     </div>
-  )
+    )
+  }
   if (stage === 'gaps') return (
     <div>
       <h2 style={h2}>You vs the <span style={{ color: ORANGE }}>winners</span></h2>
