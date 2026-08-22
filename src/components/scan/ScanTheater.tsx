@@ -219,8 +219,13 @@ export default function ScanTheater() {
             {picked ? (
               /* STEP 2 — add competitors before we run (or skip → auto-detect) */
               <div style={{ maxWidth: 480 }}>
-                <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.95)', fontSize: 20, marginBottom: 6 }}>Auditing {picked.name}</div>
-                <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.5, margin: '0 0 16px' }}>Add the competitors you want to be measured against — or skip and we&rsquo;ll find them for you.</p>
+                {/* brand is LOCKED IN — a confirmed chip so it's obvious it was added, not still asking */}
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(255,255,255,.16)', border: '1px solid rgba(255,255,255,.32)', borderRadius: 100, padding: '8px 16px 8px 10px', marginBottom: 22 }}>
+                  <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#fff', color: ORANGE, fontWeight: 900, fontSize: 13, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>✓</span>
+                  <span style={{ color: '#fff', fontSize: 15 }}><b>{picked.name}</b> <span style={{ opacity: .7 }}>· your brand, added</span></span>
+                </div>
+                <div style={{ fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, color: '#fff', fontSize: 'clamp(24px,3.4vw,30px)', lineHeight: 1.05, margin: '0 0 8px' }}>Now — who do you compete with?</div>
+                <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.5, margin: '0 0 16px' }}>Add the rival brands you want to be measured against — or skip and we&rsquo;ll find them for you.</p>
                 <div style={{ position: 'relative' }}>
                   <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Add a competitor — name or Ad Library link…" autoFocus
                     onKeyDown={(e) => {
