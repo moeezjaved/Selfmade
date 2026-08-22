@@ -193,6 +193,7 @@ export default function ScanTheater() {
           deck.push({ key: 'ads', stage: 'ads', render: () => slideNoAds(bn) })
         }
         deck.push({ key: 'rivals', stage: 'rivals', render: () => slideRivals(d.winners) })
+        if ((wD.hook_type || wD.angle || wD.usp)) deck.push({ key: 'rivals-formula', stage: 'rivals', render: () => slideFormula(d.winners) })
         for (let i = 0; i < dnaChunks(wD); i++) deck.push({ key: `rivals-dna-${i}`, stage: 'rivals', render: () => slideDna(wD, 'Their winning DNA', i) })
         const vsDims = PANELS.filter(([k]) => (oD[k] || []).length || (wD[k] || []).length).length
         for (let i = 0; i < (vsDims > 3 ? 2 : 1); i++) deck.push({ key: `vs-${i}`, stage: 'gaps', render: () => slideVs(oD, wD, i) })
@@ -223,6 +224,14 @@ export default function ScanTheater() {
           if (data.winners.media[0]) f.push(F(`They lean on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`))
           if (data.winners.examples[0]?.daysRunning) f.push(F(`Longest-running winner: ${data.winners.examples[0].daysRunning} days live`))
           return f
+        }
+        if (key === 'rivals-formula') {
+          const f: [string, boolean?][] = []
+          const hk = topLabel(winD0, 'hook_type'), an = topLabel(winD0, 'angle'), fm = data.winners.media[0]?.label
+          if (an && hk) f.push(F(`Their recipe: ${hk} hook × ${an} angle`))
+          if (fm) f.push(F(`Delivered mostly as ${fm}`))
+          if (topLabel(winD0, 'usp')) f.push(F(`Promising: ${topLabel(winD0, 'usp')}`))
+          return f.length ? f : [F('Synthesising their winning formula')]
         }
         if (key.startsWith('rivals-dna')) {
           const f: [string, boolean?][] = []
@@ -506,41 +515,36 @@ const slideHead = (eyebrow: string, title: ReactNode) => (
   <div style={{ flex: 'none' }}><div style={slideEyebrow}>{eyebrow}</div><h2 style={slideH}>{title}</h2></div>
 )
 
-// A capped grid of ad tiles (own or rivals), sized to ~2 rows so it fits under the header.
-function slideAdGrid(items: { adId: string; thumb: string | null; label: ReactNode; badge?: string }[]) {
-  if (!items.length) return null
-  return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(clamp(96px,11vw,140px),1fr))', gap: 10, minHeight: 0 }}>
-      {items.map((ex, i) => (
-        <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 10)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
-          <div style={{ padding: '6px 9px 8px' }}>
-            {ex.badge && <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10.5, fontWeight: 700, color: ORANGE }}>{ex.badge}</div>}
-            <div style={{ fontSize: 11, color: SUB, lineHeight: 1.3, marginTop: ex.badge ? 3 : 0, maxHeight: 30, overflow: 'hidden' }}>{ex.label}</div>
-          </div>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// SLIDE 1 — your ad presence: a big verdict headline + three hero numbers + media bar + a capped ad grid.
+// SLIDE 1 — your ad presence: narrative column (verdict + hero numbers + media bar) beside a FEATURED
+// own ad shown large + a filmstrip. Mirrors the Rivals slide so "you" and "them" read as a matched set.
 function slideAdsStats(own: FullDnaResult['own'], brandName: string) {
   const vid = own.media.find((m) => m.label === 'Video')?.pct ?? 0
+  const ex = own.examples
+  const hero = ex.find((e) => e.thumb) || ex[0]
+  const strip = ex.filter((e) => e.adId !== hero?.adId).slice(0, 4)
   return (
-    <>
-      {slideHead('Reading your ads', <>{brandName === 'your brand' ? "You're" : brandName + " is"} present — {own.totalAds.toLocaleString()} ads, {vid}% video</>)}
-      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', flex: 'none' }}>
-        {([['Total ads', own.totalAds, ''], ['Active now', own.activeAds, ''], ['Video', vid, '%']] as [string, number, string][]).map(([l, v, suf], i) => (
-          <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 150px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 'clamp(14px,2vw,22px) clamp(16px,2.4vw,26px)' }}>
-            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(34px,5.4vw,58px)', color: INK, lineHeight: .95, letterSpacing: '-.02em' }}><Count n={v} />{suf}</div>
-            <div style={{ fontSize: 13.5, color: SUB, marginTop: 6, fontWeight: 600 }}>{l}</div>
-          </div>
-        ))}
+    <div style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
+      {/* LEFT — the narrative */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.2vw,24px)', minWidth: 0 }}>
+        <div>
+          <div style={slideEyebrow}>Reading your ads</div>
+          <h2 style={slideH}>{brandName === 'your brand' ? "You're" : brandName + ' is'} <span style={{ color: ORANGE }}>in market</span>.</h2>
+        </div>
+        <div style={{ display: 'flex', gap: 'clamp(14px,3vw,40px)', flexWrap: 'wrap' }}>
+          <HeroStat n={own.totalAds} label="ads in market" color={ORANGE} />
+          <HeroStat n={own.activeAds} label="live right now" />
+          <HeroStat n={vid} suffix="%" label="are video" />
+        </div>
+        <div><MediaBar media={own.media} /></div>
       </div>
-      <div style={{ flex: 'none' }}><MediaBar media={own.media} /></div>
-      {slideAdGrid(own.examples.slice(0, 10).map((ex) => ({ adId: ex.adId, thumb: ex.thumb, label: ex.format || ex.hook || '—' })))}
-    </>
+      {/* RIGHT — one of your ads, featured */}
+      {hero && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+          <FeaturedAdCard ex={hero} badge={hero.daysRunning ? `${hero.daysRunning}d live` : 'your ad'} />
+          <Filmstrip items={strip} />
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -554,21 +558,38 @@ function slideNoAds(brandName: string) {
   )
 }
 
-// SLIDE — creative DNA, chunked 4 panels per slide (so 7 dims split 4+3, never scroll). `chunk` picks the set.
+// SLIDE — creative DNA, chunked 4 panels per slide (so 7 dims split 4+3, never scroll). Each panel leads
+// with its #1 move BIG (Fraunces + a share bar), then the runners-up as chips — editorial, not a flat list.
 function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
   const panels = PANELS.filter(([k]) => (dist[k] || []).length).slice(chunk * 4, chunk * 4 + 4)
   return (
     <>
       {slideHead('Creative DNA', title)}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 16 }}>
-        {panels.map(([k, label], i) => (
-          <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(14px,1.8vw,20px)' }}>
-            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>{label}</div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(dist[k] || []).slice(0, 6).map((t, j) => <span key={j} style={{ fontSize: 'clamp(13px,1.5vw,15px)', background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', color: INK, fontWeight: 600 }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 'clamp(12px,1.6vw,16px)' }}>
+        {panels.map(([k, label], i) => {
+          const items = dist[k] || []
+          const top = items[0]
+          const max = items.reduce((m, t) => Math.max(m, t.count), 1)
+          return (
+            <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(13px,1.7vw,19px)' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
+              {top && (
+                <div style={{ marginBottom: items.length > 1 ? 11 : 0 }}>
+                  <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                    <span style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(17px,2.1vw,23px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{top.label}</span>
+                    <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 13, fontWeight: 700, color: ORANGE, flex: 'none' }}>{top.pct}%</span>
+                  </div>
+                  <div style={{ height: 6, borderRadius: 100, background: '#eee6d7', marginTop: 7, overflow: 'hidden' }}>
+                    <div style={{ height: '100%', width: `${Math.max(8, Math.round((top.count / max) * 100))}%`, background: ORANGE, borderRadius: 100 }} />
+                  </div>
+                </div>
+              )}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                {items.slice(1, 5).map((t, j) => <span key={j} style={{ fontSize: 'clamp(12px,1.4vw,14px)', background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '5px 12px', color: INK, fontWeight: 600 }}>{t.label} <b style={{ color: SUB }}>{t.pct}%</b></span>)}
+              </div>
             </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </>
   )
@@ -580,6 +601,31 @@ function HeroStat({ n, label, suffix = '', color = INK }: { n: number; label: st
     <div>
       <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,6.4vw,72px)', color, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={n} />{suffix}</div>
       <div style={{ fontSize: 'clamp(12px,1.5vw,14px)', color: SUB, fontWeight: 600, marginTop: 5 }}>{label}</div>
+    </div>
+  )
+}
+
+type Ex = FullDnaResult['winners']['examples'][number]
+// A single ad shown large — the theater's image-dominant "hero". Real R2 thumb, badge + brand/hook overlay.
+function FeaturedAdCard({ ex, badge }: { ex: Ex; badge?: string }) {
+  return (
+    <div className="sf-rise" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', border: `1px solid ${LINE}`, aspectRatio: '4 / 5', maxHeight: '54vh', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7', boxShadow: '0 18px 50px -22px rgba(26,20,16,.5)' }}>
+      {badge && <div style={{ position: 'absolute', top: 11, left: 11, background: ORANGE, color: '#fff', fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 800, padding: '5px 11px', borderRadius: 100 }}>{badge}</div>}
+      <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '30px 13px 11px', background: 'linear-gradient(transparent,rgba(20,14,8,.78))', color: '#fff' }}>
+        <div style={{ fontWeight: 800, fontSize: 13.5 }}>{ex.brand}</div>
+        {ex.hook && <div style={{ fontSize: 11.5, opacity: .82, lineHeight: 1.3, maxHeight: 30, overflow: 'hidden', marginTop: 2 }}>{ex.hook}</div>}
+      </div>
+    </div>
+  )
+}
+// A row of small ad thumbnails under a featured card — "there's more where that came from".
+function Filmstrip({ items }: { items: Ex[] }) {
+  if (!items.length) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: `repeat(${items.length},1fr)`, gap: 8 }}>
+      {items.map((e, i) => (
+        <div key={e.adId} className="sf-rise" style={{ ...rise(i + 2), aspectRatio: '4 / 5', borderRadius: 10, border: `1px solid ${LINE}`, background: e.thumb ? `#f1ece2 url(${e.thumb}) center/cover` : '#eee6d7' }} title={`${e.brand} · ${e.daysRunning}d`} />
+      ))}
     </div>
   )
 }
@@ -619,21 +665,48 @@ function slideRivals(winners: FullDnaResult['winners']) {
       {/* RIGHT — the featured winner + a filmstrip of runners-up */}
       {hero && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
-          <div className="sf-rise" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', border: `1px solid ${LINE}`, aspectRatio: '4 / 5', maxHeight: '54vh', background: hero.thumb ? `#f1ece2 url(${hero.thumb}) center/cover` : '#eee6d7', boxShadow: '0 18px 50px -22px rgba(26,20,16,.5)' }}>
-            <div style={{ position: 'absolute', top: 11, left: 11, background: ORANGE, color: '#fff', fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 800, padding: '5px 11px', borderRadius: 100 }}>{hero.daysRunning}d running</div>
-            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '30px 13px 11px', background: 'linear-gradient(transparent,rgba(20,14,8,.78))', color: '#fff' }}>
-              <div style={{ fontWeight: 800, fontSize: 13.5 }}>{hero.brand}</div>
-              {hero.hook && <div style={{ fontSize: 11.5, opacity: .82, lineHeight: 1.3, maxHeight: 30, overflow: 'hidden', marginTop: 2 }}>{hero.hook}</div>}
+          <FeaturedAdCard ex={hero} badge={`${hero.daysRunning}d running`} />
+          <Filmstrip items={strip} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+// SLIDE — the winning formula: synthesize the rivals' recipe into ONE big line (Hook × Angle × Format ×
+// Promise), each part the #1 in that dimension. The "aha" theater beat between the rival grid and their DNA.
+function slideFormula(winners: FullDnaResult['winners']) {
+  const d = winners.dist as Record<string, Tally[]>
+  const fmt = winners.media[0]
+  const parts = ([
+    ['Hook', d.hook_type?.[0]],
+    ['Angle', d.angle?.[0]],
+    ['Format', fmt ? { label: fmt.label, pct: fmt.pct } : d.format_style?.[0]],
+    ['Promise', d.usp?.[0]],
+  ] as [string, { label: string; pct: number } | undefined][]).filter(([, v]) => v && v.label)
+  const lead = d.angle?.[0] || d.hook_type?.[0]
+  return (
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'clamp(16px,2.6vw,30px)', height: '100%' }}>
+      <div>
+        <div style={{ ...slideEyebrow, textAlign: 'center' }}>The winning formula</div>
+        <h2 style={{ ...slideH, textAlign: 'center' }}>Their winners share <span style={{ color: ORANGE }}>one recipe</span>.</h2>
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', justifyContent: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
+        {parts.map(([dim, v], i) => (
+          <div key={dim} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
+            {i > 0 && <span style={{ fontFamily: 'Fraunces,serif', fontSize: 'clamp(20px,3vw,34px)', color: MUT, fontWeight: 400 }}>×</span>}
+            <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.8vw,20px) clamp(14px,2vw,24px)', minWidth: 'clamp(120px,15vw,180px)', boxShadow: '0 10px 30px -18px rgba(26,20,16,.4)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 7 }}>{dim}</div>
+              <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(18px,2.4vw,28px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{v!.label}</div>
+              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: SUB, marginTop: 6 }}>{v!.pct}% of winners</div>
             </div>
           </div>
-          {strip.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${strip.length},1fr)`, gap: 8 }}>
-              {strip.map((e, i) => (
-                <div key={e.adId} className="sf-rise" style={{ ...rise(i + 2), aspectRatio: '4 / 5', borderRadius: 10, border: `1px solid ${LINE}`, background: e.thumb ? `#f1ece2 url(${e.thumb}) center/cover` : '#eee6d7' }} title={`${e.brand} · ${e.daysRunning}d`} />
-              ))}
-            </div>
-          )}
-        </div>
+        ))}
+      </div>
+      {lead && (
+        <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>
+          <b style={{ color: INK }}>{lead.pct}%</b> of their proven winners lead with the <b style={{ color: INK }}>{lead.label}</b> {d.angle?.[0] ? 'angle' : 'hook'}. That’s the pattern to beat.
+        </p>
       )}
     </div>
   )
@@ -709,17 +782,48 @@ function ScoreGauge({ total }: { total: number }) {
   )
 }
 
-// SLIDE — the score: big centered gauge + band + one line.
+// SLIDE — the finale: big gauge on the left, the subscore breakdown as labelled bars on the right, so the
+// number is earned, not asserted. Falls back to a centered gauge if we have no subscores to show.
 function slideScore(res: ScanResult) {
   const s = res.score
   const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
-  return (
-    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+  const subs = s.subscores.filter((x) => x.value != null).slice(0, 5)
+  const left = (
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 14 }}>
       <div style={slideEyebrow}>Your ad-presence score</div>
       <ScoreGauge total={s.total} />
-      <div style={{ display: 'inline-block', background: `${color}18`, color, fontWeight: 800, fontSize: 14, padding: '7px 16px', borderRadius: 100 }}>{s.band}</div>
-      <h2 style={{ ...slideH, fontSize: 'clamp(24px,3.6vw,40px)' }}>{s.total}/100 · {s.band}</h2>
-      <p style={{ ...sub, margin: '0 auto', textAlign: 'center' }}>Your ad-presence score across coverage, format mix, angles and the tactics you’re missing.</p>
+      <div style={{ display: 'inline-block', background: `${color}18`, color, fontWeight: 800, fontSize: 15, padding: '8px 18px', borderRadius: 100 }}>{s.band}</div>
+    </div>
+  )
+  if (!subs.length) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+        {left}
+        <p style={{ ...sub, margin: '0 auto', textAlign: 'center' }}>Your ad-presence score across coverage, format mix, angles and the tactics you’re missing.</p>
+      </div>
+    )
+  }
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,.85fr) minmax(0,1.15fr)', gap: 'clamp(20px,4vw,56px)', alignItems: 'center', height: '100%' }}>
+      {left}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.5vw,15px)', minWidth: 0 }}>
+        <h2 style={{ ...slideH, fontSize: 'clamp(22px,3.2vw,36px)' }}>Where the <span style={{ color }}>{s.total}</span> comes from</h2>
+        {subs.map((sc, i) => {
+          const c = (sc.value as number) < 50 ? '#c0281a' : (sc.value as number) < 70 ? '#b7791f' : '#1e7a4f'
+          return (
+            <div key={sc.key} className="sf-rise" style={{ ...rise(i) }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
+                <span style={{ fontSize: 'clamp(13px,1.5vw,15px)', fontWeight: 700, color: INK }}>{sc.label}</span>
+                <span style={{ fontFamily: 'ui-monospace,monospace', fontWeight: 700, fontSize: 13, color: c }}>{sc.value}/100</span>
+              </div>
+              <div style={{ height: 9, borderRadius: 100, background: '#eee6d7', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${sc.value}%`, background: c, borderRadius: 100 }} />
+              </div>
+              {sc.note && <div style={{ fontSize: 12, color: SUB, marginTop: 4, lineHeight: 1.35 }}>{sc.note}</div>}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
