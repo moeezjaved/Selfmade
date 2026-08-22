@@ -26,6 +26,16 @@ const STEPS0: Step[] = [
 ]
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
+// Pull a Meta page id out of an Ad Library link (view_all_page_id=… / page_id=… / …/<id>) or a bare id —
+// mirrors the server extractor, so a pasted competitor link resolves the same way in /api/scan/run.
+function extractPageId(s: string): string | null {
+  const t = (s || '').trim()
+  const m = t.match(/(?:view_all_page_id|page_id|[?&]id)=(\d{5,})/i) || t.match(/\/(\d{7,})(?:[/?]|$)/)
+  if (m) return m[1]
+  if (/^\d{7,}$/.test(t)) return t
+  return null
+}
+
 // Live animation: staggered reveal + reduced-motion guard.
 const REVEAL_CSS = `
 @keyframes sf-rise{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
@@ -212,7 +222,12 @@ export default function ScanTheater() {
                 <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.95)', fontSize: 20, marginBottom: 6 }}>Auditing {picked.name}</div>
                 <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.5, margin: '0 0 16px' }}>Add the competitors you want to be measured against — or skip and we&rsquo;ll find them for you.</p>
                 <div style={{ position: 'relative' }}>
-                  <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Add a competitor brand…" autoFocus
+                  <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Add a competitor — name or Ad Library link…" autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key !== 'Enter') return
+                      const id = extractPageId(cq)   // pasted a Meta Ad Library link / page id → add directly
+                      if (id && id !== picked.pageId && !comps.some((c) => c.pageId === id)) { setComps((s) => [...s, { pageId: id, name: `Competitor · ${id}` }]); setCq(''); setCresults([]) }
+                    }}
                     style={{ width: '100%', padding: '14px 16px', borderRadius: cresults.length ? '14px 14px 0 0' : 100, border: 'none', fontSize: 15, background: '#fff', color: INK, outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
                   {cresults.length > 0 && (
                     <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', borderRadius: '0 0 14px 14px', overflow: 'hidden', zIndex: 5, boxShadow: '0 24px 44px -18px rgba(0,0,0,.5)' }}>
@@ -226,6 +241,7 @@ export default function ScanTheater() {
                     </div>
                   )}
                 </div>
+                <div style={{ marginTop: 10, fontSize: 13, color: 'rgba(255,255,255,.8)' }}>Search our directory, or paste their <b style={{ color: '#fff' }}>Meta Ad Library link</b> and hit Enter.</div>
                 {comps.length > 0 && (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
                     {comps.map((c) => (
