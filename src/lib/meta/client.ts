@@ -118,6 +118,34 @@ export class MetaClient {
     })
   }
 
+  // Account-level frequency (avg times each person saw an ad). Meta returns `frequency` directly; fall
+  // back to impressions/reach. Best-effort → null on any error, so callers degrade to "no data".
+  async getAccountFrequency(datePreset = 'last_30d'): Promise<number | null> {
+    try {
+      const res = await this.client.get(`/${this.accountId}/insights`, {
+        params: { fields: 'frequency,reach,impressions', date_preset: datePreset, level: 'account' },
+      })
+      const row = res.data?.data?.[0]
+      if (!row) return null
+      const freq = Number(row.frequency || 0)
+      if (freq > 0) return freq
+      const reach = Number(row.reach || 0), impr = Number(row.impressions || 0)
+      return reach > 0 ? impr / reach : null
+    } catch { return null }
+  }
+
+  // Count of currently-ACTIVE ads (creatives) in the account. Best-effort → null on error.
+  async getActiveAdCount(): Promise<number | null> {
+    try {
+      const res = await this.client.get(`/${this.accountId}/ads`, {
+        params: { fields: 'id', filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]), limit: 500, summary: 'total_count' },
+      })
+      const total = res.data?.summary?.total_count
+      if (typeof total === 'number') return total
+      return Array.isArray(res.data?.data) ? res.data.data.length : null
+    } catch { return null }
+  }
+
   async pauseCampaign(campaignId: string) {
     const res = await this.client.post(`/${campaignId}`, { status: 'PAUSED' })
     return res.data
