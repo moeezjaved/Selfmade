@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { FullDnaResult, Tally } from '@/lib/dna/engine'
 import { videoShotList, remakeScript, type CreativeBrief } from '@/lib/dna/creative'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#ef4a1e', PAPER = '#fbf4e2'
 const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
@@ -49,6 +50,13 @@ const REVEAL_CSS = `
 @keyframes sf-glow{0%{box-shadow:0 0 0 0 rgba(224,47,6,.0)}30%{box-shadow:0 0 0 4px rgba(224,47,6,.28)}100%{box-shadow:0 0 0 0 rgba(224,47,6,0)}}
 .sf-glow{animation:sf-glow 1.6s ease-out 1 both}
 @media (prefers-reduced-motion:reduce){.sf-rise{animation:none}.sf-shim{animation:none}.sf-gauge{transition:none}.sf-glow{animation:none}}
+/* MOBILE: the deck's two-column slides + panel grids stack to one column, and each slide flows from the
+   top (the main pane scrolls on mobile — see isMobile below — instead of cropping a too-tall slide). */
+@media (max-width:767px){
+  .sf-two-col{grid-template-columns:1fr !important;height:auto !important;align-items:start !important;align-content:start !important;gap:18px !important;}
+  .sf-panels{grid-template-columns:1fr !important;}
+  .sf-frame{justify-content:flex-start !important;height:auto !important;overflow:visible !important;gap:16px !important;}
+}
 `
 const rise = (i = 0): CSSProperties => ({ animationDelay: `${i * 70}ms` })
 
@@ -90,6 +98,7 @@ export default function ScanTheater() {
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
   const mainRef = useRef<HTMLElement>(null)
+  const isMobile = useIsMobile()   // stack the theater to one column on phones (client-only; SSR-safe)
   // Each act is a full-viewport frame that SWAPS in place (Ryze-style) — reset the pane to the top when
   // the stage changes or the report opens, so a new act always starts at the top of the window.
   useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [stage, revealed, phase])
@@ -387,12 +396,16 @@ export default function ScanTheater() {
   const own = res?.own
 
   return (
-    <div style={{ minHeight: '100dvh', height: phase === 'done' ? 'auto' : '100dvh', overflow: phase === 'done' ? 'visible' : 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
+    <div style={{ minHeight: '100dvh', height: phase === 'done' ? 'auto' : '100dvh', overflow: phase === 'done' ? 'visible' : 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,300px) minmax(0,1fr)', gridTemplateRows: isMobile && phase !== 'done' ? 'auto minmax(0,1fr)' : undefined }}>
       <style>{REVEAL_CSS}</style>
-      <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100dvh', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: '#fff' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
-        <div style={{ color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
-        <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
+      {/* Sidebar → on phones a COMPACT top bar (title + progress only; the step/findings list is hidden so
+          the slide gets the whole screen). On desktop it's the full sticky rail. */}
+      <aside style={{ background: DARK, color: CREAM, display: 'flex', ...(isMobile
+        ? { flexDirection: 'row', alignItems: 'center', gap: 14, padding: '11px 16px', position: 'sticky', top: 0, zIndex: 5 }
+        : { flexDirection: 'column', padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100dvh' }) }}>
+        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: isMobile ? 16 : 22, color: '#fff', flex: 'none' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
+        <div style={{ display: isMobile ? 'none' : 'block', color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
+        <div style={{ display: isMobile ? 'none' : 'block', flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {steps.map((s) => (
             <div key={s.id} style={{ padding: '10px 0', borderBottom: '1px solid rgba(255,255,255,.07)' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -413,7 +426,7 @@ export default function ScanTheater() {
             </div>
           ))}
         </div>
-        <div style={{ marginTop: 18 }}>
+        <div style={{ marginTop: isMobile ? 0 : 18, flex: isMobile ? '1 1 auto' : 'none', minWidth: isMobile ? 100 : undefined }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: MUT, marginBottom: 6 }}><span>{phase === 'done' ? 'Done' : 'Working…'}</span><span>{pct}%</span></div>
           <div style={{ height: 4, background: 'rgba(255,255,255,.12)', borderRadius: 100 }}><div style={{ height: 4, width: `${pct}%`, background: ORANGE, borderRadius: 100, transition: 'width .5s' }} /></div>
         </div>
@@ -421,7 +434,7 @@ export default function ScanTheater() {
 
       {/* RUNNING: a fixed 100dvh pane holding ONE slide (no scroll). DONE: the report flows + scrolls with
           the page (root goes overflow:visible), which Moeez approved. */}
-      <main ref={mainRef} style={{ padding: 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
+      <main ref={mainRef} style={{ padding: isMobile ? 'clamp(18px,5vw,24px)' : 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: '100%', overflow: isMobile ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
         {phase === 'error' && (
           <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
         )}
@@ -509,7 +522,7 @@ function MediaBar({ media }: { media: Tally[] }) {
 // + grids so it FITS one screen; dense sets are split into sub-slides upstream — a slide NEVER scrolls.
 function SlideFrame({ children }: { children: ReactNode }) {
   return (
-    <div className="sf-rise" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
+    <div className="sf-rise sf-frame" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
       {children}
     </div>
   )
@@ -528,7 +541,7 @@ function slideAdsStats(own: FullDnaResult['own'], brandName: string) {
   const hero = ex.find((e) => e.thumb) || ex[0]
   const strip = ex.filter((e) => e.adId !== hero?.adId).slice(0, 4)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
+    <div className="sf-two-col" style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
       {/* LEFT — the narrative */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.2vw,24px)', minWidth: 0 }}>
         <div>
@@ -570,7 +583,7 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
   return (
     <>
       {slideHead('Creative DNA', title)}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 'clamp(12px,1.6vw,16px)' }}>
+      <div className="sf-panels" style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 'clamp(12px,1.6vw,16px)' }}>
         {panels.map(([k, label], i) => {
           const items = dist[k] || []
           const top = items[0]
@@ -644,7 +657,7 @@ function slideRivals(winners: FullDnaResult['winners']) {
   const brands = Array.from(new Set(ex.map((e) => e.brand).filter(Boolean))).slice(0, 6)
   const topDays = ex.reduce((m, e) => Math.max(m, e.daysRunning || 0), 0)
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
+    <div className="sf-two-col" style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
       {/* LEFT — the narrative */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.2vw,24px)', minWidth: 0 }}>
         <div>
@@ -809,7 +822,7 @@ function slideScore(res: ScanResult) {
     )
   }
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,.85fr) minmax(0,1.15fr)', gap: 'clamp(20px,4vw,56px)', alignItems: 'center', height: '100%' }}>
+    <div className="sf-two-col" style={{ display: 'grid', gridTemplateColumns: 'minmax(0,.85fr) minmax(0,1.15fr)', gap: 'clamp(20px,4vw,56px)', alignItems: 'center', height: '100%' }}>
       {left}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(10px,1.5vw,15px)', minWidth: 0 }}>
         <h2 style={{ ...slideH, fontSize: 'clamp(22px,3.2vw,36px)' }}>Where the <span style={{ color }}>{s.total}</span> comes from</h2>
