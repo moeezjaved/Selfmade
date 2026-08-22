@@ -83,6 +83,10 @@ export default function ScanTheater() {
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
+  const mainRef = useRef<HTMLElement>(null)
+  // Each act is a full-viewport frame that SWAPS in place (Ryze-style) — reset the pane to the top when
+  // the stage changes or the report opens, so a new act always starts at the top of the window.
+  useEffect(() => { mainRef.current?.scrollTo({ top: 0 }) }, [stage, revealed, phase])
 
   useEffect(() => {
     if (phase !== 'idle') return
@@ -157,11 +161,14 @@ export default function ScanTheater() {
         if (topLabel(ownD, 'emotion')) await note('ads', `Strongest emotion you pull: ${topLabel(ownD, 'emotion')}`)
         await verdictBeat(`You're present — ${data.own.totalAds.toLocaleString()} ads, ${vidPct}% video`,
           `Leaning on ${topLabel(ownD, 'hook_type') || 'a narrow set of'} hooks and ${topLabel(ownD, 'angle') || 'few'} angles across ${(ownD.persona || []).length} personas.`)
+      } else if (data.ownPending) {
+        await note('ads', 'Pulling your ads now — first time we’ve seen you')
+        await verdictBeat(`Pulling your ads now`, 'You weren’t in our index yet, so we just kicked off a crawl of your library — your own-ad breakdown fills in within a few minutes. Meanwhile, here’s your market.')
       } else {
         await note('ads', 'No live ads we can see — that’s gap #1', true)
         await verdictBeat(`You're invisible right now`, 'No ads we can find — the first fix is simply showing up.', true)
       }
-      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : 'none')
+      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : data.ownPending ? 'crawling…' : 'none')
 
       // ── Spying on your rivals ──
       await openStage('rivals')
@@ -208,10 +215,14 @@ export default function ScanTheater() {
   // ── IDLE — audit framing + brand picker (or ad-library link) ──
   if (phase === 'idle') {
     return (
-      <div style={{ minHeight: '100vh', background: 'radial-gradient(125% 100% at 82% 2%, #ff5a2e 0%, #f4380d 48%, #e02f06 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', color: '#fff' }}>
-        <div style={{ width: '100%', maxWidth: 1040, display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 44, alignItems: 'center' }}>
-          {/* left — the pitch + brand picker */}
-          <div style={{ minWidth: 0 }}>
+      <div style={{ position: 'relative', minHeight: '100vh', background: '#e02f06', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: 'clamp(32px,6vw,80px)', color: '#fff', overflow: 'hidden' }}>
+        {/* full-bleed hero film, like the landing page */}
+        <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+        {/* orange wash for legibility — heavy over the text on the left, thinning to reveal the film right */}
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.95) 0%, rgba(224,47,6,.88) 40%, rgba(224,47,6,.5) 100%)' }} />
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 1040 }}>
+          {/* the pitch + brand picker */}
+          <div style={{ minWidth: 0, maxWidth: 560 }}>
             <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 90 seconds · no login</div>
             <h1 style={{ fontFamily: 'Fraunces,Georgia,serif', fontSize: 'clamp(40px,6.4vw,64px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your ads.</h1>
             <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 460 }}>See exactly where your ads stand — your presence, your gaps, and what your rivals are winning with.</p>
@@ -295,12 +306,6 @@ export default function ScanTheater() {
               </div>
             )}
           </div>
-
-          {/* right — the hero film, framed so it stays legible on orange */}
-          <div style={{ minWidth: 0, borderRadius: 22, overflow: 'hidden', border: '1px solid rgba(255,255,255,.28)', boxShadow: '0 40px 90px -30px rgba(0,0,0,.55)', aspectRatio: '16 / 10', background: 'rgba(0,0,0,.2)' }}>
-            <video src="/hero.mp4" autoPlay muted loop playsInline
-              style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-          </div>
         </div>
       </div>
     )
@@ -310,7 +315,7 @@ export default function ScanTheater() {
   const own = res?.own
 
   return (
-    <div style={{ minHeight: '100vh', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
+    <div style={{ height: '100vh', overflow: 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
       <style>{REVEAL_CSS}</style>
       <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100vh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: '#fff' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
@@ -342,7 +347,7 @@ export default function ScanTheater() {
         </div>
       </aside>
 
-      <main style={{ padding: 'clamp(28px,5vw,64px)', maxWidth: 900 }}>
+      <main ref={mainRef} style={{ padding: 'clamp(28px,4vw,56px)', height: '100vh', overflowY: 'auto', minWidth: 0 }}>
         {phase === 'error' && (
           <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
         )}
@@ -373,16 +378,16 @@ function DnaPanels({ dist }: { dist: Record<string, Tally[]> }) {
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 14, marginTop: 20 }}>
       {has.map(([k, label], i) => (
         <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 16px' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
-          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {(dist[k] || []).slice(0, 3).map((t, i) => <span key={i} style={{ fontSize: 12.5, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '4px 10px', color: INK }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
+          <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>{label}</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            {(dist[k] || []).slice(0, 6).map((t, i) => <span key={i} style={{ fontSize: 15, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', color: INK, fontWeight: 600 }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
           </div>
         </div>
       ))}
     </div>
   )
 }
-const pill = (hot: boolean): CSSProperties => ({ fontSize: 12.5, background: hot ? ORANGE : PAPER, color: hot ? '#fff' : INK, border: `1px solid ${hot ? ORANGE : LINE}`, borderRadius: 100, padding: '4px 10px' })
+const pill = (hot: boolean): CSSProperties => ({ fontSize: 15, fontWeight: 600, background: hot ? ORANGE : PAPER, color: hot ? '#fff' : INK, border: `1px solid ${hot ? ORANGE : LINE}`, borderRadius: 100, padding: '7px 14px' })
 // YOU vs WINNERS, dimension by dimension. Orange pill on the winners' side = a winning move you don't run.
 function VsPanels({ own, winners }: { own: Record<string, Tally[]>; winners: Record<string, Tally[]> }) {
   const rows = PANELS.map(([k, label]) => ({ k, label, o: own[k] || [], w: winners[k] || [] })).filter((r) => r.w.length || r.o.length)
