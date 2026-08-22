@@ -122,6 +122,7 @@ HARD RULES:
 - Prefer diversity of levers over five variations of one idea. Max ${limit} tasks.
 - "impact" must be honest: give a $ estimate ONLY if the data supports it (e.g. from ad counts, gaps); otherwise qualitative ("protects scale", "unlocks a channel").
 - "runnable": true if Selfmade can act now (ads live, creatives, competitor remakes, replies); false if it first needs a connection the account lacks (e.g. Meta not connected, no store).
+- IF meta_connected is false: ALWAYS include exactly one task titled like "Launch your first campaign" (lever "traffic", dept "media", runnable=false) whose "steps" ARE a concrete campaign blueprint — objective, 1 campaign with 2-3 ad sets, the audiences, which of the ready ads go in each, and a starting daily budget. Its "impact" is the realistic first-month revenue. The app uses runnable=false to prompt the founder to connect Meta so this can launch. This is the single most important task for a not-yet-connected account — rank it first.
 Return JSON: {"stage_read":"one plain-English sentence naming the biggest constraint", "tasks":[{"title","lever","dept","why","steps":["…"],"hypothesis","impact","runnable":true|false}]}. lever ∈ {traffic,conversion,aov,retention,efficiency,brand}. dept ∈ {media,creative,research,customer,reports,email,seo,site,outreach}.`
 
   const user = JSON.stringify({
