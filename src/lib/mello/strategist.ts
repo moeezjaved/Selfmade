@@ -81,19 +81,25 @@ export async function generateStrategistPlan(
     cnt(() => { let q = (admin as any).from('customer_threads').select('id', { count: 'exact', head: true }).eq('user_id', opts.userId).eq('status', 'open'); if (brandId) q = q.eq('brand_id', brandId); return q }),
   ])
 
-  // Competitor winning DNA + the gaps the brand is missing (grounded market truth).
+  // Own-ad DNA (what the brand ALREADY runs) + competitor winning DNA + the real gaps between them.
+  // Resolving the brand's own page makes the diagnosis surgical ("you run X, you're missing Y") instead
+  // of assuming every competitor move is missing. Falls back to null (competitor-only) if we can't match
+  // the brand confidently — never grounds on the wrong brand's ads.
+  const ownPageId = await resolveOwnPageId(admin, ctx.brandName)
   const compPageIds = ctx.competitors.map(c => c.pageId).filter((p): p is string => !!p)
   let winners: Awaited<ReturnType<typeof winnerDna>> | null = null
   let gaps: ReturnType<typeof dnaDiff> = []
+  let ownDist: unknown = null
   let ownFound = false, ownAds = 0
-  if (compPageIds.length) {
-    try {
-      winners = await winnerDna(compPageIds, null, ctx.brandName)
-      const own = await ownDna(null)   // own-ad grounding resolves once the brand's own page is linked; competitor DNA already grounds the plan
-      ownFound = own.found; ownAds = own.totalAds
-      gaps = dnaDiff(own, winners)
-    } catch { /* DNA optional — plan still grounds on context + signals + brain */ }
-  }
+  try {
+    const [w, own] = await Promise.all([
+      compPageIds.length ? winnerDna(compPageIds, null, ctx.brandName) : Promise.resolve(null),
+      ownDna(ownPageId),
+    ])
+    winners = w
+    ownFound = own.found; ownAds = own.totalAds; ownDist = own.found ? own.dist : null
+    if (winners) gaps = dnaDiff(own, winners)
+  } catch { /* DNA optional — plan still grounds on context + signals + brain */ }
 
   // The brain — what the founder prefers + what we've already learned works/fails.
   let prefs: Record<string, any> = {}, learnings: any[] = []
@@ -109,6 +115,7 @@ export async function generateStrategistPlan(
     `inbox_open:${openChats}`,
     winners ? `winner_dna:${winners.winnerCount}` : 'winner_dna:none',
     `gaps:${gaps.length}`,
+    `own_page:${ownPageId || 'none'}`,
     ownFound ? `own_ads:${ownAds}` : 'own_ads:0',
   ]
 
@@ -136,7 +143,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     },
     competitors: ctx.competitors.map(c => c.name).slice(0, 12),
     winner_dna: winners ? { proven_winners: winners.winnerCount, sample: winners.sampleSize, dist: winners.dist, media_mix: winners.media } : null,
-    your_ads: ownFound ? { count: ownAds } : 'no own ads linked yet — ground on competitor DNA',
+    your_ads: ownFound ? { count: ownAds, your_dna: ownDist } : 'no own ads found for this brand yet — ground on competitor DNA and be explicit that you cannot yet see their own ads',
     gaps: gaps.slice(0, 12),
     ceo_preferences: prefs,
     recent_learnings: learnings.slice(0, 8).map((l: any) => ({ event: l.event, result: l.result, metric: l.metric })),
@@ -181,6 +188,29 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
 }
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48)
+
+// Fold to a comparable key: lowercase, strip accents + all non-alphanumerics.
+const fold = (s: string) => (s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]/g, '')
+
+/**
+ * Resolve the brand's OWN Meta page_id from its name via the same directory the scan uses
+ * (search_brand_directory RPC). CONFIDENCE-GUARDED: only returns a page when the directory name matches
+ * the brand name exactly (folded) — prefers the highest-ad-count match. Returns null on any ambiguity so
+ * the Strategist NEVER reasons over a different brand's ads as if they were the founder's own.
+ */
+async function resolveOwnPageId(admin: SupabaseClient, brandName: string | null): Promise<string | null> {
+  const q = (brandName || '').trim()
+  if (q.length < 3) return null
+  try {
+    const { data } = await (admin as any).rpc('search_brand_directory', { p_q: q, p_industry: null, p_limit: 15 })
+    const rows = (Array.isArray(data) ? data : []) as { page_id: string; name: string; source_ad_count?: number }[]
+    const want = fold(q)
+    const exact = rows.filter((r) => fold(r.name) === want)
+    if (!exact.length) return null
+    exact.sort((a, b) => (b.source_ad_count || 0) - (a.source_ad_count || 0))
+    return exact[0].page_id ? String(exact[0].page_id) : null
+  } catch { return null }
+}
 
 // Write the plan's tasks as SUGGESTED mello_tasks (idempotent by suggested_key). Never executes.
 async function persistTasks(admin: SupabaseClient, userId: string, brandId: string | null, plan: StrategistPlan): Promise<void> {
