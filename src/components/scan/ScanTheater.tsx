@@ -708,7 +708,7 @@ function FullReport({ res, onReaudit }: { res: ScanResult; own: FullDnaResult['o
       <div style={{ marginTop: 40 }}><CompetitorRefine pageId={res.brand.pageId} onReaudit={onReaudit} /></div>
       <div style={{ marginTop: 40 }}><UpsideTeaser cost={res.cost} gaps={res.gaps.length} /></div>
       <div style={{ marginTop: 40 }}><TheFix res={res} /></div>
-      <div style={{ marginTop: 40 }}><ForwardCta /></div>
+      <div style={{ marginTop: 40 }}><ForwardCta brand={res.brand} /></div>
     </div>
   )
 }
@@ -809,25 +809,23 @@ function UpsideTeaser({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }
           </div>
         )}
         <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-          {/* TODO(phase-3): wire Meta connect */}
-          <button style={{ ...btn, padding: '14px 26px', fontSize: 15.5 }}>Connect Meta to see your real number →</button>
-          <p style={{ color: MUT, fontSize: 12.5, marginTop: 9, lineHeight: 1.5 }}>Read-only, ~30 seconds. We&rsquo;ll replace this estimate with your true numbers — real revenue at risk and the exact lift from fixing it.</p>
+          <a href="/signup?ref=scan-meta" style={{ ...btn, display: 'inline-block', textDecoration: 'none', padding: '14px 26px', fontSize: 15.5 }}>Connect Meta to see your real number →</a>
+          <p style={{ color: MUT, fontSize: 12.5, marginTop: 9, lineHeight: 1.5 }}>Sign up free, then connect Meta — we&rsquo;ll replace this estimate with your true numbers: real revenue at risk and the exact lift from fixing it.</p>
         </div>
       </div>
     </div>
   )
 }
 
-// ── The forward door — Phase-2 wires real auth; for now a safe no-op ──
-function ForwardCta() {
-  const [noted, setNoted] = useState(false)
+// ── The forward door — real sign-up (Google/email). We stash the scanned brand so onboarding can pick
+// up where the audit left off. Personal email is fine (the business-email gate is off). ──
+function ForwardCta({ brand }: { brand: { name: string; pageId: string } }) {
+  const go = () => { try { localStorage.setItem('sf_scan', JSON.stringify({ pageId: brand.pageId, name: brand.name, at: Date.now() })) } catch { /* private mode */ } }
   return (
     <div style={{ background: DARK, borderRadius: 20, padding: '34px 32px', color: CREAM }}>
       <h2 style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', letterSpacing: '-.02em', lineHeight: 1.1, color: '#fff', margin: '0 0 10px' }}>Ready to run these?</h2>
       <p style={{ color: MUT, fontSize: 15.5, margin: '0 0 22px', maxWidth: 560, lineHeight: 1.5 }}>Start free — we&rsquo;ll generate these ads to your account and you approve every one before it launches.</p>
-      {/* TODO(phase-2): wire Google sign-up here */}
-      <button onClick={() => setNoted(true)} style={{ ...btn, padding: '15px 32px', fontSize: 16 }}>Start free → unlock your ads</button>
-      {noted && <div style={{ marginTop: 14, fontSize: 13.5, color: '#ff9f7a', fontWeight: 700 }}>🚀 Coming in your account — sign-in is being wired up.</div>}
+      <a href={`/signup?ref=scan&brand=${encodeURIComponent(brand.pageId)}`} onClick={go} style={{ ...btn, display: 'inline-block', textDecoration: 'none', padding: '15px 32px', fontSize: 16 }}>Start free → unlock your ads</a>
     </div>
   )
 }
