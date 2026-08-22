@@ -654,10 +654,10 @@ function slideVs(own: Record<string, Tally[]>, winners: Record<string, Tally[]>,
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', flex: 'none' }}>
         <div>
           <div style={slideEyebrow}>You vs the winners</div>
-          <h2 style={slideH}>The moves you’re <span style={{ color: ORANGE }}>not</span> making</h2>
+          <h2 style={{ ...slideH, fontSize: 'clamp(24px,3.6vw,42px)' }}>The moves you’re <span style={{ color: ORANGE }}>not</span> making</h2>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(36px,6vw,64px)', color: ORANGE, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={missingTotal} /></div>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(32px,5vw,54px)', color: ORANGE, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={missingTotal} /></div>
           <div style={{ fontSize: 12.5, color: SUB, fontWeight: 600 }}>winning moves you’re missing</div>
         </div>
       </div>
