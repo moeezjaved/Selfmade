@@ -881,7 +881,8 @@ function timeoutSlide(brandName: string) {
     <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
       <div style={{ fontSize: 'clamp(44px,8vw,72px)', lineHeight: 1 }}>🐢</div>
       <h2 style={slideH}>Still pulling your ads</h2>
-      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>We’ve been crawling for a few minutes and {brandName === 'your brand' ? 'your' : brandName + "’s"} library is a deep one — it’s still indexing. It’ll be ready shortly: re-run the audit in a few minutes for the full breakdown, or connect Meta for the complete picture right away.</p>
+      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>We’ve been crawling for a few minutes and {brandName === 'your brand' ? 'your' : brandName + "’s"} library is a deep one — it’s still indexing. It’ll be ready shortly. Skip the wait — connect Meta and we’ll pull your complete ad account right now.</p>
+      <div style={{ marginTop: 4 }}><MetaCta size="lg" align="center" label="Connect Meta — get your full audit now" note="Free to start. Or re-run the audit in a few minutes for the crawled breakdown." /></div>
     </div>
   )
 }
@@ -1363,8 +1364,7 @@ function UpsideTeaser({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }
           </div>
         )}
         <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-          <a href="/signup?ref=scan-meta" style={{ ...btn, display: 'inline-block', textDecoration: 'none', padding: '14px 26px', fontSize: 15.5 }}>Connect Meta to see your real number →</a>
-          <p style={{ color: MUT, fontSize: 12.5, marginTop: 9, lineHeight: 1.5 }}>Sign up free, then connect Meta — we&rsquo;ll replace this estimate with your true numbers: real revenue at risk and the exact lift from fixing it.</p>
+          <MetaCta size="lg" label="Connect Meta to see your real number" note="Sign up free, then connect Meta — we’ll replace this estimate with your true numbers: real revenue at risk and the exact lift from fixing it." />
         </div>
       </div>
     </div>
@@ -1387,3 +1387,29 @@ function ForwardCta({ brand }: { brand: { name: string; pageId: string } }) {
 const h2: CSSProperties = { fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, fontSize: 'clamp(28px,4vw,40px)', letterSpacing: '-.02em', lineHeight: 1.05, color: INK, margin: '0 0 10px' }
 const sub: CSSProperties = { color: SUB, fontSize: 17, maxWidth: 620, margin: 0, lineHeight: 1.5 }
 const btn: CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }
+
+// A small "connect / link" chain icon (white) — signals "connect your account" on the Meta CTA.
+function LinkIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden style={{ flex: 'none' }}>
+      <path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" />
+      <path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" />
+    </svg>
+  )
+}
+// The highest-intent action in the funnel — bold, glowing, full-width pill so "Connect Meta" stands out
+// wherever the scan hands the visitor over (the money section + the crawl-timeout dead-end).
+function MetaCta({ label, note, size = 'md', align = 'left' }: { label?: string; note?: string; size?: 'md' | 'lg'; align?: 'left' | 'center' }) {
+  const lg = size === 'lg'
+  return (
+    <div style={{ maxWidth: lg ? 480 : 440, margin: align === 'center' ? '0 auto' : undefined, width: '100%' }}>
+      <a href="/signup?ref=scan-meta" className="sf-glow" style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 11, width: '100%',
+        background: ORANGE, color: '#fff', border: 'none', borderRadius: 100,
+        padding: lg ? '17px 30px' : '15px 26px', fontSize: lg ? 17 : 15.5, fontWeight: 900,
+        textDecoration: 'none', letterSpacing: '-.01em', boxShadow: '0 16px 38px -12px rgba(239,74,30,.62)',
+      }}><LinkIcon /> {label || 'Connect Meta — see your real numbers'} →</a>
+      {note && <p style={{ color: MUT, fontSize: 12.5, marginTop: 10, lineHeight: 1.5, textAlign: align }}>{note}</p>}
+    </div>
+  )
+}
