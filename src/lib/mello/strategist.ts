@@ -23,6 +23,8 @@ import OpenAI from 'openai'
 import { loadMelloContext } from '@/lib/mello/context'
 import { recall } from '@/lib/brain'
 import { winnerDna, ownDna, dnaDiff } from '@/lib/dna/engine'
+import { auditAccount } from '@/lib/meta/audit'
+import { diagnose, biggestLever, type AccountMetrics } from '@/lib/meta/diagnose'
 
 let _oai: OpenAI | null = null
 const oai = () => (_oai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }))
@@ -101,6 +103,36 @@ export async function generateStrategistPlan(
     if (winners) gaps = dnaDiff(own, winners)
   } catch { /* DNA optional — plan still grounds on context + signals + brain */ }
 
+  // REAL performance from the connected Meta account — the STRONGEST grounding. When Meta is connected we
+  // reason over the brand's ACTUAL numbers (CTR/CVR/AOV/ROAS/frequency) + the media-buyer diagnosis, not a
+  // name-guessed page. A banned/empty account just yields no performance grounding (degrades gracefully).
+  let performance: AccountMetrics | null = null
+  let diagnoses: ReturnType<typeof diagnose> = []
+  let biggestLeverRead: { headline: string; detail: string } | null = null
+  if (ctx.integrations.meta.connected) {
+    try {
+      const totals: any = await auditAccount(admin, opts.userId)
+      if (totals && totals.spend != null) {
+        let frequency: number | null = null, activeCreatives: number | null = null
+        try {
+          const { createMetaClientForUser } = await import('@/lib/meta/client')
+          const mc = await createMetaClientForUser(opts.userId)
+          if (mc) { const [f, n] = await Promise.all([mc.getAccountFrequency('last_30d'), mc.getActiveAdCount()]); frequency = f; activeCreatives = n }
+        } catch { /* best-effort */ }
+        performance = {
+          spend: totals.spend, currency: totals.currency || 'USD', cpm: totals.cpm ?? null,
+          ctr: totals.ctr != null ? totals.ctr / 100 : null,   // auditAccount ctr is a PERCENTAGE → fraction
+          cvr: (totals.clicks > 0 && totals.purchases != null) ? totals.purchases / totals.clicks : null,
+          aov: (totals.purchases > 0 && totals.revenue != null) ? totals.revenue / totals.purchases : null,
+          roas: totals.avgRoas ?? null, frequency,
+          activeCreatives: activeCreatives ?? (Array.isArray(totals.ads) ? totals.ads.length : null),
+        }
+        diagnoses = diagnose(performance)
+        biggestLeverRead = biggestLever(performance, diagnoses)
+      }
+    } catch { /* Meta read optional */ }
+  }
+
   // The brain — what the founder prefers + what we've already learned works/fails.
   let prefs: Record<string, any> = {}, learnings: any[] = []
   try { const r = await recall(admin, { userId: opts.userId, department: 'media', brandId, limit: 8 }); prefs = r.prefs || {}; learnings = r.learnings || [] } catch { /* brain optional */ }
@@ -117,6 +149,7 @@ export async function generateStrategistPlan(
     `gaps:${gaps.length}`,
     `own_page:${ownPageId || 'none'}`,
     ownFound ? `own_ads:${ownAds}` : 'own_ads:0',
+    performance ? `perf:spend=${Math.round(performance.spend)},roas=${performance.roas ?? '?'},cvr=${performance.cvr != null ? (performance.cvr * 100).toFixed(1) + '%' : '?'}` : 'perf:none',
   ]
 
   const sys = `You are the CEO-level growth strategist inside Selfmade — an autonomous marketing company for DTC brands. You think like a top e-commerce founder/operator, not an ad tool.
@@ -124,6 +157,7 @@ YOUR JOB: from the account data below, produce a SMALL, RANKED set of the next h
 HARD RULES:
 - Ground everything ONLY in the data provided. Never invent a competitor, number, metric, or gap that isn't in the input. If evidence is thin, propose lower-confidence discovery tasks and say what you'd need.
 - Diagnose first: identify the single biggest constraint on revenue right now, then pick moves that relieve it. More ad spend is rarely the answer once ads are live.
+- If real_performance / funnel_diagnosis is present, it is your STRONGEST evidence — anchor the diagnosis and tasks on those ACTUAL numbers and reference the real values (e.g. low cvr → fix conversion/offer, not more traffic; high frequency → refresh creative, audience fatigued; low aov → bundle/upsell; low roas with healthy ctr+cvr → AOV or margin). Prefer real performance over competitor-DNA inference whenever both exist.
 - Respect the BUSINESS STAGE (given below as stage + stage_focus). Do not propose stage-inappropriate plays.
 - Each task is concrete and one a real operator would run this week. Name the specific competitor / gap / signal it comes from.
 - Prefer diversity of levers over five variations of one idea. Max ${limit} tasks.
@@ -144,6 +178,8 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     competitors: ctx.competitors.map(c => c.name).slice(0, 12),
     winner_dna: winners ? { proven_winners: winners.winnerCount, sample: winners.sampleSize, dist: winners.dist, media_mix: winners.media } : null,
     your_ads: ownFound ? { count: ownAds, your_dna: ownDist } : 'no own ads found for this brand yet — ground on competitor DNA and be explicit that you cannot yet see their own ads',
+    real_performance: performance,   // connected Meta account: ctr/cvr/aov/roas as fractions, spend in currency, frequency
+    funnel_diagnosis: biggestLeverRead ? { biggest_lever: biggestLeverRead, signals: diagnoses.map((d: any) => ({ label: d.label, value: d.value, verdict: d.verdict, meaning: d.meaning ?? undefined })) } : null,
     gaps: gaps.slice(0, 12),
     ceo_preferences: prefs,
     recent_learnings: learnings.slice(0, 8).map((l: any) => ({ event: l.event, result: l.result, metric: l.metric })),
