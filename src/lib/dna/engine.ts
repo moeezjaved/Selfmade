@@ -47,6 +47,7 @@ type AdRow = Record<string, unknown>
 const SELECT =
   'ad_id, page_id, page_name, format, days_running, is_active, has_creative, performance_score, ' +
   'body, title, thumbnail_url, raw_image_urls, snapshot_url, start_date, link_url, ' +
+  'discovery_creatives(asset_type, r2_url, poster_url, position), ' +
   DIMS.map((d) => d.key).join(', ')
 
 // ── rollup: rows → distribution per dimension (single + array columns) ──
@@ -93,6 +94,11 @@ function scriptOf(s: string): 'latin' | 'cyrillic' | 'cjk' | 'arabic' | 'other' 
 }
 
 const thumbOf = (a: AdRow): string | null => {
+  // Prefer OUR permanent R2 copy (crawled into discovery_creatives) — fbcdn thumbnail_url / raw_image_urls
+  // are hotlink-protected and expire, so they 404 through the weserv proxy and the grid shows blanks.
+  const cres = (a.discovery_creatives as { asset_type?: string; r2_url?: string | null; poster_url?: string | null; position?: number }[]) || []
+  const cre = cres.slice().sort((x, y) => (x.position || 0) - (y.position || 0)).find((c) => c.r2_url || c.poster_url)
+  if (cre) { const r2 = (cre.asset_type === 'video' ? cre.poster_url : cre.r2_url) || cre.r2_url || cre.poster_url; if (r2) return String(r2) }
   const imgs = a.raw_image_urls as string[] | null
   const u = (a.thumbnail_url as string) || imgs?.[0] || null
   if (!u) return null
@@ -379,7 +385,7 @@ export function estimateCost(own: OwnDna, gaps: Gap[], score: Score): CostEstima
 // ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. `v2` =
 // added own.examples (ad thumbnails) + cost; bumping the key bypasses caches that predate those fields. ──
 const cacheKey = (pageIds: string[], ownPage: string | null) =>
-  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v3').digest('hex').slice(0, 24)}.json`
+  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v4').digest('hex').slice(0, 24)}.json`
 
 export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cost: CostEstimate; cached: boolean }
 
