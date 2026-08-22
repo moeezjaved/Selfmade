@@ -11,7 +11,12 @@ const INK = '#1c1710', SUB = '#6f665a', MUT = '#a49a89', LINE = '#e2d9c4', LINE2
 const PAPER = '#f6f1e6', CARD = '#fffdf8', CARD2 = '#f8f3e7'
 const FLAME = '#ef4a1e', LIVE = '#1f8a53', RUN = '#2f6df0', WAIT = '#c07d17'
 
-type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; suggested_key: string }
+type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
+const CONNECT: Record<string, { label: string; href: string }> = {
+  meta: { label: 'Connect Meta to launch →', href: '/connect/meta' },
+  shopify: { label: 'Connect Shopify to fix this →', href: '/connect/shopify' },
+  klaviyo: { label: 'Connect Klaviyo to send →', href: '/settings' },
+}
 type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[] }
 
 const STAGE_LABEL: Record<string, string> = { setup: 'Setup', 'first-cycle': 'First cycle', running: 'Running', scaling: 'Scaling' }
@@ -79,9 +84,10 @@ export default function MissionPage() {
         {!loading && plan && plan.tasks.map((t, i) => {
           const lc = LEVER_COLOR[t.lever] || SUB
           const isOpen = open === t.suggested_key
-          const needsMeta = !t.runnable
+          const connect = t.needs ? CONNECT[t.needs] : null
+          const highlight = !!connect
           return (
-            <div key={t.suggested_key || i} style={{ background: CARD, border: `1px solid ${needsMeta ? FLAME : LINE}`, boxShadow: needsMeta ? '0 0 0 3px rgba(239,74,30,.07)' : 'none', borderRadius: 14, padding: 17, marginBottom: 11 }}>
+            <div key={t.suggested_key || i} style={{ background: CARD, border: `1px solid ${highlight ? FLAME : LINE}`, boxShadow: highlight ? '0 0 0 3px rgba(239,74,30,.07)' : 'none', borderRadius: 14, padding: 17, marginBottom: 11 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 8 }}>
                 <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 9.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: lc, background: `${lc}18`, borderRadius: 100, padding: '3px 9px' }}>{t.lever}</span>
                 <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.05em', textTransform: 'uppercase', color: MUT }}>{t.dept}</span>
@@ -101,9 +107,11 @@ export default function MissionPage() {
               )}
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {needsMeta
-                  ? <a href="/connect/meta" style={btnFlame()}>Connect Meta to launch →</a>
-                  : <button style={btnFlame()}>Approve &amp; run →</button>}
+                {connect
+                  ? <a href={connect.href} style={btnFlame()}>{connect.label}</a>
+                  : t.runnable
+                    ? <button style={btnFlame()}>Approve &amp; run →</button>
+                    : <button onClick={() => setOpen(t.suggested_key)} style={btnFlame()}>Get the brief →</button>}
                 <button onClick={() => setOpen(isOpen ? null : t.suggested_key)} style={btnGhost()}>{isOpen ? 'Hide brief' : 'Open brief'}</button>
               </div>
             </div>
