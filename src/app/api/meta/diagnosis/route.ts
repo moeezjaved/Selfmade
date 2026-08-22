@@ -22,9 +22,22 @@ export async function GET() {
     const totals: any = await auditAccount(admin, user.id)
     if (!totals) return NextResponse.json({ connected: false })
 
+    // Frequency + real active-creative count aren't in auditAccount's totals — fetch them straight from
+    // Meta (best-effort; null on any error → diagnose shows 'unknown'). One extra client, two cheap calls.
+    let frequency: number | null = null
+    let activeCreatives: number | null = null
+    try {
+      const { createMetaClientForUser } = await import('@/lib/meta/client')
+      const mc = await createMetaClientForUser(user.id)
+      if (mc) {
+        const [f, n] = await Promise.all([mc.getAccountFrequency('last_30d'), mc.getActiveAdCount()])
+        frequency = f
+        activeCreatives = n
+      }
+    } catch { /* best-effort — leave null */ }
+
     // Map auditAccount's real totals → AccountMetrics. NOTE: auditAccount's `ctr` is a PERCENTAGE number
-    // (1.2 = 1.2%), so divide by 100 to get the fraction diagnose() expects. reach isn't in the totals,
-    // so frequency stays null (diagnose shows 'unknown') — a later expansion.
+    // (1.2 = 1.2%), so divide by 100 to get the fraction diagnose() expects.
     const metrics: AccountMetrics = {
       spend: totals.spend,
       currency: totals.currency || 'USD',
@@ -33,8 +46,8 @@ export async function GET() {
       cvr: (totals.clicks > 0 && totals.purchases != null) ? totals.purchases / totals.clicks : null,
       aov: (totals.purchases > 0 && totals.revenue != null) ? totals.revenue / totals.purchases : null,
       roas: totals.avgRoas ?? null,
-      frequency: null,
-      activeCreatives: Array.isArray(totals.ads) ? totals.ads.length : null,
+      frequency,
+      activeCreatives: activeCreatives ?? (Array.isArray(totals.ads) ? totals.ads.length : null),
     }
 
     const diagnoses = diagnose(metrics)
