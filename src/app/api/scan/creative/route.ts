@@ -141,6 +141,10 @@ export async function POST(req: NextRequest) {
       styleTags: styleTags.slice(0, 8), insights, angle: brief.angle || undefined, isService: !product,
     }) || brief.prompt || `${brandName} ad.`
     if (offer) prompt += ` Write a short, punchy headline that lands this message: "${offer}"${persona ? `, speaking to ${persona}` : ''}. Do not write the words "ad", "testimonial", "pain point" or the ad type as the headline — write real marketing copy a shopper would see.`
+    // Composition guard: the product REFERENCE here is the brand's own crawled AD (not a clean cutout), so
+    // the model tends to over-scale/crop the product. Steer it to a natural portrait ad layout with room
+    // for the copy — keeps the whole creative visible (no head-cropping) and the product life-sized.
+    prompt += ' Compose as a portrait ad with clear headroom at the top for the headline and space at the bottom for the call-to-action. Show the product at a natural, moderate size — centered in the frame, fully visible, neither oversized nor cropped at any edge.'
     // order MUST be [inspirations…, product?] to match the prompt's image-index math
     const genImages: ImageInput[] = [...inspImgs, ...(product ? [product] : [])]
 
@@ -150,7 +154,7 @@ export async function POST(req: NextRequest) {
     if (!gen.ok) return NextResponse.json({ error: 'render_failed' }, { status: 503 })
 
     const buf = Buffer.from(gen.dataB64, 'base64')
-    const hash = crypto.createHash('sha1').update(`${brandName}|${offer}|${brief.gapLabel || ''}|${brief.angle || ''}`).digest('hex')
+    const hash = crypto.createHash('sha1').update(`${brandName}|${offer}|${brief.gapLabel || ''}|${brief.angle || ''}|v2`).digest('hex')
     const key = 'scan-previews/' + hash + '.png'
     const url = await uploadBufferToR2(buf, key, gen.mimeType || 'image/png') || r2PublicUrl(key)
     if (!url) return NextResponse.json({ error: 'render_failed' }, { status: 503 })

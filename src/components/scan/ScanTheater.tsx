@@ -1111,11 +1111,13 @@ function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief;
   }, [brief.key]) // eslint-disable-line react-hooks/exhaustive-deps
   return (
     <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
-      <div style={{ position: 'relative', aspectRatio: '1 / 1', background: '#efe8da' }}>
+      {/* Container MUST match the generated aspect (route renders 4:5). A 1:1 box + object-fit:cover was
+          cropping the headline off the top AND zooming the product so it looked oversized. */}
+      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#efe8da' }}>
         {st.status === 'loading' && <div className="sf-shim" style={{ position: 'absolute', inset: 0 }} />}
         {st.status === 'ready' && st.imageUrl && (
           <>
-            <img src={st.imageUrl} alt={brief.headline} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+            <img src={st.imageUrl} alt={brief.headline} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
             <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               <span style={{ transform: 'rotate(-20deg)', fontFamily: 'ui-monospace,monospace', fontWeight: 800, letterSpacing: '.35em', fontSize: 'clamp(26px,7vw,44px)', color: 'rgba(255,255,255,.5)', textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>PREVIEW</span>
             </div>
