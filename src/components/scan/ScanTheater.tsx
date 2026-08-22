@@ -66,7 +66,7 @@ export default function ScanTheater() {
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string }>({})
+  const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
 
   useEffect(() => {
     if (phase !== 'idle') return
@@ -83,7 +83,7 @@ export default function ScanTheater() {
   const addFinding = useCallback((id: StepId, text: string, bad?: boolean) =>
     setSteps((s) => s.map((x) => (x.id === id ? { ...x, findings: [...x.findings, { text, bad }] } : x))), [])
 
-  const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string }) => {
+  const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string; competitors?: string[] }) => {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
@@ -272,7 +272,7 @@ export default function ScanTheater() {
         )}
         {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
         {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
-        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : revealed ? <FullReport res={res} own={own!} winners={winners!} /> : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
+        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : revealed ? <FullReport res={res} own={own!} winners={winners!} onReaudit={(ids) => run({ ...lastPayload.current, competitors: ids })} /> : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
       </main>
     </div>
   )
@@ -700,14 +700,67 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
 // The REPORT is deliberately compact (Ryze-sized): the rich DNA panels + ad grids + side-by-side live in
 // the THEATER (the reveal acts). Here we show only the distilled result — score, the gaps that matter, the
 // upside (gated on connecting Meta), the fixes, and the door.
-function FullReport({ res }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners'] }) {
+function FullReport({ res, onReaudit }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners']; onReaudit: (ids: string[]) => void }) {
   return (
     <div>
       <ScoreAct res={res} />
       <div style={{ marginTop: 40 }}><TopGaps gaps={res.gaps} /></div>
+      <div style={{ marginTop: 40 }}><CompetitorRefine pageId={res.brand.pageId} onReaudit={onReaudit} /></div>
       <div style={{ marginTop: 40 }}><UpsideTeaser cost={res.cost} gaps={res.gaps.length} /></div>
       <div style={{ marginTop: 40 }}><TheFix res={res} /></div>
       <div style={{ marginTop: 40 }}><ForwardCta /></div>
+    </div>
+  )
+}
+
+// Let the user CORRECT their competitors — auto-matching is imperfect, so the surest path to an accurate
+// audit is to name the rivals yourself. Adds brands (from the same directory search) → re-runs the audit.
+function CompetitorRefine({ pageId, onReaudit }: { pageId: string; onReaudit: (ids: string[]) => void }) {
+  const [q, setQ] = useState('')
+  const [results, setResults] = useState<Brand[]>([])
+  const [picked, setPicked] = useState<{ pageId: string; name: string }[]>([])
+  const deb = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (q.trim().length < 2) { setResults([]); return }
+    if (deb.current) clearTimeout(deb.current)
+    deb.current = setTimeout(() => {
+      fetch(`/api/scan/brands?q=${encodeURIComponent(q.trim())}`).then((r) => r.json())
+        .then((j) => setResults(Array.isArray(j.results) ? j.results.slice(0, 6) : [])).catch(() => setResults([]))
+    }, 220)
+  }, [q])
+  const add = (b: Brand) => { if (b.pageId !== pageId && !picked.some((p) => p.pageId === b.pageId)) setPicked((s) => [...s, { pageId: b.pageId, name: b.name }]); setQ(''); setResults([]) }
+  return (
+    <div style={{ background: CREAM, border: `1px solid ${LINE}`, borderRadius: 18, padding: '24px 26px' }}>
+      <h2 style={{ ...h2, fontSize: 'clamp(22px,3vw,28px)', margin: '0 0 6px' }}>These aren&rsquo;t your real rivals?</h2>
+      <p style={{ ...sub, fontSize: 15 }}>We match competitors automatically — but you know yours best. Add them and we&rsquo;ll re-run the whole audit against the right brands.</p>
+      <div style={{ position: 'relative', maxWidth: 460, marginTop: 16 }}>
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a competitor brand…"
+          style={{ width: '100%', padding: '13px 16px', borderRadius: results.length ? '14px 14px 0 0' : 100, border: `1.5px solid ${LINE}`, fontSize: 15, background: '#fff', color: INK, outline: 'none' }} />
+        {results.length > 0 && (
+          <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, background: '#fff', border: `1.5px solid ${LINE}`, borderTop: 'none', borderRadius: '0 0 14px 14px', overflow: 'hidden', zIndex: 5, boxShadow: '0 20px 40px -20px rgba(0,0,0,.3)' }}>
+            {results.map((b) => (
+              <button key={b.pageId} onClick={() => add(b)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 15px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
+                <span style={{ fontWeight: 700, fontSize: 14.5, color: INK }}>{b.name}</span>
+                <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+      {picked.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 14 }}>
+          {picked.map((p) => (
+            <span key={p.pageId} style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 8px 6px 14px', fontSize: 13.5, fontWeight: 700, color: INK }}>
+              {p.name}
+              <button onClick={() => setPicked((s) => s.filter((x) => x.pageId !== p.pageId))} aria-label="Remove" style={{ border: 'none', background: 'rgba(26,20,16,.08)', borderRadius: 100, width: 20, height: 20, cursor: 'pointer', color: SUB, fontWeight: 800, lineHeight: 1 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <button onClick={() => picked.length && onReaudit(picked.map((p) => p.pageId))} disabled={!picked.length}
+        style={{ ...btn, marginTop: 16, padding: '13px 26px', opacity: picked.length ? 1 : .5, cursor: picked.length ? 'pointer' : 'not-allowed' }}>
+        Re-audit against {picked.length || 'these'} competitor{picked.length === 1 ? '' : 's'} →
+      </button>
     </div>
   )
 }

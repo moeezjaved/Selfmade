@@ -103,11 +103,20 @@ export async function POST(req: NextRequest) {
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'anon'
   if (limited(ip)) return NextResponse.json({ error: 'Too many scans — try again in a bit.' }, { status: 429 })
 
-  let body: { pageId?: string; adLibraryUrl?: string }
+  let body: { pageId?: string; adLibraryUrl?: string; competitors?: string[] }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   const pageId = (body.pageId && /^\d{5,}$/.test(body.pageId)) ? body.pageId : extractPageId(body.adLibraryUrl || '')
   if (!pageId) return NextResponse.json({ error: 'Pick your brand or paste your Meta Ad Library link.' }, { status: 400 })
+
+  // USER-PROVIDED competitors (page ids or ad-library links) override our auto-matching — the surest way
+  // to get accurate rivals when the content-overlap guess is off. Deduped, self excluded, capped at 12.
+  const manualCompetitors = Array.isArray(body.competitors)
+    ? Array.from(new Set(body.competitors.map((c) => {
+        const s = String(c || '').trim()
+        return /^\d{5,}$/.test(s) ? s : extractPageId(s)
+      }).filter((p): p is string => !!p && p !== pageId))).slice(0, 12)
+    : []
 
   try {
     const admin = createAdminClient()
@@ -141,13 +150,14 @@ export async function POST(req: NextRequest) {
     // Rivals by CONTENT OVERLAP — the coarse niche ("Health & Wellness") lumps a nicotine brand in with
     // mattresses and period care. So we pull the brand's OWN distinctive ad keywords and rank same-niche
     // brands by how much their ad copy talks about the same things. Fall back to volume-in-niche if thin.
-    let competitorPageIds: string[] = []
+    // User-provided competitors win outright — the accurate path when auto-matching is off.
+    let competitorPageIds: string[] = [...manualCompetitors]
     const push = (arr: string[]) => { const seen = new Set(competitorPageIds); for (const p of arr) if (!seen.has(p)) { seen.add(p); competitorPageIds.push(p) } }
 
     // 1) the brand's distinctive keywords from its own ad copy
-    const { data: myAds } = await admin.from('discovery_ads_index').select('body, title').eq('page_id', pageId).eq('has_creative', true).limit(80)
+    const { data: myAds } = manualCompetitors.length ? { data: null } : await admin.from('discovery_ads_index').select('body, title').eq('page_id', pageId).eq('has_creative', true).limit(80)
     const brandTokens = new Set(brandName.toLowerCase().split(/[^a-z]+/).filter(Boolean))
-    const kw = topKeywords((myAds || []) as { body?: string | null; title?: string | null }[], brandTokens)
+    const kw = manualCompetitors.length ? [] : topKeywords((myAds || []) as { body?: string | null; title?: string | null }[], brandTokens)
 
     // 2) FAST ranked keyword search (search_ads_v2 RPC, mig 099 — indexed, ~1s) → brands whose ads match
     // the brand's own keywords, ranked by how many of their ads hit. This is what surfaces real peers.
@@ -161,7 +171,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 3) fallback — too few content matches → highest-volume same-niche brands (directory, then live index)
-    if (competitorPageIds.length < 3 && niche) {
+    if (!manualCompetitors.length && competitorPageIds.length < 3 && niche) {
       let q = admin.from('brand_directory').select('page_id').eq('industry', niche).neq('page_id', pageId).gt('source_ad_count', 0)
       if (brandCountry) q = q.eq('country', brandCountry)
       const { data: dir } = await q.order('source_ad_count', { ascending: false }).limit(10)
