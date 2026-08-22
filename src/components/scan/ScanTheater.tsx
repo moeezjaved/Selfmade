@@ -574,54 +574,116 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
   )
 }
 
-// SLIDE — scanning your rivals: named brands + media bar + a capped rival grid (days-running badges).
-function slideRivals(winners: FullDnaResult['winners']) {
-  const brands = Array.from(new Set(winners.examples.map((e) => e.brand).filter(Boolean))).slice(0, 8)
+// A hero stat — one huge Fraunces number + a small caption. The theater's "big words" workhorse.
+function HeroStat({ n, label, suffix = '', color = INK }: { n: number; label: string; suffix?: string; color?: string }) {
   return (
-    <>
-      {slideHead('Scanning your rivals', <>Your rivals have a formula — {winners.winnerCount.toLocaleString()} proven winners</>)}
-      {brands.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flex: 'none' }}>
-          {brands.map((b, i) => (
-            <span key={i} className="sf-rise" style={{ ...rise(i), fontSize: 'clamp(13px,1.5vw,15px)', fontWeight: 700, color: INK, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '8px 16px' }}>{b}</span>
-          ))}
-        </div>
-      )}
-      <div style={{ flex: 'none' }}><MediaBar media={winners.media} /></div>
-      {slideAdGrid(winners.examples.slice(0, 10).map((ex) => ({ adId: ex.adId, thumb: ex.thumb, label: ex.hook || ex.brand, badge: `${ex.daysRunning}d running` })))}
-    </>
+    <div>
+      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,6.4vw,72px)', color, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={n} />{suffix}</div>
+      <div style={{ fontSize: 'clamp(12px,1.5vw,14px)', color: SUB, fontWeight: 600, marginTop: 5 }}>{label}</div>
+    </div>
   )
 }
 
-// SLIDE — you vs the winners, 3 dimensions per slide (7 dims split across 2 slides). Orange = a move you miss.
+// SLIDE — spying on rivals: a narrative column (headline + surveillance stats + rival names + media bar)
+// beside a FEATURED winning ad shown large, with a filmstrip of more. Image-dominant, Ryze theater.
+function slideRivals(winners: FullDnaResult['winners']) {
+  const ex = winners.examples
+  const hero = ex.find((e) => e.thumb) || ex[0]
+  const strip = ex.filter((e) => e.adId !== hero?.adId).slice(0, 4)
+  const brands = Array.from(new Set(ex.map((e) => e.brand).filter(Boolean))).slice(0, 6)
+  const topDays = ex.reduce((m, e) => Math.max(m, e.daysRunning || 0), 0)
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: hero ? 'minmax(0,1.15fr) minmax(0,.85fr)' : '1fr', gap: 'clamp(18px,3vw,44px)', alignItems: 'center', height: '100%' }}>
+      {/* LEFT — the narrative */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 'clamp(14px,2.2vw,24px)', minWidth: 0 }}>
+        <div>
+          <div style={slideEyebrow}>Spying on your rivals</div>
+          <h2 style={slideH}>Your rivals have a <span style={{ color: ORANGE }}>formula</span>.</h2>
+        </div>
+        <div style={{ display: 'flex', gap: 'clamp(14px,3vw,40px)', flexWrap: 'wrap' }}>
+          <HeroStat n={winners.winnerCount} label="proven winners (90+ days live)" color={ORANGE} />
+          {topDays > 0 && <HeroStat n={topDays} suffix=" days" label="longest still running" />}
+        </div>
+        {brands.length > 0 && (
+          <div>
+            <div style={{ fontSize: 11.5, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 9 }}>Who you’re up against</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {brands.map((b, i) => (
+                <span key={i} className="sf-rise" style={{ ...rise(i), fontSize: 'clamp(12px,1.4vw,14.5px)', fontWeight: 700, color: INK, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 15px' }}>{b}</span>
+              ))}
+            </div>
+          </div>
+        )}
+        <div><MediaBar media={winners.media} /></div>
+      </div>
+      {/* RIGHT — the featured winner + a filmstrip of runners-up */}
+      {hero && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minHeight: 0 }}>
+          <div className="sf-rise" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', border: `1px solid ${LINE}`, aspectRatio: '4 / 5', maxHeight: '54vh', background: hero.thumb ? `#f1ece2 url(${hero.thumb}) center/cover` : '#eee6d7', boxShadow: '0 18px 50px -22px rgba(26,20,16,.5)' }}>
+            <div style={{ position: 'absolute', top: 11, left: 11, background: ORANGE, color: '#fff', fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 800, padding: '5px 11px', borderRadius: 100 }}>{hero.daysRunning}d running</div>
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '30px 13px 11px', background: 'linear-gradient(transparent,rgba(20,14,8,.78))', color: '#fff' }}>
+              <div style={{ fontWeight: 800, fontSize: 13.5 }}>{hero.brand}</div>
+              {hero.hook && <div style={{ fontSize: 11.5, opacity: .82, lineHeight: 1.3, maxHeight: 30, overflow: 'hidden', marginTop: 2 }}>{hero.hook}</div>}
+            </div>
+          </div>
+          {strip.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: `repeat(${strip.length},1fr)`, gap: 8 }}>
+              {strip.map((e, i) => (
+                <div key={e.adId} className="sf-rise" style={{ ...rise(i + 2), aspectRatio: '4 / 5', borderRadius: 10, border: `1px solid ${LINE}`, background: e.thumb ? `#f1ece2 url(${e.thumb}) center/cover` : '#eee6d7' }} title={`${e.brand} · ${e.daysRunning}d`} />
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// SLIDE — you vs the winners, reframed as "the moves you're NOT making": a hero count of missing moves
+// + per-dimension rows of the winners' proven tactics, with the ones you don't run flagged orange (⚡).
+// 3 dims per slide (7 dims split across 2 slides); the missing count is over ALL dims, stable across both.
 function slideVs(own: Record<string, Tally[]>, winners: Record<string, Tally[]>, chunk: number) {
-  const rows = PANELS.map(([k, label]) => ({ k, label, o: own[k] || [], w: winners[k] || [] })).filter((r) => r.w.length || r.o.length).slice(chunk * 3, chunk * 3 + 3)
+  const all = PANELS.map(([k, label]) => ({ k, label, o: own[k] || [], w: winners[k] || [] })).filter((r) => r.w.length || r.o.length)
+  const missingTotal = all.reduce((acc, { o, w }) => {
+    const oSet = new Set(o.map((t) => t.label.toLowerCase()))
+    return acc + w.slice(0, 6).filter((t) => !oSet.has(t.label.toLowerCase())).length
+  }, 0)
+  const rows = all.slice(chunk * 3, chunk * 3 + 3)
   return (
     <>
-      {slideHead('You vs the winners', <>You vs the <span style={{ color: ORANGE }}>winners</span></>)}
-      <div style={{ display: 'grid', gap: 14 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', flex: 'none' }}>
+        <div>
+          <div style={slideEyebrow}>You vs the winners</div>
+          <h2 style={slideH}>The moves you’re <span style={{ color: ORANGE }}>not</span> making</h2>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(36px,6vw,64px)', color: ORANGE, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={missingTotal} /></div>
+          <div style={{ fontSize: 12.5, color: SUB, fontWeight: 600 }}>winning moves you’re missing</div>
+        </div>
+      </div>
+      <div style={{ display: 'grid', gap: 'clamp(10px,1.4vw,14px)' }}>
         {rows.map(({ k, label, o, w }, ri) => {
           const oSet = new Set(o.map((t) => t.label.toLowerCase()))
           return (
-            <div key={k} className="sf-rise" style={{ ...rise(ri), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(14px,1.8vw,20px)' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>{label}</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginBottom: 8 }}>You</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                    {o.length ? o.slice(0, 5).map((t, i) => <span key={i} style={pill(false)}>{t.label}</span>) : <span style={{ fontSize: 13, color: MUT }}>—</span>}
-                  </div>
-                </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 700, color: '#c8410f', marginBottom: 8 }}>Winners</div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
-                    {w.slice(0, 5).map((t, i) => { const missing = !oSet.has(t.label.toLowerCase()); return <span key={i} style={pill(missing)}>{t.label} <b style={{ color: missing ? '#fff' : SUB }}>{t.pct}%</b></span> })}
-                  </div>
-                </div>
+            <div key={k} className="sf-rise" style={{ ...rise(ri), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.6vw,18px) clamp(14px,1.8vw,22px)', display: 'grid', gridTemplateColumns: 'clamp(84px,10vw,120px) 1fr', gap: 'clamp(12px,1.6vw,20px)', alignItems: 'center' }}>
+              <div style={{ fontSize: 'clamp(13px,1.6vw,17px)', fontWeight: 800, color: INK, letterSpacing: '-.01em' }}>{label}</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                {w.slice(0, 6).map((t, i) => {
+                  const missing = !oSet.has(t.label.toLowerCase())
+                  return (
+                    <span key={i} style={{ ...pill(missing), display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 'clamp(12px,1.4vw,14.5px)' }}>
+                      {missing && <span style={{ fontSize: 11, lineHeight: 1 }}>⚡</span>}{t.label} <b style={{ color: missing ? '#fff' : SUB }}>{t.pct}%</b>
+                    </span>
+                  )
+                })}
               </div>
             </div>
           )
         })}
+      </div>
+      <div style={{ fontSize: 12.5, color: SUB, flex: 'none' }}>
+        <span style={{ display: 'inline-block', width: 11, height: 11, borderRadius: 3, background: ORANGE, marginRight: 7, verticalAlign: '-1px' }} />
+        Orange ⚡ = a proven move the winners run that you don’t. Percentages = share of winners using it.
       </div>
     </>
   )
