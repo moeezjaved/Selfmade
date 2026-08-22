@@ -115,6 +115,42 @@ Append a short "Phase 1 integration verified" note to the spec (or this plan) li
 
 ---
 
+### Task 4: Surface Mello approvals on Reports too (not just /brief)
+
+The leak actions currently live only on `/brief` via `<MelloTasks>`. Render the same approvals on the Reports page so users see + act on them there too. Additive reuse of the existing component.
+
+**Files:**
+- Modify: `src/app/(dashboard)/reports/page.tsx`
+- Reference (read only): `src/app/(dashboard)/brief/MelloTasks.tsx` (the component), `src/app/(dashboard)/brief/BriefScan.tsx` (how it passes `brandId`)
+
+**Interfaces:**
+- Consumes: `<MelloTasks brandId={activeBrandId} />` — the existing component (self-contained, fetches `/api/mello/tasks`, renders approvable cards).
+
+- [ ] **Step 1: Read how MelloTasks gets its brandId**
+
+Read `BriefScan.tsx` around its `<MelloTasks brandId={...} />` usage to learn how the active brand id is resolved on a dashboard page. Read `reports/page.tsx` to see if it already has the active brand id in scope (it likely resolves a brand for the reports it shows).
+
+- [ ] **Step 2: Render `<MelloTasks>` on Reports**
+
+In `src/app/(dashboard)/reports/page.tsx`, add `<MelloTasks brandId={<activeBrandId in scope>} />` near the top of the reports content (above the report list), matching how BriefScan mounts it. If `reports/page.tsx` is a server component and `MelloTasks` is a client component, importing + rendering it is fine (client islands in server pages are supported). If the active brand id isn't already resolved there, resolve it the same way BriefScan/other dashboard pages do — do not invent a new resolution path.
+
+- [ ] **Step 3: Type-check**
+
+Run: `npx tsc --noEmit -p tsconfig.json` — expect 0 errors.
+
+- [ ] **Step 4: Prod verification**
+
+Browser pane: visit `/reports` logged in as a Creator with a connected Meta account — confirm the approval cards render and a "Start"/approve click still works (same as /brief). Confirm `/brief` is unchanged.
+
+- [ ] **Step 5: Commit**
+
+```bash
+git add "src/app/(dashboard)/reports/page.tsx"
+git commit -m "feat(reports): surface Mello approvals on Reports too (reuse MelloTasks)"
+```
+
+---
+
 ## Self-Review
 
 **Spec coverage (Phase 1):** connect Meta = real (reuse connect-byo) ✓ (Tasks 2–3); leak-led framing → the paywall banner (Task 1) + verified leak data (Task 3) ✓; paywall = existing Creator $49 ✓ (no new billing, per constraints); Mello ongoing loop ✓ (already exists, verified Task 3). Onboarding resume → partial (connect-page copy, Task 2; full onboarding pre-fill deferred — see roadmap). The **emailed** approvals digest and **$1 trial** are explicitly Phases 2–3.
