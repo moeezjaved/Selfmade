@@ -110,6 +110,13 @@ export async function POST(req: NextRequest) {
   let learned: any = null
   try { learned = await runMetaAudit(admin, user.id, { syncFirst: true }) } catch { /* audit lands via cron instead */ }
 
+  // Email them the "N actions waiting for your approval" digest moments after connecting (the audit just
+  // deposited the fix-actions into mello_tasks). Best-effort — never blocks or fails the connect.
+  try {
+    const { sendApprovalsEmail } = await import('@/lib/channels/approvals-email')
+    void sendApprovalsEmail(admin, user.id, user.email || null).catch(() => {})
+  } catch { /* email is best-effort */ }
+
   return NextResponse.json({
     ok: true,
     connected: chosen.length,
