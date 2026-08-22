@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import PricingSection from '@/components/pricing/PricingSection'
+import MetaUpsellBanner from '@/components/billing/MetaUpsellBanner'
 import { PLANS, normalizePlan } from '@/lib/plans'
 
 interface Profile {
@@ -38,6 +39,7 @@ export default function BillingPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const expired = searchParams.get('expired') === '1'
+  const feature = searchParams.get('feature')
 
   useEffect(() => {
     const supabase = createClient()
@@ -115,6 +117,9 @@ export default function BillingPage() {
     <div style={{ padding: '32px 28px', maxWidth: 1120, fontFamily: 'system-ui, sans-serif' }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Billing & plans</h1>
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Choose a plan, buy top-ups, or manage your subscription.</p>
+
+      {/* Meta-specific, leak-led upsell — additive, only when redirected from /connect/meta. */}
+      {feature === 'meta' && <MetaUpsellBanner />}
 
       {/* Full pricing (shared with the landing page — one source of truth). */}
       <div style={{ marginBottom: 40 }}>
