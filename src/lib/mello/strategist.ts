@@ -144,8 +144,10 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
   let stageRead = STAGE_FOCUS[stage]
   let rawTasks: any[] = []
   try {
+    // The Strategist is the BRAIN and runs infrequently (nightly / on-demand), so it's the right place to
+    // spend on a stronger reasoning model. Swap via STRATEGIST_MODEL without a deploy; gpt-4o is a safe default.
     const res = await oai().chat.completions.create({
-      model: 'gpt-4o',
+      model: process.env.STRATEGIST_MODEL || 'gpt-4o',
       temperature: 0.5,
       response_format: { type: 'json_object' },
       messages: [{ role: 'system', content: sys }, { role: 'user', content: user }],
