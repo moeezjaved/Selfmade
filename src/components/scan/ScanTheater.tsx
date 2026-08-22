@@ -4,7 +4,7 @@
  * score your ad presence, show the gaps — and spying on rivals is ONE part of it. Public, no login.
  * Input: pick your brand from the 611K directory, or paste your Meta Ad Library link.
  */
-import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { FullDnaResult, Tally } from '@/lib/dna/engine'
 import { videoShotList, remakeScript, type CreativeBrief } from '@/lib/dna/creative'
 
@@ -17,6 +17,9 @@ type Finding = { text: string; bad?: boolean }   // bad → red dot (a gap/probl
 type Step = { id: StepId; label: string; status: 'pending' | 'active' | 'done'; metric?: string; findings: Finding[] }
 type RivalVideo = { adId: string; brand: string; daysRunning: number; hook: string; angle: string | null; hookType: string | null; videoUrl: string; posterUrl: string | null }
 type ScanResult = FullDnaResult & { brand: { pageId: string; name: string; niche: string | null }; competitors: number; ownPending?: boolean; building?: boolean; briefs?: CreativeBrief[]; rivalToRemake?: { adId: string; brand: string; daysRunning: number; hook: string; format: string | null; thumb: string | null } | null; rivalVideo?: RivalVideo | null }
+// One full-screen slide in the running theater. `stage` maps it to a sidebar step (so findings tick under
+// the right heading); `render` returns the slide's big, screen-fitting content.
+type Slide = { key: string; stage: StepId; render: () => ReactNode }
 
 const STEPS0: Step[] = [
   { id: 'ads', label: 'Reading your ads', status: 'pending', findings: [] },
@@ -78,7 +81,10 @@ export default function ScanTheater() {
   const [pct, setPct] = useState(0)
   const [res, setRes] = useState<ScanResult | null>(null)
   const [revealed, setRevealed] = useState(false)
-  const [verdict, setVerdict] = useState<{ text: string; sub?: string; bad?: boolean } | null>(null)
+  // The running phase is a full-viewport SLIDE DECK (Ryze-style): run() builds an ordered deck from the
+  // data and advances slideIdx on a timer; the main pane renders exactly ONE slide at a time, no scroll.
+  const [slides, setSlides] = useState<Slide[]>([])
+  const [slideIdx, setSlideIdx] = useState(0)
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -125,87 +131,139 @@ export default function ScanTheater() {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
-    setRes(null); setRevealed(false); setVerdict(null); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(5)
+    setRes(null); setRevealed(false); setSlides([]); setSlideIdx(0); setSteps(STEPS0); setPhase('running'); setStage('ads'); setStep('ads', 'active'); setPct(5)
     // Smooth, time-based progress creep (Ryze-style "13%… 57%…") — independent of the findings, so the
-    // bar always drifts up instead of jumping. Cleared on every exit path.
+    // bar always drifts up instead of jumping. Cleared on every exit path. Reassignable so we can pause it
+    // during a crawl-wait poll and restart it once the ads land.
     let prog = 5
-    const progIv = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
-    const stopProg = () => clearInterval(progIv)
+    let progIv: ReturnType<typeof setInterval> | null = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
+    const stopProg = () => { if (progIv) { clearInterval(progIv); progIv = null } }
+    const PER_SLIDE_MS = 6500          // dwell per slide — long enough to read each screen
+    const F = (t: string, b?: boolean): [string, boolean?] => [t, b]
     try {
       const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
-      const data: ScanResult = await r.json()
+      let data: ScanResult = await r.json()
       setRes(data)
       // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
       // instead of staging empty acts + a meaningless score.
       if (data.building) { stopProg(); setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
 
-      // THE THEATER. Each step slowly ticks in what we NOTICED (sidebar), the panel shows the evidence,
-      // and the step ENDS on a big plain-English VERDICT — the payoff — before moving on. ~30s a step.
-      const note = async (id: StepId, text: string, bad?: boolean, ms = 2800) => { addFinding(id, text, bad); await sleep(ms) }
-      const verdictBeat = async (text: string, sub: string, bad?: boolean, ms = 6000) => { setVerdict({ text, sub, bad }); await sleep(ms) }
-      const openStage = async (id: StepId) => { setVerdict(null); setStage(id); setStep(id, 'active'); await sleep(1800) }
-      const topLabel = (d: Record<string, Tally[]>, k: string) => (d[k] || [])[0]?.label
-      const ownD = data.own.dist as Record<string, Tally[]>, winD = data.winners.dist as Record<string, Tally[]>
-      const vidPct = data.own.media.find((m) => /video/i.test(m.label))?.pct ?? 0
+      const brandNameOf = (d: ScanResult) => (d.brand?.name && d.brand.name !== 'your brand' ? d.brand.name : 'your brand')
 
-      // ── Reading your ads ──
-      await sleep(900)
-      if (data.own.found) {
-        await note('ads', `Opened ${data.own.totalAds.toLocaleString()} ads — reading every one`)
-        await note('ads', `${data.own.activeAds} live right now`)
-        if (data.own.media.length) await note('ads', `Format mix: ${data.own.media.slice(0, 3).map((m) => `${m.label} ${m.pct}%`).join(' · ')}`)
-        if (topLabel(ownD, 'hook_type')) await note('ads', `Your signature hook: ${topLabel(ownD, 'hook_type')}`)
-        if (topLabel(ownD, 'angle')) await note('ads', `Your lead angle: ${topLabel(ownD, 'angle')}`)
-        await note('ads', `Speaking to ${(ownD.persona || []).length} personas across ${(ownD.angle || []).length} angles`)
-        if (topLabel(ownD, 'emotion')) await note('ads', `Strongest emotion you pull: ${topLabel(ownD, 'emotion')}`)
-        await verdictBeat(`You're present — ${data.own.totalAds.toLocaleString()} ads, ${vidPct}% video`,
-          `Leaning on ${topLabel(ownD, 'hook_type') || 'a narrow set of'} hooks and ${topLabel(ownD, 'angle') || 'few'} angles across ${(ownD.persona || []).length} personas.`)
-      } else if (data.ownPending) {
-        await note('ads', 'Pulling your ads now — first time we’ve seen you')
-        await verdictBeat(`Pulling your ads now`, 'You weren’t in our index yet, so we just kicked off a crawl of your library — your own-ad breakdown fills in within a few minutes. Meanwhile, here’s your market.')
-      } else {
-        await note('ads', 'No live ads we can see — that’s gap #1', true)
-        await verdictBeat(`You're invisible right now`, 'No ads we can find — the first fix is simply showing up.', true)
+      // ── WAIT FOR THE CRAWL ── first time we've seen this brand: ads aren't indexed yet but a priority
+      // crawl was kicked off. Hold a "pulling your ads" slide + poll /api/scan/run until they land (or cap).
+      if (!data.own.found && data.ownPending) {
+        setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data)) }]); setSlideIdx(0)
+        setStage('ads'); setStep('ads', 'active', 'crawling…')
+        addFinding('ads', `Pulling your ads now — first time we’ve seen ${brandNameOf(data)}`)
+        stopProg()
+        // Hold the bar honestly at ~40–60% while we wait (don't look "done").
+        let hp = 40
+        const holdIv = setInterval(() => { hp = hp >= 58 ? 42 : hp + 1; setPct(hp) }, 700)
+        let data2 = data
+        for (let t = 0; t < 13 && !data2.own.found; t++) {   // ~13 × 18s ≈ 4 min cap
+          await sleep(18000)
+          try { const rr = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(lastPayload.current) }); if (rr.ok) data2 = await rr.json() } catch { /* keep polling */ }
+        }
+        clearInterval(holdIv)
+        if (!data2.own.found) {
+          // Still nothing after the cap — honest "still pulling" copy, NEVER a fake "invisible/0".
+          setSlides([{ key: 'timeout', stage: 'ads', render: () => timeoutSlide(brandNameOf(data2)) }]); setSlideIdx(0)
+          setSteps((s) => s.map((x) => ({ ...x, status: x.id === 'ads' ? 'active' : 'pending', metric: x.id === 'ads' ? 'crawling…' : '' })))
+          setPct(55); running.current = false; return
+        }
+        data = data2; setRes(data2)
+        // Ads landed — restart the normal creep from where the hold left off.
+        prog = 58
+        progIv = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
       }
-      setStep('ads', 'done', data.own.found ? `${data.own.totalAds} ads` : data.ownPending ? 'crawling…' : 'none')
 
-      // ── Spying on your rivals ──
-      await openStage('rivals')
-      await note('rivals', `Pulled ${data.winners.winnerCount.toLocaleString()} rival ads still running after 90 days`)
-      if (topLabel(winD, 'angle')) await note('rivals', `Their favourite angle: ${topLabel(winD, 'angle')}`)
-      if (topLabel(winD, 'hook_type')) await note('rivals', `Their favourite hook: ${topLabel(winD, 'hook_type')}`)
-      if (data.winners.media[0]) await note('rivals', `They lean on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`)
-      if (topLabel(winD, 'persona')) await note('rivals', `Persona they chase: ${topLabel(winD, 'persona')}`)
-      if (topLabel(winD, 'usp')) await note('rivals', `Their strongest promise: ${topLabel(winD, 'usp')}`)
-      if (data.winners.examples[0]?.daysRunning) await note('rivals', `Longest-running winner: ${data.winners.examples[0].daysRunning} days live`)
-      await verdictBeat(`Your rivals have a formula`,
-        `${data.winners.winnerCount.toLocaleString()} ads running 90+ days — built on ${topLabel(winD, 'angle') || 'proven'} angles and ${topLabel(winD, 'hook_type') || 'sharp'} hooks.`)
-      setStep('rivals', 'done', `${data.winners.winnerCount} winners`)
-
-      // ── Finding your gaps ──
-      await openStage('gaps')
-      await note('gaps', 'Lining your DNA up against theirs…')
-      if (data.gaps.length) {
-        await note('gaps', `${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you’re not running`, true)
-        for (const g of data.gaps.slice(0, 5)) await note('gaps', `Missing: ${g.dimension} — ${g.label}`, true)
-        await verdictBeat(`${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you're missing`,
-          `The tactics your proven rivals rely on that you don't run yet — each one is fixable.`, true)
-      } else {
-        await note('gaps', 'You’re already running the winners’ playbook')
-        await verdictBeat(`You're running the winners' playbook`, 'No missing tactics — your edge now is volume, velocity and creative quality.')
+      // ── BUILD THE DECK ── ordered, screen-fitting slides. Dense sets (DNA / vs) split into sub-slides.
+      const ownD0 = data.own.dist as Record<string, Tally[]>, winD0 = data.winners.dist as Record<string, Tally[]>
+      const dnaChunks = (dist: Record<string, Tally[]>) => (PANELS.filter(([k]) => (dist[k] || []).length).length > 4 ? 2 : 1)
+      const buildDeck = (d: ScanResult): Slide[] => {
+        const deck: Slide[] = []
+        const oD = d.own.dist as Record<string, Tally[]>, wD = d.winners.dist as Record<string, Tally[]>
+        const bn = brandNameOf(d)
+        if (d.own.found) {
+          deck.push({ key: 'ads', stage: 'ads', render: () => slideAdsStats(d.own, bn) })
+          for (let i = 0; i < dnaChunks(oD); i++) deck.push({ key: `ads-dna-${i}`, stage: 'ads', render: () => slideDna(oD, 'Your creative DNA', i) })
+        } else {
+          deck.push({ key: 'ads', stage: 'ads', render: () => slideNoAds(bn) })
+        }
+        deck.push({ key: 'rivals', stage: 'rivals', render: () => slideRivals(d.winners) })
+        for (let i = 0; i < dnaChunks(wD); i++) deck.push({ key: `rivals-dna-${i}`, stage: 'rivals', render: () => slideDna(wD, 'Their winning DNA', i) })
+        const vsDims = PANELS.filter(([k]) => (oD[k] || []).length || (wD[k] || []).length).length
+        for (let i = 0; i < (vsDims > 3 ? 2 : 1); i++) deck.push({ key: `vs-${i}`, stage: 'gaps', render: () => slideVs(oD, wD, i) })
+        deck.push({ key: 'score', stage: 'score', render: () => slideScore(d) })
+        return deck
       }
-      setStep('gaps', 'done', `${data.gaps.length} gaps`)
+      const deck = buildDeck(data)
+      setSlides(deck); setSlideIdx(0)
 
-      // ── Scoring ──
-      await openStage('score')
-      for (const sc of data.score.subscores) {
-        if (sc.value == null) continue
-        await note('score', `${sc.label}: ${sc.value}/100`, sc.value < 50, 1800)
+      // Per-slide sidebar findings (kept from the old theater copy) — tick a few as each slide shows.
+      const topLabel = (dd: Record<string, Tally[]>, k: string) => (dd[k] || [])[0]?.label
+      const slideFindings = (key: string): [string, boolean?][] => {
+        if (key === 'ads' && data.own.found) {
+          const f: [string, boolean?][] = [F(`Opened ${data.own.totalAds.toLocaleString()} ads — reading every one`), F(`${data.own.activeAds} live right now`)]
+          if (data.own.media.length) f.push(F(`Format mix: ${data.own.media.slice(0, 3).map((m) => `${m.label} ${m.pct}%`).join(' · ')}`))
+          return f
+        }
+        if (key === 'ads') return [F('No live ads we can see — that’s gap #1', true)]
+        if (key.startsWith('ads-dna')) {
+          const f: [string, boolean?][] = []
+          if (topLabel(ownD0, 'hook_type')) f.push(F(`Your signature hook: ${topLabel(ownD0, 'hook_type')}`))
+          if (topLabel(ownD0, 'angle')) f.push(F(`Your lead angle: ${topLabel(ownD0, 'angle')}`))
+          if (topLabel(ownD0, 'emotion')) f.push(F(`Strongest emotion you pull: ${topLabel(ownD0, 'emotion')}`))
+          return f.length ? f : [F('Mapping your creative DNA')]
+        }
+        if (key === 'rivals') {
+          const f: [string, boolean?][] = [F(`Pulled ${data.winners.winnerCount.toLocaleString()} rival ads still running after 90 days`)]
+          if (data.winners.media[0]) f.push(F(`They lean on ${data.winners.media[0].label} (${data.winners.media[0].pct}%)`))
+          if (data.winners.examples[0]?.daysRunning) f.push(F(`Longest-running winner: ${data.winners.examples[0].daysRunning} days live`))
+          return f
+        }
+        if (key.startsWith('rivals-dna')) {
+          const f: [string, boolean?][] = []
+          if (topLabel(winD0, 'angle')) f.push(F(`Their favourite angle: ${topLabel(winD0, 'angle')}`))
+          if (topLabel(winD0, 'hook_type')) f.push(F(`Their favourite hook: ${topLabel(winD0, 'hook_type')}`))
+          if (topLabel(winD0, 'usp')) f.push(F(`Their strongest promise: ${topLabel(winD0, 'usp')}`))
+          return f.length ? f : [F('Decoding their winning DNA')]
+        }
+        if (key.startsWith('vs')) {
+          if (data.gaps.length) {
+            const f: [string, boolean?][] = [F(`${data.gaps.length} winning move${data.gaps.length === 1 ? '' : 's'} you’re not running`, true)]
+            for (const g of data.gaps.slice(0, 3)) f.push(F(`Missing: ${g.dimension} — ${g.label}`, true))
+            return f
+          }
+          return [F('You’re already running the winners’ playbook')]
+        }
+        if (key === 'score') {
+          const f: [string, boolean?][] = []
+          for (const sc of data.score.subscores) { if (sc.value == null) continue; f.push(F(`${sc.label}: ${sc.value}/100`, sc.value < 50)) }
+          return f.length ? f : [F(`${data.score.total}/100 · ${data.score.band}`)]
+        }
+        return []
       }
-      await verdictBeat(`${data.score.total}/100 · ${data.score.band}`,
-        `That's your ad-presence score across coverage, format mix, angles and the tactics you're missing.`, data.score.total < 60, 4500)
-      stopProg(); setStep('score', 'done', `${data.score.total}/100`); setPct(100); await sleep(700)
+      const stageMetric = (id: StepId): string =>
+        id === 'ads' ? (data.own.found ? `${data.own.totalAds} ads` : 'none')
+          : id === 'rivals' ? `${data.winners.winnerCount} winners`
+            : id === 'gaps' ? `${data.gaps.length} gaps`
+              : `${data.score.total}/100`
+
+      // ── STEP THE DECK ── one full-screen slide at a time; tick its findings, then dwell.
+      await sleep(700)
+      for (let i = 0; i < deck.length; i++) {
+        const s = deck[i]
+        setSlideIdx(i); setStage(s.stage); setStep(s.stage, 'active')
+        let used = 0
+        for (const [text, bad] of slideFindings(s.key)) { addFinding(s.stage, text, bad); await sleep(1000); used += 1000 }
+        // last slide of this stage → mark the sidebar step done
+        if (i === deck.length - 1 || deck[i + 1].stage !== s.stage) setStep(s.stage, 'done', stageMetric(s.stage))
+        await sleep(Math.max(1400, PER_SLIDE_MS - used))
+      }
+      stopProg(); setPct(100); await sleep(600)
       setPhase('done'); running.current = false
     } catch (e) {
       stopProg(); setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
@@ -315,9 +373,9 @@ export default function ScanTheater() {
   const own = res?.own
 
   return (
-    <div style={{ height: '100vh', overflow: 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
+    <div style={{ minHeight: '100dvh', height: phase === 'done' ? 'auto' : '100dvh', overflow: phase === 'done' ? 'visible' : 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: 'minmax(0,300px) minmax(0,1fr)' }}>
       <style>{REVEAL_CSS}</style>
-      <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+      <aside style={{ background: DARK, color: CREAM, padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100dvh', display: 'flex', flexDirection: 'column' }}>
         <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: '#fff' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
         <div style={{ color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
         <div style={{ flex: 1, overflowY: 'auto', minHeight: 0 }}>
@@ -347,19 +405,15 @@ export default function ScanTheater() {
         </div>
       </aside>
 
-      <main ref={mainRef} style={{ padding: 'clamp(28px,4vw,56px)', height: '100vh', overflowY: 'auto', minWidth: 0 }}>
+      {/* RUNNING: a fixed 100dvh pane holding ONE slide (no scroll). DONE: the report flows + scrolls with
+          the page (root goes overflow:visible), which Moeez approved. */}
+      <main ref={mainRef} style={{ padding: 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
         {phase === 'error' && (
           <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
         )}
-        {phase === 'running' && verdict && (
-          <div key={verdict.text} className="sf-rise" style={{ position: 'sticky', top: 16, zIndex: 5, marginBottom: 26, background: verdict.bad ? '#2a1712' : DARK, color: '#fff', borderRadius: 18, padding: '22px 26px', boxShadow: '0 24px 50px -24px rgba(0,0,0,.5)', border: verdict.bad ? '1px solid rgba(255,106,61,.4)' : '1px solid rgba(255,255,255,.08)' }}>
-            <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: verdict.bad ? '#ff8a5f' : ORANGE, marginBottom: 8 }}>What we found</div>
-            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(24px,3.4vw,34px)', lineHeight: 1.1, letterSpacing: '-.01em' }}>{verdict.text}</div>
-            {verdict.sub && <p style={{ color: 'rgba(255,255,255,.75)', fontSize: 15, lineHeight: 1.5, margin: '10px 0 0', maxWidth: 620 }}>{verdict.sub}</p>}
-          </div>
-        )}
-        {phase !== 'error' && phase !== 'done' && res && <StageAct stage={stage} res={res} own={own!} winners={winners!} />}
-        {phase !== 'error' && phase !== 'done' && !res && <div><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></div>}
+        {phase === 'running' && (slides.length
+          ? <SlideFrame key={slides[slideIdx]?.key}>{slides[slideIdx]?.render()}</SlideFrame>
+          : <SlideFrame><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></SlideFrame>)}
         {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : revealed ? <FullReport res={res} own={own!} winners={winners!} onReaudit={(ids) => run({ ...lastPayload.current, competitors: ids })} /> : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
       </main>
     </div>
@@ -432,6 +486,203 @@ function MediaBar({ media }: { media: Tally[] }) {
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginTop: 9 }}>
         {media.map((m, i) => <span key={i} style={{ fontSize: 12.5, color: SUB, display: 'flex', alignItems: 'center', gap: 6 }}><span style={{ width: 9, height: 9, borderRadius: '50%', background: MEDIA_COLOR[m.label] || '#bbb' }} /><b style={{ color: INK }}>{m.label}</b> {m.count} · {m.pct}%</span>)}
       </div>
+    </div>
+  )
+}
+
+// ════════════ RUNNING THEATER — full-viewport SLIDE DECK ════════════
+// Each slide fills one screen and swaps in place (auto-advance on a timer). Content is sized with clamp()
+// + grids so it FITS one screen; dense sets are split into sub-slides upstream — a slide NEVER scrolls.
+function SlideFrame({ children }: { children: ReactNode }) {
+  return (
+    <div className="sf-rise" style={{ height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 18 }}>
+      {children}
+    </div>
+  )
+}
+const slideEyebrow: CSSProperties = { fontSize: 'clamp(11px,1.4vw,13px)', fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: ORANGE, marginBottom: 8 }
+const slideH: CSSProperties = { fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, fontSize: 'clamp(26px,4.4vw,52px)', letterSpacing: '-.02em', lineHeight: 1.02, color: INK, margin: 0 }
+const slideHead = (eyebrow: string, title: ReactNode) => (
+  <div style={{ flex: 'none' }}><div style={slideEyebrow}>{eyebrow}</div><h2 style={slideH}>{title}</h2></div>
+)
+
+// A capped grid of ad tiles (own or rivals), sized to ~2 rows so it fits under the header.
+function slideAdGrid(items: { adId: string; thumb: string | null; label: ReactNode; badge?: string }[]) {
+  if (!items.length) return null
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(clamp(96px,11vw,140px),1fr))', gap: 10, minHeight: 0 }}>
+      {items.map((ex, i) => (
+        <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 10)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+          <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
+          <div style={{ padding: '6px 9px 8px' }}>
+            {ex.badge && <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10.5, fontWeight: 700, color: ORANGE }}>{ex.badge}</div>}
+            <div style={{ fontSize: 11, color: SUB, lineHeight: 1.3, marginTop: ex.badge ? 3 : 0, maxHeight: 30, overflow: 'hidden' }}>{ex.label}</div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// SLIDE 1 — your ad presence: a big verdict headline + three hero numbers + media bar + a capped ad grid.
+function slideAdsStats(own: FullDnaResult['own'], brandName: string) {
+  const vid = own.media.find((m) => m.label === 'Video')?.pct ?? 0
+  return (
+    <>
+      {slideHead('Reading your ads', <>{brandName === 'your brand' ? "You're" : brandName + " is"} present — {own.totalAds.toLocaleString()} ads, {vid}% video</>)}
+      <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', flex: 'none' }}>
+        {([['Total ads', own.totalAds, ''], ['Active now', own.activeAds, ''], ['Video', vid, '%']] as [string, number, string][]).map(([l, v, suf], i) => (
+          <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 150px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 'clamp(14px,2vw,22px) clamp(16px,2.4vw,26px)' }}>
+            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(34px,5.4vw,58px)', color: INK, lineHeight: .95, letterSpacing: '-.02em' }}><Count n={v} />{suf}</div>
+            <div style={{ fontSize: 13.5, color: SUB, marginTop: 6, fontWeight: 600 }}>{l}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ flex: 'none' }}><MediaBar media={own.media} /></div>
+      {slideAdGrid(own.examples.slice(0, 10).map((ex) => ({ adId: ex.adId, thumb: ex.thumb, label: ex.format || ex.hook || '—' })))}
+    </>
+  )
+}
+
+// SLIDE — no live ads (honest, only for genuinely-not-found brands; never shown for a pending crawl).
+function slideNoAds(brandName: string) {
+  return (
+    <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto' }}>
+      {slideHead('Reading your ads', <>No live ads we can see — that’s gap #1</>)}
+      <p style={{ ...sub, margin: '16px auto 0', textAlign: 'center' }}>We couldn’t find ads running for {brandName === 'your brand' ? 'your page' : brandName} right now. Showing up is the first fix — here’s what winning looks like in your market.</p>
+    </div>
+  )
+}
+
+// SLIDE — creative DNA, chunked 4 panels per slide (so 7 dims split 4+3, never scroll). `chunk` picks the set.
+function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
+  const panels = PANELS.filter(([k]) => (dist[k] || []).length).slice(chunk * 4, chunk * 4 + 4)
+  return (
+    <>
+      {slideHead('Creative DNA', title)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,minmax(0,1fr))', gap: 16 }}>
+        {panels.map(([k, label], i) => (
+          <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(14px,1.8vw,20px)' }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>{label}</div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(dist[k] || []).slice(0, 6).map((t, j) => <span key={j} style={{ fontSize: 'clamp(13px,1.5vw,15px)', background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '7px 14px', color: INK, fontWeight: 600 }}>{t.label} <b style={{ color: SUB }}>{t.count}</b></span>)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </>
+  )
+}
+
+// SLIDE — scanning your rivals: named brands + media bar + a capped rival grid (days-running badges).
+function slideRivals(winners: FullDnaResult['winners']) {
+  const brands = Array.from(new Set(winners.examples.map((e) => e.brand).filter(Boolean))).slice(0, 8)
+  return (
+    <>
+      {slideHead('Scanning your rivals', <>Your rivals have a formula — {winners.winnerCount.toLocaleString()} proven winners</>)}
+      {brands.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, flex: 'none' }}>
+          {brands.map((b, i) => (
+            <span key={i} className="sf-rise" style={{ ...rise(i), fontSize: 'clamp(13px,1.5vw,15px)', fontWeight: 700, color: INK, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '8px 16px' }}>{b}</span>
+          ))}
+        </div>
+      )}
+      <div style={{ flex: 'none' }}><MediaBar media={winners.media} /></div>
+      {slideAdGrid(winners.examples.slice(0, 10).map((ex) => ({ adId: ex.adId, thumb: ex.thumb, label: ex.hook || ex.brand, badge: `${ex.daysRunning}d running` })))}
+    </>
+  )
+}
+
+// SLIDE — you vs the winners, 3 dimensions per slide (7 dims split across 2 slides). Orange = a move you miss.
+function slideVs(own: Record<string, Tally[]>, winners: Record<string, Tally[]>, chunk: number) {
+  const rows = PANELS.map(([k, label]) => ({ k, label, o: own[k] || [], w: winners[k] || [] })).filter((r) => r.w.length || r.o.length).slice(chunk * 3, chunk * 3 + 3)
+  return (
+    <>
+      {slideHead('You vs the winners', <>You vs the <span style={{ color: ORANGE }}>winners</span></>)}
+      <div style={{ display: 'grid', gap: 14 }}>
+        {rows.map(({ k, label, o, w }, ri) => {
+          const oSet = new Set(o.map((t) => t.label.toLowerCase()))
+          return (
+            <div key={k} className="sf-rise" style={{ ...rise(ri), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(14px,1.8vw,20px)' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>{label}</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: SUB, marginBottom: 8 }}>You</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {o.length ? o.slice(0, 5).map((t, i) => <span key={i} style={pill(false)}>{t.label}</span>) : <span style={{ fontSize: 13, color: MUT }}>—</span>}
+                  </div>
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 700, color: '#c8410f', marginBottom: 8 }}>Winners</div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+                    {w.slice(0, 5).map((t, i) => { const missing = !oSet.has(t.label.toLowerCase()); return <span key={i} style={pill(missing)}>{t.label} <b style={{ color: missing ? '#fff' : SUB }}>{t.pct}%</b></span> })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </>
+  )
+}
+
+// The big centered score ring (mimics ScanSummary's gauge) — its own component so the draw animates.
+function ScoreGauge({ total }: { total: number }) {
+  const color = total < 40 ? '#c0281a' : total < 60 ? '#b7791f' : '#1e7a4f'
+  const size = 220, r = 94, C = 2 * Math.PI * r
+  const [drawn, setDrawn] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setDrawn(true), 80); return () => clearTimeout(t) }, [])
+  return (
+    <div style={{ position: 'relative', width: size, height: size, margin: '0 auto' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="rgba(26,20,16,.1)" strokeWidth="14" />
+        <circle className="sf-gauge" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - total / 100) : C} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(48px,8vw,64px)', color: INK, lineHeight: 1 }}><Count n={total} dur={1200} /></div>
+        <div style={{ fontSize: 12, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
+      </div>
+    </div>
+  )
+}
+
+// SLIDE — the score: big centered gauge + band + one line.
+function slideScore(res: ScanResult) {
+  const s = res.score
+  const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
+  return (
+    <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 }}>
+      <div style={slideEyebrow}>Your ad-presence score</div>
+      <ScoreGauge total={s.total} />
+      <div style={{ display: 'inline-block', background: `${color}18`, color, fontWeight: 800, fontSize: 14, padding: '7px 16px', borderRadius: 100 }}>{s.band}</div>
+      <h2 style={{ ...slideH, fontSize: 'clamp(24px,3.6vw,40px)' }}>{s.total}/100 · {s.band}</h2>
+      <p style={{ ...sub, margin: '0 auto', textAlign: 'center' }}>Your ad-presence score across coverage, format mix, angles and the tactics you’re missing.</p>
+    </div>
+  )
+}
+
+// SLIDE — waiting for the crawl (never a fake "invisible/0" — we're actively pulling the ads).
+function pullingSlide(brandName: string) {
+  return (
+    <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+      <div style={{ fontSize: 'clamp(48px,9vw,84px)', lineHeight: 1 }}>⏳</div>
+      <h2 style={slideH}>Pulling your ads now</h2>
+      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>First time we’ve seen {brandName === 'your brand' ? 'your brand' : brandName} — we just kicked off a priority crawl of your full ad library. This takes a couple of minutes; hang tight and your audit builds itself.</p>
+      <div style={{ width: 'min(420px,80vw)', height: 6, background: 'rgba(26,20,16,.1)', borderRadius: 100, overflow: 'hidden' }}>
+        <div className="sf-shim" style={{ height: '100%', width: '60%', borderRadius: 100 }} />
+      </div>
+    </div>
+  )
+}
+
+// SLIDE — still crawling after the cap. Honest, no fake score.
+function timeoutSlide(brandName: string) {
+  return (
+    <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
+      <div style={{ fontSize: 'clamp(44px,8vw,72px)', lineHeight: 1 }}>🐢</div>
+      <h2 style={slideH}>Still pulling your ads</h2>
+      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>{brandName === 'your brand' ? 'Your' : brandName + "’s"} library is taking a little longer to index. Re-run the audit in a few minutes for the full breakdown — or connect Meta for the complete picture right away.</p>
     </div>
   )
 }
