@@ -11,8 +11,18 @@ import GeneratedReport from '@/components/reports/GeneratedReport'
 import ReportsNarrative from '@/components/reports/ReportsNarrative'
 import LaunchReport from '@/components/reports/LaunchReport'
 import { TEMPLATES } from '@/lib/reports/templates'
+import MelloTasks from '../brief/MelloTasks'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
 
 export const dynamic = 'force-dynamic'
+
+// Active project (the ProjectSwitcher's client-safe cookie) — same resolution BriefClient uses to pass
+// activeBrandId into <MelloTasks>. Empty = "All brands".
+const readBrandCookie = () => {
+  if (typeof document === 'undefined') return ''
+  const m = document.cookie.match(new RegExp('(?:^|; )' + BRAND_COOKIE + '=([^;]*)'))
+  return m ? decodeURIComponent(m[1]) : ''
+}
 
 // ── Theme (matches the app: cream page, ink text, forest/lime, soft-elevation cards) ──
 const INK = '#141d15', MUTED = '#6f7d70', FAINT = '#9aa79a', LINE = '#e9ece7', FOREST = '#141d15', LIME = '#ff5a2c', GREEN = '#ef4a1e'
@@ -48,6 +58,10 @@ function ReportsPage() {
   // (the healthy connected one), never the server's org-wide "primary" — a stale/banned is_primary row
   // (e.g. the old banned ROY 1) otherwise wins and the report loads empty in the wrong currency.
   const [activeAccount, setActiveAccount] = useState<string>('')
+  // The active project (brand) — read the same sf_brand cookie the ProjectSwitcher writes, so Mello's
+  // approvals here scope to the same brand the /brief shows.
+  const [activeBrandId, setActiveBrandId] = useState<string | null>(null)
+  useEffect(() => { setActiveBrandId(readBrandCookie() || null) }, [])
 
   // Deep-links (reactive — fires on every URL change, so sidebar shortcuts work while already on /reports):
   // ?create=1 opens the picker; ?report=<id> opens a saved report; ?template=<key>&... a template/shared one.
@@ -167,6 +181,10 @@ function ReportsPage() {
       {showCreate && <CreateReportModal onClose={() => setShowCreate(false)} onCreate={(k) => { setShowCreate(false); setActiveReport({ templateKey: k }) }} />}
 
       <AdsTabs />
+
+      {/* Mello's approvals — the SAME decision cards from /brief, surfaced here too so pending work is
+          actionable straight from Reports. Self-hides when there's nothing to approve. */}
+      <MelloTasks key={`tasks-${activeBrandId || 'all'}`} brandId={activeBrandId} />
 
       {/* Full-width report (no sidebar) — Mello's debrief (headlines + suggestions) on top, then every
           breakdown. This is the 'few days back' design (db1a59e), before the saved-reports sidebar. */}

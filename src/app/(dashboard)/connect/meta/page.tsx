@@ -39,6 +39,20 @@ export default function ConnectMetaByo() {
   const [bizName, setBizName] = useState('')
   const [picked, setPicked] = useState<string[]>([])
 
+  // Came from the /scan funnel? The scan's forward CTA stashes {pageId,name,at} in localStorage so the
+  // connect page can greet them as a continuation of their audit (presentational only).
+  const [scan, setScan] = useState<{ name: string } | null>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem('sf_scan')
+      if (!raw) return
+      const j = JSON.parse(raw)
+      if (j && typeof j === 'object' && j.name && typeof j.at === 'number' && Date.now() - j.at < 7 * 24 * 3600 * 1000) {
+        setScan({ name: String(j.name) })
+      }
+    } catch { /* ignore malformed stash */ }
+  }, [])
+
   // Meta is a Creator (paid) feature — a Free user shouldn't reach the connect flow (it OAuth'd then
   // dead-ended on an empty home). Gate here → upgrade.
   const [gate, setGate] = useState<'checking' | 'ok' | 'locked'>('checking')
@@ -124,6 +138,13 @@ export default function ConnectMetaByo() {
       <p style={{ fontSize: 14.5, color: MUTED, lineHeight: 1.65, margin: '10px 0 22px', maxWidth: 54 * 8 }}>
         Mello reads your campaigns tonight and puts the first audit — with one-click fixes — in tomorrow&rsquo;s brief.
       </p>
+
+      {scan && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, background: '#f4fbe6', border: `1px solid #d6e8b0`, borderRadius: 12, padding: '11px 15px', margin: '0 0 22px', fontSize: 13.5, color: '#2c342d', lineHeight: 1.55 }}>
+          <span style={{ width: 7, height: 7, borderRadius: '50%', background: GREEN, flexShrink: 0 }} />
+          <span>Finishing your audit for <b>{scan.name}</b> — connect Meta to see your real numbers.</span>
+        </div>
+      )}
 
       {learned ? (
         <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '22px 24px' }}>
