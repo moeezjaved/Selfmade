@@ -154,28 +154,31 @@ export default function ScanTheater() {
       // ── WAIT FOR THE CRAWL ── first time we've seen this brand: ads aren't indexed yet but a priority
       // crawl was kicked off. Hold a "pulling your ads" slide + poll /api/scan/run until they land (or cap).
       if (!data.own.found && data.ownPending) {
-        setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data)) }]); setSlideIdx(0)
         setStage('ads'); setStep('ads', 'active', 'crawling…')
         addFinding('ads', `Pulling your ads now — first time we’ve seen ${brandNameOf(data)}`)
         stopProg()
-        // Hold the bar honestly at ~40–60% while we wait (don't look "done").
-        let hp = 40
-        const holdIv = setInterval(() => { hp = hp >= 58 ? 42 : hp + 1; setPct(hp) }, 700)
+        // A cold, spy-priority full-archive crawl (same IPRoyal crawler as Brand Spy) usually takes a few
+        // minutes, sometimes more for deep libraries. Wait up to ~8 min, re-polling and showing HONEST
+        // progress (elapsed + a bar driven by elapsed + copy that deepens) so it never looks frozen.
+        const STEP_MS = 18000, MAX_STEPS = 27          // ~8 min cap
+        const capS = Math.round((MAX_STEPS * STEP_MS) / 1000)
         let data2 = data
-        for (let t = 0; t < 13 && !data2.own.found; t++) {   // ~13 × 18s ≈ 4 min cap
-          await sleep(18000)
+        for (let t = 0; t < MAX_STEPS && !data2.own.found; t++) {
+          const elapsedS = t * (STEP_MS / 1000)
+          setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data), elapsedS, capS) }]); setSlideIdx(0)
+          setPct(40 + Math.round((t / MAX_STEPS) * 35))   // sidebar bar creeps 40 → 75 over the wait
+          await sleep(STEP_MS)
           try { const rr = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(lastPayload.current) }); if (rr.ok) data2 = await rr.json() } catch { /* keep polling */ }
         }
-        clearInterval(holdIv)
         if (!data2.own.found) {
           // Still nothing after the cap — honest "still pulling" copy, NEVER a fake "invisible/0".
           setSlides([{ key: 'timeout', stage: 'ads', render: () => timeoutSlide(brandNameOf(data2)) }]); setSlideIdx(0)
           setSteps((s) => s.map((x) => ({ ...x, status: x.id === 'ads' ? 'active' : 'pending', metric: x.id === 'ads' ? 'crawling…' : '' })))
-          setPct(55); running.current = false; return
+          setPct(75); running.current = false; return
         }
         data = data2; setRes(data2)
-        // Ads landed — restart the normal creep from where the hold left off.
-        prog = 58
+        // Ads landed — restart the normal creep from where the wait left off.
+        prog = 76
         progIv = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
       }
 
@@ -830,15 +833,30 @@ function slideScore(res: ScanResult) {
   )
 }
 
-// SLIDE — waiting for the crawl (never a fake "invisible/0" — we're actively pulling the ads).
-function pullingSlide(brandName: string) {
+// SLIDE — waiting for the crawl (never a fake "invisible/0" — we're actively pulling the ads). Shows HONEST
+// progress: an elapsed-driven bar + elapsed readout + copy that deepens, so a longer wait never looks frozen.
+function pullingSlide(brandName: string, elapsedS = 0, capS = 480) {
+  const name = brandName === 'your brand' ? 'your brand' : brandName
+  const line = elapsedS < 90
+    ? <>First time we’ve seen {name} — we kicked off a <b>priority</b> crawl of your full ad library. This usually takes a few minutes.</>
+    : elapsedS < 240
+      ? <>Still going — we’re reading every ad {name} is running. First-time crawls take a few minutes; hang tight, your audit builds itself.</>
+      : <>Almost there — deep libraries take a little longer. We’re finishing up {name}’s ads now.</>
+  const barPct = Math.min(80, 12 + Math.round((elapsedS / Math.max(1, capS)) * 68))
+  const elapsedLabel = elapsedS < 60 ? 'just started' : `~${Math.round(elapsedS / 60)} min so far`
   return (
     <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
       <div style={{ fontSize: 'clamp(48px,9vw,84px)', lineHeight: 1 }}>⏳</div>
       <h2 style={slideH}>Pulling your ads now</h2>
-      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>First time we’ve seen {brandName === 'your brand' ? 'your brand' : brandName} — we just kicked off a priority crawl of your full ad library. This takes a couple of minutes; hang tight and your audit builds itself.</p>
-      <div style={{ width: 'min(420px,80vw)', height: 6, background: 'rgba(26,20,16,.1)', borderRadius: 100, overflow: 'hidden' }}>
-        <div className="sf-shim" style={{ height: '100%', width: '60%', borderRadius: 100 }} />
+      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>{line}</p>
+      <div style={{ width: 'min(440px,82vw)' }}>
+        <div style={{ height: 8, background: 'rgba(26,20,16,.1)', borderRadius: 100, overflow: 'hidden' }}>
+          <div style={{ height: '100%', width: `${barPct}%`, background: ORANGE, borderRadius: 100, transition: 'width .7s ease' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9, fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>
+          <span>Crawling your library…</span>
+          <span>{elapsedLabel}</span>
+        </div>
       </div>
     </div>
   )
@@ -850,7 +868,7 @@ function timeoutSlide(brandName: string) {
     <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
       <div style={{ fontSize: 'clamp(44px,8vw,72px)', lineHeight: 1 }}>🐢</div>
       <h2 style={slideH}>Still pulling your ads</h2>
-      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>{brandName === 'your brand' ? 'Your' : brandName + "’s"} library is taking a little longer to index. Re-run the audit in a few minutes for the full breakdown — or connect Meta for the complete picture right away.</p>
+      <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>We’ve been crawling for a few minutes and {brandName === 'your brand' ? 'your' : brandName + "’s"} library is a deep one — it’s still indexing. It’ll be ready shortly: re-run the audit in a few minutes for the full breakdown, or connect Meta for the complete picture right away.</p>
     </div>
   )
 }
