@@ -195,6 +195,7 @@ function ReportsPage() {
         <div>
           <h1 style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: INK, letterSpacing: '-.01em', lineHeight: 1.05, margin: 0 }}>Reports</h1>
           <div style={{ fontSize: 13.5, color: MUTED, marginTop: 4 }}>Deep insights from your Meta ads.</div>
+          <a href="/reports/diagnosis" style={{ display: 'inline-block', marginTop: 8, fontSize: 12.5, fontWeight: 800, color: GREEN, textDecoration: 'none' }}>🩺 Account diagnosis →</a>
         </div>
         <div data-tour="ads-controls" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           {/* Which ad account this report is for. The selector RESOLVES the healthy connected account
