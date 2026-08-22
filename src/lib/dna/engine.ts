@@ -345,12 +345,18 @@ export function scoreDna(own: OwnDna, winners: WinnerDna, gaps: Gap[]): Score {
   const coverage = !own.found ? 0 : a >= 20 ? 95 : a >= 11 ? 80 : a >= 6 ? 60 : a >= 3 ? 40 : a >= 1 ? 20 : 0
   subs.push({ key: 'coverage', label: 'Coverage', value: coverage, note: own.found ? `${a} active ad${a === 1 ? '' : 's'}.` : "You're running no ads we can see." })
 
-  // Format mix — of the formats winners use, how many do you? (null if you run nothing)
+  // Format mix — of the media formats winners lean on (Video/Image/Carousel), how many do you also run?
+  // Uses the media mix (always populated when there are ads), NOT format_style (UGC/Studio/Graphic — often
+  // unclassified → the old "0 of the 0 formats" bug). Silent (null) if we have no rival format data to compare.
   if (own.found) {
-    const wF = new Set((winners.dist.format_style || []).map((t) => t.label.toLowerCase()))
-    const oF = new Set((own.dist.format_style || []).map((t) => t.label.toLowerCase()))
-    const overlap = wF.size ? Array.from(wF).filter((f) => oF.has(f)).length / wF.size : 0
-    subs.push({ key: 'format', label: 'Format mix', value: Math.round(overlap * 100), note: `You use ${oF.size} of the ${wF.size} formats winners run.` })
+    const wF = new Set(winners.media.map((t) => t.label.toLowerCase()))
+    const oF = new Set(own.media.map((t) => t.label.toLowerCase()))
+    if (!wF.size) {
+      subs.push({ key: 'format', label: 'Format mix', value: null, note: 'Not enough rival format data to compare.' })
+    } else {
+      const overlap = Array.from(wF).filter((f) => oF.has(f)).length
+      subs.push({ key: 'format', label: 'Format mix', value: Math.round((overlap / wF.size) * 100), note: `You run ${overlap} of the ${wF.size} format${wF.size === 1 ? '' : 's'} winners lean on.` })
+    }
   } else subs.push({ key: 'format', label: 'Format mix', value: null, note: 'No ads to compare.' })
 
   // Angle diversity — distinct hooks+angles you run vs winners
@@ -385,7 +391,7 @@ export function estimateCost(own: OwnDna, gaps: Gap[], score: Score): CostEstima
 // ── Orchestrator with R2 cache (no migration needed). Keyed by the competitor set + own page. `v2` =
 // added own.examples (ad thumbnails) + cost; bumping the key bypasses caches that predate those fields. ──
 const cacheKey = (pageIds: string[], ownPage: string | null) =>
-  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v4').digest('hex').slice(0, 24)}.json`
+  `dna-reports/${createHash('sha256').update([...pageIds].sort().join(',') + '|' + (ownPage || '') + '|v5').digest('hex').slice(0, 24)}.json`
 
 export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; report: DnaReport; score: Score; cost: CostEstimate; cached: boolean }
 
