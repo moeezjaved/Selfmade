@@ -41,6 +41,7 @@ export type StrategistTask = {
   hypothesis: string     // the revenue/outcome bet
   impact: string         // "+$4,200/mo", "+$310/wk", "protects scale" — honest, may be qualitative
   runnable: boolean      // can Mello execute it now, or does it need a connection first
+  needs: 'meta' | 'shopify' | 'klaviyo' | null   // the connection required before it can run
   suggested_key: string  // dedupe key
 }
 
@@ -162,9 +163,11 @@ HARD RULES:
 - Each task is concrete and one a real operator would run this week. Name the specific competitor / gap / signal it comes from.
 - Prefer diversity of levers over five variations of one idea. Max ${limit} tasks.
 - "impact" must be honest: give a $ estimate ONLY if the data supports it (e.g. from ad counts, gaps); otherwise qualitative ("protects scale", "unlocks a channel").
-- "runnable": true if Selfmade can act now (ads live, creatives, competitor remakes, replies); false if it first needs a connection the account lacks (e.g. Meta not connected, no store).
-- IF meta_connected is false: ALWAYS include exactly one task titled like "Launch your first campaign" (lever "traffic", dept "media", runnable=false) whose "steps" ARE a concrete campaign blueprint — objective, 1 campaign with 2-3 ad sets, the audiences, which of the ready ads go in each, and a starting daily budget. Its "impact" is the realistic first-month revenue. The app uses runnable=false to prompt the founder to connect Meta so this can launch. This is the single most important task for a not-yet-connected account — rank it first.
-Return JSON: {"stage_read":"one plain-English sentence naming the biggest constraint", "tasks":[{"title","lever","dept","why","steps":["…"],"hypothesis","impact","runnable":true|false}]}. lever ∈ {traffic,conversion,aov,retention,efficiency,brand}. dept ∈ {media,creative,research,customer,reports,email,seo,site,outreach}.`
+- WHAT SELFMADE CAN EXECUTE (set runnable=true ONLY for these, and only if their connection exists): dept "media" (launch/scale/kill/budget ads — needs Meta connected), "creative" (make ad images/videos), "research" (competitor reports/spying), "customer" (draft replies to comments/DMs), "reports". For these, "needs" is null (or "meta" for media when Meta is not connected).
+- NEEDS-A-CONNECTION-FIRST (ALWAYS runnable=false, set "needs"): dept "site"/CRO and "aov"-lever moves need the STORE — set needs="shopify"; "email"/SMS needs needs="klaviyo". No store is connected yet, so you can only INFER a conversion/AOV/site problem from Meta's post-click metrics — say "your post-click conversion is low (X%)" and, in "steps", give the exact fix, but frame it as "connect Shopify and I'll do this for you", NOT "I'll optimize your pages" (Selfmade can't touch a store it isn't connected to). needs="shopify" makes the app show a Connect-Shopify button first.
+- STILL FUTURE / BRIEF-ONLY (runnable=false, needs=null): dept "seo", "blog", "outreach" — propose if highest-leverage, write "steps" as a founder-facing brief, don't imply auto-execution.
+- IF meta_connected is false: ALWAYS include exactly one task titled like "Launch your first campaign" (lever "traffic", dept "media", runnable=false, needs="meta") whose "steps" ARE a concrete campaign blueprint — objective, 1 campaign with 2-3 ad sets, the audiences, which of the ready ads go in each, and a starting daily budget. Rank it first — the app uses needs="meta" to prompt Connect Meta.
+Return JSON: {"stage_read":"one plain-English sentence naming the biggest constraint", "tasks":[{"title","lever","dept","why","steps":["…"],"hypothesis","impact","runnable":true|false,"needs":"meta"|"shopify"|"klaviyo"|null}]}. lever ∈ {traffic,conversion,aov,retention,efficiency,brand}. dept ∈ {media,creative,research,customer,reports,email,seo,site,outreach}. "needs" = the connection the task requires before it can run (null when Selfmade can already do it).`
 
   const user = JSON.stringify({
     brand: ctx.brandName || 'the brand',
@@ -204,6 +207,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
   const LEVERS: Lever[] = ['traffic', 'conversion', 'aov', 'retention', 'efficiency', 'brand']
   const tasks: StrategistTask[] = rawTasks.slice(0, limit).map((t: any, i: number): StrategistTask => {
     const title = String(t?.title || '').trim() || 'Untitled move'
+    const needs = (['meta', 'shopify', 'klaviyo'].includes(t?.needs) ? t.needs : null) as StrategistTask['needs']
     return {
       title,
       lever: LEVERS.includes(t?.lever) ? t.lever : 'traffic',
@@ -212,7 +216,8 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
       steps: Array.isArray(t?.steps) ? t.steps.map((s: any) => String(s)).slice(0, 6) : [],
       hypothesis: String(t?.hypothesis || '').trim(),
       impact: String(t?.impact || '').trim() || '—',
-      runnable: t?.runnable !== false,
+      runnable: t?.runnable === true && !needs,   // a task that needs a connection can't be run yet
+      needs,
       suggested_key: `strat:${stage}:${slug(title)}:${i}`,
     }
   })
@@ -256,7 +261,7 @@ async function persistTasks(admin: SupabaseClient, userId: string, brandId: stri
       await (admin as any).from('mello_tasks').upsert({
         user_id: userId, brand_id: brandId, kind: kindFor(t.dept), status: 'suggested',
         title: t.title, why: t.why,
-        evidence: { lever: t.lever, dept: t.dept, steps: t.steps, hypothesis: t.hypothesis, impact: t.impact, runnable: t.runnable, stage: plan.stage, source: 'strategist' },
+        evidence: { lever: t.lever, dept: t.dept, steps: t.steps, hypothesis: t.hypothesis, impact: t.impact, runnable: t.runnable, needs: t.needs, stage: plan.stage, source: 'strategist' },
         suggested_key: t.suggested_key, credits: null,
       }, { onConflict: 'suggested_key' })
     } catch { /* best-effort persist — a schema/column mismatch must never break plan generation */ }
