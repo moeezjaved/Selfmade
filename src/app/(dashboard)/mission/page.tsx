@@ -84,7 +84,7 @@ export default function MissionPage() {
 
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
-  type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; thumbnail_url?: string; preview_url?: string }
+  type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; cpa?: number; thumbnail_url?: string; preview_url?: string }
   const [ownReports, setOwnReports] = useState<AdRow[] | null>(null)   // null = loading; [] = none/not connected
   useEffect(() => {
     (async () => {
@@ -329,7 +329,7 @@ export default function MissionPage() {
               {/* per-ad table, Polsia-style: thumbnail + spend/impr/clicks/ctr/cpc columns */}
               {rep.length > 0 ? (
                 <div className="ms-adtable">
-                  <div className="hd"><span className="ad">Ad</span><span>Spend</span><span>Impr</span><span>Clicks</span><span>CTR</span><span>CPC</span></div>
+                  <div className="hd"><span className="ad">Ad</span><span>Spend</span><span>Impr</span><span>Clicks</span><span>CTR</span><span>CAC</span></div>
                   {rep.map((c, i) => (
                     <a className="row" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer" title={c.name || ''}>
                       <span className="ad">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="ph">🎨</span>}</span>
@@ -337,7 +337,7 @@ export default function MissionPage() {
                       <span>{fmtN(c.impressions)}</span>
                       <span>{fmtN(c.clicks)}</span>
                       <span>{c.ctr != null ? c.ctr.toFixed(1) + '%' : '—'}</span>
-                      <span>{c.cpc != null ? money(c.cpc, m.currency) : '—'}</span>
+                      <span>{(() => { const cac = c.cpa != null ? c.cpa : (c.conversions && c.conversions > 0 && c.spend != null ? c.spend / c.conversions : null); return cac != null ? money(cac, m.currency) : '—' })()}</span>
                     </a>
                   ))}
                 </div>
