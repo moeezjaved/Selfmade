@@ -15,7 +15,7 @@
 import { llm } from '@/lib/llm'
 import { shopifyGraphql, tokenFor, type StoreRow } from '@/lib/shopify/client'
 
-export type Agent = 'seo' | 'description' | 'alt'
+export type Agent = 'seo' | 'description' | 'alt' | 'title' | 'tags' | 'collection'
 
 function stripHtml(html: string, max = 600): string {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -29,15 +29,18 @@ function firstJson(text: string): any {
   return null
 }
 
-/** Products in the cache that have the gap this agent fixes. */
+/** Products in the cache that have the gap this agent fixes. (Collections are fetched live in generateDrafts.) */
 export async function catalogTargets(admin: any, storeId: string, agent: Agent, limit = 50): Promise<any[]> {
+  if (agent === 'collection') return []
   let q = admin.from('shopify_products').select('*').eq('store_id', storeId).eq('status', 'active').limit(limit)
   if (agent === 'seo') q = q.or('seo_title.is.null,seo_description.is.null')
   else if (agent === 'alt') q = q.gt('images_missing_alt', 0)
-  // description: everything is a candidate (we rewrite thin/empty bodies); order by shortest body first
+  else if (agent === 'tags') q = q.or('tags.is.null,tags.eq.')
+  // description + title: every product is a candidate; order by weakest first
   const { data } = await q
   let rows: any[] = data || []
   if (agent === 'description') rows = rows.sort((a, b) => (a.body_html?.length || 0) - (b.body_html?.length || 0))
+  else if (agent === 'title') rows = rows.sort((a, b) => (a.title?.length || 0) - (b.title?.length || 0))
   return rows
 }
 
@@ -97,9 +100,91 @@ export async function draftAlt(shop: string, token: string, p: any): Promise<{ i
   } catch { return null }
 }
 
+export async function draftTitle(p: any): Promise<{ current: string | null; proposed: string } | null> {
+  const sys = 'You are a Shopify merchandiser. Rewrite this product\'s STOREFRONT title so a shopper instantly knows what it is and searches find it. Keep the brand\'s voice, keep it concise (≤ 70 chars), no ALL CAPS, no gimmicks, no price. Do NOT change what the product fundamentally is. If the current title is already strong, return it unchanged. Return ONLY JSON: {"title":"..."}'
+  const facts = { title: p.title, type: p.product_type, vendor: p.vendor, tags: p.tags, body: stripHtml(p.body_html, 300) }
+  try {
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.5, messages: [{ role: 'user', content: `${sys}\n\nPRODUCT:\n${JSON.stringify(facts)}` }] })
+    const j = firstJson(res.content?.[0]?.text || '')
+    const proposed = String(j?.title || '').trim().slice(0, 80)
+    if (!proposed || proposed === p.title) return null
+    return { current: p.title || null, proposed }
+  } catch { return null }
+}
+
+export async function draftTags(p: any): Promise<{ current: string | null; proposed: string; added: string[] } | null> {
+  const sys = 'You are a Shopify catalog taxonomist. Suggest storefront filter/discovery tags for this product — attributes a shopper would filter or search by (material, use-case, format, scent/flavor, category, audience). 6-12 short lowercase tags. Reuse the existing ones and add what is missing; invent nothing not supported by the facts. Return ONLY JSON: {"tags":["...","..."]}'
+  const existing = String(p.tags || '').split(',').map((t: string) => t.trim()).filter(Boolean)
+  const facts = { title: p.title, type: p.product_type, vendor: p.vendor, existingTags: existing, body: stripHtml(p.body_html, 400) }
+  try {
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 250, temperature: 0.4, messages: [{ role: 'user', content: `${sys}\n\nPRODUCT:\n${JSON.stringify(facts)}` }] })
+    const j = firstJson(res.content?.[0]?.text || '')
+    const suggested: string[] = Array.isArray(j?.tags) ? j.tags.map((t: any) => String(t).trim().toLowerCase()).filter(Boolean) : []
+    if (!suggested.length) return null
+    const merged = Array.from(new Set([...existing.map((t: string) => t.toLowerCase()), ...suggested]))
+    const added = suggested.filter((t) => !existing.map((e: string) => e.toLowerCase()).includes(t))
+    if (!added.length) return null
+    return { current: existing.join(', ') || null, proposed: merged.join(', '), added }
+  } catch { return null }
+}
+
+/* ── Collections (fetched live; not in the product cache) ─────────────────────────────────────── */
+const COLLECTIONS_QUERY = /* GraphQL */ `
+  query($cursor: String) {
+    collections(first: 50, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes { id title descriptionHtml seo { title description } }
+    }
+  }
+`
+export async function fetchCollections(shop: string, token: string, limit = 30): Promise<any[]> {
+  const out: any[] = []
+  let cursor: string | null = null
+  while (out.length < limit) {
+    const data: any = await shopifyGraphql(shop, token, COLLECTIONS_QUERY, { cursor })
+    const conn = data?.collections
+    out.push(...(conn?.nodes || []))
+    if (!conn?.pageInfo?.hasNextPage) break
+    cursor = conn.pageInfo.endCursor
+  }
+  return out.slice(0, limit)
+}
+
+export async function draftCollection(c: any): Promise<{ title: { current: string | null; proposed: string }; description: { current: string | null; proposed: string }; body: { current: string | null; proposed: string } } | null> {
+  const sys = 'You are a Shopify SEO copywriter working on a COLLECTION page. Write: (1) an SEO title ≤ 60 chars, (2) a meta description 140-158 chars, (3) a short intro paragraph as HTML (2-3 sentences) that tells shoppers what\'s in this collection and who it\'s for. Ground everything in the collection name — invent no products. Return ONLY JSON: {"seoTitle":"...","metaDescription":"...","bodyHtml":"..."}'
+  try {
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 400, temperature: 0.5, messages: [{ role: 'user', content: `${sys}\n\nCOLLECTION: ${JSON.stringify({ title: c.title, currentBody: stripHtml(c.descriptionHtml, 400) })}` }] })
+    const j = firstJson(res.content?.[0]?.text || '')
+    if (!j?.seoTitle || !j?.metaDescription) return null
+    return {
+      title: { current: c.seo?.title || null, proposed: String(j.seoTitle).slice(0, 70) },
+      description: { current: c.seo?.description || null, proposed: String(j.metaDescription).slice(0, 320) },
+      body: { current: c.descriptionHtml || null, proposed: String(j.bodyHtml || '') },
+    }
+  } catch { return null }
+}
+
 /* ── Draft persistence ────────────────────────────────────────────────────────────────────────── */
 
 export async function generateDrafts(admin: any, store: StoreRow, agent: Agent, limit = 25): Promise<{ created: number; scanned: number }> {
+  // Collections aren't in the product cache — fetch them live and draft against them.
+  if (agent === 'collection') {
+    const token = tokenFor(store)
+    const cols = await fetchCollections(store.shop_domain, token, limit)
+    let created = 0
+    for (const c of cols) {
+      const proposal = await draftCollection(c)
+      if (!proposal) continue
+      await admin.from('shopify_catalog_drafts').delete().eq('store_id', store.id).eq('product_gid', c.id).eq('agent', agent).eq('status', 'draft')
+      await admin.from('shopify_catalog_drafts').insert({
+        store_id: store.id, brand_id: store.brand_id, user_id: store.user_id,
+        product_gid: c.id, product_title: c.title, agent, proposal, status: 'draft',
+      })
+      created++
+    }
+    return { created, scanned: cols.length }
+  }
+
   const targets = await catalogTargets(admin, store.id, agent, limit)
   const token = agent === 'alt' ? tokenFor(store) : ''
   let created = 0
@@ -107,6 +192,8 @@ export async function generateDrafts(admin: any, store: StoreRow, agent: Agent, 
     let proposal: any = null
     if (agent === 'seo') proposal = await draftSeo(p)
     else if (agent === 'description') proposal = await draftDescription(p)
+    else if (agent === 'title') proposal = await draftTitle(p)
+    else if (agent === 'tags') proposal = await draftTags(p)
     else if (agent === 'alt') { const a = await draftAlt(store.shop_domain, token, p); proposal = a && a.images.length ? a : null }
     if (!proposal) continue
     // replace any prior open draft for this (product, agent)
@@ -132,18 +219,32 @@ const FILE_UPDATE = /* GraphQL */ `
     fileUpdate(files: $files) { files { id alt } userErrors { field message } }
   }
 `
+const COLLECTION_UPDATE = /* GraphQL */ `
+  mutation($input: CollectionInput!) {
+    collectionUpdate(input: $input) { collection { id } userErrors { field message } }
+  }
+`
+
+async function productUpdate(shop: string, token: string, input: any): Promise<void> {
+  const d = await shopifyGraphql(shop, token, PRODUCT_UPDATE, { input })
+  const errs = d?.productUpdate?.userErrors || []
+  if (errs.length) throw new Error(errs.map((e: any) => e.message).join('; '))
+}
 
 async function applyOne(shop: string, token: string, row: any): Promise<void> {
   const pr = row.proposal || {}
   if (row.agent === 'seo') {
-    const input: any = { id: row.product_gid, seo: { title: pr.title?.proposed, description: pr.description?.proposed } }
-    const d = await shopifyGraphql(shop, token, PRODUCT_UPDATE, { input })
-    const errs = d?.productUpdate?.userErrors || []
-    if (errs.length) throw new Error(errs.map((e: any) => e.message).join('; '))
+    await productUpdate(shop, token, { id: row.product_gid, seo: { title: pr.title?.proposed, description: pr.description?.proposed } })
   } else if (row.agent === 'description') {
-    const input: any = { id: row.product_gid, descriptionHtml: pr.proposed }
-    const d = await shopifyGraphql(shop, token, PRODUCT_UPDATE, { input })
-    const errs = d?.productUpdate?.userErrors || []
+    await productUpdate(shop, token, { id: row.product_gid, descriptionHtml: pr.proposed })
+  } else if (row.agent === 'title') {
+    await productUpdate(shop, token, { id: row.product_gid, title: pr.proposed })
+  } else if (row.agent === 'tags') {
+    await productUpdate(shop, token, { id: row.product_gid, tags: String(pr.proposed || '').split(',').map((t: string) => t.trim()).filter(Boolean) })
+  } else if (row.agent === 'collection') {
+    const input: any = { id: row.product_gid, descriptionHtml: pr.body?.proposed, seo: { title: pr.title?.proposed, description: pr.description?.proposed } }
+    const d = await shopifyGraphql(shop, token, COLLECTION_UPDATE, { input })
+    const errs = d?.collectionUpdate?.userErrors || []
     if (errs.length) throw new Error(errs.map((e: any) => e.message).join('; '))
   } else if (row.agent === 'alt') {
     const files = (pr.images || []).map((im: any) => ({ id: im.mediaId, alt: im.proposed }))
@@ -179,9 +280,12 @@ export async function applyDrafts(admin: any, store: StoreRow, draftIds: string[
     for (const r of applies) {
       if (r.agent === 'seo') { patch.seo_title = r.proposal?.title?.proposed; patch.seo_description = r.proposal?.description?.proposed }
       else if (r.agent === 'description') patch.body_html = r.proposal?.proposed
+      else if (r.agent === 'title') patch.title = r.proposal?.proposed
+      else if (r.agent === 'tags') patch.tags = r.proposal?.proposed
       else if (r.agent === 'alt') patch.images_missing_alt = 0
     }
-    if (Object.keys(patch).length) await admin.from('shopify_products').update(patch).eq('store_id', store.id).eq('gid', gid)
+    // collection drafts have no product-cache row (product_gid is a Collection gid) — skip the update.
+    if (Object.keys(patch).length && String(gid).includes('/Product/')) await admin.from('shopify_products').update(patch).eq('store_id', store.id).eq('gid', gid)
   }
   return { applied, failed }
 }

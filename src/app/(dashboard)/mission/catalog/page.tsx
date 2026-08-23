@@ -17,8 +17,11 @@ type Data = {
 
 const AGENTS = [
   { key: 'seo', name: 'SEO title & description', blurb: 'Search-result copy for products missing it', gap: (h?: Health | null) => h?.missingSeoTitle ?? 0, gapLabel: 'missing SEO title' },
+  { key: 'title', name: 'Product title', blurb: 'Clearer, more searchable storefront titles', gap: () => null, gapLabel: '' },
   { key: 'description', name: 'Description writer', blurb: 'Richer PDP body from the product’s own facts', gap: () => null, gapLabel: 'thin descriptions' },
   { key: 'alt', name: 'Image alt text', blurb: 'Accessibility + image SEO for photos with no alt', gap: (h?: Health | null) => h?.imagesMissingAlt ?? 0, gapLabel: 'images without alt' },
+  { key: 'tags', name: 'Search filter tags', blurb: 'Discovery/filter tags shoppers actually use', gap: () => null, gapLabel: '' },
+  { key: 'collection', name: 'Collection pages', blurb: 'SEO + intro copy for your collections', gap: () => null, gapLabel: '' },
 ] as const
 
 export default function CatalogPage() {
@@ -139,6 +142,13 @@ function DraftCard({ d, checked, onToggle }: { d: Draft; checked: boolean; onTog
           <Field label="Title" cur={p.title?.current} next={p.title?.proposed} />
           <Field label="Meta description" cur={p.description?.current} next={p.description?.proposed} />
         </>}
+        {d.agent === 'collection' && <>
+          <Field label="SEO title" cur={p.title?.current} next={p.title?.proposed} />
+          <Field label="Meta description" cur={p.description?.current} next={p.description?.proposed} />
+          <Field label="Intro copy" cur={strip(p.body?.current)} next={strip(p.body?.proposed)} />
+        </>}
+        {d.agent === 'title' && <Field label="Product title" cur={p.current} next={p.proposed} />}
+        {d.agent === 'tags' && <Field label="Tags" cur={p.current} next={p.proposed} />}
         {d.agent === 'description' && <Field label="Description" cur={strip(p.current)} next={strip(p.proposed)} />}
         {d.agent === 'alt' && (p.images || []).map((im: any, i: number) => (
           <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>

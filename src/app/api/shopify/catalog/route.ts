@@ -16,7 +16,7 @@ import { catalogHealth } from '@/lib/shopify/sync'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const AGENTS: Agent[] = ['seo', 'description', 'alt']
+const AGENTS: Agent[] = ['seo', 'description', 'alt', 'title', 'tags', 'collection']
 const isAgent = (a: any): a is Agent => AGENTS.includes(a)
 
 async function ctx(req: NextRequest) {
@@ -38,13 +38,14 @@ export async function GET(req: NextRequest) {
   const { data: drafts } = await admin.from('shopify_catalog_drafts')
     .select('id, product_gid, product_title, agent, proposal, status, error, created_at')
     .eq('store_id', store.id).eq('status', 'draft').order('created_at', { ascending: false }).limit(500)
-  const byAgent: Record<string, any[]> = { seo: [], description: [], alt: [] }
+  const byAgent: Record<string, any[]> = { seo: [], description: [], alt: [], title: [], tags: [], collection: [] }
   for (const d of (drafts || [])) (byAgent[d.agent] ||= []).push(d)
+  const counts: Record<string, number> = {}
+  for (const a of AGENTS) counts[a] = (byAgent[a] || []).length
   return NextResponse.json({
     connected: true,
     store: { shop_domain: store.shop_domain, shop_name: store.shop_name, currency: store.currency },
-    health, drafts: byAgent,
-    counts: { seo: byAgent.seo.length, description: byAgent.description.length, alt: byAgent.alt.length },
+    health, drafts: byAgent, counts,
   })
 }
 
