@@ -9,16 +9,27 @@ import { useCallback, useEffect, useState } from 'react'
 
 type Issue = { severity: 'high' | 'medium' | 'low'; title: string; detail: string; pages: string[] }
 type Audit = { hasData: boolean; site?: string; score?: number; pagesCrawled?: number; issues?: Issue[]; note?: string }
+type KwCluster = { label: string; intent: string; keywords: string[]; why: string }
+type Kw = { hasData: boolean; clusters: KwCluster[]; total: number; note?: string; scored: boolean }
+type Brief = { id: string | null; keyword: string; title: string; body_markdown: string; status: string }
 
 export default function SeoPage() {
   const [audit, setAudit] = useState<Audit | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
+  const [kw, setKw] = useState<Kw | null>(null)
+  const [findingKw, setFindingKw] = useState(false)
+  const [briefs, setBriefs] = useState<Brief[]>([])
+  const [writing, setWriting] = useState<string | null>(null)
+  const [openBrief, setOpenBrief] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try { const r = await fetch('/api/seo/audit'); const j = await r.json(); if (r.ok) setAudit(j as Audit) } catch { /* empty */ }
+    try { const r = await fetch('/api/seo/keywords'); const j = await r.json(); if (r.ok) setKw(j as Kw) } catch { /* empty */ }
+    try { const r = await fetch('/api/seo/brief'); const j = await r.json(); if (r.ok && Array.isArray(j?.briefs)) setBriefs(j.briefs) } catch { /* empty */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -29,6 +40,19 @@ export default function SeoPage() {
     try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) setAudit(j as Audit) } catch { /* keep */ }
     setRunning(false)
   }
+  const findKeywords = async () => {
+    if (findingKw) return
+    setFindingKw(true)
+    try { const r = await fetch('/api/seo/keywords', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) setKw(j as Kw) } catch { /* keep */ }
+    setFindingKw(false)
+  }
+  const writeBrief = async (keyword: string) => {
+    if (writing) return
+    setWriting(keyword)
+    try { const r = await fetch('/api/seo/brief', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ keyword }) }); const j = await r.json(); if (r.ok && j?.brief?.body_markdown) { setBriefs((b) => [j.brief as Brief, ...b]); setOpenBrief(j.brief.id || keyword) } } catch { /* keep */ }
+    setWriting(null)
+  }
+  const copyBrief = async (b: Brief) => { try { await navigator.clipboard.writeText(b.body_markdown); setCopied(b.id || b.keyword); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
   const issues = audit?.issues || []
   const counts = { high: issues.filter((i) => i.severity === 'high').length, medium: issues.filter((i) => i.severity === 'medium').length, low: issues.filter((i) => i.severity === 'low').length }
@@ -81,8 +105,51 @@ export default function SeoPage() {
               </div>
             ))}
 
-            <div className="foot">Every finding is read live from your site — nothing is assumed. Next: I’ll fix these for you (needs Shopify), plus keyword research + programmatic pages.</div>
+            <div className="foot">Every finding is read live from your site — nothing is assumed. Next: I’ll fix these for you (needs Shopify).</div>
           </>
+        )}
+
+        {/* Keyword opportunities (Phase 2) */}
+        <div className="section">
+          <div className="shead">
+            <div><div className="lead">Keywords worth winning</div><div className="assub">The real searches your buyers type — pulled live from Google, grouped by topic + intent.</div></div>
+            <button className="btn" disabled={findingKw} onClick={findKeywords}>{findingKw ? 'Finding keywords…' : kw?.hasData ? '↻ Refresh' : 'Find keywords →'}</button>
+          </div>
+          {kw?.hasData ? (
+            <>
+              {!kw.scored && <div className="note">Keywords are real (from Google). Search volume + difficulty need a keyword API — add one and I’ll score + rank these.</div>}
+              {kw.clusters.map((c, i) => (
+                <div className="cluster" key={i}>
+                  <div className="chead"><span className="cl">{c.label}</span><span className={`intent ${c.intent}`}>{c.intent}</span></div>
+                  {c.why && <div className="cwhy">{c.why}</div>}
+                  <div className="chips">
+                    {c.keywords.map((k, j) => <span className="chip" key={j}>{k}</span>)}
+                  </div>
+                  <button className="btn tiny" disabled={writing === c.keywords[0]} onClick={() => writeBrief(c.keywords[0])}>{writing === c.keywords[0] ? 'Writing brief…' : `Write a brief for “${c.keywords[0]}” →`}</button>
+                </div>
+              ))}
+            </>
+          ) : (
+            <div className="empty small">{kw?.note || (loading ? 'Loading…' : 'Tap “Find keywords” and I’ll pull the real searches your buyers use.')}</div>
+          )}
+        </div>
+
+        {/* Content briefs */}
+        {briefs.length > 0 && (
+          <div className="section">
+            <div className="lead">Content briefs</div>
+            <div className="assub">Give one to a writer (or Mello) to produce the page. Publishing to your Shopify blog is one-click once connected.</div>
+            {briefs.map((b) => (
+              <div className="brief" key={b.id || b.keyword}>
+                <div className="bhead" onClick={() => setOpenBrief(openBrief === (b.id || b.keyword) ? null : (b.id || b.keyword))}>
+                  <span className="bt">{b.title}</span><span className="bk">{b.keyword}</span>
+                </div>
+                {openBrief === (b.id || b.keyword) && (
+                  <div className="bbody"><pre>{b.body_markdown}</pre><button className="btn tiny" onClick={() => copyBrief(b)}>{copied === (b.id || b.keyword) ? 'Copied ✓' : 'Copy'}</button></div>
+                )}
+              </div>
+            ))}
+          </div>
         )}
       </div>
     </div>
@@ -131,4 +198,24 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .ipages{margin-top:10px;border-top:1px solid var(--hair);padding-top:10px;display:flex;flex-direction:column;gap:4px}
 .pg{font-family:var(--mono);font-size:11.5px;color:var(--flame);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .foot{margin-top:22px;font-family:var(--mono);font-size:11px;color:var(--mut);line-height:1.6}
+.section{margin-top:38px}
+.shead{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.assub{font-size:13.5px;color:var(--sub);margin:-4px 0 14px}
+.cluster{border:1px solid var(--line);border-radius:14px;background:var(--card);padding:15px 17px;margin-bottom:11px}
+.chead{display:flex;align-items:center;gap:10px}
+.cl{font-family:var(--serif);font-size:19px;letter-spacing:-.005em}
+.intent{font-family:var(--mono);font-size:9px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-radius:100px;padding:3px 8px;color:var(--sub);border:1px solid var(--line)}
+.intent.commercial{color:var(--lime);border-color:#ffd9cc;background:#fff4f0}
+.intent.transactional{color:var(--live);border-color:#cfe6cf;background:var(--greenBg)}
+.intent.informational{color:#2f6df0;border-color:#c9d9fb;background:#f2f6ff}
+.cwhy{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.5}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin:11px 0}
+.chip{font-family:var(--mono);font-size:11.5px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:100px;padding:4px 10px}
+.brief{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px 16px;margin-bottom:10px}
+.bhead{display:flex;align-items:baseline;gap:10px;cursor:pointer}
+.bt{font-family:var(--serif);font-size:18px;flex:1;min-width:0}
+.bk{font-family:var(--mono);font-size:11px;color:var(--mut)}
+.bbody{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px}
+.bbody pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ui);font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-height:420px;overflow-y:auto;margin:0 0 10px}
+.btn.tiny{font-size:11.5px;padding:7px 12px;border-radius:8px}
 `
