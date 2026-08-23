@@ -38,12 +38,15 @@ export async function askEngine(engine: GeoEngine, prompt: string): Promise<Engi
 }
 
 async function askOpenAI(prompt: string): Promise<EngineAnswer> {
-  // Prefer the Responses API with web search (real, live citations). Older SDKs lack it → fall back.
-  try {
-    const res: any = await (oai() as any).responses.create({ model: 'gpt-4o', tools: [{ type: 'web_search_preview' }], input: prompt })
-    const text = res?.output_text || textFromResponses(res)
-    if (text) return { engine: 'chatgpt', text, grounded: true }
-  } catch { /* fall through to plain completion */ }
+  // Prefer the Responses API with the web-search tool → REAL live citations (like ChatGPT-with-search).
+  // The tool type was renamed across SDK versions, so try both names before falling back to model knowledge.
+  for (const toolType of ['web_search', 'web_search_preview']) {
+    try {
+      const res: any = await (oai() as any).responses.create({ model: 'gpt-4o', tools: [{ type: toolType }], input: prompt })
+      const text = res?.output_text || textFromResponses(res)
+      if (text) return { engine: 'chatgpt', text, grounded: true }
+    } catch { /* try next tool name / fall through */ }
+  }
   const c = await oai().chat.completions.create({ model: 'gpt-4o', temperature: 0, messages: [{ role: 'user', content: prompt }] })
   return { engine: 'chatgpt', text: c.choices[0]?.message?.content || '', grounded: false }
 }
