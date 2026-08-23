@@ -46,6 +46,20 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     ],
   },
   {
+    // GROW — the organic growth engine: the retention journey + every SEO/GEO/Shopify content agent.
+    key: 'grow', label: 'Grow', railLabel: 'Grow', railIcon: TrendingUp, defaultHref: '/mission/journey',
+    items: [
+      { href: '/mission/journey',      icon: TrendingUp,      label: 'Journey' },
+      { href: '/mission/plan',         icon: ClipboardList,   label: 'Growth plan' },
+      { href: '/mission/catalog',      icon: Store,           label: 'Store catalog' },
+      { href: '/mission/blog',         icon: Newspaper,       label: 'Content' },
+      { href: '/mission/programmatic', icon: LayoutDashboard, label: 'Pages at scale' },
+      { href: '/mission/seo',          icon: LineChart,       label: 'SEO' },
+      { href: '/mission/geo',          icon: Sparkles,        label: 'AI search' },
+      { href: '/mission/competitors',  icon: Eye,             label: 'Competitors' },
+    ],
+  },
+  {
     // Customer Employee — the founder's unified inbox (customers in) + proactive nudges (Mello out).
     key: 'inbox', label: 'Inbox', railLabel: 'Inbox', railIcon: Inbox, defaultHref: '/inbox',
     items: [
