@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let body: { brandId?: string | null; persist?: boolean; limit?: number } = {}
+  let body: { brandId?: string | null; persist?: boolean; limit?: number; exclude?: string[] } = {}
   try { body = await req.json() } catch { /* empty body is fine */ }
 
   try {
@@ -29,6 +29,7 @@ export async function POST(req: NextRequest) {
       brandId: body.brandId ?? null,
       persist: body.persist === true,
       limit: body.limit,
+      exclude: Array.isArray(body.exclude) ? body.exclude : undefined,
     })
     return NextResponse.json(plan, { status: 200 })
   } catch (e) {

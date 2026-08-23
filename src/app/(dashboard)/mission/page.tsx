@@ -113,18 +113,22 @@ export default function MissionPage() {
 
   const STEPS = ['Reviewing your funnel + backlog…', 'Benchmarking against your competitors…', 'Diagnosing your biggest constraint…', 'Drafting your highest-impact moves…']
 
-  // "+ Add to backlog" — ask Mello for more moves and append the ones we're not already showing.
+  // "+ Add to backlog" — ask Mello for a FRESH batch of moves, telling it what's already on the desk so it
+  // proposes genuinely different ones. Appends the new moves; each click grows the backlog.
+  const [backlogNote, setBacklogNote] = useState<string | null>(null)
   const addToBacklog = async () => {
     if (adding) return
-    setAdding(true)
+    setAdding(true); setBacklogNote(null)
     try {
-      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 6 }) })
+      const shown = [...(plan?.tasks || []).slice(0, 3), ...extra]
+      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 5, exclude: shown.map((t) => t.title) }) })
       const j = await r.json()
       const incoming: Task[] = Array.isArray(j?.tasks) ? j.tasks : []
-      const seen = new Set([...(plan?.tasks || []).slice(0, 3), ...extra].map((t) => slugT(t.title)))
+      const seen = new Set(shown.map((t) => slugT(t.title)))
       const fresh = incoming.filter((t) => t.title && !seen.has(slugT(t.title)))
-      if (fresh.length) setExtra((prev) => [...prev, ...fresh].slice(0, 9))
-    } catch { /* keep the desk usable */ }
+      if (fresh.length) setExtra((prev) => [...prev, ...fresh].slice(0, 30))
+      else setBacklogNote('That’s every high-impact move I can see right now — approve some, and I’ll find the next ones.')
+    } catch { setBacklogNote('Couldn’t reach Mello just now — try again.') }
     setAdding(false)
   }
 
@@ -324,9 +328,12 @@ export default function MissionPage() {
 
           {!loading && plan && (
             <div className="ms-taskbtns">
-              <button className="ms-btn solid" onClick={addToBacklog} disabled={adding}>{adding ? 'Adding…' : '+ Add to backlog'}</button>
+              <button className="ms-btn solid" onClick={addToBacklog} disabled={adding}>{adding ? 'Thinking of more…' : '+ Add to backlog'}</button>
               <button className="ms-btn" onClick={openBoard}>▦ Sprint board</button>
             </div>
+          )}
+          {!loading && backlogNote && (
+            <div className="ms-note sm" style={{ marginTop: 8 }}>{backlogNote}</div>
           )}
 
           <h2 className="ms-sec sec2">From the studio <small>made by Mello</small></h2>
