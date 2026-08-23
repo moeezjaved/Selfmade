@@ -64,6 +64,17 @@ export default function MissionPage() {
   }, [])
   useEffect(() => { fetchDesk() }, [fetchDesk])
 
+  // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
+  // Reuse that data path so the mission desk matches how we already display ads.
+  type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; thumbnail_url?: string; preview_url?: string }
+  const [ownReports, setOwnReports] = useState<AdRow[] | null>(null)   // null = loading; [] = none/not connected
+  useEffect(() => {
+    (async () => {
+      try { const r = await fetch('/api/reports?dateRange=last_30d'); const j = await r.json(); setOwnReports(Array.isArray(j?.creatives) ? j.creatives : []) }
+      catch { setOwnReports([]) }
+    })()
+  }, [])
+
   // The standup board — the founder's tasks by status (running/done/failed from mello_tasks; to-do = the plan).
   type BoardRow = { id: string; title: string; why: string | null; kind: string; status: string; url: string | null; error: string | null; at: string }
   type Board = { running: BoardRow[]; done: BoardRow[]; failed: BoardRow[] }
@@ -170,10 +181,12 @@ export default function MissionPage() {
           )}
 
           {(() => {
+            const rep = (ownReports || []).filter((c) => c.thumbnail_url || c.spend != null).slice(0, 4)
             const ads = desk?.ownAds || []
             const m = plan?.meta
-            const liveN = m?.connected ? (m.activeCreatives ?? ads.length) : ads.length
+            const liveN = m?.connected ? (m.activeCreatives ?? rep.length) : ads.length
             const sub = m?.connected && m.spend != null ? `${money(m.spend, m.currency)} spend · ${xx(m.roas)} ROAS` : null
+            const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
             return (
               <div className="ms-yours">
                 <h2 className="ms-sec sec2">Your ads {m?.connected && <small>last 30 days</small>}</h2>
@@ -184,7 +197,22 @@ export default function MissionPage() {
                     {sub && <span className="sub">{sub}</span>}
                   </div>
                 )}
-                {ads.length > 0 ? (
+                {rep.length > 0 ? (
+                  // the /reports per-ad row: thumbnail + spend·CTR + ROAS pill — real Meta ad-level numbers
+                  <div className="ms-adrows">
+                    {rep.map((c, i) => (
+                      <a className="ms-adrow" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer">
+                        <div className="th">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span>🎨</span>}</div>
+                        <div className="mid">
+                          <div className="nm">{c.name || 'Ad'}</div>
+                          <div className="mt">{money(c.spend, m?.currency)} · CTR {c.ctr != null ? c.ctr.toFixed(1) : '—'}%</div>
+                        </div>
+                        <span className={`roas ${roasClass(c.roas)}`}>{c.roas != null ? `${c.roas.toFixed(1)}×` : '—'}</span>
+                      </a>
+                    ))}
+                  </div>
+                ) : ads.length > 0 ? (
+                  // fallback before Meta ad-level lands: the crawled creatives filmstrip
                   <div className="ms-strip">
                     {ads.map((a) => (
                       <div className="ms-shot" key={a.adId} title={a.title || ''}>
@@ -195,7 +223,7 @@ export default function MissionPage() {
                     ))}
                   </div>
                 ) : (
-                  <div className="ms-note sm">{desk === null ? 'Loading your ads…' : 'Your live ad creatives appear here once indexed — Mello is pulling them in.'}</div>
+                  <div className="ms-note sm">{ownReports === null || desk === null ? 'Loading your ads…' : sig?.metaConnected ? 'No ad-level data yet — your live creatives appear here once they spend.' : 'Your live ads appear here once Meta is connected.'}</div>
                 )}
                 {!sig?.metaConnected && <a href="/connect/meta" className="ms-btn flame full">Connect Meta →</a>}
               </div>
@@ -476,6 +504,17 @@ const CSS = `
 .ms-figure .big{font-family:var(--serif);font-weight:600;font-size:32px;letter-spacing:-.02em;line-height:1}
 .ms-figure .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
 .ms-figure .sub{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
+.ms-adrows{display:flex;flex-direction:column;gap:2px}
+.ms-adrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--hair);text-decoration:none}
+.ms-adrow .th{width:38px;height:38px;flex:none;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:15px}
+.ms-adrow .th img{width:100%;height:100%;object-fit:cover;display:block}
+.ms-adrow .mid{flex:1;min-width:0}
+.ms-adrow .mid .nm{font-size:12.5px;font-weight:500;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-adrow .mid .mt{font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
+.ms-adrow .roas{font-family:var(--mono);font-size:12px;font-weight:700;flex:none;color:var(--sub)}
+.ms-adrow .roas.good{color:var(--live)}
+.ms-adrow .roas.mid{color:var(--ink)}
+.ms-adrow .roas.bad{color:var(--flame)}
 .ms-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
 .ms-shot{position:relative;aspect-ratio:4/5;background:var(--panel);border:1px solid #e2ded4;overflow:hidden}
 .ms-shot img{width:100%;height:100%;object-fit:cover;display:block}
