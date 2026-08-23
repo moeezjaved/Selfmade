@@ -1,0 +1,122 @@
+/**
+ * Technical SEO Audit (SEO Phase 1) — crawl the brand's real site and report the on-page/technical issues
+ * that hurt rankings. Dependency-free: it fetches the homepage + a few internal pages (the same site we
+ * resolve for GEO — from the brand's Meta ads or brand_kit) and checks each for real problems. Everything
+ * reported is a fact found on a real page, never asserted.
+ */
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { describeBrand } from '@/lib/geo/understand'
+
+export type Severity = 'high' | 'medium' | 'low'
+export type Issue = { severity: Severity; title: string; detail: string; pages: string[] }
+export type SeoAudit = { hasData: boolean; site?: string; score?: number; pagesCrawled?: number; issues?: Issue[]; note?: string }
+
+const UA = 'Selfmade-SEO/1.0 (+https://tryselfmade.ai)'
+
+type PageCheck = {
+  url: string
+  title: string; titleLen: number
+  metaDesc: string; metaLen: number
+  h1Count: number
+  hasSchema: boolean
+  hasCanonical: boolean
+  wordCount: number
+  imgs: number; imgsNoAlt: number
+  noindex: boolean
+}
+
+async function fetchHtml(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'text/html' }, signal: AbortSignal.timeout(9000), redirect: 'follow' })
+    if (!r.ok) return null
+    const ct = r.headers.get('content-type') || ''
+    if (!ct.includes('html')) return null
+    return (await r.text()).slice(0, 400_000)
+  } catch { return null }
+}
+
+function checkPage(url: string, html: string): PageCheck {
+  const g = (re: RegExp) => re.exec(html)?.[1]?.trim() || ''
+  const title = g(/<title[^>]*>([^<]{0,300})/i)
+  const metaDesc = g(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{0,400})/i) || g(/<meta[^>]+content=["']([^"']{0,400})["'][^>]+name=["']description["']/i)
+  const h1Count = (html.match(/<h1[\s>]/gi) || []).length
+  const hasSchema = /<script[^>]+type=["']application\/ld\+json["']/i.test(html)
+  const hasCanonical = /<link[^>]+rel=["']canonical["']/i.test(html)
+  const noindex = /<meta[^>]+name=["']robots["'][^>]+content=["'][^"']*noindex/i.test(html)
+  const body = html.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const wordCount = body ? body.split(' ').length : 0
+  const imgTags = html.match(/<img[^>]*>/gi) || []
+  const imgsNoAlt = imgTags.filter((t) => !/\balt=/i.test(t)).length
+  return { url, title, titleLen: title.length, metaDesc, metaLen: metaDesc.length, h1Count, hasSchema, hasCanonical, wordCount, imgs: imgTags.length, imgsNoAlt, noindex }
+}
+
+function internalLinks(html: string, base: URL, limit: number): string[] {
+  const out: string[] = [], seen = new Set<string>()
+  const re = /<a[^>]+href=["']([^"'#]+)["']/gi
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html)) && out.length < limit) {
+    try {
+      const u = new URL(m[1], base)
+      if (u.hostname.replace(/^www\./, '') !== base.hostname.replace(/^www\./, '')) continue
+      if (!/^https?:$/.test(u.protocol)) continue
+      if (/\.(png|jpe?g|gif|svg|webp|pdf|css|js|ico|zip|mp4)$/i.test(u.pathname)) continue
+      const key = u.origin + u.pathname
+      if (seen.has(key)) continue
+      seen.add(key); out.push(key)
+    } catch { /* skip */ }
+  }
+  return out
+}
+
+export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId: string | null): Promise<SeoAudit> {
+  const u = await describeBrand(admin, userId, brandId)
+  const siteRaw = (u?.website || '').trim()
+  if (!siteRaw) return { hasData: false, note: 'I don’t have your website yet — connect Meta (so I can read your ads’ landing page) or set it under “tell me exactly” on the GEO page, then re-run.' }
+  let base: URL
+  try { base = new URL(siteRaw.startsWith('http') ? siteRaw : `https://${siteRaw}`) } catch { return { hasData: false, note: 'Your website URL looks invalid — set it on the GEO page and re-run.' } }
+
+  const home = await fetchHtml(base.href)
+  if (!home) return { hasData: false, site: base.href, note: `Couldn’t fetch ${base.hostname} — it may block bots or be down. I’ll retry next run.` }
+
+  const urls = [base.origin + base.pathname, ...internalLinks(home, base, 12)]
+  const uniq = Array.from(new Set(urls)).slice(0, 10)
+  const checks: PageCheck[] = []
+  for (const url of uniq) {
+    const html = url === (base.origin + base.pathname) ? home : await fetchHtml(url)
+    if (html) checks.push(checkPage(url, html))
+  }
+  if (!checks.length) return { hasData: false, site: base.href, note: `Fetched ${base.hostname} but couldn’t read any pages. I’ll retry.` }
+
+  // ── aggregate real findings ──
+  const issues: Issue[] = []
+  const add = (severity: Severity, title: string, detail: string, pages: string[]) => { if (pages.length) issues.push({ severity, title, detail, pages: pages.slice(0, 8) }) }
+  const P = (pred: (c: PageCheck) => boolean) => checks.filter(pred).map((c) => c.url)
+
+  add('high', 'Missing title tag', 'Pages with no <title> — search engines have nothing to show in results.', P((c) => !c.title))
+  add('high', 'Missing meta description', 'Pages with no meta description — you’re letting Google write your snippet.', P((c) => !c.metaDesc))
+  add('high', 'No H1 heading', 'Pages missing an <h1> — the main topic signal for the page.', P((c) => c.h1Count === 0))
+  add('high', 'Blocked from indexing (noindex)', 'Pages set to noindex — they can’t rank at all. Confirm this is intentional.', P((c) => c.noindex))
+  add('medium', 'Multiple H1 headings', 'Pages with more than one <h1> — dilutes the topic signal.', P((c) => c.h1Count > 1))
+  add('medium', 'Thin content', 'Pages under ~250 words — usually too little to rank for anything competitive.', P((c) => c.wordCount > 0 && c.wordCount < 250))
+  add('medium', 'No structured data (schema)', 'Pages with no JSON-LD schema — you miss rich results and AI/entity understanding.', P((c) => !c.hasSchema))
+  add('medium', 'Title too long or too short', 'Titles outside ~30–60 chars get truncated or waste space in results.', P((c) => c.title !== '' && (c.titleLen < 30 || c.titleLen > 65)))
+  add('low', 'No canonical tag', 'Pages without a canonical link — risks duplicate-content confusion.', P((c) => !c.hasCanonical))
+  add('low', 'Images missing alt text', 'Images without alt text — bad for accessibility and image search.', P((c) => c.imgsNoAlt > 0))
+
+  const weight = { high: 12, medium: 6, low: 2 } as const
+  const penalty = issues.reduce((s, i) => s + weight[i.severity] * Math.min(3, Math.ceil(i.pages.length / 3)), 0)
+  const score = Math.max(5, 100 - penalty)
+
+  try { await (admin as any).from('seo_audit').insert({ brand_id: brandId, user_id: userId, score, issues, pages_crawled: checks.length, site: base.href }) } catch { /* best-effort */ }
+  return { hasData: true, site: base.href, score, pagesCrawled: checks.length, issues: issues.sort((a, b) => weight[b.severity] - weight[a.severity]) }
+}
+
+export async function loadSeoAudit(admin: SupabaseClient, userId: string, brandId: string | null): Promise<SeoAudit> {
+  try {
+    let q = (admin as any).from('seo_audit').select('score, issues, pages_crawled, site, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
+    if (brandId) q = q.eq('brand_id', brandId)
+    const { data } = await q.maybeSingle()
+    if (!data) return { hasData: false }
+    return { hasData: true, site: data.site, score: data.score, pagesCrawled: data.pages_crawled, issues: data.issues || [] }
+  } catch { return { hasData: false } }
+}

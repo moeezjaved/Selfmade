@@ -148,7 +148,7 @@ export function buildGrowthPlan(inp: PlanInput): GrowthPlan {
       ],
       flow: [`${assumedVisits.toLocaleString()} visits/mo`, `${pct(cvr)} buy`, `${Math.round(assumedVisits * cvr)} sales × ${money(aov, c)}`, `${moneyK(delta, c)}/mo & growing`],
       assumption: 'Three agents chain here: Research finds the keywords rivals rank for → SEO writes the blog → Creative makes the hero image. Compounds monthly. Estimate firms up once we see real search volumes.',
-      action: { kind: 'soon', label: 'Unlock keyword data →' },
+      action: { kind: 'run', label: 'Audit your SEO →', href: '/mission/seo' },
       chain: 'Research → SEO → Creative · a real growth engine',
     })
   }
