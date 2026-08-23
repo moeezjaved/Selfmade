@@ -146,6 +146,30 @@ export class MetaClient {
     } catch { return null }
   }
 
+  // The REAL landing pages + ad copy this account's ads point at — the unambiguous "what this brand sells"
+  // signal (it's THIS connected account, not a name match). Best-effort → empty on error.
+  async getAdCreatives(limit = 25): Promise<{ urls: string[]; copy: string[] }> {
+    try {
+      const res = await this.client.get(`/${this.accountId}/ads`, {
+        params: {
+          fields: 'name,creative{object_story_spec{link_data{link,message,name},video_data{message,title,call_to_action{value{link}}}},asset_feed_spec{link_urls{website_url},bodies{text},titles{text}}}',
+          filtering: JSON.stringify([{ field: 'effective_status', operator: 'IN', value: ['ACTIVE'] }]), limit,
+        },
+      })
+      const urls: string[] = [], copy: string[] = []
+      for (const ad of (res.data?.data || [])) {
+        const c = ad?.creative || {}
+        const oss = c.object_story_spec || {}
+        const link = oss.link_data?.link || oss.video_data?.call_to_action?.value?.link || c.asset_feed_spec?.link_urls?.[0]?.website_url
+        if (link) urls.push(link)
+        const msg = oss.link_data?.message || oss.link_data?.name || oss.video_data?.title || oss.video_data?.message
+          || c.asset_feed_spec?.titles?.[0]?.text || c.asset_feed_spec?.bodies?.[0]?.text || ad?.name
+        if (msg) copy.push(String(msg).slice(0, 200))
+      }
+      return { urls, copy: copy.slice(0, 8) }
+    } catch { return { urls: [], copy: [] } }
+  }
+
   async pauseCampaign(campaignId: string) {
     const res = await this.client.post(`/${campaignId}`, { status: 'PAUSED' })
     return res.data
