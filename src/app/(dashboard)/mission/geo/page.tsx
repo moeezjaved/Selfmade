@@ -13,7 +13,7 @@ type Status = {
   engines: { engine: string; label: string }[]; availableEngines: { engine: string; label: string }[]
   results: PromptResult[]; gaps: { prompt: string; rivals: string[] }[]; history: { date: string; score: number }[]
   lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; category?: string
-  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }; note?: string
+  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number; uncertain: boolean }; note?: string
 }
 const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
@@ -36,6 +36,8 @@ export default function GeoPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  // when we're only guessing (name-match, no trusted signal), open the correction form so it's obvious.
+  useEffect(() => { if (status?.understanding?.uncertain) setShowFix(true) }, [status?.understanding?.uncertain])
 
   const writeAnswer = async (prompt: string, rivals: string[]) => {
     if (writing) return
@@ -92,7 +94,9 @@ export default function GeoPage() {
 
         {status?.category && (
           <div className="understood">
-            <div>Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button> or <button className="reglink" onClick={() => setShowFix((s) => !s)} disabled={running}>tell me exactly →</button></div>
+            <div>{status.understanding?.uncertain
+              ? <>I couldn’t confidently tell what you sell (I don’t have your Meta ads, competitors or site yet). <b>Tell me your category</b> so the check is accurate:</>
+              : <>Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button> or <button className="reglink" onClick={() => setShowFix((s) => !s)} disabled={running}>tell me exactly →</button></>}</div>
             {showFix && (
               <div className="fixform">
                 <input placeholder="Your category, e.g. nicotine-free vape / quit-vaping aid" value={fixCat} onChange={(e) => setFixCat(e.target.value)} />

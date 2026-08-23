@@ -24,7 +24,7 @@ export type BrandUnderstanding = {
   competitors: string[]
   website?: string | null
   fromCache?: boolean       // true = returned the remembered understanding (no fresh read this run)
-  debug?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }
+  debug?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number; uncertain: boolean }
 }
 
 export async function describeBrand(admin: SupabaseClient, userId: string, brandId: string | null, opts?: { fresh?: boolean }): Promise<BrandUnderstanding | null> {
@@ -48,7 +48,7 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
   if (founderCategory) {
     const u = { category: founderCategory, description: founderCategory, buyerTerms: [] as string[], website: kitWebsite || null }
     await writeCache(admin, userId, brandId, u)
-    return { brandName, competitors, ...u, fromCache: false, debug: { websiteUrl: kitWebsite || null, websiteSource: 'you set it', siteRead: false, competitors, metaAdCopy: 0 } }
+    return { brandName, competitors, ...u, fromCache: false, debug: { websiteUrl: kitWebsite || null, websiteSource: 'you set it', siteRead: false, competitors, metaAdCopy: 0, uncertain: false } }
   }
 
   // reuse the remembered understanding unless asked for a fresh read
@@ -125,11 +125,14 @@ If the competitors are nicotine/vaping brands, the category is nicotine/vaping â
     if (Array.isArray(parsed?.buyer_terms)) buyerTerms = parsed.buyer_terms.map((t: any) => String(t)).filter(Boolean).slice(0, 8)
   } catch { /* keep whatever we resolved from signals */ }
 
+  // If NOTHING trustworthy drove this (no Meta ads, no competitors, no products, no founder site) then the
+  // category came only from a name-matched brand that may not be you â†’ flag it uncertain instead of asserting.
+  const uncertain = metaCopy.length === 0 && competitors.length === 0 && products.length === 0 && !kitWebsite
   const understanding = { category: category || 'this product', description, buyerTerms, website: landingUrl || null }
-  await writeCache(admin, userId, brandId, understanding)   // remember it in the Company Brain
+  if (!uncertain) await writeCache(admin, userId, brandId, understanding)   // only remember it if it's trustworthy
   const debug = {
     websiteUrl: landingUrl, websiteSource: metaUrl ? 'meta_ads' : kitWebsite ? 'brand_kit' : nameUrl ? 'name_match' : 'none',
-    siteRead: !!(verifiedSite || unverifiedSite), competitors, metaAdCopy: metaCopy.length,
+    siteRead: !!(verifiedSite || unverifiedSite), competitors, metaAdCopy: metaCopy.length, uncertain,
   }
   return { brandName, competitors, ...understanding, fromCache: false, debug }
 }

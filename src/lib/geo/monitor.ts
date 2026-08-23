@@ -32,7 +32,7 @@ export type GeoStatus = {
   estCostUsd?: number        // ~cost of the last sweep (estimate)
   perCheckEstUsd?: number    // ~cost of running a check now (available engines × prompt count)
   category?: string          // what we understood the brand to be (shown so the founder can correct it)
-  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }
+  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number; uncertain: boolean }
   note?: string
 }
 
