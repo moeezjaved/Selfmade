@@ -37,9 +37,10 @@ import BootMotion from '@/components/motion/BootMotion'
 type NavItem = { href?: string; icon?: React.ElementType; label?: string; badge?: string | null; section?: string }
 const AREAS: { key: string; label: string; railLabel: string; railIcon: React.ElementType; defaultHref: string; items: NavItem[] }[] = [
   {
-    key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/brief',
+    key: 'home', label: 'Home', railLabel: 'Home', railIcon: Sun, defaultHref: '/mission',
     items: [
-      { href: '/brief', icon: Sun, label: 'Morning Brief' },
+      { href: '/mission', icon: Sun, label: 'Mission' },
+      { href: '/mission/journey', icon: TrendingUp, label: 'Journey' },
       { href: '/company', icon: Users, label: 'Your Team' },
       { href: '/brain', icon: Brain, label: 'Company Brain' },
       { href: '/documents', icon: FileText, label: 'Documents' },
