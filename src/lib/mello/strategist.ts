@@ -83,9 +83,10 @@ const STAGE_FOCUS: Record<BusinessStage, string> = {
 
 export async function generateStrategistPlan(
   admin: SupabaseClient,
-  opts: { userId: string; brandId?: string | null; persist?: boolean; limit?: number },
+  opts: { userId: string; brandId?: string | null; persist?: boolean; limit?: number; exclude?: string[] },
 ): Promise<StrategistPlan> {
-  const limit = Math.min(6, Math.max(2, opts.limit ?? 5))
+  const limit = Math.min(8, Math.max(2, opts.limit ?? 5))
+  const exclude = (opts.exclude || []).map((s) => String(s || '').trim()).filter(Boolean).slice(0, 30)
   const ctx = await loadMelloContext(admin, opts.userId, opts.brandId ?? null)
   const brandId = ctx.brandId
 
@@ -200,6 +201,7 @@ HARD RULES:
 - Respect the BUSINESS STAGE (given below as stage + stage_focus). Do not propose stage-inappropriate plays.
 - Each task is concrete and one a real operator would run this week. Name the specific competitor / gap / signal it comes from.
 - Prefer diversity of levers over five variations of one idea. Max ${limit} tasks.
+- If "already_proposed" below is non-empty, those moves are ALREADY on the founder's desk: do NOT repeat, restate, or lightly reword any of them. Propose genuinely DIFFERENT next moves — other levers, other channels, other angles — still ranked by real impact. If you've run out of high-impact ideas grounded in the data, return fewer tasks rather than padding with filler.
 - "impact" must be honest: give a $ estimate ONLY if the data supports it (e.g. from ad counts, gaps); otherwise qualitative ("protects scale", "unlocks a channel").
 - WHAT SELFMADE CAN EXECUTE (set runnable=true ONLY for these, and only if their connection exists): dept "media" (launch/scale/kill/budget ads — needs Meta connected), "creative" (make ad images/videos), "research" (competitor reports/spying), "customer" (draft replies to comments/DMs), "reports". For these, "needs" is null (or "meta" for media when Meta is not connected).
 - NEEDS-A-CONNECTION-FIRST (ALWAYS runnable=false, set "needs"): dept "site"/CRO and "aov"-lever moves need the STORE — set needs="shopify"; "email"/SMS needs needs="klaviyo". No store is connected yet, so you can only INFER a conversion/AOV/site problem from Meta's post-click metrics — say "your post-click conversion is low (X%)" and, in "steps", give the exact fix, but frame it as "connect Shopify and I'll do this for you", NOT "I'll optimize your pages" (Selfmade can't touch a store it isn't connected to). needs="shopify" makes the app show a Connect-Shopify button first.
@@ -224,6 +226,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     gaps: gaps.slice(0, 12),
     ceo_preferences: prefs,
     recent_learnings: learnings.slice(0, 8).map((l: any) => ({ event: l.event, result: l.result, metric: l.metric })),
+    already_proposed: exclude,
   })
 
   let stageRead = STAGE_FOCUS[stage]
