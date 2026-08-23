@@ -172,6 +172,10 @@ export async function generateStrategistPlan(
     } catch { /* Meta read optional */ }
   }
 
+  // Is a Shopify store actually connected for this brand? (site/CRO/AOV/SEO moves are runnable when it is.)
+  let shopifyConnected = false
+  try { const { resolveStore } = await import('@/lib/shopify/client'); shopifyConnected = !!(await resolveStore(admin, opts.userId, brandId ?? null)) } catch { /* optional */ }
+
   // The brain — what the founder prefers + what we've already learned works/fails.
   let prefs: Record<string, any> = {}, learnings: any[] = []
   try { const r = await recall(admin, { userId: opts.userId, department: 'media', brandId, limit: 8 }); prefs = r.prefs || {}; learnings = r.learnings || [] } catch { /* brain optional */ }
@@ -204,9 +208,10 @@ HARD RULES:
 - If "already_proposed" below is non-empty, those moves are ALREADY on the founder's desk: do NOT repeat, restate, or lightly reword any of them. Propose genuinely DIFFERENT next moves — other levers, other channels, other angles — still ranked by real impact. If you've run out of high-impact ideas grounded in the data, return fewer tasks rather than padding with filler.
 - "impact" must be honest: give a $ estimate ONLY if the data supports it (e.g. from ad counts, gaps); otherwise qualitative ("protects scale", "unlocks a channel").
 - WHAT SELFMADE CAN EXECUTE (set runnable=true ONLY for these, and only if their connection exists): dept "media" (launch/scale/kill/budget ads — needs Meta connected), "creative" (make ad images/videos), "research" (competitor reports/spying), "customer" (draft replies to comments/DMs), "reports". For these, "needs" is null (or "meta" for media when Meta is not connected).
-- NEEDS-A-CONNECTION-FIRST (ALWAYS runnable=false, set "needs"): dept "site"/CRO and "aov"-lever moves need the STORE — set needs="shopify"; "email"/SMS needs needs="klaviyo". No store is connected yet, so you can only INFER a conversion/AOV/site problem from Meta's post-click metrics — say "your post-click conversion is low (X%)" and, in "steps", give the exact fix, but frame it as "connect Shopify and I'll do this for you", NOT "I'll optimize your pages" (Selfmade can't touch a store it isn't connected to). needs="shopify" makes the app show a Connect-Shopify button first.
-- STILL FUTURE / BRIEF-ONLY (runnable=false, needs=null): dept "seo", "blog", "outreach" — propose if highest-leverage, write "steps" as a founder-facing brief, don't imply auto-execution.
-- IF meta_connected is false: ALWAYS include exactly one task titled like "Launch your first campaign" (lever "traffic", dept "media", runnable=false, needs="meta") whose "steps" ARE a concrete campaign blueprint — objective, 1 campaign with 2-3 ad sets, the audiences, which of the ready ads go in each, and a starting daily budget. Rank it first — the app uses needs="meta" to prompt Connect Meta.
+- CONNECTION-DEPENDENT — READ account.shopify_connected AND account.meta_connected, and set "needs" ONLY for a connection that is genuinely MISSING. NEVER set needs for something already connected.
+  • dept "site"/CRO + "aov"-lever + "seo"/"blog" moves need the STORE. If account.shopify_connected is TRUE: Selfmade CAN act on the store — set needs=null and frame as "I'll fix your product pages / write the SEO content" (we have catalog, blog, programmatic-SEO and store-audit tools). If FALSE: set needs="shopify", infer the problem from Meta's post-click metrics, and frame as "connect Shopify and I'll do this for you".
+  • "email"/SMS moves need Klaviyo — set needs="klaviyo" only if not connected.
+- IF account.meta_connected is FALSE: include exactly one task titled like "Launch your first campaign" (lever "traffic", dept "media", runnable=false, needs="meta") whose "steps" ARE a concrete campaign blueprint, ranked first. IF account.meta_connected is TRUE: do NOT propose any "connect Meta" or "launch your first campaign" task — Meta is already live; propose scale/efficiency/new-audience moves with needs=null instead.
 Return JSON: {"stage_read":"one plain-English sentence naming the biggest constraint", "tasks":[{"title","lever","dept","why","steps":["…"],"hypothesis","impact","runnable":true|false,"needs":"meta"|"shopify"|"klaviyo"|null}]}. lever ∈ {traffic,conversion,aov,retention,efficiency,brand}. dept ∈ {media,creative,research,customer,reports,email,seo,site,outreach}. "needs" = the connection the task requires before it can run (null when Selfmade can already do it).`
 
   const user = JSON.stringify({
@@ -214,7 +219,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     stage,
     stage_focus: STAGE_FOCUS[stage],
     account: {
-      plan: ctx.plan.label, meta_connected: ctx.integrations.meta.connected,
+      plan: ctx.plan.label, meta_connected: brandMetaConnected, shopify_connected: shopifyConnected,
       slack: ctx.integrations.slack.connected, whatsapp: ctx.integrations.whatsapp.connected,
       active_campaigns: activeCampaigns, creatives_last_week: creativesWk, open_inbox_threads: openChats,
     },
@@ -248,7 +253,10 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
   const LEVERS: Lever[] = ['traffic', 'conversion', 'aov', 'retention', 'efficiency', 'brand']
   const tasks: StrategistTask[] = rawTasks.slice(0, limit).map((t: any, i: number): StrategistTask => {
     const title = String(t?.title || '').trim() || 'Untitled move'
-    const needs = (['meta', 'shopify', 'klaviyo'].includes(t?.needs) ? t.needs : null) as StrategistTask['needs']
+    let needs = (['meta', 'shopify', 'klaviyo'].includes(t?.needs) ? t.needs : null) as StrategistTask['needs']
+    // Never show a "Connect X" CTA for something already connected — the model sometimes emits a stale
+    // needs even when the integration exists. Clear it so the task becomes actionable, not a dead connect.
+    if ((needs === 'meta' && brandMetaConnected) || (needs === 'shopify' && shopifyConnected)) needs = null
     return {
       title,
       lever: LEVERS.includes(t?.lever) ? t.lever : 'traffic',
