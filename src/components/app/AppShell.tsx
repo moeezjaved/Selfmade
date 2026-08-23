@@ -47,18 +47,12 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     ],
   },
   {
-    // GROW — the organic growth engine: the retention journey + every SEO/GEO/Shopify content agent.
-    key: 'grow', label: 'Grow', railLabel: 'Grow', railIcon: TrendingUp, defaultHref: '/mission/journey',
+    // GROW — the organic growth engine. ONE page (the Growth hub) surfaces everything; the departments open
+    // from its cards, not the rail — no menu soup.
+    key: 'grow', label: 'Grow', railLabel: 'Grow', railIcon: TrendingUp, defaultHref: '/grow',
     items: [
-      { href: '/mission/journey',      icon: TrendingUp,      label: 'Journey' },
-      { href: '/mission/wins',         icon: Trophy,          label: 'Wins ledger' },
-      { href: '/mission/plan',         icon: ClipboardList,   label: 'Growth plan' },
-      { href: '/mission/catalog',      icon: Store,           label: 'Store catalog' },
-      { href: '/mission/blog',         icon: Newspaper,       label: 'Content' },
-      { href: '/mission/programmatic', icon: LayoutDashboard, label: 'Pages at scale' },
-      { href: '/mission/seo',          icon: LineChart,       label: 'SEO' },
-      { href: '/mission/geo',          icon: Sparkles,        label: 'AI search' },
-      { href: '/mission/competitors',  icon: Eye,             label: 'Competitors' },
+      { href: '/grow',          icon: TrendingUp, label: 'Growth' },
+      { href: '/mission/wins',  icon: Trophy,     label: 'Impact ledger' },
     ],
   },
   {
@@ -106,7 +100,9 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
 
 // Analytics pages folded into Reports (reachable via the Reports tab strip, not the rail) — but they
 // still belong to the 'ads' area for rail highlighting when visited directly.
-const ADS_AREA_EXTRA_PATHS = ['/insights', '/leaderboard', '/snapshots', '/dashboard']
+const ADS_AREA_EXTRA_PATHS = ['/insights', '/leaderboard', '/snapshots', '/dashboard', '/mission/ads']
+// GROW department pages open from the Growth hub's cards (not the rail), but still belong to the Grow area.
+const GROW_AREA_EXTRA_PATHS = ['/mission/catalog', '/mission/blog', '/mission/programmatic', '/mission/seo', '/mission/geo', '/mission/competitors', '/mission/plan', '/mission/journey']
 
 const RAIL_W = 72
 
@@ -153,7 +149,10 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
   const melloActive = pathname === '/mello' || pathname.startsWith('/mello/')
   // Reports-folded analytics pages have no nav item but belong to the 'ads' area → keep it highlighted.
   const inAdsExtra = ADS_AREA_EXTRA_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
-  const activeArea = inAdsExtra ? AREAS.find(a => a.key === 'ads') : AREAS.find(a => a.items.some(i => i.href === activeHref))
+  const inGrowExtra = GROW_AREA_EXTRA_PATHS.some(p => pathname === p || pathname.startsWith(p + '/'))
+  const activeArea = inAdsExtra ? AREAS.find(a => a.key === 'ads')
+    : inGrowExtra ? AREAS.find(a => a.key === 'grow')
+    : AREAS.find(a => a.items.some(i => i.href === activeHref))
 
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
