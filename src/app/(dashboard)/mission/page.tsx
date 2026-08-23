@@ -480,8 +480,8 @@ const CSS = `
 .ms-figure .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
 .ms-figure .sub{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
 .ms-adsplit{display:flex;gap:14px;margin-top:10px}
-.ms-ad-cre{flex:1;min-width:0;display:grid;grid-template-columns:repeat(2,1fr);gap:5px;align-content:start}
-.ms-ad-cre .cre{position:relative;aspect-ratio:4/5;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:block}
+.ms-ad-cre{flex:1;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,42px);gap:4px;align-content:start}
+.ms-ad-cre .cre{position:relative;aspect-ratio:1;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:block}
 .ms-ad-cre .cre img{width:100%;height:100%;object-fit:cover;display:block}
 .ms-ad-cre .cre .rp{position:absolute;bottom:0;right:0;font-family:var(--mono);font-size:9px;font-weight:700;color:#fff;background:rgba(20,18,15,.72);padding:1px 4px}
 .ms-ad-cre .cre .rp.good{background:rgba(31,138,83,.88)}
