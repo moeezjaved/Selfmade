@@ -63,6 +63,7 @@ export type MetaPanel = {
   spend?: number | null; currency?: string; roas?: number | null; ctr?: number | null
   cvr?: number | null; aov?: number | null; frequency?: number | null
   activeCreatives?: number | null; biggestLever?: string | null
+  revenue?: number | null   // ad-driven purchase value (30d) — powers the mission revenue ladder
 }
 
 // ── stage detection — from real signals, honest and cheap ──
@@ -264,7 +265,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     brand: ctx.brandName || undefined,
     signals: { competitors: ctx.competitors.length, ownAdsFound: ownFound, winnerCount: winners?.winnerCount || 0, metaConnected: brandMetaConnected },
     meta: brandMetaConnected
-      ? { connected: true, spend: performance?.spend ?? null, currency: performance?.currency ?? 'USD', roas: performance?.roas ?? null, ctr: performance?.ctr ?? null, cvr: performance?.cvr ?? null, aov: performance?.aov ?? null, frequency: performance?.frequency ?? null, activeCreatives: performance?.activeCreatives ?? null, biggestLever: biggestLeverRead?.headline ?? null }
+      ? { connected: true, spend: performance?.spend ?? null, currency: performance?.currency ?? 'USD', roas: performance?.roas ?? null, ctr: performance?.ctr ?? null, cvr: performance?.cvr ?? null, aov: performance?.aov ?? null, frequency: performance?.frequency ?? null, activeCreatives: performance?.activeCreatives ?? null, biggestLever: biggestLeverRead?.headline ?? null, revenue: (performance?.spend != null && performance?.roas != null) ? performance.spend * performance.roas : null }
       : { connected: false },
     ...(ownCrawlNote ? { notice: ownCrawlNote } : {}),
   }
