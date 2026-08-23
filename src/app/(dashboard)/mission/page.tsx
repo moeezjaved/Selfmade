@@ -102,6 +102,11 @@ export default function MissionPage() {
   const [ideas, setIdeas] = useState<Idea[] | null>(null)
   useEffect(() => { (async () => { try { const r = await fetch('/api/creative/strategy'); const j = await r.json(); if (r.ok && Array.isArray(j.ideas)) setIdeas(j.ideas.slice(0, 3)) } catch { /* optional */ } })() }, [])
 
+  // Ads Account-Health — the watchdog's flagged issues (CPA spike, ROAS drop, fatigue…) on the ads panel.
+  type AdIssue = { kind: string; severity: 'high' | 'med'; title: string; body: string }
+  const [adIssues, setAdIssues] = useState<AdIssue[] | null>(null)
+  useEffect(() => { (async () => { try { const r = await fetch('/api/meta/health'); const j = await r.json(); if (r.ok && Array.isArray(j.issues)) setAdIssues(j.issues) } catch { /* optional */ } })() }, [])
+
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
   type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; cpa?: number; thumbnail_url?: string; preview_url?: string }
@@ -449,6 +454,16 @@ export default function MissionPage() {
                 <span>CVR <b className={m.cvr != null && m.cvr < 0.01 ? 'bad' : ''}>{pct(m.cvr)}</b></span>
                 <span>AOV <b>{money(m.aov, m.currency)}</b></span>
               </div>
+              {adIssues && adIssues.length > 0 && (
+                <div className="ms-adhealth">
+                  {adIssues.slice(0, 3).map((iss, i) => (
+                    <div className={`ms-adissue ${iss.severity}`} key={i}>
+                      <span className="dot" />
+                      <span className="t">{iss.title}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
               {/* per-ad table, Polsia-style: thumbnail + spend/impr/clicks/ctr/cpc columns */}
               {rep.length > 0 ? (
                 <div className="ms-adtable">
@@ -648,6 +663,14 @@ const CSS = `
 .ms-grow .grow-card.accent .gc-v{color:var(--live)}
 .ms-grow .grow-card .gc-l{font-family:var(--ui);font-size:11.5px;font-weight:700;color:var(--sub);margin-top:4px}
 .ms-grow .grow-card .gc-s{font-family:var(--mono);font-size:10px;color:var(--mut);margin-top:2px}
+.ms-adhealth{display:flex;flex-direction:column;gap:6px;margin:10px 0 4px}
+.ms-adissue{display:flex;align-items:center;gap:9px;border:1px solid var(--line);border-left:3px solid var(--mut);border-radius:9px;padding:8px 11px;background:var(--paper)}
+.ms-adissue.high{border-left-color:#c0392b;background:#fdecea}
+.ms-adissue.med{border-left-color:var(--lime);background:#fff6f2}
+.ms-adissue .dot{width:7px;height:7px;border-radius:50%;background:var(--mut);flex:none}
+.ms-adissue.high .dot{background:#c0392b}
+.ms-adissue.med .dot{background:var(--lime)}
+.ms-adissue .t{font-family:var(--ui);font-size:12.5px;font-weight:700;color:var(--ink);line-height:1.3}
 .ms-ideas{display:flex;flex-direction:column;gap:8px}
 .ms-idea{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:11px;background:var(--card);padding:9px 11px;text-decoration:none}
 .ms-idea img,.ms-idea .noimg{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:var(--greenBg);display:flex;align-items:center;justify-content:center;color:var(--live);font-size:16px}
