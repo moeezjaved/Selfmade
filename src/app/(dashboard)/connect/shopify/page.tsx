@@ -117,7 +117,10 @@ function ConnectShopifyInner() {
             <div style={{ fontSize: 12.5, color: SUB }}>
               {s.last_sync ? `Last synced ${new Date(s.last_sync).toLocaleString()}` : 'Not yet synced'}
             </div>
-            <a href="/mission/catalog" style={{ background: LIME, color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Fix these gaps →</a>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <a href="/mission/blog" style={{ background: '#fff', color: INK, border: `1.5px solid ${LINE}`, padding: '9px 16px', borderRadius: 100, fontSize: 13.5, fontWeight: 700, textDecoration: 'none', whiteSpace: 'nowrap' }}>Write a blog →</a>
+              <a href="/mission/catalog" style={{ background: LIME, color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Fix these gaps →</a>
+            </div>
           </div>
         </div>
       ) : (
