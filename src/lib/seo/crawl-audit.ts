@@ -23,6 +23,7 @@ type PageCheck = {
   wordCount: number
   imgs: number; imgsNoAlt: number
   noindex: boolean
+  outLinks: string[]   // internal links this page points at (for the link graph)
 }
 
 async function fetchHtml(url: string): Promise<string | null> {
@@ -35,7 +36,7 @@ async function fetchHtml(url: string): Promise<string | null> {
   } catch { return null }
 }
 
-function checkPage(url: string, html: string): PageCheck {
+function checkPage(url: string, html: string, base: URL): PageCheck {
   const g = (re: RegExp) => re.exec(html)?.[1]?.trim() || ''
   const title = g(/<title[^>]*>([^<]{0,300})/i)
   const metaDesc = g(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{0,400})/i) || g(/<meta[^>]+content=["']([^"']{0,400})["'][^>]+name=["']description["']/i)
@@ -47,7 +48,7 @@ function checkPage(url: string, html: string): PageCheck {
   const wordCount = body ? body.split(' ').length : 0
   const imgTags = html.match(/<img[^>]*>/gi) || []
   const imgsNoAlt = imgTags.filter((t) => !/\balt=/i.test(t)).length
-  return { url, title, titleLen: title.length, metaDesc, metaLen: metaDesc.length, h1Count, hasSchema, hasCanonical, wordCount, imgs: imgTags.length, imgsNoAlt, noindex }
+  return { url, title, titleLen: title.length, metaDesc, metaLen: metaDesc.length, h1Count, hasSchema, hasCanonical, wordCount, imgs: imgTags.length, imgsNoAlt, noindex, outLinks: internalLinks(html, base, 60) }
 }
 
 function internalLinks(html: string, base: URL, limit: number): string[] {
@@ -83,7 +84,7 @@ export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId
   const checks: PageCheck[] = []
   for (const url of uniq) {
     const html = url === (base.origin + base.pathname) ? home : await fetchHtml(url)
-    if (html) checks.push(checkPage(url, html))
+    if (html) checks.push(checkPage(url, html, base))
   }
   if (!checks.length) return { hasData: false, site: base.href, note: `Fetched ${base.hostname} but couldn’t read any pages. I’ll retry.` }
 
@@ -102,6 +103,21 @@ export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId
   add('medium', 'Title too long or too short', 'Titles outside ~30–60 chars get truncated or waste space in results.', P((c) => c.title !== '' && (c.titleLen < 30 || c.titleLen > 65)))
   add('low', 'No canonical tag', 'Pages without a canonical link — risks duplicate-content confusion.', P((c) => !c.hasCanonical))
   add('low', 'Images missing alt text', 'Images without alt text — bad for accessibility and image search.', P((c) => c.imgsNoAlt > 0))
+
+  // ── cannibalization + duplicate tags (grouped by identical value) ──
+  const dupBy = (get: (c: PageCheck) => string) => {
+    const m = new Map<string, string[]>()
+    for (const c of checks) { const v = get(c).trim().toLowerCase(); if (!v) continue; m.set(v, [...(m.get(v) || []), c.url]) }
+    const urls: string[] = []; m.forEach((list) => { if (list.length > 1) urls.push(...list) }); return urls
+  }
+  add('medium', 'Duplicate titles (keyword cannibalization)', 'Multiple pages share the same title — they compete with each other in Google. Give each a distinct target.', dupBy((c) => c.title))
+  add('low', 'Duplicate meta descriptions', 'Pages sharing the same meta description — write a unique one per page.', dupBy((c) => c.metaDesc))
+
+  // ── orphan / weakly-linked pages (link graph from the crawl) ──
+  const home2 = base.origin + base.pathname
+  const inbound = new Map<string, number>()
+  for (const c of checks) for (const l of c.outLinks) if (l !== c.url) inbound.set(l, (inbound.get(l) || 0) + 1)
+  add('medium', 'Orphan / weakly-linked pages', 'Pages nothing else links to — search engines and users can barely find them. Add internal links.', checks.filter((c) => c.url !== home2 && (inbound.get(c.url) || 0) === 0).map((c) => c.url))
 
   const weight = { high: 12, medium: 6, low: 2 } as const
   const penalty = issues.reduce((s, i) => s + weight[i.severity] * Math.min(3, Math.ceil(i.pages.length / 3)), 0)
