@@ -54,6 +54,17 @@ export default function SeoPage() {
   }
   const copyBrief = async (b: Brief) => { try { await navigator.clipboard.writeText(b.body_markdown); setCopied(b.id || b.keyword); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
+  type LinkRec = { from: string; to: string; anchor: string; why: string }
+  const [links, setLinks] = useState<{ hasData: boolean; recs: LinkRec[]; note?: string } | null>(null)
+  const [linking, setLinking] = useState(false)
+  const findLinks = async () => {
+    if (linking) return
+    setLinking(true)
+    try { const r = await fetch('/api/seo/links', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) setLinks(j) } catch { /* keep */ }
+    setLinking(false)
+  }
+  const pth = (u: string) => { try { const x = new URL(u); return x.pathname === '/' ? x.hostname.replace(/^www\./, '') : x.pathname } catch { return u } }
+
   const issues = audit?.issues || []
   const counts = { high: issues.filter((i) => i.severity === 'high').length, medium: issues.filter((i) => i.severity === 'medium').length, low: issues.filter((i) => i.severity === 'low').length }
 
@@ -131,6 +142,25 @@ export default function SeoPage() {
             </>
           ) : (
             <div className="empty small">{kw?.note || (loading ? 'Loading…' : 'Tap “Find keywords” and I’ll pull the real searches your buyers use.')}</div>
+          )}
+        </div>
+
+        {/* Internal link opportunities (free) */}
+        <div className="section">
+          <div className="shead">
+            <div><div className="lead">Internal links to add</div><div className="assub">The links your pages are missing — they spread ranking power and help readers. From your real site, no guessing.</div></div>
+            <button className="btn" disabled={linking} onClick={findLinks}>{linking ? 'Analyzing your site…' : links?.hasData ? '↻ Re-analyze' : 'Find link opportunities →'}</button>
+          </div>
+          {links?.hasData ? (
+            links.recs.length ? links.recs.map((r, i) => (
+              <div className="linkrec" key={i}>
+                <div className="lr"><span className="lp">{pth(r.from)}</span><span className="arr">→ link to →</span><span className="lp to">{pth(r.to)}</span></div>
+                <div className="la">anchor: <b>“{r.anchor}”</b></div>
+                {r.why && <div className="lw">{r.why}</div>}
+              </div>
+            )) : <div className="empty small">{links.note}</div>
+          ) : (
+            <div className="empty small">{links?.note || (loading ? 'Loading…' : 'Tap “Find link opportunities” and I’ll map your internal linking.')}</div>
           )}
         </div>
 
@@ -218,4 +248,11 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .bbody{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px}
 .bbody pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ui);font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-height:420px;overflow-y:auto;margin:0 0 10px}
 .btn.tiny{font-size:11.5px;padding:7px 12px;border-radius:8px}
+.linkrec{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:13px 16px;margin-bottom:10px}
+.lr{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:12px}
+.lp{color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:7px;padding:3px 8px}
+.lp.to{color:var(--flame)}
+.arr{color:var(--mut);font-size:10px}
+.la{font-size:13px;color:var(--sub);margin-top:8px} .la b{color:var(--ink)}
+.lw{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.5}
 `
