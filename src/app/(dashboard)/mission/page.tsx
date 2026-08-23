@@ -247,8 +247,8 @@ export default function MissionPage() {
 
           {!loading && plan && (
             <div className="ms-taskbtns">
-              <a href="/brief" className="ms-btn">✎ Brief the team</a>
-              <button className="ms-btn" onClick={openBoard}>▦ Standup</button>
+              <a href="/brief" className="ms-btn">✎ The ask</a>
+              <button className="ms-btn" onClick={openBoard}>▦ Sprint board</button>
             </div>
           )}
 
@@ -308,7 +308,7 @@ export default function MissionPage() {
           <div className="ms-modal-wrap" onClick={() => setBoardOpen(false)}>
             <div className="ms-modal" onClick={(e) => e.stopPropagation()}>
               <div className="ms-modal-top">
-                <h3>Standup</h3>
+                <h3>Sprint board</h3>
                 <button className="ms-x" onClick={() => setBoardOpen(false)}>✕</button>
               </div>
               <div className="ms-tabs">
