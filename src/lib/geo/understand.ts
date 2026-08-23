@@ -53,9 +53,22 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
     if (brandId) { const { data } = await (admin as any).from('brand_products').select('name, description').eq('brand_id', brandId).limit(6); products = ((data || []) as any[]).map((p) => ({ name: p.name || '', description: (p.description || '').slice(0, 300) })).filter((p) => p.name || p.description) }
   } catch { /* ignore */ }
 
-  // ── own ads/site found by matching the brand NAME — UNVERIFIED (a common name like "Aura" matches many
-  //    different brands), so we label them and let the competitors/products (brand-scoped truth) override. ──
-  let adCopy: string[] = [], nameResolvedUrl = ''
+  // ── VERIFIED signal: the CONNECTED Meta account's ads — the real brand, not a name match. Read the
+  //    landing page its ads point at + its real ad copy. This is the source of truth for a connected brand. ──
+  let metaUrl = '', metaCopy: string[] = []
+  try {
+    const { resolveBrandScopedAccount } = await import('@/lib/meta/scope')
+    const acct = await resolveBrandScopedAccount(admin, userId, brandId)
+    const acctId = (acct as any)?.account_id ? String((acct as any).account_id) : undefined
+    if (acctId) {
+      const { createMetaClientForUser } = await import('@/lib/meta/client')
+      const mc = await createMetaClientForUser(userId, acctId)
+      if (mc) { const cr = await mc.getAdCreatives(25); metaUrl = mostCommonUrl(cr.urls); metaCopy = cr.copy }
+    }
+  } catch { /* Meta optional */ }
+
+  // ── name-matched own ads (fallback only) — UNVERIFIED, a common name matches many different brands ──
+  let nameCopy: string[] = [], nameUrl = ''
   try {
     const ownPageId = await resolveOwnPageId(admin, brandName)
     if (ownPageId) {
@@ -63,24 +76,27 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
         .select('title, link_url, performance_score').eq('page_id', ownPageId)
         .order('performance_score', { ascending: false, nullsFirst: false }).limit(20)
       const ads = (data || []) as any[]
-      adCopy = ads.map((a) => a.title).filter(Boolean).slice(0, 6)
-      nameResolvedUrl = mostCommonUrl(ads.map((a) => a.link_url).filter(Boolean))
+      nameCopy = ads.map((a) => a.title).filter(Boolean).slice(0, 6)
+      nameUrl = mostCommonUrl(ads.map((a) => a.link_url).filter(Boolean))
     }
   } catch { /* ignore */ }
 
-  // ── READ THE LANDING PAGE — prefer the founder-set URL (verified); else the name-matched one (unverified). ──
-  const verifiedSite = kitWebsite ? await readLanding(kitWebsite) : null
-  const unverifiedSite = !verifiedSite && nameResolvedUrl ? await readLanding(nameResolvedUrl) : null
-  const landingUrl = kitWebsite || nameResolvedUrl || null
+  // ── READ THE LANDING PAGE — verified URL first (connected account's ad destination, or founder-set),
+  //    then the name-matched one as an unverified fallback. ──
+  const verifiedUrl = metaUrl || kitWebsite || ''
+  const verifiedSite = verifiedUrl ? await readLanding(verifiedUrl) : null
+  const unverifiedSite = !verifiedSite && nameUrl ? await readLanding(nameUrl) : null
+  const landingUrl = verifiedUrl || nameUrl || null
 
   // ── have the model state the TRUE category — trusting the brand-scoped signals over name-matched ones ──
   const signals = {
     brand: brandName, category_hint: kitCategory || undefined,
     products: products.length ? products : undefined,                                  // TRUSTED (brand-scoped)
     competitor_brands: competitors.length ? competitors : undefined,                   // MOST TRUSTED (brand-scoped)
+    your_meta_ad_copy: metaCopy.length ? metaCopy : undefined,                         // TRUSTED (your connected account)
     verified_website: verifiedSite ? { title: verifiedSite.title, text: verifiedSite.text } : undefined,
     unverified_website_matched_by_name: unverifiedSite ? { title: unverifiedSite.title, text: unverifiedSite.text } : undefined,
-    unverified_ad_headlines_matched_by_name: adCopy.length ? adCopy : undefined,
+    unverified_ad_headlines_matched_by_name: nameCopy.length ? nameCopy : undefined,
   }
   let category = kitCategory || '', description = '', buyerTerms: string[] = []
   try {
