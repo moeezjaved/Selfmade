@@ -14,6 +14,7 @@
  * a follow-up. Additive: only this page + the strategist plan shape changed.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
 const CONNECT: Record<string, { label: string; href: string }> = {
@@ -52,6 +53,8 @@ export default function MissionPage() {
   const [open, setOpen] = useState<string | null>(null)
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
+  const [ask, setAsk] = useState('')
+  const router = useRouter()
 
   // Live desk panels (DB-only, fast) — load independently of the LLM plan so they populate immediately.
   type Rival = { name: string; pageId: string; newAds: number; thumbs: string[] }
@@ -296,35 +299,32 @@ export default function MissionPage() {
           <h2 className="ms-sec">Your ads <small>{plan?.meta?.connected ? 'meta · last 30 days' : 'meta'}</small></h2>
           {plan?.meta?.connected ? (() => {
             const m = plan.meta!
-            const rep = (ownReports || []).filter((c) => c.thumbnail_url || c.spend != null).slice(0, 5)
+            const rep = (ownReports || []).filter((c) => c.thumbnail_url).slice(0, 4)
             const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
             return <>
               <div className="ms-krow"><span className="k">Ad account</span><span className="v ok">● CONNECTED</span></div>
-              <div className="ms-krow"><span className="k">Spend</span><span className="v">{money(m.spend, m.currency)}</span></div>
-              <div className="ms-krow"><span className="k">ROAS</span><span className="v">{xx(m.roas)}</span></div>
-              <div className="ms-krow"><span className="k">CTR</span><span className="v">{pct(m.ctr)}</span></div>
-              <div className="ms-krow"><span className="k">CVR</span><span className={`v${m.cvr != null && m.cvr < 0.01 ? ' bad' : ''}`}>{pct(m.cvr)}</span></div>
-              <div className="ms-krow"><span className="k">AOV</span><span className="v">{money(m.aov, m.currency)}</span></div>
-              <div className="ms-krow"><span className="k">Frequency</span><span className="v">{m.frequency == null ? '—' : m.frequency.toFixed(1)}</span></div>
-              <div className="ms-krow"><span className="k">Live creatives</span><span className="v">{m.activeCreatives ?? '—'}</span></div>
-              {m.biggestLever && <div className="ms-note sm" style={{ marginTop: 10 }}><b>Biggest lever:</b> {m.biggestLever}</div>}
-              {rep.length > 0 ? (
-                // the /reports per-ad row: thumbnail + spend·CTR + ROAS pill — real Meta ad-level numbers
-                <div className="ms-adrows" style={{ marginTop: 12 }}>
-                  {rep.map((c, i) => (
-                    <a className="ms-adrow" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer">
-                      <div className="th">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span>🎨</span>}</div>
-                      <div className="mid">
-                        <div className="nm">{c.name || 'Ad'}</div>
-                        <div className="mt">{money(c.spend, m.currency)} · CTR {c.ctr != null ? c.ctr.toFixed(1) : '—'}%</div>
-                      </div>
-                      <span className={`roas ${roasClass(c.roas)}`}>{c.roas != null ? `${c.roas.toFixed(1)}×` : '—'}</span>
+              <div className="ms-adsplit">
+                {/* creatives on one side */}
+                <div className="ms-ad-cre">
+                  {rep.length > 0 ? rep.map((c, i) => (
+                    <a className="cre" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer" title={c.name || ''}>
+                      <img src={c.thumbnail_url} alt="" loading="lazy" />
+                      {c.roas != null && <span className={`rp ${roasClass(c.roas)}`}>{c.roas.toFixed(1)}×</span>}
                     </a>
-                  ))}
+                  )) : <div className="ms-note sm none">{ownReports === null ? 'Loading your creatives…' : 'No ads spending in the last 30 days.'}</div>}
                 </div>
-              ) : (
-                <div className="ms-note sm" style={{ marginTop: 10 }}>{ownReports === null ? 'Loading your ad creatives…' : 'No ads have spent in the last 30 days — launch a campaign and they’ll show here.'}</div>
-              )}
+                {/* compact numbers on the other */}
+                <div className="ms-ad-nums">
+                  <div className="st"><span className="l">Spend</span><span className="n">{money(m.spend, m.currency)}</span></div>
+                  <div className="st"><span className="l">ROAS</span><span className="n">{xx(m.roas)}</span></div>
+                  <div className="st"><span className="l">CTR</span><span className="n">{pct(m.ctr)}</span></div>
+                  <div className="st"><span className="l">CVR</span><span className={`n${m.cvr != null && m.cvr < 0.01 ? ' bad' : ''}`}>{pct(m.cvr)}</span></div>
+                  <div className="st"><span className="l">AOV</span><span className="n">{money(m.aov, m.currency)}</span></div>
+                  <div className="st"><span className="l">Freq</span><span className="n">{m.frequency == null ? '—' : m.frequency.toFixed(1)}</span></div>
+                  <div className="st"><span className="l">Live</span><span className="n">{m.activeCreatives ?? '—'}</span></div>
+                </div>
+              </div>
+              {m.biggestLever && <div className="ms-note sm" style={{ marginTop: 10 }}><b>Biggest lever:</b> {m.biggestLever}</div>}
             </>
           })() : <>
             <div className="ms-conn">Ad account <span className="st"><a href="/connect/meta" className="ms-btn flame tiny">Connect</a></span></div>
@@ -359,20 +359,26 @@ export default function MissionPage() {
           <div className="ms-conn">📈 Meta <span className="st">{sig?.metaConnected ? <span className="on">● CONNECTED</span> : <a href="/connect/meta" className="ms-btn tiny">Connect</a>}</span></div>
         </div>
 
-        {/* COL 4 — Mello rail */}
+        {/* COL 4 — Mello rail (chat) */}
         <div className="ms-rail">
           <div className="stamp">Today</div>
-          <div className="ms-mello">
-            <h5>Here’s where {brand} stands</h5>
-            <ul>
-              <li><b>Market mapped</b> — {sig?.competitors ? `${sig.competitors} rival${sig.competitors === 1 ? '' : 's'} watched, their winning DNA extracted.` : 'add competitors in Brand Spy so I can benchmark you.'}</li>
-              <li><b>Your ads</b> — {sig?.ownAdsFound ? 'read and grounding the diagnosis.' : 'not indexed yet — I’m pulling them in.'}</li>
-              <li><b>The read</b> — {plan && !loading ? plan.headline : 'diagnosing your biggest constraint…'}</li>
-            </ul>
-            <div className="cta">Approve the moves on the left — I’ll take it from there.</div>
+          <div className="ms-rail-body">
+            <div className="ms-mello">
+              <div className="ms-mello-who"><span className="dot">◍</span> Mello · Chief of Staff</div>
+              <h5>Here’s where {brand} stands</h5>
+              <ul>
+                <li><b>Market mapped</b> — {sig?.competitors ? `${sig.competitors} rival${sig.competitors === 1 ? '' : 's'} watched, their winning DNA extracted.` : 'add competitors in Brand Spy so I can benchmark you.'}</li>
+                <li><b>Your ads</b> — {plan?.meta?.connected ? 'read from your Meta account, grounding the diagnosis.' : 'connect Meta and I’ll read them to ground every move.'}</li>
+                <li><b>The read</b> — {plan && !loading ? plan.headline : 'diagnosing your biggest constraint…'}</li>
+              </ul>
+              <div className="cta">Approve the moves on the left, or ask me anything below — I’ll take it from there.</div>
+            </div>
           </div>
-          <a href="/brief" className="ms-btn open">Open Mello →</a>
           <div className="ms-approve">Approve mode · nothing runs or spends without your yes.</div>
+          <form className="ms-ask" onSubmit={(e) => { e.preventDefault(); const q = ask.trim(); if (!q) return; try { sessionStorage.setItem('mello_prefill', q) } catch { /* ignore */ } router.push('/mello') }}>
+            <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Ask Mello anything…" aria-label="Ask Mello anything" />
+            <button type="submit">SEND</button>
+          </form>
         </div>
       </div>
 
@@ -473,6 +479,19 @@ const CSS = `
 .ms-figure .big{font-family:var(--serif);font-weight:600;font-size:32px;letter-spacing:-.02em;line-height:1}
 .ms-figure .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
 .ms-figure .sub{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
+.ms-adsplit{display:flex;gap:14px;margin-top:10px}
+.ms-ad-cre{flex:1;min-width:0;display:grid;grid-template-columns:repeat(2,1fr);gap:5px;align-content:start}
+.ms-ad-cre .cre{position:relative;aspect-ratio:4/5;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:block}
+.ms-ad-cre .cre img{width:100%;height:100%;object-fit:cover;display:block}
+.ms-ad-cre .cre .rp{position:absolute;bottom:0;right:0;font-family:var(--mono);font-size:9px;font-weight:700;color:#fff;background:rgba(20,18,15,.72);padding:1px 4px}
+.ms-ad-cre .cre .rp.good{background:rgba(31,138,83,.88)}
+.ms-ad-cre .cre .rp.bad{background:rgba(239,74,30,.88)}
+.ms-ad-cre .none{grid-column:1/-1}
+.ms-ad-nums{width:112px;flex:none;display:flex;flex-direction:column}
+.ms-ad-nums .st{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--hair)}
+.ms-ad-nums .st .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
+.ms-ad-nums .st .n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink)}
+.ms-ad-nums .st .n.bad{color:var(--flame)}
 .ms-adrows{display:flex;flex-direction:column;gap:2px}
 .ms-adrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--hair);text-decoration:none}
 .ms-adrow .th{width:38px;height:38px;flex:none;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:15px}
@@ -546,14 +565,21 @@ const CSS = `
 .ms-conn{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .ms-conn .st{margin-left:auto}
 .ms-conn .on{font-family:var(--mono);font-size:10.5px;color:var(--live);letter-spacing:.05em}
-.ms-rail{background:var(--panel);padding:18px clamp(14px,1.6vw,20px);display:flex;flex-direction:column}
+.ms-rail{background:var(--panel);padding:18px clamp(14px,1.6vw,20px);display:flex;flex-direction:column;min-height:100%}
 .ms-rail .stamp{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:12px}
+.ms-rail-body{flex:1;min-height:0}
 .ms-mello{background:var(--paper);border:1px solid #e2ded4;padding:14px 15px;font-size:13px;line-height:1.55}
+.ms-mello .ms-mello-who{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:9px}
+.ms-mello .ms-mello-who .dot{color:var(--flame);font-size:12px}
 .ms-mello h5{font-family:var(--serif);font-weight:600;font-size:15.5px;margin:0 0 9px}
 .ms-mello ul{margin:0;padding-left:16px;color:var(--ink2)}
 .ms-mello li{margin-bottom:7px}
 .ms-mello .cta{border-top:1px solid var(--hair);margin-top:11px;padding-top:11px;font-weight:600}
-.ms-approve{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.04em;margin-top:14px}
+.ms-approve{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.04em;margin:14px 0 10px}
+.ms-ask{display:flex;border:1px solid var(--ink);background:var(--paper)}
+.ms-ask input{flex:1;min-width:0;border:none;outline:none;padding:11px 12px;font-family:var(--ui);font-size:13px;background:transparent;color:var(--ink)}
+.ms-ask button{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.07em;background:var(--ink);color:var(--paper);border:none;padding:0 15px;cursor:pointer}
+.ms-ask button:hover{background:var(--flame)}
 .ms-modal-wrap{position:fixed;inset:0;background:rgba(20,18,15,.34);display:flex;align-items:flex-start;justify-content:center;padding:6vh 18px;z-index:60}
 .ms-modal{background:var(--paper);border:1px solid var(--ink);width:100%;max-width:660px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(20,18,15,.5)}
 .ms-modal-top{display:flex;align-items:center;padding:18px 22px 14px;border-bottom:1px solid var(--rule)}

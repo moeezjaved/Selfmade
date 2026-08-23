@@ -42,6 +42,11 @@ export default function MelloPage() {
 
   useEffect(() => { loadConversations() }, [loadConversations])
 
+  // Prefill from another surface (e.g. the /mission rail's "Ask Mello anything…" composer).
+  useEffect(() => {
+    try { const p = sessionStorage.getItem('mello_prefill'); if (p) { setInput(p); sessionStorage.removeItem('mello_prefill') } } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
   }, [messages])
