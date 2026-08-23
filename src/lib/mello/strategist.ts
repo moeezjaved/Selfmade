@@ -15,8 +15,9 @@
  * retention, not more ads. Grounded rule (same as the DNA engine): it may only speak from the data we
  * hand it — never invent a competitor, number, or gap.
  *
- * ADDITIVE + SAFE: new module + new endpoint. It only ever WRITES suggested tasks (status 'suggested');
- * it never executes anything or touches billing/Meta. runTask (existing) still gates real actions.
+ * ADDITIVE + SAFE: new module + new endpoint. It never executes anything or touches billing/Meta —
+ * execution happens only through the agent router → the existing /api/mello/tasks/run spine, which
+ * keeps every credit/approval guard. (opts.persist is accepted but a no-op — see note at bottom.)
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import OpenAI from 'openai'
@@ -50,6 +51,7 @@ export type StrategistPlan = {
   headline: string       // the founder-level read: "You don't have a traffic problem — you have a conversion problem."
   tasks: StrategistTask[]
   grounding: string[]    // provenance of what the plan was built from
+  notice?: string        // an honest, transient system note (e.g. "pulling your own ads into view…")
 }
 
 // ── stage detection — from real signals, honest and cheap ──
@@ -104,6 +106,21 @@ export async function generateStrategistPlan(
     if (winners) gaps = dnaDiff(own, winners)
   } catch { /* DNA optional — plan still grounds on context + signals + brain */ }
 
+  // AUTO-CRAWL THE OWN BRAND: we matched the founder's page in the directory but its ads haven't been
+  // pulled into the index yet → queue a tier-0 crawl NOW so the NEXT plan grounds on their real ads
+  // (same guarded mechanism a Brand Spy uses: metadata via the crawler, media via the drain worker —
+  // never through IPRoyal). requestCompetitorCrawl already enforces the 12h freshness guard + the
+  // per-plan expressPulls daily cap + BRAND_PULLED accounting, so this can never spam the queue.
+  let ownCrawlNote: string | null = null
+  if (ownPageId && !ownFound) {
+    try {
+      const { requestCompetitorCrawl } = await import('@/lib/mello/actions')
+      const r = await requestCompetitorCrawl(opts.userId, ownPageId, ctx.brandName || undefined)
+      if ((r as any)?.queued) ownCrawlNote = 'Pulling your own live ads into view — the next plan will be grounded in them.'
+      else if ((r as any)?.already_fresh) ownCrawlNote = 'Your ad library was just crawled — your own ads should appear in the next plan.'
+    } catch { /* best-effort — a queue hiccup must never block the plan */ }
+  }
+
   // REAL performance from the connected Meta account — the STRONGEST grounding. When Meta is connected we
   // reason over the brand's ACTUAL numbers (CTR/CVR/AOV/ROAS/frequency) + the media-buyer diagnosis, not a
   // name-guessed page. A banned/empty account just yields no performance grounding (degrades gracefully).
@@ -150,6 +167,7 @@ export async function generateStrategistPlan(
     `gaps:${gaps.length}`,
     `own_page:${ownPageId || 'none'}`,
     ownFound ? `own_ads:${ownAds}` : 'own_ads:0',
+    ...(ownCrawlNote ? ['own_crawl:queued'] : []),
     performance ? `perf:spend=${Math.round(performance.spend)},roas=${performance.roas ?? '?'},cvr=${performance.cvr != null ? (performance.cvr * 100).toFixed(1) + '%' : '?'}` : 'perf:none',
   ]
 
@@ -222,9 +240,7 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     }
   })
 
-  const plan: StrategistPlan = { stage, headline: stageRead, tasks, grounding }
-
-  if (opts.persist && tasks.length) await persistTasks(admin, opts.userId, brandId, plan)
+  const plan: StrategistPlan = { stage, headline: stageRead, tasks, grounding, ...(ownCrawlNote ? { notice: ownCrawlNote } : {}) }
   return plan
 }
 
@@ -253,17 +269,9 @@ async function resolveOwnPageId(admin: SupabaseClient, brandName: string | null)
   } catch { return null }
 }
 
-// Write the plan's tasks as SUGGESTED mello_tasks (idempotent by suggested_key). Never executes.
-async function persistTasks(admin: SupabaseClient, userId: string, brandId: string | null, plan: StrategistPlan): Promise<void> {
-  const kindFor = (dept: string): string => (dept === 'creative' ? 'creative' : dept === 'research' ? 'research' : 'strategy')
-  for (const t of plan.tasks) {
-    try {
-      await (admin as any).from('mello_tasks').upsert({
-        user_id: userId, brand_id: brandId, kind: kindFor(t.dept), status: 'suggested',
-        title: t.title, why: t.why,
-        evidence: { lever: t.lever, dept: t.dept, steps: t.steps, hypothesis: t.hypothesis, impact: t.impact, runnable: t.runnable, needs: t.needs, stage: plan.stage, source: 'strategist' },
-        suggested_key: t.suggested_key, credits: null,
-      }, { onConflict: 'suggested_key' })
-    } catch { /* best-effort persist — a schema/column mismatch must never break plan generation */ }
-  }
-}
+// NOTE: strategist tasks are deliberately NOT persisted into mello_tasks. Their evidence shape (steps/
+// hypothesis/lever) is not what runTask's executors expect — a persisted `kind:'research'` row without a
+// real `evidence.competitor` could be picked up by the legacy desk and mis-charge 50 credits on a bad
+// subject. Execution instead goes through the AGENT ROUTER (src/lib/mello/agents.ts): it resolves a
+// strategist move to a CONCRETE, correctly-shaped TaskSuggestion and runs it through the existing
+// /api/mello/tasks/run spine — inheriting every credit/approval guard. /mission reads the live plan.
