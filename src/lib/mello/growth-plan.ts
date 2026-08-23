@@ -153,6 +153,24 @@ export function buildGrowthPlan(inp: PlanInput): GrowthPlan {
     })
   }
 
+  // ── 3b. GEO — get cited in AI answers (Traffic) — the monitor is LIVE, so this one links to it ──
+  {
+    const delta = Math.round(1200 * cvr * aov)   // if AI answers send ~1,200 visits/mo at your buy-rate
+    levers.push({
+      key: 'geo', name: 'Get cited in AI answers', agent: '🛰️ GEO agent', metric: 'traffic', live: true,
+      delta, deltaText: moneyK(delta, c), confidence: 'potential',
+      math: [
+        { t: 'More buyers now ask ' }, { t: 'ChatGPT, Gemini and Perplexity', b: true }, { t: ' “what’s the best…” instead of Googling. If you’re ' },
+        { t: 'not cited', b: true }, { t: ', that traffic goes to whoever is. Getting recommended in even ' }, { t: '~1,200 answers/mo', b: true },
+        { t: ' at your ' }, { t: pct(cvr), b: true }, { t: ' buy rate × ' }, { t: money(aov, c), b: true }, { t: ':' },
+      ],
+      flow: ['1,200 AI answers/mo', `${pct(cvr)} buy`, `${Math.round(1200 * cvr)} sales × ${money(aov, c)}`, `${moneyK(delta, c)}/mo`],
+      assumption: 'Start by seeing where you stand — I check ChatGPT/Gemini/Perplexity for your buyers’ questions and track it over time. Then GEO agents write the answer pages that earn the citations.',
+      action: { kind: 'run', label: 'See your AI visibility →', href: '/mission/geo' },
+      chain: 'GEO monitor is live · content publishing unlocks with Shopify',
+    })
+  }
+
   // ── 4. EMAIL / SMS (Retention) — benchmark ──
   {
     const delta = Math.round(current * 0.2)
