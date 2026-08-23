@@ -30,6 +30,7 @@ const curSym = (c?: string) => (({ USD: '$', EUR: '€', GBP: '£' } as Record<s
 const money = (n?: number | null, c?: string) => (n == null ? '—' : `${curSym(c)}${Math.round(n).toLocaleString()}`)
 const pct = (f?: number | null) => (f == null ? '—' : `${(f * 100).toFixed(2)}%`)
 const xx = (n?: number | null) => (n == null ? '—' : `${n.toFixed(1)}×`)
+const slugT = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, '')
 
 // The agent router's answer for one task: who runs it, how, and what it costs — confirm-before-run.
 type AgentInfo = { key: string; name: string; emoji: string; role: string }
@@ -53,6 +54,8 @@ export default function MissionPage() {
   const [open, setOpen] = useState<string | null>(null)
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
+  const [extra, setExtra] = useState<Task[]>([])   // more moves added to the backlog on demand
+  const [adding, setAdding] = useState(false)
   // Inline Mello chat in the rail — the real streaming brain, no page change.
   const [ask, setAsk] = useState('')
   const [convId, setConvId] = useState<string | null>(null)
@@ -110,8 +113,23 @@ export default function MissionPage() {
 
   const STEPS = ['Reviewing your funnel + backlog…', 'Benchmarking against your competitors…', 'Diagnosing your biggest constraint…', 'Drafting your highest-impact moves…']
 
+  // "+ Add to backlog" — ask Mello for more moves and append the ones we're not already showing.
+  const addToBacklog = async () => {
+    if (adding) return
+    setAdding(true)
+    try {
+      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 6 }) })
+      const j = await r.json()
+      const incoming: Task[] = Array.isArray(j?.tasks) ? j.tasks : []
+      const seen = new Set([...(plan?.tasks || []).slice(0, 3), ...extra].map((t) => slugT(t.title)))
+      const fresh = incoming.filter((t) => t.title && !seen.has(slugT(t.title)))
+      if (fresh.length) setExtra((prev) => [...prev, ...fresh].slice(0, 9))
+    } catch { /* keep the desk usable */ }
+    setAdding(false)
+  }
+
   const fetchPlan = useCallback(async () => {
-    setLoading(true); setStep(0); setRuns({})
+    setLoading(true); setStep(0); setRuns({}); setExtra([])
     const iv = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1600)
     try {
       // limit:3 — the desk shows the 3 highest-impact moves (Polsia-style), so the engine drafts exactly 3;
@@ -240,7 +258,7 @@ export default function MissionPage() {
             </div>
           )}
 
-          {!loading && plan && plan.tasks.slice(0, 3).map((t, i) => {
+          {!loading && plan && [...plan.tasks.slice(0, 3), ...extra].map((t, i) => {
             const isOpen = open === t.suggested_key
             const connect = t.needs ? CONNECT[t.needs] : null
             const run = runs[t.suggested_key] || { phase: 'idle' as const }
@@ -306,7 +324,7 @@ export default function MissionPage() {
 
           {!loading && plan && (
             <div className="ms-taskbtns">
-              <a href="/brief" className="ms-btn solid">+ Add to backlog</a>
+              <button className="ms-btn solid" onClick={addToBacklog} disabled={adding}>{adding ? 'Adding…' : '+ Add to backlog'}</button>
               <button className="ms-btn" onClick={openBoard}>▦ Sprint board</button>
             </div>
           )}
@@ -434,7 +452,7 @@ export default function MissionPage() {
 
       {/* the standup — tasks by status */}
       {boardOpen && (() => {
-        const todo = plan?.tasks || []
+        const todo = plan ? [...plan.tasks.slice(0, 3), ...extra] : []
         const rows: BoardRow[] = boardTab === 'todo'
           ? todo.map((t) => ({ id: t.suggested_key, title: t.title, why: t.why, kind: t.dept, status: 'todo', url: null, error: null, at: '' }))
           : (board?.[boardTab] || [])
