@@ -53,6 +53,17 @@ export default function MissionPage() {
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
 
+  // Live desk panels (DB-only, fast) — load independently of the LLM plan so they populate immediately.
+  type OwnAd = { adId: string; title: string | null; days: number | null; thumb: string; isVideo: boolean }
+  type Rival = { name: string; pageId: string; newAds: number }
+  type Gen = { id: string; url: string; isVideo: boolean; at: string }
+  type Desk = { ownAds: OwnAd[]; rivals: Rival[]; generations: Gen[]; ownIndexed: boolean }
+  const [desk, setDesk] = useState<Desk | null>(null)
+  const fetchDesk = useCallback(async () => {
+    try { const r = await fetch('/api/mello/desk'); const j = await r.json(); if (r.ok) setDesk(j as Desk) } catch { /* panels degrade to empty states */ }
+  }, [])
+  useEffect(() => { fetchDesk() }, [fetchDesk])
+
   // The standup board — the founder's tasks by status (running/done/failed from mello_tasks; to-do = the plan).
   type BoardRow = { id: string; title: string; why: string | null; kind: string; status: string; url: string | null; error: string | null; at: string }
   type Board = { running: BoardRow[]; done: BoardRow[]; failed: BoardRow[] }
@@ -158,14 +169,38 @@ export default function MissionPage() {
             <div className="ms-diag">“{plan.headline}”</div>
           )}
 
-          <div className="ms-signals">
-            {sig?.metaConnected
-              ? <div className="ms-note">Your live Meta read grounds the diagnosis above. The full metric panel — spend, ROAS, CVR, AOV — lands here next.</div>
-              : <>
-                  <div className="ms-note">Connect Meta and your real numbers ground every move.</div>
-                  <a href="/connect/meta" className="ms-btn flame full">Connect Meta →</a>
-                </>}
-          </div>
+          {(() => {
+            const ads = desk?.ownAds || []
+            const m = plan?.meta
+            const liveN = m?.connected ? (m.activeCreatives ?? ads.length) : ads.length
+            const sub = m?.connected && m.spend != null ? `${money(m.spend, m.currency)} spend · ${xx(m.roas)} ROAS` : null
+            return (
+              <div className="ms-yours">
+                <h2 className="ms-sec sec2">Your ads {m?.connected && <small>last 30 days</small>}</h2>
+                {liveN > 0 && (
+                  <div className="ms-figure">
+                    <span className="big">{liveN}</span>
+                    <span className="lbl">{m?.connected ? 'live creative' + (liveN === 1 ? '' : 's') : 'ad' + (liveN === 1 ? '' : 's') + ' in library'}</span>
+                    {sub && <span className="sub">{sub}</span>}
+                  </div>
+                )}
+                {ads.length > 0 ? (
+                  <div className="ms-strip">
+                    {ads.map((a) => (
+                      <div className="ms-shot" key={a.adId} title={a.title || ''}>
+                        <img src={a.thumb} alt="" loading="lazy" />
+                        {a.isVideo && <span className="pv">▶</span>}
+                        {a.days != null && a.days > 0 && <span className="dd">{a.days}d</span>}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="ms-note sm">{desk === null ? 'Loading your ads…' : 'Your live ad creatives appear here once indexed — Mello is pulling them in.'}</div>
+                )}
+                {!sig?.metaConnected && <a href="/connect/meta" className="ms-btn flame full">Connect Meta →</a>}
+              </div>
+            )
+          })()}
 
           <div className="ms-hire">
             <div className="k">Works while you sleep</div>
@@ -260,6 +295,20 @@ export default function MissionPage() {
             </div>
           )}
 
+          <h2 className="ms-sec sec2">From the studio <small>made by Mello</small></h2>
+          {desk && desk.generations.length > 0 ? (
+            <a href="/studio" className="ms-gens" title="Open the studio">
+              {desk.generations.map((g) => (
+                <div className="ms-gen" key={g.id}>
+                  {g.isVideo ? <video src={g.url} muted preload="metadata" playsInline /> : <img src={g.url} alt="" loading="lazy" />}
+                  {g.isVideo && <span className="pv">▶</span>}
+                </div>
+              ))}
+            </a>
+          ) : (
+            <div className="ms-empty small">{desk === null ? 'Loading…' : 'Images & videos Mello makes for you land here — approve a creative move to fill it.'}</div>
+          )}
+
           <h2 className="ms-sec sec2">Documents</h2>
           <div className="ms-empty small">Reports Mello writes — competitor teardowns, weekly narratives — land here.</div>
         </div>
@@ -286,9 +335,14 @@ export default function MissionPage() {
           </>}
 
           <h2 className="ms-sec sec2">Rivals <small>brand spy</small></h2>
-          {sig && sig.competitors > 0
-            ? <div className="ms-note sm">Watching <b>{sig.competitors}</b> rival{sig.competitors === 1 ? '' : 's'}. Their new-ad moves land in this feed next.</div>
-            : <div className="ms-note sm">Spy a competitor and their moves appear here.</div>}
+          {desk && desk.rivals.length > 0 ? desk.rivals.map((r) => (
+            <div className="ms-comp" key={r.pageId}>
+              <span className="nm">{r.name}</span>
+              <span className={`sig${r.newAds > 0 ? ' hot' : ''}`}>{r.newAds > 0 ? `${r.newAds} new · 72h` : 'quiet'}</span>
+            </div>
+          )) : (
+            <div className="ms-note sm">{desk === null ? 'Loading your rivals…' : 'Spy a competitor in Brand Spy and their moves appear here.'}</div>
+          )}
 
           <h2 className="ms-sec sec2">Customer <small>live</small></h2>
           <div className="ms-conn">💬 Support replies <span className="st"><a href="/inbox" className="ms-btn tiny">Inbox</a></span></div>
@@ -410,6 +464,24 @@ const CSS = `
 .ms-note{font-size:12.5px;color:var(--sub);line-height:1.5}
 .ms-note.sm{font-size:12px;margin-top:2px}
 .ms-note b{color:var(--ink);font-weight:600}
+.ms-yours{margin-top:6px}
+.ms-figure{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:11px}
+.ms-figure .big{font-family:var(--serif);font-weight:600;font-size:32px;letter-spacing:-.02em;line-height:1}
+.ms-figure .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
+.ms-figure .sub{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
+.ms-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.ms-shot{position:relative;aspect-ratio:4/5;background:var(--panel);border:1px solid #e2ded4;overflow:hidden}
+.ms-shot img{width:100%;height:100%;object-fit:cover;display:block}
+.ms-shot .pv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.ms-shot .dd{position:absolute;bottom:0;left:0;right:0;font-family:var(--mono);font-size:8.5px;font-weight:600;color:#fff;background:rgba(20,18,15,.6);padding:1px 3px;text-align:right;letter-spacing:.03em}
+.ms-gens{display:grid;grid-template-columns:repeat(4,1fr);gap:5px;text-decoration:none}
+.ms-gen{position:relative;aspect-ratio:1;background:var(--panel);border:1px solid #e2ded4;overflow:hidden}
+.ms-gen img,.ms-gen video{width:100%;height:100%;object-fit:cover;display:block}
+.ms-gen .pv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+.ms-comp{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair)}
+.ms-comp .nm{font-weight:500;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-comp .sig{font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:.03em;flex:none}
+.ms-comp .sig.hot{color:var(--flame);font-weight:700}
 .ms-hire{border:1px solid var(--ink);padding:18px 15px;text-align:center;margin-top:24px}
 .ms-hire .k{font-family:var(--mono);font-size:10px;letter-spacing:.13em;color:var(--sub);text-transform:uppercase}
 .ms-hire h3{font-family:var(--serif);font-weight:500;font-size:21px;line-height:1.15;letter-spacing:-.02em;margin:4px 0 0}
