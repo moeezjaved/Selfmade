@@ -52,6 +52,8 @@ export type StrategistPlan = {
   tasks: StrategistTask[]
   grounding: string[]    // provenance of what the plan was built from
   notice?: string        // an honest, transient system note (e.g. "pulling your own ads into view…")
+  brand?: string         // the active brand's name — for the masthead
+  signals?: { competitors: number; ownAdsFound: boolean; winnerCount: number; metaConnected: boolean }  // honest facts for the desk
 }
 
 // ── stage detection — from real signals, honest and cheap ──
@@ -240,7 +242,12 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     }
   })
 
-  const plan: StrategistPlan = { stage, headline: stageRead, tasks, grounding, ...(ownCrawlNote ? { notice: ownCrawlNote } : {}) }
+  const plan: StrategistPlan = {
+    stage, headline: stageRead, tasks, grounding,
+    brand: ctx.brandName || undefined,
+    signals: { competitors: ctx.competitors.length, ownAdsFound: ownFound, winnerCount: winners?.winnerCount || 0, metaConnected: ctx.integrations.meta.connected },
+    ...(ownCrawlNote ? { notice: ownCrawlNote } : {}),
+  }
   return plan
 }
 
