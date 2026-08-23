@@ -94,10 +94,11 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     // Insights / Leaderboard / Snapshots are folded IN as tabs on /reports, not separate nav items).
     key: 'ads', label: 'Ads', railLabel: 'Ads', railIcon: BarChart2, defaultHref: '/reports',
     items: [
-      { href: '/reports',     icon: BarChart2, label: 'Reports' },
-      { href: '/campaigns',   icon: Megaphone, label: 'Campaigns' },
-      { href: '/m4',          icon: Rocket,    label: 'Launch Ads' },
-      { href: '/connect/meta', icon: Plug,     label: 'Connect Meta' },
+      { href: '/reports',      icon: BarChart2, label: 'Reports' },
+      { href: '/mission/ads',  icon: Sparkles,  label: 'Ads agents' },
+      { href: '/campaigns',    icon: Megaphone, label: 'Campaigns' },
+      { href: '/m4',           icon: Rocket,    label: 'Launch Ads' },
+      { href: '/connect/meta', icon: Plug,      label: 'Connect Meta' },
     ],
   },
 ]
