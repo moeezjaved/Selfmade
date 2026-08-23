@@ -86,6 +86,17 @@ export default function MissionPage() {
   }, [])
   useEffect(() => { fetchDesk() }, [fetchDesk])
 
+  // GROW — the organic journey (Shopify/SEO/GEO/content) folded onto the mission: momentum, next move,
+  // real revenue + organic (SEO) split, and per-department status. Reads /api/mello/journey.
+  type Journey = {
+    momentum: number
+    nextAction?: { label: string; href: string; stage: string } | null
+    revenue?: { total: number; aov: number; orders: number; currency: string | null; organic: number; organicShare: number } | null
+    stages?: { key: string; tasks: { key: string; label: string; done: boolean; value?: string; href: string }[] }[]
+  }
+  const [journey, setJourney] = useState<Journey | null>(null)
+  useEffect(() => { (async () => { try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setJourney(j as Journey) } catch { /* optional band */ } })() }, [])
+
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
   type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; cpa?: number; thumbnail_url?: string; preview_url?: string }
@@ -224,6 +235,48 @@ export default function MissionPage() {
           <div className="pace"><a className="seeplan" href="/mission/plan">See the plan →</a></div>
         </>}
       </div>
+
+      {/* GROW — the organic engine (Shopify · SEO · GEO · content) folded onto the mission */}
+      {journey && (() => {
+        const task = (k: string) => journey.stages?.flatMap((s) => s.tasks).find((t) => t.key === k)
+        const rev = journey.revenue
+        const cards: { label: string; value: string; sub?: string; href: string; accent?: boolean }[] = []
+        if (rev) cards.push({ label: 'Revenue · 30d', value: money(rev.total, rev.currency || undefined), sub: `${money(rev.organic, rev.currency || undefined)} organic (${rev.organicShare}%)`, href: '/mission/plan', accent: true })
+        const seoGap = task('catalog_seo'); const altGap = task('catalog_alt')
+        cards.push({ label: 'Store catalog', value: seoGap?.value || altGap?.value || 'ready', sub: 'SEO + image gaps', href: '/mission/catalog' })
+        const blog = task('first_blog'); const prog = task('programmatic')
+        cards.push({ label: 'Content live', value: (blog?.value || prog?.value || '0 live'), sub: 'blog + pages at scale', href: '/mission/blog' })
+        const geo = task('geo_check')
+        cards.push({ label: 'AI visibility', value: geo?.value || 'not checked', sub: 'GEO share of voice', href: '/mission/geo' })
+        return (
+          <div className="ms-grow">
+            <div className="grow-head">
+              <div className="grow-title">Your growth engine <small>seo · ai search · store · content</small></div>
+              <a className="grow-open" href="/mission/journey">Open journey →</a>
+            </div>
+            <div className="grow-momentum">
+              <div className="gm-bar"><span style={{ width: `${journey.momentum}%` }} /></div>
+              <div className="gm-pct">{journey.momentum}%</div>
+            </div>
+            {journey.nextAction && (
+              <a className="grow-next" href={journey.nextAction.href}>
+                <span className="gn-k">Next move · {journey.nextAction.stage}</span>
+                <span className="gn-l">{journey.nextAction.label}</span>
+                <span className="gn-arrow">→</span>
+              </a>
+            )}
+            <div className="grow-cards">
+              {cards.map((c, i) => (
+                <a className={`grow-card${c.accent ? ' accent' : ''}`} href={c.href} key={i}>
+                  <div className="gc-v">{c.value}</div>
+                  <div className="gc-l">{c.label}</div>
+                  {c.sub && <div className="gc-s">{c.sub}</div>}
+                </a>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
 
       <div className="ms-sheet">
         {/* COL 1 — the company */}
@@ -552,6 +605,26 @@ const CSS = `
 .ms-mission .pace .l{font-family:var(--mono);font-size:10px;color:var(--sub);margin-top:4px}
 .ms-mission .pace .shopify{display:block;font-family:var(--mono);font-size:10px;color:var(--flame);margin-top:6px}
 .ms-mission .pace .seeplan{display:inline-block;font-family:var(--ui);font-size:12px;font-weight:700;color:#fff;background:var(--lime);border-radius:9px;padding:8px 14px;margin-top:8px}
+.ms-grow{padding:16px clamp(16px,3vw,26px);border-bottom:1px solid var(--line);background:var(--shell)}
+.ms-grow .grow-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.ms-grow .grow-title{font-family:var(--serif);font-size:19px;color:var(--ink)}
+.ms-grow .grow-title small{font-family:var(--mono);font-size:10px;color:var(--mut);text-transform:uppercase;letter-spacing:.04em;margin-left:8px}
+.ms-grow .grow-open{font-family:var(--ui);font-size:12px;font-weight:700;color:var(--lime);text-decoration:none}
+.ms-grow .grow-momentum{display:flex;align-items:center;gap:12px;margin:10px 0 12px}
+.ms-grow .gm-bar{flex:1;height:8px;border-radius:100px;background:var(--greenBg);overflow:hidden}
+.ms-grow .gm-bar span{display:block;height:100%;background:linear-gradient(90deg,var(--live),var(--lime));border-radius:100px}
+.ms-grow .gm-pct{font-family:var(--serif);font-size:18px;color:var(--ink);min-width:44px;text-align:right}
+.ms-grow .grow-next{display:flex;align-items:center;gap:10px;background:var(--forest);border-radius:12px;padding:12px 16px;text-decoration:none;margin-bottom:12px}
+.ms-grow .grow-next .gn-k{font-family:var(--mono);font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:rgba(255,255,255,.55)}
+.ms-grow .grow-next .gn-l{font-family:var(--ui);font-size:15px;font-weight:800;color:#fff;flex:1}
+.ms-grow .grow-next .gn-arrow{color:var(--lime);font-size:18px}
+.ms-grow .grow-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px}
+.ms-grow .grow-card{display:block;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--paper);text-decoration:none}
+.ms-grow .grow-card.accent{background:var(--greenBg);border-color:rgba(63,122,78,.25)}
+.ms-grow .grow-card .gc-v{font-family:var(--serif);font-size:21px;color:var(--ink);line-height:1.05}
+.ms-grow .grow-card.accent .gc-v{color:var(--live)}
+.ms-grow .grow-card .gc-l{font-family:var(--ui);font-size:11.5px;font-weight:700;color:var(--sub);margin-top:4px}
+.ms-grow .grow-card .gc-s{font-family:var(--mono);font-size:10px;color:var(--mut);margin-top:2px}
 .ms-sheet{display:grid;grid-template-columns:230px 1fr 1fr 372px}
 .ms-col{padding:20px clamp(14px,1.6vw,22px);border-right:1px solid var(--hair);min-width:0}
 .ms-sec{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.005em;padding-bottom:8px;border-bottom:1px solid var(--line);margin:0 0 13px;display:flex;align-items:baseline;gap:9px}
