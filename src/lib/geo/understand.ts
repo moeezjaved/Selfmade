@@ -53,38 +53,44 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
     if (brandId) { const { data } = await (admin as any).from('brand_products').select('name, description').eq('brand_id', brandId).limit(6); products = ((data || []) as any[]).map((p) => ({ name: p.name || '', description: (p.description || '').slice(0, 300) })).filter((p) => p.name || p.description) }
   } catch { /* ignore */ }
 
-  // ── the brand's own ad copy + niche + the landing URL its ads point at ──
-  let adCopy: string[] = [], adNiche = '', landingUrl = kitWebsite || ''
+  // ── own ads/site found by matching the brand NAME — UNVERIFIED (a common name like "Aura" matches many
+  //    different brands), so we label them and let the competitors/products (brand-scoped truth) override. ──
+  let adCopy: string[] = [], nameResolvedUrl = ''
   try {
     const ownPageId = await resolveOwnPageId(admin, brandName)
     if (ownPageId) {
       const { data } = await (admin as any).from('discovery_ads_index')
-        .select('title, niche, link_url, performance_score').eq('page_id', ownPageId)
+        .select('title, link_url, performance_score').eq('page_id', ownPageId)
         .order('performance_score', { ascending: false, nullsFirst: false }).limit(20)
       const ads = (data || []) as any[]
       adCopy = ads.map((a) => a.title).filter(Boolean).slice(0, 6)
-      adNiche = ads.find((a) => a.niche)?.niche || ''
-      if (!landingUrl) landingUrl = mostCommonUrl(ads.map((a) => a.link_url).filter(Boolean))
+      nameResolvedUrl = mostCommonUrl(ads.map((a) => a.link_url).filter(Boolean))
     }
   } catch { /* ignore */ }
 
-  // ── READ THE LANDING PAGE (the deepest signal — what they actually say they sell) ──
-  const site = landingUrl ? await readLanding(landingUrl) : null
+  // ── READ THE LANDING PAGE — prefer the founder-set URL (verified); else the name-matched one (unverified). ──
+  const verifiedSite = kitWebsite ? await readLanding(kitWebsite) : null
+  const unverifiedSite = !verifiedSite && nameResolvedUrl ? await readLanding(nameResolvedUrl) : null
+  const landingUrl = kitWebsite || nameResolvedUrl || null
 
-  // ── have the model state the TRUE category from all signals (anchored, not guessed) ──
+  // ── have the model state the TRUE category — trusting the brand-scoped signals over name-matched ones ──
   const signals = {
-    brand: brandName, brand_kit_category: kitCategory || undefined,
-    products: products.length ? products : undefined,
-    own_ad_headlines: adCopy.length ? adCopy : undefined, ad_niche: adNiche || undefined,
-    website_text: site?.text || undefined, website_title: site?.title || undefined, website_description: site?.description || undefined,
-    competitor_brands: competitors.length ? competitors : undefined,
+    brand: brandName, category_hint: kitCategory || undefined,
+    products: products.length ? products : undefined,                                  // TRUSTED (brand-scoped)
+    competitor_brands: competitors.length ? competitors : undefined,                   // MOST TRUSTED (brand-scoped)
+    verified_website: verifiedSite ? { title: verifiedSite.title, text: verifiedSite.text } : undefined,
+    unverified_website_matched_by_name: unverifiedSite ? { title: unverifiedSite.title, text: unverifiedSite.text } : undefined,
+    unverified_ad_headlines_matched_by_name: adCopy.length ? adCopy : undefined,
   }
-  let category = kitCategory || adNiche || '', description = '', buyerTerms: string[] = []
+  let category = kitCategory || '', description = '', buyerTerms: string[] = []
   try {
     const { llm } = await import('@/lib/llm')
-    const sys = `Identify what this brand ACTUALLY sells from the signals. The LANDING PAGE text, the brand's own products/ad copy, and the competitor brands are the strongest clues — trust them over any generic label. Return ONLY JSON:
-{"category":"plain-words product category (e.g. 'nicotine-free vape / quit-vaping aid')","description":"one line: what it is and who buys it","buyer_terms":["the exact words/phrases a buyer types when researching this — 5-8 of them"]}
-Be specific and correct. If the signals point to nicotine/vaping, this is that category — do NOT say 'supplements' or 'vitamins'.`
+    const sys = `Identify what this brand ACTUALLY sells. Signal reliability, HIGH → LOW:
+1) competitor_brands and products — the founder's OWN confirmed data. TRUST THESE MOST.
+2) verified_website, category_hint.
+3) anything prefixed "unverified" was found by matching the brand NAME and may belong to a DIFFERENT company with the same name — if it conflicts with the competitors/products, IGNORE it entirely.
+If the competitors are nicotine/vaping brands, the category is nicotine/vaping — do NOT say "supplements" or "vitamins". Return ONLY JSON:
+{"category":"plain-words product category (e.g. 'nicotine-free vape / quit-vaping aid')","description":"one line: what it is and who buys it","buyer_terms":["the exact words/phrases a buyer types — 5-8 of them"]}`
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 500, temperature: 0.2, messages: [{ role: 'user', content: `${sys}\n\nSIGNALS:\n${JSON.stringify(signals)}` }] })
     const txt = res?.content?.[0]?.text || ''
     const parsed = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1))
