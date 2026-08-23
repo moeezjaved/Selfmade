@@ -97,6 +97,11 @@ export default function MissionPage() {
   const [journey, setJourney] = useState<Journey | null>(null)
   useEffect(() => { (async () => { try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setJourney(j as Journey) } catch { /* optional band */ } })() }, [])
 
+  // "What to make next" — the Creative Strategist ideas from the old brief, folded onto the mission.
+  type Idea = { title: string; format: string; why: string; basedOn?: string; reference?: { label?: string; brand?: string; image?: string | null } | null; studioHref: string }
+  const [ideas, setIdeas] = useState<Idea[] | null>(null)
+  useEffect(() => { (async () => { try { const r = await fetch('/api/creative/strategy'); const j = await r.json(); if (r.ok && Array.isArray(j.ideas)) setIdeas(j.ideas.slice(0, 3)) } catch { /* optional */ } })() }, [])
+
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
   type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; cpa?: number; thumbnail_url?: string; preview_url?: string }
@@ -406,6 +411,24 @@ export default function MissionPage() {
             <div className="ms-empty small">{desk === null ? 'Loading…' : 'Images & videos Mello makes for you land here — approve a creative move to fill it.'}</div>
           )}
 
+          {ideas && ideas.length > 0 && (
+            <>
+              <h2 className="ms-sec sec2">What to make next <small>from your ads + rivals</small></h2>
+              <div className="ms-ideas">
+                {ideas.map((idea, i) => (
+                  <a className="ms-idea" href={idea.studioHref || '/studio'} key={i}>
+                    {idea.reference?.image ? <img src={idea.reference.image} alt="" loading="lazy" /> : <span className="noimg">✎</span>}
+                    <span className="body">
+                      <span className="t">{idea.title.replace(/\.+$/, '')}</span>
+                      <span className="f">{idea.format}{idea.reference?.label ? ` · inspired by ${idea.reference.brand || idea.reference.label}` : ''}</span>
+                    </span>
+                    <span className="go">→</span>
+                  </a>
+                ))}
+              </div>
+            </>
+          )}
+
           <h2 className="ms-sec sec2">Documents</h2>
           <div className="ms-empty small">Reports Mello writes — competitor teardowns, weekly narratives — land here.</div>
         </div>
@@ -625,6 +648,13 @@ const CSS = `
 .ms-grow .grow-card.accent .gc-v{color:var(--live)}
 .ms-grow .grow-card .gc-l{font-family:var(--ui);font-size:11.5px;font-weight:700;color:var(--sub);margin-top:4px}
 .ms-grow .grow-card .gc-s{font-family:var(--mono);font-size:10px;color:var(--mut);margin-top:2px}
+.ms-ideas{display:flex;flex-direction:column;gap:8px}
+.ms-idea{display:flex;align-items:center;gap:11px;border:1px solid var(--line);border-radius:11px;background:var(--card);padding:9px 11px;text-decoration:none}
+.ms-idea img,.ms-idea .noimg{width:40px;height:40px;border-radius:8px;object-fit:cover;flex:none;background:var(--greenBg);display:flex;align-items:center;justify-content:center;color:var(--live);font-size:16px}
+.ms-idea .body{display:flex;flex-direction:column;min-width:0;flex:1}
+.ms-idea .body .t{font-family:var(--ui);font-size:13.5px;font-weight:700;color:var(--ink);line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-idea .body .f{font-family:var(--mono);font-size:10px;color:var(--sub);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-idea .go{color:var(--lime);font-size:15px;flex:none}
 .ms-sheet{display:grid;grid-template-columns:230px 1fr 1fr 372px}
 .ms-col{padding:20px clamp(14px,1.6vw,22px);border-right:1px solid var(--hair);min-width:0}
 .ms-sec{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.005em;padding-bottom:8px;border-bottom:1px solid var(--line);margin:0 0 13px;display:flex;align-items:baseline;gap:9px}
