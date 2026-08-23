@@ -95,5 +95,11 @@ export async function publishBatch(admin: any, store: StoreRow, userId: string, 
       urls.push(res.url); published++
     } catch { failed++ }
   }
+  if (published > 0) {
+    try {
+      const { recordWin } = await import('@/lib/mello/wins')
+      await recordWin(admin, { userId, brandId: store.brand_id, category: 'programmatic', title: `Published ${published} SEO ${published === 1 ? 'page' : 'pages'}`, detail: 'Programmatic SEO — buyer-intent pages live', currency: store.currency, meta: { store_id: store.id, published, urls: urls.slice(0, 20) } })
+    } catch { /* optional */ }
+  }
   return { published, failed, urls }
 }

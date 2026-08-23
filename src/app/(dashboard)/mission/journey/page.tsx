@@ -14,7 +14,7 @@ type Ladder = { window: string; title: string; desc: string; reached: boolean }
 type Revenue = { total: number; aov: number; orders: number; currency: string | null; organic: number; organicShare: number; windowDays: number }
 type Data = {
   store?: { name: string } | null
-  momentum: number; wins: number
+  momentum: number; wins: number; banked?: number
   nextAction?: { label: string; href: string; stage: string } | null
   revenue?: Revenue | null
   stages: Stage[]; ladder: Ladder[]
@@ -58,7 +58,7 @@ export default function JourneyPage() {
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: PAPER, padding: 20, marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 15, color: INK }}>Momentum</div>
-          <div style={{ fontSize: 13, color: SUB }}><b style={{ color: GOOD }}>{data.wins}</b> wins banked</div>
+          <a href="/mission/wins" style={{ fontSize: 13, color: SUB, textDecoration: 'none' }}><b style={{ color: GOOD }}>{data.wins}</b> moves{data.banked ? <> · <b style={{ color: GOOD }}>{money(data.banked, data.revenue?.currency)}</b> banked</> : ''} →</a>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
           <div style={{ flex: 1, height: 10, borderRadius: 100, background: '#eaf0ea', overflow: 'hidden' }}>

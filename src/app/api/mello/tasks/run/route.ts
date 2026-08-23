@@ -54,5 +54,9 @@ export async function POST(req: NextRequest) {
 
   // Execute through the shared executor (same path Slack/WhatsApp approvals use — no drift).
   const updated = await runTask(admin, { userId: user.id, email: user.email, cookie, source: 'brief' }, task)
+  // Log the approved move to the Wins Ledger (the revenue game's record).
+  if ((updated as any)?.status === 'done') {
+    try { const { recordWin } = await import('@/lib/mello/wins'); await recordWin(admin, { userId: user.id, brandId: (updated as any).brand_id || null, category: 'ads', title: (updated as any).title || 'Ran a move', detail: 'Approved & run', meta: { task_id: (updated as any).id } }) } catch { /* optional */ }
+  }
   return NextResponse.json({ task: updated })
 }
