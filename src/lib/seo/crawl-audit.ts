@@ -13,7 +13,7 @@ export type SeoAudit = { hasData: boolean; site?: string; score?: number; pagesC
 
 const UA = 'Selfmade-SEO/1.0 (+https://tryselfmade.ai)'
 
-type PageCheck = {
+export type PageCheck = {
   url: string
   title: string; titleLen: number
   metaDesc: string; metaLen: number
@@ -69,16 +69,16 @@ function internalLinks(html: string, base: URL, limit: number): string[] {
   return out
 }
 
-export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId: string | null): Promise<SeoAudit> {
+/** Crawl the brand's real site (homepage + a few internal pages) — shared by the audit + the internal-link
+ *  agent so we fetch once. Returns the per-page checks, or a note if we couldn't resolve/read the site. */
+export async function crawlSite(admin: SupabaseClient, userId: string, brandId: string | null): Promise<{ base: URL; checks: PageCheck[] } | { note: string; site?: string }> {
   const u = await describeBrand(admin, userId, brandId)
   const siteRaw = (u?.website || '').trim()
-  if (!siteRaw) return { hasData: false, note: 'I don’t have your website yet — connect Meta (so I can read your ads’ landing page) or set it under “tell me exactly” on the GEO page, then re-run.' }
+  if (!siteRaw) return { note: 'I don’t have your website yet — connect Meta (so I can read your ads’ landing page) or set it under “tell me exactly” on the GEO page, then re-run.' }
   let base: URL
-  try { base = new URL(siteRaw.startsWith('http') ? siteRaw : `https://${siteRaw}`) } catch { return { hasData: false, note: 'Your website URL looks invalid — set it on the GEO page and re-run.' } }
-
+  try { base = new URL(siteRaw.startsWith('http') ? siteRaw : `https://${siteRaw}`) } catch { return { note: 'Your website URL looks invalid — set it on the GEO page and re-run.' } }
   const home = await fetchHtml(base.href)
-  if (!home) return { hasData: false, site: base.href, note: `Couldn’t fetch ${base.hostname} — it may block bots or be down. I’ll retry next run.` }
-
+  if (!home) return { site: base.href, note: `Couldn’t fetch ${base.hostname} — it may block bots or be down. I’ll retry next run.` }
   const urls = [base.origin + base.pathname, ...internalLinks(home, base, 12)]
   const uniq = Array.from(new Set(urls)).slice(0, 10)
   const checks: PageCheck[] = []
@@ -86,7 +86,14 @@ export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId
     const html = url === (base.origin + base.pathname) ? home : await fetchHtml(url)
     if (html) checks.push(checkPage(url, html, base))
   }
-  if (!checks.length) return { hasData: false, site: base.href, note: `Fetched ${base.hostname} but couldn’t read any pages. I’ll retry.` }
+  if (!checks.length) return { site: base.href, note: `Fetched ${base.hostname} but couldn’t read any pages. I’ll retry.` }
+  return { base, checks }
+}
+
+export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId: string | null): Promise<SeoAudit> {
+  const crawl = await crawlSite(admin, userId, brandId)
+  if ('note' in crawl) return { hasData: false, site: crawl.site, note: crawl.note }
+  const { base, checks } = crawl
 
   // ── aggregate real findings ──
   const issues: Issue[] = []
