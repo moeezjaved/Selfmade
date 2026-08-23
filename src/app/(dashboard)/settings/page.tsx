@@ -90,6 +90,7 @@ export default function SettingsPage() {
   const [apComp, setApComp] = useState('')  // optional competitor page_id — daily ad follows THIS rival's latest ad
   const [competitors, setCompetitors] = useState<{ pageId: string; name: string }[]>([])
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)  // null = still loading
+  const [shopifyConnected, setShopifyConnected] = useState<boolean | null>(null)
   const [disconnecting, setDisconnecting] = useState(false)
   const [metaConfirm, setMetaConfirm] = useState(false)  // in-app disconnect confirmation (not window.confirm)
   const [newPw, setNewPw] = useState(''); const [confirmPw, setConfirmPw] = useState(''); const [pwSaving, setPwSaving] = useState(false)
@@ -125,6 +126,9 @@ export default function SettingsPage() {
       fetch('/api/meta/accounts').then(r => r.json())
         .then(j => { if (!cancelled) setMetaConnected(Array.isArray(j.workspaceAccounts) && j.workspaceAccounts.length > 0) })
         .catch(() => { if (!cancelled) setMetaConnected(false) })
+      fetch('/api/shopify/connect').then(r => r.json())
+        .then(j => { if (!cancelled) setShopifyConnected(!!j?.connected) })
+        .catch(() => { if (!cancelled) setShopifyConnected(false) })
       // load notification prefs (non-blocking)
       fetch('/api/notifications/prefs').then(r => r.json()).then(j => { if (!cancelled && j.prefs) setPrefs(j.prefs) }).catch(() => {})
       // load daily-autopilot enrollments (non-blocking)
@@ -462,6 +466,16 @@ export default function SettingsPage() {
                 <a href="/connect-meta" style={{background:'#ff5a2c',color:'#fff',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>Connect →</a>
               ) : null}
             </div>
+          </div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',flexWrap:'wrap',gap:12,marginTop:18,paddingTop:18,borderTop:'1px solid rgba(0,0,0,0.06)'}}>
+            <div style={{fontSize:14,color: shopifyConnected ? '#3a5a3a' : '#9ca3af'}}>
+              {shopifyConnected == null ? 'Shopify — checking…' : shopifyConnected ? 'Shopify — Connected ✓' : 'Shopify'}
+            </div>
+            <a href="/connect/shopify" style={shopifyConnected
+              ? {fontSize:13,color:'#141d15',fontWeight:700,textDecoration:'none'}
+              : {background:'#ff5a2c',color:'#fff',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
+              {shopifyConnected ? 'Manage →' : 'Connect →'}
+            </a>
           </div>
         </div>
       </div>

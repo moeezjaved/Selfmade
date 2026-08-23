@@ -17,12 +17,12 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.redirect(new URL('/login?next=/mission', req.url), 303)
 
   if (!shopifyOAuthConfigured()) {
-    return NextResponse.redirect(new URL('/mission?shopify=unconfigured', appBaseUrl()), 303)
+    return NextResponse.redirect(new URL('/connect/shopify?status=unconfigured', appBaseUrl()), 303)
   }
 
   const shop = normalizeShopDomain(req.nextUrl.searchParams.get('shop') || '')
   if (!isValidShopDomain(shop)) {
-    return NextResponse.redirect(new URL('/mission?shopify=badshop', appBaseUrl()), 303)
+    return NextResponse.redirect(new URL('/connect/shopify?status=badshop', appBaseUrl()), 303)
   }
 
   const admin = createAdminClient() as any

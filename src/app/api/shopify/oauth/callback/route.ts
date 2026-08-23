@@ -16,7 +16,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
 function fail(reason: string) {
-  return NextResponse.redirect(new URL(`/mission?shopify=error&why=${encodeURIComponent(reason)}`, appBaseUrl()), 303)
+  return NextResponse.redirect(new URL(`/connect/shopify?status=error&why=${encodeURIComponent(reason)}`, appBaseUrl()), 303)
 }
 
 export async function GET(req: NextRequest) {
@@ -38,7 +38,7 @@ export async function GET(req: NextRequest) {
   // Must be a logged-in Selfmade user (the callback is a top-level nav, so first-party cookies are sent).
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent('/mission?shopify=retry')}`, req.url), 303)
+  if (!user) return NextResponse.redirect(new URL(`/login?next=${encodeURIComponent('/connect/shopify?status=retry')}`, req.url), 303)
 
   // Exchange the code for a lasting token.
   let token: string
@@ -66,7 +66,7 @@ export async function GET(req: NextRequest) {
   // First sync (best-effort; the store is already saved).
   if (saved) { try { await syncShopifyProducts(admin, saved, 20) } catch { /* retryable */ } }
 
-  const res = NextResponse.redirect(new URL('/mission?shopify=connected', appBaseUrl()), 303)
+  const res = NextResponse.redirect(new URL('/connect/shopify?status=connected', appBaseUrl()), 303)
   // Clear the one-shot cookies.
   for (const c of ['sh_oauth_nonce', 'sh_oauth_shop', 'sh_oauth_brand']) res.cookies.set(c, '', { path: '/', maxAge: 0 })
   return res
