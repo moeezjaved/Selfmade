@@ -43,6 +43,14 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
   // competitors are cheap + can change → always fetched fresh (a strong category anchor)
   const competitors = await loadCompetitors(admin, userId, brandId)
 
+  // FOUNDER OVERRIDE beats everything — if you told us the category, we use it verbatim (no guessing).
+  const founderCategory = await readFounderCategory(admin, userId, brandId)
+  if (founderCategory) {
+    const u = { category: founderCategory, description: founderCategory, buyerTerms: [] as string[], website: kitWebsite || null }
+    await writeCache(admin, userId, brandId, u)
+    return { brandName, competitors, ...u, fromCache: false, debug: { websiteUrl: kitWebsite || null, websiteSource: 'you set it', siteRead: false, competitors, metaAdCopy: 0 } }
+  }
+
   // reuse the remembered understanding unless asked for a fresh read
   if (!opts?.fresh) {
     const cached = await readCache(admin, userId, brandId)
@@ -154,6 +162,16 @@ function mostCommonUrl(urls: string[]): string {
   let best = '', top = 0
   count.forEach((n, d) => { if (n > top) { top = n; best = d } })
   return byDomain.get(best) || urls[0]
+}
+
+/** The founder's own category override (source of truth), set via POST /api/geo/identity. */
+async function readFounderCategory(admin: SupabaseClient, userId: string, brandId: string | null): Promise<string> {
+  try {
+    let q = (admin as any).from('company_dna').select('rule').eq('user_id', userId).eq('source', 'geo_founder_category').eq('active', true)
+    if (brandId) q = q.eq('brand_id', brandId)
+    const { data } = await q.order('created_at', { ascending: false }).limit(1).maybeSingle()
+    return data?.rule ? String(data.rule).replace(/^category:\s*/i, '').trim() : ''
+  } catch { return '' }
 }
 
 async function loadCompetitors(admin: SupabaseClient, userId: string, brandId: string | null): Promise<string[]> {
