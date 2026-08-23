@@ -179,45 +179,6 @@ export default function MissionPage() {
             <div className="ms-diag">“{plan.headline}”</div>
           )}
 
-          {(() => {
-            // Your ads come ONLY from the connected Meta account (/api/reports level=ad) — never a
-            // name-guess against the crawl index, which can match a different brand of the same name.
-            const rep = (ownReports || []).filter((c) => c.thumbnail_url || c.spend != null).slice(0, 4)
-            const m = plan?.meta
-            const liveN = m?.connected ? (m.activeCreatives ?? rep.length) : 0
-            const sub = m?.connected && m.spend != null ? `${money(m.spend, m.currency)} spend · ${xx(m.roas)} ROAS` : null
-            const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
-            return (
-              <div className="ms-yours">
-                <h2 className="ms-sec sec2">Your ads {m?.connected && <small>last 30 days</small>}</h2>
-                {liveN > 0 && (
-                  <div className="ms-figure">
-                    <span className="big">{liveN}</span>
-                    <span className="lbl">live creative{liveN === 1 ? '' : 's'}</span>
-                    {sub && <span className="sub">{sub}</span>}
-                  </div>
-                )}
-                {rep.length > 0 ? (
-                  // the /reports per-ad row: thumbnail + spend·CTR + ROAS pill — real Meta ad-level numbers
-                  <div className="ms-adrows">
-                    {rep.map((c, i) => (
-                      <a className="ms-adrow" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer">
-                        <div className="th">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span>🎨</span>}</div>
-                        <div className="mid">
-                          <div className="nm">{c.name || 'Ad'}</div>
-                          <div className="mt">{money(c.spend, m?.currency)} · CTR {c.ctr != null ? c.ctr.toFixed(1) : '—'}%</div>
-                        </div>
-                        <span className={`roas ${roasClass(c.roas)}`}>{c.roas != null ? `${c.roas.toFixed(1)}×` : '—'}</span>
-                      </a>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="ms-note sm">{!sig?.metaConnected ? 'Your live ads appear here once Meta is connected.' : ownReports === null ? 'Loading your ads…' : 'No ads have spent in the last 30 days — launch a campaign and they’ll show here.'}</div>
-                )}
-                {!sig?.metaConnected && <a href="/connect/meta" className="ms-btn flame full">Connect Meta →</a>}
-              </div>
-            )
-          })()}
 
           <div className="ms-hire">
             <div className="k">Works while you sleep</div>
@@ -332,9 +293,11 @@ export default function MissionPage() {
 
         {/* COL 3 — channels & signals (honest shells) */}
         <div className="ms-col">
-          <h2 className="ms-sec">Meta <small>{plan?.meta?.connected ? 'last 30 days' : ''}</small></h2>
+          <h2 className="ms-sec">Your ads <small>{plan?.meta?.connected ? 'meta · last 30 days' : 'meta'}</small></h2>
           {plan?.meta?.connected ? (() => {
             const m = plan.meta!
+            const rep = (ownReports || []).filter((c) => c.thumbnail_url || c.spend != null).slice(0, 5)
+            const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
             return <>
               <div className="ms-krow"><span className="k">Ad account</span><span className="v ok">● CONNECTED</span></div>
               <div className="ms-krow"><span className="k">Spend</span><span className="v">{money(m.spend, m.currency)}</span></div>
@@ -345,10 +308,27 @@ export default function MissionPage() {
               <div className="ms-krow"><span className="k">Frequency</span><span className="v">{m.frequency == null ? '—' : m.frequency.toFixed(1)}</span></div>
               <div className="ms-krow"><span className="k">Live creatives</span><span className="v">{m.activeCreatives ?? '—'}</span></div>
               {m.biggestLever && <div className="ms-note sm" style={{ marginTop: 10 }}><b>Biggest lever:</b> {m.biggestLever}</div>}
+              {rep.length > 0 ? (
+                // the /reports per-ad row: thumbnail + spend·CTR + ROAS pill — real Meta ad-level numbers
+                <div className="ms-adrows" style={{ marginTop: 12 }}>
+                  {rep.map((c, i) => (
+                    <a className="ms-adrow" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer">
+                      <div className="th">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span>🎨</span>}</div>
+                      <div className="mid">
+                        <div className="nm">{c.name || 'Ad'}</div>
+                        <div className="mt">{money(c.spend, m.currency)} · CTR {c.ctr != null ? c.ctr.toFixed(1) : '—'}%</div>
+                      </div>
+                      <span className={`roas ${roasClass(c.roas)}`}>{c.roas != null ? `${c.roas.toFixed(1)}×` : '—'}</span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="ms-note sm" style={{ marginTop: 10 }}>{ownReports === null ? 'Loading your ad creatives…' : 'No ads have spent in the last 30 days — launch a campaign and they’ll show here.'}</div>
+              )}
             </>
           })() : <>
             <div className="ms-conn">Ad account <span className="st"><a href="/connect/meta" className="ms-btn flame tiny">Connect</a></span></div>
-            <div className="ms-note sm">Connect Meta and your live read — spend, ROAS, CTR, CVR, AOV — grounds every move.</div>
+            <div className="ms-note sm">Connect Meta and your live read — spend, ROAS, CTR, CVR, AOV + your ad creatives — grounds every move.</div>
           </>}
 
           <h2 className="ms-sec sec2">Rivals <small>brand spy</small></h2>
