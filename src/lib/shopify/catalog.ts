@@ -287,5 +287,13 @@ export async function applyDrafts(admin: any, store: StoreRow, draftIds: string[
     // collection drafts have no product-cache row (product_gid is a Collection gid) — skip the update.
     if (Object.keys(patch).length && String(gid).includes('/Product/')) await admin.from('shopify_products').update(patch).eq('store_id', store.id).eq('gid', gid)
   }
+  // Log the move to the Wins Ledger (the revenue game's record). Projected € stays null — catalog fixes
+  // compound into organic revenue, which the proof loop banks later from real order attribution.
+  if (applied > 0) {
+    try {
+      const { recordWin } = await import('@/lib/mello/wins')
+      await recordWin(admin, { userId: store.user_id, brandId: store.brand_id, category: 'catalog', title: `Fixed ${applied} catalog ${applied === 1 ? 'gap' : 'gaps'}`, detail: 'Product SEO / titles / alt text / collections', currency: store.currency, meta: { store_id: store.id, applied } })
+    } catch { /* ledger optional */ }
+  }
   return { applied, failed }
 }

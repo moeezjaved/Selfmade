@@ -9,6 +9,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { revenueSummary } from '@/lib/shopify/orders'
+import { winsSummary } from '@/lib/mello/wins'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
@@ -102,8 +103,10 @@ export async function GET(_req: NextRequest) {
   const nextTask = (activeStage?.tasks || allTasks).find((t) => !t.done && !t.locked) || allTasks.find((t) => !t.done)
   const nextAction = nextTask ? { label: nextTask.label, href: nextTask.href, stage: activeStage?.name || '' } : null
 
-  // wins (the streak counter)
-  const wins = catalogApplied + contentLive + (geoAudit ? 1 : 0) + (seoAudit ? 1 : 0)
+  // wins — the real ledger count (falls back to a derived estimate if the ledger is empty/not applied yet)
+  let wins = 0, banked = 0
+  try { const ws = await winsSummary(admin, uid, brandId, 365); wins = ws.moves; banked = ws.bankedTotal } catch { /* ledger optional */ }
+  if (!wins) wins = catalogApplied + contentLive + (geoAudit ? 1 : 0) + (seoAudit ? 1 : 0)
 
   // forward ladder (honest framing — outcomes, not promises)
   const ladder = [
@@ -127,7 +130,7 @@ export async function GET(_req: NextRequest) {
 
   return NextResponse.json({
     store: store ? { name: store.shop_name || store.shop_domain } : null,
-    momentum, wins, nextAction, revenue,
+    momentum, wins, banked, nextAction, revenue,
     stages, ladder,
   })
 }

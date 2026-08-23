@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
         author: store.shop_name || undefined,
       })
       await admin.from('geo_assets').update({ status: 'published', published_url: res.url, shopify_article_id: String(res.articleId) }).eq('id', id)
+      try { const { recordWin } = await import('@/lib/mello/wins'); await recordWin(admin, { userId, brandId: store.brand_id, category: 'content', title: 'Published a blog article', detail: draft.title, currency: store.currency, meta: { geo_asset_id: id, url: res.url } }) } catch { /* optional */ }
       return NextResponse.json({ ok: true, url: res.url })
     } catch (e: any) {
       return NextResponse.json({ error: `Publish failed: ${String(e?.message || e).slice(0, 200)}` }, { status: 500 })

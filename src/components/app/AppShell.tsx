@@ -51,6 +51,7 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     key: 'grow', label: 'Grow', railLabel: 'Grow', railIcon: TrendingUp, defaultHref: '/mission/journey',
     items: [
       { href: '/mission/journey',      icon: TrendingUp,      label: 'Journey' },
+      { href: '/mission/wins',         icon: Trophy,          label: 'Wins ledger' },
       { href: '/mission/plan',         icon: ClipboardList,   label: 'Growth plan' },
       { href: '/mission/catalog',      icon: Store,           label: 'Store catalog' },
       { href: '/mission/blog',         icon: Newspaper,       label: 'Content' },
