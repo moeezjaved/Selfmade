@@ -68,6 +68,9 @@
     },
     "src/app/api/cron/ads-health/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/proof-loop/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -110,6 +113,10 @@
     {
       "path": "/api/cron/ads-health",
       "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/proof-loop",
+      "schedule": "0 8 * * 1"
     },
     {
       "path": "/api/cron/reconcile-reservations",

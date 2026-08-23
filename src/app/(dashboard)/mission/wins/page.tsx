@@ -22,6 +22,8 @@ function money(n: number, cur?: string | null) {
 export default function WinsPage() {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
+  const [verifying, setVerifying] = useState(false)
+  const [note, setNote] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     try { const r = await fetch('/api/mello/wins'); const j = await r.json(); if (r.ok) setData(j) } catch { /* noop */ }
@@ -29,14 +31,35 @@ export default function WinsPage() {
   }, [])
   useEffect(() => { load() }, [load])
 
+  const verify = async () => {
+    setVerifying(true); setNote(null)
+    try {
+      const r = await fetch('/api/mello/wins', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'verify' }) })
+      const j = await r.json()
+      if (r.ok) {
+        setNote(j.newlyBanked > 0
+          ? `Banked ${money(j.newlyBanked, j.currency)} of real organic revenue against your moves. Organic is up ${money(j.lift, j.currency)} since you started.`
+          : j.lift > 0 ? `Organic revenue is up ${money(j.lift, j.currency)} — already banked.` : `No organic lift to bank yet. Publish more pages and it compounds.`)
+        await load()
+      } else setNote(j.error || 'Could not verify.')
+    } catch { setNote('Network error.') }
+    setVerifying(false)
+  }
+
   if (loading) return <Shell><div style={{ color: SUB }}>Loading your wins…</div></Shell>
   const s = data?.summary
   const cur = s?.currency
 
   return (
     <Shell>
-      <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>The revenue game · your wins</div>
-      <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 18px' }}>Every move you've made</h1>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
+        <div>
+          <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>Impact ledger</div>
+          <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 18px' }}>Every move you've made</h1>
+        </div>
+        <button onClick={verify} disabled={verifying} style={{ flex: 'none', marginTop: 4, background: '#fff', color: GOOD, border: `1.5px solid rgba(37,96,41,.3)`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 800, cursor: verifying ? 'default' : 'pointer', fontFamily: 'inherit' }}>{verifying ? 'Checking orders…' : 'Bank the revenue →'}</button>
+      </div>
+      {note && <div style={{ borderRadius: 12, padding: '11px 15px', marginBottom: 16, fontSize: 14, fontWeight: 600, background: '#f2f8ef', color: GOOD, border: '1px solid rgba(37,96,41,.2)' }}>{note}</div>}
 
       {/* Scoreboard */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 8 }}>
