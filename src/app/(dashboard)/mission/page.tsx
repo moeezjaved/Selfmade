@@ -53,7 +53,9 @@ export default function MissionPage() {
     setLoading(true); setStep(0); setRuns({})
     const iv = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1600)
     try {
-      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false }) })
+      // limit:3 — the desk shows the 3 highest-impact moves (Polsia-style), so the engine drafts exactly 3;
+      // nothing Mello reasoned about is generated-then-hidden. Regenerate ("+ New moves") for a fresh set.
+      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 3 }) })
       const j = await r.json()
       if (r.ok && Array.isArray(j?.tasks)) setPlan(j as Plan)
       else setPlan({ stage: 'setup', headline: j?.error ? 'Mello couldn’t reach your data just now — try again.' : 'No plan yet.', tasks: [] })
@@ -166,7 +168,7 @@ export default function MissionPage() {
             </div>
           )}
 
-          {!loading && plan && plan.tasks.map((t, i) => {
+          {!loading && plan && plan.tasks.slice(0, 3).map((t, i) => {
             const isOpen = open === t.suggested_key
             const connect = t.needs ? CONNECT[t.needs] : null
             const run = runs[t.suggested_key] || { phase: 'idle' as const }
@@ -226,6 +228,13 @@ export default function MissionPage() {
 
           {!loading && plan && plan.tasks.length === 0 && (
             <div className="ms-empty">No moves yet. Tap <b>+ New moves</b> and Mello drafts your highest-impact next steps.</div>
+          )}
+
+          {!loading && plan && (
+            <div className="ms-taskbtns">
+              <a href="/brief" className="ms-btn">+ Ask for a move</a>
+              <a href="/brief" className="ms-btn">▦ All moves</a>
+            </div>
           )}
 
           <h2 className="ms-sec sec2">Documents</h2>
@@ -341,6 +350,7 @@ const CSS = `
 .ms-runline.muted{color:var(--sub);font-style:italic;font-family:var(--ui);margin-bottom:8px}
 .ms-empty{color:var(--sub);font-size:13.5px;padding:14px 0}
 .ms-empty.small{font-size:12.5px;padding:10px 0}
+.ms-taskbtns{display:flex;gap:8px;margin:4px 0 2px;flex-wrap:wrap}
 .ms-krow{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--hair);font-size:13px}
 .ms-krow .k{color:var(--sub)}
 .ms-krow .v{font-family:var(--mono);font-size:12px;font-weight:600}
