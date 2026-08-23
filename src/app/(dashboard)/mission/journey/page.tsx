@@ -25,13 +25,22 @@ function money(n: number, cur?: string | null) {
   return `${sym}${(n || 0).toLocaleString()}`
 }
 
+type Move = { title: string; why?: string; impact?: string; needs?: string | null; dept?: string; lever?: string }
+
+const MOVE_HREF: Record<string, string> = { meta: '/connect-meta', shopify: '/connect/shopify', klaviyo: '/inbox' }
+const DEPT_HREF: Record<string, string> = { seo: '/mission/seo', site: '/mission/catalog', media: '/reports', creative: '/studio', email: '/inbox', outreach: '/mission/competitors', research: '/mission/competitors', reports: '/reports', customer: '/inbox' }
+function moveHref(m: Move): string { return (m.needs && MOVE_HREF[m.needs]) || (m.dept && DEPT_HREF[m.dept]) || '/brief' }
+
 export default function JourneyPage() {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
+  const [moves, setMoves] = useState<Move[] | null>(null)
 
   const load = useCallback(async () => {
     try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setData(j) } catch { /* noop */ }
     setLoading(false)
+    // Mello's ranked GTM moves (paid + organic) — the same brain that powers the Morning Brief.
+    try { const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok && Array.isArray(j.tasks)) setMoves(j.tasks.slice(0, 3)) } catch { /* noop */ }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -78,6 +87,25 @@ export default function JourneyPage() {
             <div style={{ fontSize: 22, color: LIME }}>→</div>
           </div>
         </a>
+      )}
+
+      {/* What Mello would do — the ranked GTM moves (paid + organic) unified onto mission */}
+      {moves && moves.length > 0 && (
+        <div style={{ marginBottom: 30 }}>
+          <div style={{ fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase', marginBottom: 12 }}>What Mello would do</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+            {moves.map((m, i) => (
+              <a key={i} href={moveHref(m)} style={{ textDecoration: 'none', color: 'inherit', border: `1px solid ${LINE}`, borderLeft: `3px solid ${LIME}`, borderRadius: 12, background: '#fff', padding: 15, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                <div style={{ fontSize: 14.5, fontWeight: 800, color: INK, lineHeight: 1.25 }}>{m.title}</div>
+                {m.why && <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.45 }}>{m.why}</div>}
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 'auto', paddingTop: 4 }}>
+                  {m.impact && <span style={{ fontSize: 12.5, fontWeight: 800, color: GOOD }}>{m.impact}</span>}
+                  <span style={{ color: LIME, fontSize: 15, marginLeft: 'auto' }}>→</span>
+                </div>
+              </a>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* The quest chain */}
