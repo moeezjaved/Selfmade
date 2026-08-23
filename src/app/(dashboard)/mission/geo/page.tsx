@@ -17,7 +17,8 @@ type Status = {
 }
 const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
-type Asset = { id: string | null; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null }
+type Asset = { id: string | null; kind?: string; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null }
+const CRAWL_KINDS = ['llms_txt', 'schema', 'fact_sheet']
 
 export default function GeoPage() {
   const [status, setStatus] = useState<Status | null>(null)
@@ -50,6 +51,38 @@ export default function GeoPage() {
     setWriting(null)
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
+
+  const [building, setBuilding] = useState<string | null>(null)
+  const buildAsset = async (kind: string) => {
+    if (building) return
+    setBuilding(kind)
+    try {
+      const r = await fetch('/api/geo/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) })
+      const j = await r.json()
+      if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || kind) }
+    } catch { /* keep prior */ }
+    setBuilding(null)
+  }
+  const renderAsset = (a: Asset) => (
+    <div className="asset" key={a.id || a.target_prompt}>
+      <div className="ahead" onClick={() => setOpenAsset(openAsset === (a.id || a.target_prompt) ? null : (a.id || a.target_prompt))}>
+        <span className="at">{a.title}</span>
+        <span className={`ast ${a.status}`}>{a.published_url ? 'published' : a.status}</span>
+      </div>
+      {a.target_prompt && a.kind === 'answer_page' && <div className="aq">answers: “{a.target_prompt}”</div>}
+      {openAsset === (a.id || a.target_prompt) && (
+        <div className="abody">
+          <pre>{a.body_markdown}</pre>
+          <div className="aact">
+            <button className="btn tiny" onClick={() => copy(a)}>{copied === (a.id || a.target_prompt) ? 'Copied ✓' : 'Copy'}</button>
+            <button className="btn tiny" disabled title="Connect Shopify to publish/apply automatically">{a.kind === 'answer_page' ? 'Publish to Shopify — soon' : 'Apply to your site — soon'}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+  const answerAssets = assets.filter((a) => !a.kind || a.kind === 'answer_page')
+  const crawlAssets = assets.filter((a) => a.kind && CRAWL_KINDS.includes(a.kind))
 
   const [showFix, setShowFix] = useState(false)
   const [fixCat, setFixCat] = useState('')
@@ -176,30 +209,24 @@ export default function GeoPage() {
               </div>
             ))}
 
-            {assets.length > 0 && (
+            {answerAssets.length > 0 && (
               <div className="assets">
                 <div className="lead">Answer pages Mello wrote</div>
                 <div className="assub">Review, tweak, and publish. Copy into your site now, or one-click to your Shopify blog once connected.</div>
-                {assets.map((a) => (
-                  <div className="asset" key={a.id || a.target_prompt}>
-                    <div className="ahead" onClick={() => setOpenAsset(openAsset === (a.id || a.target_prompt) ? null : (a.id || a.target_prompt))}>
-                      <span className="at">{a.title}</span>
-                      <span className={`ast ${a.status}`}>{a.published_url ? 'published' : a.status}</span>
-                    </div>
-                    <div className="aq">answers: “{a.target_prompt}”</div>
-                    {openAsset === (a.id || a.target_prompt) && (
-                      <div className="abody">
-                        <pre>{a.body_markdown}</pre>
-                        <div className="aact">
-                          <button className="btn tiny" onClick={() => copy(a)}>{copied === (a.id || a.target_prompt) ? 'Copied ✓' : 'Copy markdown'}</button>
-                          <button className="btn tiny" disabled title="Connect Shopify to publish to your blog">Publish to Shopify — soon</button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
+                {answerAssets.map(renderAsset)}
               </div>
             )}
+
+            <div className="assets">
+              <div className="lead">Make yourself readable to AI</div>
+              <div className="assub">The files + markup that tell AI engines exactly who you are — so they can find and cite {status.brandName || 'you'}. Built from your real brand, copy-to-apply now.</div>
+              <div className="crawlbtns">
+                <button className="btn" disabled={building === 'llms_txt'} onClick={() => buildAsset('llms_txt')}>{building === 'llms_txt' ? 'Writing…' : 'Generate llms.txt'}</button>
+                <button className="btn" disabled={building === 'schema'} onClick={() => buildAsset('schema')}>{building === 'schema' ? 'Writing…' : 'Generate schema'}</button>
+                <button className="btn" disabled={building === 'fact_sheet'} onClick={() => buildAsset('fact_sheet')}>{building === 'fact_sheet' ? 'Writing…' : 'Generate fact sheet'}</button>
+              </div>
+              {crawlAssets.map(renderAsset)}
+            </div>
 
             <div className="foot">
               {status.lastRunCalls != null && status.lastRunCalls > 0 && (
@@ -277,6 +304,7 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .abody{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px}
 .abody pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ui);font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-height:420px;overflow-y:auto;margin:0}
 .aact{display:flex;gap:8px;margin-top:10px}
+.crawlbtns{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}
 .lead{font-family:var(--serif);font-size:23px;margin:30px 0 12px}
 .tablehd{display:grid;gap:8px;padding:0 6px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
 .tablehd .eh{text-align:center}
