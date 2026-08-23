@@ -65,6 +65,9 @@
     },
     "src/app/api/cron/brain-signals/route.ts": {
       "maxDuration": 300
+    },
+    "src/app/api/cron/ads-health/route.ts": {
+      "maxDuration": 300
     }
   },
   "crons": [
@@ -103,6 +106,10 @@
     {
       "path": "/api/cron/geo-monitor",
       "schedule": "0 6 * * 1"
+    },
+    {
+      "path": "/api/cron/ads-health",
+      "schedule": "0 7 * * *"
     },
     {
       "path": "/api/cron/reconcile-reservations",
