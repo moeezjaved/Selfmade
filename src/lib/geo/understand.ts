@@ -167,6 +167,15 @@ function mostCommonUrl(urls: string[]): string {
   return byDomain.get(best) || urls[0]
 }
 
+/** Cheap read of the current category (founder override → remembered understanding) with NO fresh compute —
+ *  for the status endpoint so the category + correction control always show on page load. */
+export async function cachedCategory(admin: SupabaseClient, userId: string, brandId: string | null): Promise<string> {
+  const founder = await readFounderCategory(admin, userId, brandId)
+  if (founder) return founder
+  const cached = await readCache(admin, userId, brandId)
+  return cached?.category || ''
+}
+
 /** The founder's own category override (source of truth), set via POST /api/geo/identity. */
 async function readFounderCategory(admin: SupabaseClient, userId: string, brandId: string | null): Promise<string> {
   try {
