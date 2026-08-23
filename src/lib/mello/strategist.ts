@@ -138,14 +138,22 @@ export async function generateStrategistPlan(
   let performance: AccountMetrics | null = null
   let diagnoses: ReturnType<typeof diagnose> = []
   let biggestLeverRead: { headline: string; detail: string } | null = null
+  let brandMetaConnected = false
   if (ctx.integrations.meta.connected) {
     try {
-      const totals: any = await auditAccount(admin, opts.userId)
+      // Resolve THIS brand's linked Meta account (same resolver /api/reports uses) — NOT the org primary.
+      // Multi-brand founders link a different account per brand; auditing the primary reads a wrong/empty
+      // account and shows all-zeros. Falls back to the primary only when the brand has no linked account.
+      const { resolveBrandScopedAccount } = await import('@/lib/meta/scope')
+      const acct = await resolveBrandScopedAccount(admin, opts.userId, brandId ?? null)
+      const acctId = (acct as any)?.account_id ? String((acct as any).account_id) : undefined
+      brandMetaConnected = !!acctId
+      const totals: any = await auditAccount(admin, opts.userId, acctId)
       if (totals && totals.spend != null) {
         let frequency: number | null = null, activeCreatives: number | null = null
         try {
           const { createMetaClientForUser } = await import('@/lib/meta/client')
-          const mc = await createMetaClientForUser(opts.userId)
+          const mc = await createMetaClientForUser(opts.userId, acctId)
           if (mc) { const [f, n] = await Promise.all([mc.getAccountFrequency('last_30d'), mc.getActiveAdCount()]); frequency = f; activeCreatives = n }
         } catch { /* best-effort */ }
         performance = {
@@ -254,8 +262,8 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
   const plan: StrategistPlan = {
     stage, headline: stageRead, tasks, grounding,
     brand: ctx.brandName || undefined,
-    signals: { competitors: ctx.competitors.length, ownAdsFound: ownFound, winnerCount: winners?.winnerCount || 0, metaConnected: ctx.integrations.meta.connected },
-    meta: ctx.integrations.meta.connected
+    signals: { competitors: ctx.competitors.length, ownAdsFound: ownFound, winnerCount: winners?.winnerCount || 0, metaConnected: brandMetaConnected },
+    meta: brandMetaConnected
       ? { connected: true, spend: performance?.spend ?? null, currency: performance?.currency ?? 'USD', roas: performance?.roas ?? null, ctr: performance?.ctr ?? null, cvr: performance?.cvr ?? null, aov: performance?.aov ?? null, frequency: performance?.frequency ?? null, activeCreatives: performance?.activeCreatives ?? null, biggestLever: biggestLeverRead?.headline ?? null }
       : { connected: false },
     ...(ownCrawlNote ? { notice: ownCrawlNote } : {}),
