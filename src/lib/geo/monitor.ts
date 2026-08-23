@@ -65,7 +65,7 @@ function detect(text: string, brandName: string, competitors: string[]) {
   return { cited, competitorsCited }
 }
 
-async function resolveBrand(admin: SupabaseClient, userId: string, brandId: string | null): Promise<{ brandName: string; niche: string; competitors: string[] } | null> {
+export async function resolveBrand(admin: SupabaseClient, userId: string, brandId: string | null): Promise<{ brandName: string; niche: string; competitors: string[] } | null> {
   try {
     let b: any = null
     if (brandId) { const { data } = await (admin as any).from('brands').select('name, brand_type').eq('id', brandId).maybeSingle(); b = data }
