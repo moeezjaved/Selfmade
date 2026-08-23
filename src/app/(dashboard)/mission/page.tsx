@@ -54,10 +54,9 @@ export default function MissionPage() {
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
 
   // Live desk panels (DB-only, fast) — load independently of the LLM plan so they populate immediately.
-  type OwnAd = { adId: string; title: string | null; days: number | null; thumb: string; isVideo: boolean }
   type Rival = { name: string; pageId: string; newAds: number; thumbs: string[] }
   type Gen = { id: string; url: string; isVideo: boolean; at: string }
-  type Desk = { ownAds: OwnAd[]; rivals: Rival[]; generations: Gen[]; ownIndexed: boolean }
+  type Desk = { rivals: Rival[]; generations: Gen[] }
   const [desk, setDesk] = useState<Desk | null>(null)
   const fetchDesk = useCallback(async () => {
     try { const r = await fetch('/api/mello/desk'); const j = await r.json(); if (r.ok) setDesk(j as Desk) } catch { /* panels degrade to empty states */ }
@@ -181,10 +180,11 @@ export default function MissionPage() {
           )}
 
           {(() => {
+            // Your ads come ONLY from the connected Meta account (/api/reports level=ad) — never a
+            // name-guess against the crawl index, which can match a different brand of the same name.
             const rep = (ownReports || []).filter((c) => c.thumbnail_url || c.spend != null).slice(0, 4)
-            const ads = desk?.ownAds || []
             const m = plan?.meta
-            const liveN = m?.connected ? (m.activeCreatives ?? rep.length) : ads.length
+            const liveN = m?.connected ? (m.activeCreatives ?? rep.length) : 0
             const sub = m?.connected && m.spend != null ? `${money(m.spend, m.currency)} spend · ${xx(m.roas)} ROAS` : null
             const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
             return (
@@ -193,7 +193,7 @@ export default function MissionPage() {
                 {liveN > 0 && (
                   <div className="ms-figure">
                     <span className="big">{liveN}</span>
-                    <span className="lbl">{m?.connected ? 'live creative' + (liveN === 1 ? '' : 's') : 'ad' + (liveN === 1 ? '' : 's') + ' in library'}</span>
+                    <span className="lbl">live creative{liveN === 1 ? '' : 's'}</span>
                     {sub && <span className="sub">{sub}</span>}
                   </div>
                 )}
@@ -211,19 +211,8 @@ export default function MissionPage() {
                       </a>
                     ))}
                   </div>
-                ) : ads.length > 0 ? (
-                  // fallback before Meta ad-level lands: the crawled creatives filmstrip
-                  <div className="ms-strip">
-                    {ads.map((a) => (
-                      <div className="ms-shot" key={a.adId} title={a.title || ''}>
-                        <img src={a.thumb} alt="" loading="lazy" />
-                        {a.isVideo && <span className="pv">▶</span>}
-                        {a.days != null && a.days > 0 && <span className="dd">{a.days}d</span>}
-                      </div>
-                    ))}
-                  </div>
                 ) : (
-                  <div className="ms-note sm">{ownReports === null || desk === null ? 'Loading your ads…' : sig?.metaConnected ? 'No ad-level data yet — your live creatives appear here once they spend.' : 'Your live ads appear here once Meta is connected.'}</div>
+                  <div className="ms-note sm">{!sig?.metaConnected ? 'Your live ads appear here once Meta is connected.' : ownReports === null ? 'Loading your ads…' : 'No ads have spent in the last 30 days — launch a campaign and they’ll show here.'}</div>
                 )}
                 {!sig?.metaConnected && <a href="/connect/meta" className="ms-btn flame full">Connect Meta →</a>}
               </div>
