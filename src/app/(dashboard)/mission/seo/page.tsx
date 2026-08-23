@@ -65,6 +65,19 @@ export default function SeoPage() {
   }
   const pth = (u: string) => { try { const x = new URL(u); return x.pathname === '/' ? x.hostname.replace(/^www\./, '') : x.pathname } catch { return u } }
 
+  type QaCheck = { pass: boolean; label: string; detail: string }
+  type Qa = { hasData: boolean; url?: string; keyword?: string; score?: number; checks?: QaCheck[]; fixes?: string[]; note?: string }
+  const [qaUrl, setQaUrl] = useState('')
+  const [qaKw, setQaKw] = useState('')
+  const [qa, setQa] = useState<Qa | null>(null)
+  const [qaRunning, setQaRunning] = useState(false)
+  const runQa = async () => {
+    if (qaRunning || !qaUrl.trim() || !qaKw.trim()) return
+    setQaRunning(true)
+    try { const r = await fetch('/api/seo/qa', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: qaUrl.trim(), keyword: qaKw.trim() }) }); const j = await r.json(); if (r.ok) setQa(j) } catch { /* keep */ }
+    setQaRunning(false)
+  }
+
   const issues = audit?.issues || []
   const counts = { high: issues.filter((i) => i.severity === 'high').length, medium: issues.filter((i) => i.severity === 'medium').length, low: issues.filter((i) => i.severity === 'low').length }
 
@@ -164,6 +177,26 @@ export default function SeoPage() {
           )}
         </div>
 
+        {/* Content QA (free) */}
+        <div className="section">
+          <div className="lead">Check a page for a keyword</div>
+          <div className="assub">Paste any page + the keyword it should rank for — I’ll check the on-page SEO and list exactly what to fix.</div>
+          <div className="qaform">
+            <input placeholder="Page URL (e.g. shopauranow.com/blogs/...)" value={qaUrl} onChange={(e) => setQaUrl(e.target.value)} />
+            <input placeholder="Target keyword" value={qaKw} onChange={(e) => setQaKw(e.target.value)} />
+            <button className="btn lime" disabled={qaRunning || !qaUrl.trim() || !qaKw.trim()} onClick={runQa}>{qaRunning ? 'Checking…' : 'Check page →'}</button>
+          </div>
+          {qa && (qa.hasData ? (
+            <div className="qares">
+              <div className="qscore"><span className={`qn ${scoreClass(qa.score || 0)}`}>{qa.score}</span><span className="ql">/ 100 for “{qa.keyword}”</span></div>
+              {(qa.checks || []).map((c, i) => (
+                <div className="qcheck" key={i}><span className={`qx ${c.pass ? 'ok' : 'no'}`}>{c.pass ? '✓' : '✗'}</span><span className="qlab">{c.label}</span><span className="qdet">{c.detail}</span></div>
+              ))}
+              {(qa.fixes || []).length > 0 && <div className="qfix"><b>Fix:</b> {(qa.fixes || []).join(' · ')}</div>}
+            </div>
+          ) : <div className="empty small">{qa.note}</div>)}
+        </div>
+
         {/* Content briefs */}
         {briefs.length > 0 && (
           <div className="section">
@@ -255,4 +288,20 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .arr{color:var(--mut);font-size:10px}
 .la{font-size:13px;color:var(--sub);margin-top:8px} .la b{color:var(--ink)}
 .lw{font-size:12.5px;color:var(--mut);margin-top:4px;line-height:1.5}
+.qaform{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.qaform input{flex:1;min-width:200px;border:1px solid var(--line);border-radius:9px;padding:10px 12px;font-family:var(--ui);font-size:13px;background:var(--card);color:var(--ink);outline:none}
+.qaform input:focus{border-color:var(--sub)}
+.qaform .btn{flex:none}
+.qares{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:15px 17px}
+.qscore{display:flex;align-items:baseline;gap:8px;margin-bottom:12px}
+.qn{font-family:var(--serif);font-size:34px;line-height:1}
+.qn.good{color:var(--live)} .qn.mid{color:var(--warn)} .qn.bad{color:var(--flame)}
+.ql{font-family:var(--mono);font-size:11px;color:var(--mut)}
+.qcheck{display:flex;align-items:baseline;gap:10px;padding:6px 0;border-top:1px solid var(--hair);font-size:13px}
+.qcheck:first-of-type{border-top:none}
+.qx{font-family:var(--mono);font-weight:700;flex:none} .qx.ok{color:var(--live)} .qx.no{color:var(--flame)}
+.qlab{color:var(--ink);flex:none;min-width:200px}
+.qdet{font-family:var(--mono);font-size:11px;color:var(--mut);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qfix{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px;font-size:13px;color:var(--sub);line-height:1.55} .qfix b{color:var(--ink)}
+@media(max-width:640px){.qlab{min-width:0}}
 `

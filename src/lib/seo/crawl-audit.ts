@@ -26,7 +26,7 @@ export type PageCheck = {
   outLinks: string[]   // internal links this page points at (for the link graph)
 }
 
-async function fetchHtml(url: string): Promise<string | null> {
+export async function fetchHtml(url: string): Promise<string | null> {
   try {
     const r = await fetch(url, { headers: { 'user-agent': UA, accept: 'text/html' }, signal: AbortSignal.timeout(9000), redirect: 'follow' })
     if (!r.ok) return null
