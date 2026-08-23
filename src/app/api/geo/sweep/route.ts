@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   const brandId = await resolveActiveBrandId(admin as any, user.id, (body?.brandId as string) || null).catch(() => null)
   try {
-    const status = await runGeoSweep(admin as any, user.id, brandId)
+    const status = await runGeoSweep(admin as any, user.id, brandId, { regenerate: body?.regenerate === true })
     return NextResponse.json(status, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'geo_sweep_failed', detail: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })
