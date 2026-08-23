@@ -32,6 +32,7 @@ export type GeoStatus = {
   estCostUsd?: number        // ~cost of the last sweep (estimate)
   perCheckEstUsd?: number    // ~cost of running a check now (available engines × prompt count)
   category?: string          // what we understood the brand to be (shown so the founder can correct it)
+  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }
   note?: string
 }
 
@@ -94,14 +95,16 @@ export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId
   if (!engines.length) return emptyStatus(engines, 'No AI engine is configured yet — add an OpenAI, Gemini or Perplexity key to run the check.')
   const brand = { brandName: u.brandName, competitors: u.competitors }
 
-  // regenerate wipes the stored question set (e.g. an old wrong-category one) before re-deriving
-  if (opts?.regenerate) {
+  // regenerate the questions when asked OR whenever the understanding was just (re)computed — so stored
+  // questions never lag behind a changed understanding (the vitamins-vs-women's-fashion mismatch).
+  const regen = !!opts?.regenerate || u.fromCache === false
+  if (regen) {
     try { let d = (admin as any).from('geo_prompts').delete().eq('user_id', userId); if (brandId) d = d.eq('brand_id', brandId); await d } catch { /* ignore */ }
   }
 
   // reuse this brand's active prompts, or derive + store a fresh set from the understanding
   let prompts: { id: string | null; text: string }[] = []
-  if (!opts?.regenerate) {
+  if (!regen) {
     try {
       let q = (admin as any).from('geo_prompts').select('id, prompt_text').eq('user_id', userId).eq('active', true)
       if (brandId) q = q.eq('brand_id', brandId)
@@ -153,7 +156,7 @@ export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId
     availableEngines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
     results, gaps, history, lastRun: new Date().toISOString(),
     lastRunCalls: checkRows.length, estCostUsd, perCheckEstUsd: estimateCost(engines, results.length || 8),
-    category: u.category,
+    category: u.category, understanding: u.debug,
   }
 }
 

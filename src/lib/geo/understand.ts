@@ -23,6 +23,8 @@ export type BrandUnderstanding = {
   buyerTerms: string[]      // the words buyers actually search
   competitors: string[]
   website?: string | null
+  fromCache?: boolean       // true = returned the remembered understanding (no fresh read this run)
+  debug?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }
 }
 
 export async function describeBrand(admin: SupabaseClient, userId: string, brandId: string | null, opts?: { fresh?: boolean }): Promise<BrandUnderstanding | null> {
@@ -44,7 +46,7 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
   // reuse the remembered understanding unless asked for a fresh read
   if (!opts?.fresh) {
     const cached = await readCache(admin, userId, brandId)
-    if (cached) return { brandName, ...cached, competitors }
+    if (cached) return { brandName, ...cached, competitors, fromCache: true }
   }
 
   // ── products (a strong signal — "nicotine-free vape" lives here) ──
@@ -115,9 +117,13 @@ If the competitors are nicotine/vaping brands, the category is nicotine/vaping �
     if (Array.isArray(parsed?.buyer_terms)) buyerTerms = parsed.buyer_terms.map((t: any) => String(t)).filter(Boolean).slice(0, 8)
   } catch { /* keep whatever we resolved from signals */ }
 
-  const understanding: Omit<BrandUnderstanding, 'brandName' | 'competitors'> = { category: category || 'this product', description, buyerTerms, website: landingUrl || null }
+  const understanding = { category: category || 'this product', description, buyerTerms, website: landingUrl || null }
   await writeCache(admin, userId, brandId, understanding)   // remember it in the Company Brain
-  return { brandName, competitors, ...understanding }
+  const debug = {
+    websiteUrl: landingUrl, websiteSource: metaUrl ? 'meta_ads' : kitWebsite ? 'brand_kit' : nameUrl ? 'name_match' : 'none',
+    siteRead: !!(verifiedSite || unverifiedSite), competitors, metaAdCopy: metaCopy.length,
+  }
+  return { brandName, competitors, ...understanding, fromCache: false, debug }
 }
 
 // ── landing page reader ──
