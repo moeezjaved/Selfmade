@@ -229,12 +229,14 @@ export default function MissionPage() {
                 ) : (
                   <div className="ms-acts">
                     {run.phase === 'note' && <div className="ms-runline muted">{run.text}</div>}
-                    {connect
-                      ? <a href={connect.href} className="ms-btn flame">{connect.label}</a>
-                      : t.runnable && run.phase !== 'note'
-                        ? <button className="ms-btn flame" disabled={(run.phase as string) === 'resolving'} onClick={() => resolveTask(t)}>{(run.phase as string) === 'resolving' ? 'Checking with the team…' : 'Approve & run →'}</button>
-                        : <button className="ms-btn flame" onClick={() => setOpen(t.suggested_key)}>Get the brief →</button>}
-                    <button className="ms-btn" onClick={() => setOpen(isOpen ? null : t.suggested_key)}>{isOpen ? 'Hide brief' : 'Open brief'}</button>
+                    <div className="ms-actrow">
+                      {connect
+                        ? <a href={connect.href} className="ms-btn flame">{connect.label}</a>
+                        : t.runnable && run.phase !== 'note'
+                          ? <button className="ms-btn flame" disabled={(run.phase as string) === 'resolving'} onClick={() => resolveTask(t)}>{(run.phase as string) === 'resolving' ? 'Checking…' : 'Approve & run →'}</button>
+                          : <button className="ms-btn flame" onClick={() => setOpen(t.suggested_key)}>Get the brief →</button>}
+                      <button className="ms-btn" onClick={() => setOpen(isOpen ? null : t.suggested_key)}>{isOpen ? 'Hide' : 'Brief'}</button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -397,7 +399,7 @@ const CSS = `
 .ms-task .foot{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .ms-task .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border:1px solid #ded9cd;background:var(--paper);padding:3px 8px;color:var(--ink2)}
 .ms-task .chip.dot::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--flame);margin-right:6px;vertical-align:1px}
-.ms-task .cost{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink)}
+.ms-task .cost{margin-left:auto;font-family:var(--mono);font-size:10px;font-weight:600;letter-spacing:.04em;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:52%;text-align:right}
 .ms-task .cost.good{color:var(--live)}
 .ms-brief{background:var(--paper);border:1px solid #e2ded4;padding:12px 14px;margin-bottom:12px}
 .ms-brief .k{font-family:var(--mono);font-size:10px;letter-spacing:.06em;color:var(--mut);margin-bottom:7px}
@@ -405,9 +407,10 @@ const CSS = `
 .ms-brief li{margin-bottom:4px}
 .ms-brief .bet{font-size:12.5px;color:var(--sub);margin-top:9px;font-style:italic}
 .ms-brief .bet b{color:var(--ink);font-style:normal}
-.ms-acts,.ms-confirm .acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-.ms-acts{flex-direction:column;align-items:stretch}
-.ms-acts>div{display:flex;gap:8px;flex-wrap:wrap}
+.ms-confirm .acts{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.ms-acts{display:flex;flex-direction:column;gap:6px}
+.ms-actrow{display:flex;gap:8px;flex-wrap:wrap}
+.ms-actrow .ms-btn{padding:7px 13px;font-size:10.5px}
 .ms-confirm{background:var(--paper);border:1px solid var(--ink);padding:12px 13px}
 .ms-confirm .line{font-size:13px;color:var(--ink2);line-height:1.5;margin-bottom:10px}
 .ms-confirm .line .c{font-family:var(--mono);font-size:11px;color:var(--sub)}
