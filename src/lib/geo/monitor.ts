@@ -7,7 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { availableEngines, askEngine, ENGINE_LABEL, ENGINE_COST, estimateCost, type GeoEngine } from './engines'
 import { fold } from '@/lib/mello/own-brand'
-import { describeBrand, type BrandUnderstanding } from './understand'
+import { describeBrand, cachedCategory, type BrandUnderstanding } from './understand'
 
 export type PromptResult = {
   promptId: string | null
@@ -164,11 +164,12 @@ export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId
 export async function loadGeoStatus(admin: SupabaseClient, userId: string, brandId: string | null): Promise<GeoStatus> {
   const engines = availableEngines()
   const brand = await resolveBrand(admin, userId, brandId)
+  const category = await cachedCategory(admin, userId, brandId).catch(() => '')   // cheap; always show the category + correction
   try {
     let aq = (admin as any).from('geo_audit').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(1)
     if (brandId) aq = aq.eq('brand_id', brandId)
     const { data: audit } = await aq.maybeSingle()
-    if (!audit) return emptyStatus(engines, undefined, brand?.brandName || null)
+    if (!audit) return { ...emptyStatus(engines, undefined, brand?.brandName || null), category: category || undefined }
 
     // hydrate the per-prompt view from the most recent day of checks
     let cq = (admin as any).from('geo_checks').select('prompt_text, engine, cited, grounded, competitors_cited, answer_excerpt, checked_on').eq('user_id', userId).order('created_at', { ascending: false }).limit(120)
@@ -193,8 +194,9 @@ export async function loadGeoStatus(admin: SupabaseClient, userId: string, brand
       lastRunCalls: (audit.prompts_checked || results.length) * ((audit.engines || []).length || engines.length),
       estCostUsd: estimateCost((audit.engines || engines) as GeoEngine[], audit.prompts_checked || results.length),
       perCheckEstUsd: estimateCost(engines, audit.prompts_checked || 8),
+      category: category || undefined,
     }
-  } catch { return emptyStatus(engines, undefined, brand?.brandName || null) }
+  } catch { return { ...emptyStatus(engines, undefined, brand?.brandName || null), category: category || undefined } }
 }
 
 async function loadHistory(admin: SupabaseClient, userId: string, brandId: string | null): Promise<{ date: string; score: number }[]> {
