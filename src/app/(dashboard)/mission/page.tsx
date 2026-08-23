@@ -14,7 +14,7 @@ const FLAME = '#ef4a1e', LIVE = '#1f8a53', RUN = '#2f6df0', WAIT = '#c07d17'
 type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
 const CONNECT: Record<string, { label: string; href: string }> = {
   meta: { label: 'Connect Meta to launch →', href: '/connect/meta' },
-  shopify: { label: 'Connect Shopify to fix this →', href: '/connect/shopify' },
+  shopify: { label: 'Connect Shopify to fix this →', href: '/settings' },   // real /connect/shopify flow pending
   klaviyo: { label: 'Connect Klaviyo to send →', href: '/settings' },
 }
 type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[]; notice?: string }
