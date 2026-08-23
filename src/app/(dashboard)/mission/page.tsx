@@ -247,7 +247,7 @@ export default function MissionPage() {
 
           {!loading && plan && (
             <div className="ms-taskbtns">
-              <a href="/brief" className="ms-btn">✎ The ask</a>
+              <a href="/brief" className="ms-btn solid">+ Add to backlog</a>
               <button className="ms-btn" onClick={openBoard}>▦ Sprint board</button>
             </div>
           )}
@@ -390,11 +390,11 @@ const CSS = `
 .ms-hire .fine{font-family:var(--mono);font-size:9.5px;color:var(--mut);margin-top:8px;letter-spacing:.04em}
 .ms-loading{display:flex;flex-direction:column;gap:2px}
 .ms-lstep{display:flex;gap:9px;padding:6px 0;font-family:var(--mono);font-size:12.5px;transition:opacity .3s}
-.ms-task{background:var(--panel);border:1px solid #e2ded4;padding:14px 15px;margin-bottom:11px}
+.ms-task{background:var(--panel);border:1px solid #e2ded4;padding:11px 13px;margin-bottom:8px}
 .ms-task.confirm{border-color:var(--ink)}
-.ms-task h4{font-family:var(--serif);font-weight:600;font-size:16px;letter-spacing:-.01em;line-height:1.25;margin:0 0 6px}
-.ms-task p{margin:0 0 11px;font-size:13px;color:var(--sub);line-height:1.5}
-.ms-task .foot{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+.ms-task h4{font-family:var(--serif);font-weight:600;font-size:15px;letter-spacing:-.01em;line-height:1.22;margin:0 0 4px}
+.ms-task p{margin:0 0 9px;font-size:12.5px;color:var(--sub);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.ms-task .foot{display:flex;align-items:center;gap:8px;margin-bottom:9px}
 .ms-task .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border:1px solid #ded9cd;background:var(--paper);padding:3px 8px;color:var(--ink2)}
 .ms-task .chip.dot::before{content:'';display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--flame);margin-right:6px;vertical-align:1px}
 .ms-task .cost{margin-left:auto;font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--ink)}
@@ -418,7 +418,8 @@ const CSS = `
 .ms-runline.muted{color:var(--sub);font-style:italic;font-family:var(--ui);margin-bottom:8px}
 .ms-empty{color:var(--sub);font-size:13.5px;padding:14px 0}
 .ms-empty.small{font-size:12.5px;padding:10px 0}
-.ms-taskbtns{display:flex;gap:8px;margin:4px 0 2px;flex-wrap:wrap}
+.ms-taskbtns{display:flex;gap:8px;margin:8px 0 2px}
+.ms-taskbtns .ms-btn{flex:1;padding:11px 12px;font-size:11px}
 .ms-krow{display:flex;justify-content:space-between;align-items:baseline;padding:8px 0;border-bottom:1px solid var(--hair);font-size:13px}
 .ms-krow .k{color:var(--sub)}
 .ms-krow .v{font-family:var(--mono);font-size:12px;font-weight:600}
