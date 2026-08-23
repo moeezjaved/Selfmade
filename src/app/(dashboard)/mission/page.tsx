@@ -22,7 +22,13 @@ const CONNECT: Record<string, { label: string; href: string }> = {
   klaviyo: { label: 'Connect Klaviyo to send →', href: '/settings' },
 }
 type Signals = { competitors: number; ownAdsFound: boolean; winnerCount: number; metaConnected: boolean }
-type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[]; notice?: string; brand?: string; signals?: Signals }
+type MetaPanel = { connected: boolean; spend?: number | null; currency?: string; roas?: number | null; ctr?: number | null; cvr?: number | null; aov?: number | null; frequency?: number | null; activeCreatives?: number | null; biggestLever?: string | null }
+type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[]; notice?: string; brand?: string; signals?: Signals; meta?: MetaPanel }
+
+const curSym = (c?: string) => (({ USD: '$', EUR: '€', GBP: '£' } as Record<string, string>)[c || 'USD']) || ''
+const money = (n?: number | null, c?: string) => (n == null ? '—' : `${curSym(c)}${Math.round(n).toLocaleString()}`)
+const pct = (f?: number | null) => (f == null ? '—' : `${(f * 100).toFixed(2)}%`)
+const xx = (n?: number | null) => (n == null ? '—' : `${n.toFixed(1)}×`)
 
 // The agent router's answer for one task: who runs it, how, and what it costs — confirm-before-run.
 type AgentInfo = { key: string; name: string; emoji: string; role: string }
@@ -260,11 +266,24 @@ export default function MissionPage() {
 
         {/* COL 3 — channels & signals (honest shells) */}
         <div className="ms-col">
-          <h2 className="ms-sec">Meta</h2>
-          {sig?.metaConnected
-            ? <div className="ms-krow"><span className="k">Ad account</span><span className="v ok">● CONNECTED</span></div>
-            : <div className="ms-conn">Meta <span className="st"><a href="/connect/meta" className="ms-btn flame tiny">Connect</a></span></div>}
-          <div className="ms-note sm">Your live account read — spend, CTR, CVR, AOV, frequency — wires up here next.</div>
+          <h2 className="ms-sec">Meta <small>{plan?.meta?.connected ? 'last 30 days' : ''}</small></h2>
+          {plan?.meta?.connected ? (() => {
+            const m = plan.meta!
+            return <>
+              <div className="ms-krow"><span className="k">Ad account</span><span className="v ok">● CONNECTED</span></div>
+              <div className="ms-krow"><span className="k">Spend</span><span className="v">{money(m.spend, m.currency)}</span></div>
+              <div className="ms-krow"><span className="k">ROAS</span><span className="v">{xx(m.roas)}</span></div>
+              <div className="ms-krow"><span className="k">CTR</span><span className="v">{pct(m.ctr)}</span></div>
+              <div className="ms-krow"><span className="k">CVR</span><span className={`v${m.cvr != null && m.cvr < 0.01 ? ' bad' : ''}`}>{pct(m.cvr)}</span></div>
+              <div className="ms-krow"><span className="k">AOV</span><span className="v">{money(m.aov, m.currency)}</span></div>
+              <div className="ms-krow"><span className="k">Frequency</span><span className="v">{m.frequency == null ? '—' : m.frequency.toFixed(1)}</span></div>
+              <div className="ms-krow"><span className="k">Live creatives</span><span className="v">{m.activeCreatives ?? '—'}</span></div>
+              {m.biggestLever && <div className="ms-note sm" style={{ marginTop: 10 }}><b>Biggest lever:</b> {m.biggestLever}</div>}
+            </>
+          })() : <>
+            <div className="ms-conn">Ad account <span className="st"><a href="/connect/meta" className="ms-btn flame tiny">Connect</a></span></div>
+            <div className="ms-note sm">Connect Meta and your live read — spend, ROAS, CTR, CVR, AOV — grounds every move.</div>
+          </>}
 
           <h2 className="ms-sec sec2">Rivals <small>brand spy</small></h2>
           {sig && sig.competitors > 0
@@ -432,6 +451,7 @@ const CSS = `
 .ms-krow .k{color:var(--sub)}
 .ms-krow .v{font-family:var(--mono);font-size:12px;font-weight:600}
 .ms-krow .v.ok{color:var(--live)}
+.ms-krow .v.bad{color:var(--flame)}
 .ms-conn{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:13.5px}
 .ms-conn .st{margin-left:auto}
 .ms-conn .on{font-family:var(--mono);font-size:10.5px;color:var(--live);letter-spacing:.05em}

@@ -54,6 +54,15 @@ export type StrategistPlan = {
   notice?: string        // an honest, transient system note (e.g. "pulling your own ads into view…")
   brand?: string         // the active brand's name — for the masthead
   signals?: { competitors: number; ownAdsFound: boolean; winnerCount: number; metaConnected: boolean }  // honest facts for the desk
+  meta?: MetaPanel       // the real account read for the Meta column (already computed for the diagnosis)
+}
+
+// The connected Meta account's headline read — fractions for ctr/cvr, currency-denominated spend/aov.
+export type MetaPanel = {
+  connected: boolean
+  spend?: number | null; currency?: string; roas?: number | null; ctr?: number | null
+  cvr?: number | null; aov?: number | null; frequency?: number | null
+  activeCreatives?: number | null; biggestLever?: string | null
 }
 
 // ── stage detection — from real signals, honest and cheap ──
@@ -246,6 +255,9 @@ Return JSON: {"stage_read":"one plain-English sentence naming the biggest constr
     stage, headline: stageRead, tasks, grounding,
     brand: ctx.brandName || undefined,
     signals: { competitors: ctx.competitors.length, ownAdsFound: ownFound, winnerCount: winners?.winnerCount || 0, metaConnected: ctx.integrations.meta.connected },
+    meta: ctx.integrations.meta.connected
+      ? { connected: true, spend: performance?.spend ?? null, currency: performance?.currency ?? 'USD', roas: performance?.roas ?? null, ctr: performance?.ctr ?? null, cvr: performance?.cvr ?? null, aov: performance?.aov ?? null, frequency: performance?.frequency ?? null, activeCreatives: performance?.activeCreatives ?? null, biggestLever: biggestLeverRead?.headline ?? null }
+      : { connected: false },
     ...(ownCrawlNote ? { notice: ownCrawlNote } : {}),
   }
   return plan
