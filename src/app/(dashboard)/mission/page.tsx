@@ -84,7 +84,7 @@ export default function MissionPage() {
 
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
-  type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; thumbnail_url?: string; preview_url?: string }
+  type AdRow = { name?: string; spend?: number; ctr?: number; roas?: number; conversions?: number; impressions?: number; clicks?: number; cpc?: number; thumbnail_url?: string; preview_url?: string }
   const [ownReports, setOwnReports] = useState<AdRow[] | null>(null)   // null = loading; [] = none/not connected
   useEffect(() => {
     (async () => {
@@ -315,31 +315,35 @@ export default function MissionPage() {
           <h2 className="ms-sec">Your ads <small>{plan?.meta?.connected ? 'meta · last 30 days' : 'meta'}</small></h2>
           {plan?.meta?.connected ? (() => {
             const m = plan.meta!
-            const rep = (ownReports || []).filter((c) => c.thumbnail_url).slice(0, 4)
-            const roasClass = (r?: number) => (r == null ? '' : r >= 2 ? 'good' : r >= 1 ? 'mid' : 'bad')
+            const rep = (ownReports || []).filter((c) => c.spend != null || c.thumbnail_url).slice(0, 6)
+            const fmtN = (n?: number) => (n == null ? '—' : n >= 1000 ? `${(n / 1000).toFixed(n >= 10000 ? 0 : 1)}k` : String(Math.round(n)))
             return <>
-              <div className="ms-krow"><span className="k">Ad account</span><span className="v ok">● CONNECTED</span></div>
-              <div className="ms-adsplit">
-                {/* creatives on one side */}
-                <div className="ms-ad-cre">
-                  {rep.length > 0 ? rep.map((c, i) => (
-                    <a className="cre" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer" title={c.name || ''}>
-                      <img src={c.thumbnail_url} alt="" loading="lazy" />
-                      {c.roas != null && <span className={`rp ${roasClass(c.roas)}`}>{c.roas.toFixed(1)}×</span>}
-                    </a>
-                  )) : <div className="ms-note sm none">{ownReports === null ? 'Loading your creatives…' : 'No ads spending in the last 30 days.'}</div>}
-                </div>
-                {/* compact numbers on the other */}
-                <div className="ms-ad-nums">
-                  <div className="st"><span className="l">Spend</span><span className="n">{money(m.spend, m.currency)}</span></div>
-                  <div className="st"><span className="l">ROAS</span><span className="n">{xx(m.roas)}</span></div>
-                  <div className="st"><span className="l">CTR</span><span className="n">{pct(m.ctr)}</span></div>
-                  <div className="st"><span className="l">CVR</span><span className={`n${m.cvr != null && m.cvr < 0.01 ? ' bad' : ''}`}>{pct(m.cvr)}</span></div>
-                  <div className="st"><span className="l">AOV</span><span className="n">{money(m.aov, m.currency)}</span></div>
-                  <div className="st"><span className="l">Freq</span><span className="n">{m.frequency == null ? '—' : m.frequency.toFixed(1)}</span></div>
-                  <div className="st"><span className="l">Live</span><span className="n">{m.activeCreatives ?? '—'}</span></div>
-                </div>
+              {/* account summary line — the "Spend Today" header, honest small numbers */}
+              <div className="ms-statline">
+                <span>Spend <b>{money(m.spend, m.currency)}</b></span>
+                <span>ROAS <b>{xx(m.roas)}</b></span>
+                <span>CTR <b>{pct(m.ctr)}</b></span>
+                <span>CVR <b className={m.cvr != null && m.cvr < 0.01 ? 'bad' : ''}>{pct(m.cvr)}</b></span>
+                <span>AOV <b>{money(m.aov, m.currency)}</b></span>
               </div>
+              {/* per-ad table, Polsia-style: thumbnail + spend/impr/clicks/ctr/cpc columns */}
+              {rep.length > 0 ? (
+                <div className="ms-adtable">
+                  <div className="hd"><span className="ad">Ad</span><span>Spend</span><span>Impr</span><span>Clicks</span><span>CTR</span><span>CPC</span></div>
+                  {rep.map((c, i) => (
+                    <a className="row" key={i} href={c.preview_url || '#'} target={c.preview_url ? '_blank' : undefined} rel="noopener noreferrer" title={c.name || ''}>
+                      <span className="ad">{c.thumbnail_url ? <img src={c.thumbnail_url} alt="" loading="lazy" /> : <span className="ph">🎨</span>}</span>
+                      <span>{money(c.spend, m.currency)}</span>
+                      <span>{fmtN(c.impressions)}</span>
+                      <span>{fmtN(c.clicks)}</span>
+                      <span>{c.ctr != null ? c.ctr.toFixed(1) + '%' : '—'}</span>
+                      <span>{c.cpc != null ? money(c.cpc, m.currency) : '—'}</span>
+                    </a>
+                  ))}
+                </div>
+              ) : (
+                <div className="ms-note sm" style={{ marginTop: 8 }}>{ownReports === null ? 'Loading your ads…' : 'No ads have spent in the last 30 days — launch a campaign and they’ll show here.'}</div>
+              )}
               {m.biggestLever && <div className="ms-note sm" style={{ marginTop: 10 }}><b>Biggest lever:</b> {m.biggestLever}</div>}
             </>
           })() : <>
@@ -506,19 +510,17 @@ const CSS = `
 .ms-figure .big{font-family:var(--serif);font-weight:600;font-size:32px;letter-spacing:-.02em;line-height:1}
 .ms-figure .lbl{font-family:var(--mono);font-size:10.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--sub)}
 .ms-figure .sub{flex-basis:100%;font-family:var(--mono);font-size:11px;color:var(--sub);letter-spacing:.02em;margin-top:2px}
-.ms-adsplit{display:flex;gap:14px;margin-top:10px}
-.ms-ad-cre{flex:1;min-width:0;display:grid;grid-template-columns:repeat(auto-fill,42px);gap:4px;align-content:start}
-.ms-ad-cre .cre{position:relative;aspect-ratio:1;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:block}
-.ms-ad-cre .cre img{width:100%;height:100%;object-fit:cover;display:block}
-.ms-ad-cre .cre .rp{position:absolute;bottom:0;right:0;font-family:var(--mono);font-size:9px;font-weight:700;color:#fff;background:rgba(20,18,15,.72);padding:1px 4px}
-.ms-ad-cre .cre .rp.good{background:rgba(31,138,83,.88)}
-.ms-ad-cre .cre .rp.bad{background:rgba(239,74,30,.88)}
-.ms-ad-cre .none{grid-column:1/-1}
-.ms-ad-nums{width:112px;flex:none;display:flex;flex-direction:column}
-.ms-ad-nums .st{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:5px 0;border-bottom:1px solid var(--hair)}
-.ms-ad-nums .st .l{font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
-.ms-ad-nums .st .n{font-family:var(--mono);font-size:12px;font-weight:600;color:var(--ink)}
-.ms-ad-nums .st .n.bad{color:var(--flame)}
+.ms-statline{display:flex;flex-wrap:wrap;gap:5px 14px;padding:9px 0;border-bottom:1px solid var(--hair);font-family:var(--mono);font-size:10.5px;color:var(--sub);letter-spacing:.02em}
+.ms-statline b{color:var(--ink);font-weight:700}
+.ms-statline b.bad{color:var(--flame)}
+.ms-adtable{margin-top:10px}
+.ms-adtable .hd,.ms-adtable .row{display:grid;grid-template-columns:28px repeat(5,minmax(0,1fr));gap:6px;align-items:center}
+.ms-adtable .hd{font-family:var(--mono);font-size:9px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);padding-bottom:6px;border-bottom:1px solid var(--rule)}
+.ms-adtable .hd span,.ms-adtable .row>span{text-align:right;font-family:var(--mono);font-size:10.5px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-adtable .hd .ad,.ms-adtable .row .ad{text-align:left}
+.ms-adtable .row{padding:6px 0;border-bottom:1px solid var(--hair);text-decoration:none}
+.ms-adtable .row .ad img{width:26px;height:26px;object-fit:cover;border:1px solid #e2ded4;display:block}
+.ms-adtable .row .ad .ph{display:flex;align-items:center;justify-content:center;width:26px;height:26px;background:var(--panel);border:1px solid #e2ded4;font-size:12px}
 .ms-adrows{display:flex;flex-direction:column;gap:2px}
 .ms-adrow{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--hair);text-decoration:none}
 .ms-adrow .th{width:38px;height:38px;flex:none;background:var(--panel);border:1px solid #e2ded4;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:15px}
