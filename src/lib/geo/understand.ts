@@ -188,9 +188,13 @@ async function readFounderCategory(admin: SupabaseClient, userId: string, brandI
 
 async function loadCompetitors(admin: SupabaseClient, userId: string, brandId: string | null): Promise<string[]> {
   try {
-    const { data } = await (admin as any).from('followed_brands').select('brand_name, brand_id').eq('user_id', userId)
+    // strict active-brand scope (brand-isolation rule) — do NOT include unassigned/other-brand spies, or
+    // noise like a Hungarian vitamin brand leaks into a nicotine brand's competitor set.
+    let q = (admin as any).from('followed_brands').select('brand_name, brand_id, spied').eq('user_id', userId)
+    if (brandId) q = q.eq('brand_id', brandId)
+    const { data } = await q
     const names = ((data || []) as any[])
-      .filter((r) => r.brand_name && (!brandId || !r.brand_id || String(r.brand_id) === brandId))
+      .filter((r) => r.brand_name && (!brandId || String(r.brand_id) === brandId))
       .map((r) => String(r.brand_name)).filter((n) => n && !/^\d+$/.test(n))
     return Array.from(new Set(names)).slice(0, 12)
   } catch { return [] }

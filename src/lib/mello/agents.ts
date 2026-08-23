@@ -56,7 +56,7 @@ async function matchCompetitor(
   const { data } = await q
   const rows = ((data || []) as any[])
     .filter((r) => r.page_id && r.brand_name)
-    .filter((r) => !brandId || !r.brand_id || String(r.brand_id) === brandId)   // brand-isolation rule
+    .filter((r) => !brandId || String(r.brand_id) === brandId)   // strict brand-isolation (no unassigned leak)
   const hay = fold(text)
   // longest name first so "Aura Bura" beats "Aura"
   rows.sort((a, b) => String(b.brand_name).length - String(a.brand_name).length)
