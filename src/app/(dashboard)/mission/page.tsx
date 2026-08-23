@@ -218,10 +218,10 @@ export default function MissionPage() {
             <div className="bar"><span className="fill" style={{ width: `${fillPct}%` }} /><span className="dot" style={{ left: `${fillPct}%` }} /></div>
             <div className="marks"><span>{money(prevM, revCur)} ✓</span><span className="you">▲ {money(rev, revCur)} you’re here</span><span>{money(goalM, revCur)}</span></div>
           </div>
-          <div className="pace"><div className="n">{money(rev, revCur)}</div><div className="l">ad-driven · 30d</div><a className="shopify" href="/settings">Connect Shopify for total →</a></div>
+          <div className="pace"><div className="n">{money(rev, revCur)}</div><div className="l">ad-driven · 30d</div><a className="seeplan" href="/mission/plan">See the plan →</a></div>
         </> : <>
           <div className="track"><div className="bar"><span className="fill" style={{ width: '0%' }} /></div><div className="marks"><span>$0</span><span>Connect to start tracking</span><span>{money(goalM, revCur)}</span></div></div>
-          <div className="pace"><a className="shopify" href="/connect/meta">Connect Meta to track revenue →</a></div>
+          <div className="pace"><a className="seeplan" href="/mission/plan">See the plan →</a></div>
         </>}
       </div>
 
@@ -551,6 +551,7 @@ const CSS = `
 .ms-mission .pace .n{font-family:var(--serif);font-size:26px;color:var(--ink);line-height:1}
 .ms-mission .pace .l{font-family:var(--mono);font-size:10px;color:var(--sub);margin-top:4px}
 .ms-mission .pace .shopify{display:block;font-family:var(--mono);font-size:10px;color:var(--flame);margin-top:6px}
+.ms-mission .pace .seeplan{display:inline-block;font-family:var(--ui);font-size:12px;font-weight:700;color:#fff;background:var(--lime);border-radius:9px;padding:8px 14px;margin-top:8px}
 .ms-sheet{display:grid;grid-template-columns:230px 1fr 1fr 372px}
 .ms-col{padding:20px clamp(14px,1.6vw,22px);border-right:1px solid var(--hair);min-width:0}
 .ms-sec{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.005em;padding-bottom:8px;border-bottom:1px solid var(--line);margin:0 0 13px;display:flex;align-items:baseline;gap:9px}
