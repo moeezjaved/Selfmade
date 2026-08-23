@@ -12,7 +12,8 @@ type Status = {
   hasData: boolean; brandName: string | null; score: number; shareOfVoice: number; promptsChecked: number
   engines: { engine: string; label: string }[]; availableEngines: { engine: string; label: string }[]
   results: PromptResult[]; gaps: { prompt: string; rivals: string[] }[]; history: { date: string; score: number }[]
-  lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; category?: string; note?: string
+  lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; category?: string
+  understanding?: { websiteUrl: string | null; websiteSource: string; siteRead: boolean; competitors: string[]; metaAdCopy: number }; note?: string
 }
 const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
@@ -80,7 +81,16 @@ export default function GeoPage() {
         </div>
 
         {status?.category && (
-          <div className="understood">Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button></div>
+          <div className="understood">
+            <div>Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button></div>
+            {status.understanding && (
+              <div className="howread">
+                How I read you: source <b>{status.understanding.websiteSource === 'meta_ads' ? 'your Meta ads' : status.understanding.websiteSource === 'brand_kit' ? 'your brand kit' : status.understanding.websiteSource === 'name_match' ? '⚠️ name match (may be a different brand)' : 'no site found'}</b>
+                {status.understanding.websiteUrl && <> · site <b>{(() => { try { return new URL(status.understanding.websiteUrl!.startsWith('http') ? status.understanding.websiteUrl! : `https://${status.understanding.websiteUrl}`).hostname } catch { return status.understanding.websiteUrl } })()}</b> {status.understanding.siteRead ? '(read ✓)' : '(not read)'}</>}
+                {' '}· competitors <b>{status.understanding.competitors.length}</b>{status.understanding.competitors.length > 0 && <> ({status.understanding.competitors.slice(0, 4).join(', ')})</>} · your ad copy <b>{status.understanding.metaAdCopy}</b> lines
+              </div>
+            )}
+          </div>
         )}
 
         {running && <div className="note">Asking {engines.map((e) => e.label).join(', ') || 'the AI engines'} your buyer questions — this takes a moment.</div>}
@@ -205,6 +215,8 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .understood{font-size:13px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:16px}
 .understood b{color:var(--ink)}
 .reglink{background:none;border:none;color:var(--flame);cursor:pointer;font-size:13px;padding:0}
+.howread{font-family:var(--mono);font-size:11px;color:var(--mut);margin-top:8px;line-height:1.6}
+.howread b{color:var(--sub)}
 .runstat{font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:8px}
 .runstat b{color:var(--ink)} .runstat .est{color:var(--mut)}
 .note{font-family:var(--mono);font-size:12.5px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:18px}
