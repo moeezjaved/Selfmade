@@ -55,7 +55,7 @@ export default function MissionPage() {
 
   // Live desk panels (DB-only, fast) — load independently of the LLM plan so they populate immediately.
   type OwnAd = { adId: string; title: string | null; days: number | null; thumb: string; isVideo: boolean }
-  type Rival = { name: string; pageId: string; newAds: number }
+  type Rival = { name: string; pageId: string; newAds: number; thumbs: string[] }
   type Gen = { id: string; url: string; isVideo: boolean; at: string }
   type Desk = { ownAds: OwnAd[]; rivals: Rival[]; generations: Gen[]; ownIndexed: boolean }
   const [desk, setDesk] = useState<Desk | null>(null)
@@ -336,9 +336,16 @@ export default function MissionPage() {
 
           <h2 className="ms-sec sec2">Rivals <small>brand spy</small></h2>
           {desk && desk.rivals.length > 0 ? desk.rivals.map((r) => (
-            <div className="ms-comp" key={r.pageId}>
-              <span className="nm">{r.name}</span>
-              <span className={`sig${r.newAds > 0 ? ' hot' : ''}`}>{r.newAds > 0 ? `${r.newAds} new · 72h` : 'quiet'}</span>
+            <div className="ms-rival" key={r.pageId}>
+              <div className="ms-rival-top">
+                <span className="nm">{r.name}</span>
+                <span className={`sig${r.newAds > 0 ? ' hot' : ''}`}>{r.newAds > 0 ? `${r.newAds} new · 72h` : 'quiet'}</span>
+              </div>
+              {r.thumbs.length > 0 && (
+                <div className="ms-rival-shots">
+                  {r.thumbs.map((t, j) => <div className="rs" key={j}><img src={t} alt="" loading="lazy" /></div>)}
+                </div>
+              )}
             </div>
           )) : (
             <div className="ms-note sm">{desk === null ? 'Loading your rivals…' : 'Spy a competitor in Brand Spy and their moves appear here.'}</div>
@@ -478,10 +485,14 @@ const CSS = `
 .ms-gen{position:relative;aspect-ratio:1;background:var(--panel);border:1px solid #e2ded4;overflow:hidden}
 .ms-gen img,.ms-gen video{width:100%;height:100%;object-fit:cover;display:block}
 .ms-gen .pv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
-.ms-comp{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--hair)}
-.ms-comp .nm{font-weight:500;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ms-comp .sig{font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:.03em;flex:none}
-.ms-comp .sig.hot{color:var(--flame);font-weight:700}
+.ms-rival{padding:9px 0;border-bottom:1px solid var(--hair)}
+.ms-rival-top{display:flex;align-items:center;gap:10px}
+.ms-rival-top .nm{font-weight:500;font-size:13.5px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ms-rival-top .sig{font-family:var(--mono);font-size:10px;color:var(--sub);letter-spacing:.03em;flex:none}
+.ms-rival-top .sig.hot{color:var(--flame);font-weight:700}
+.ms-rival-shots{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-top:6px;max-width:172px}
+.ms-rival-shots .rs{aspect-ratio:4/5;background:var(--panel);border:1px solid #e2ded4;overflow:hidden}
+.ms-rival-shots .rs img{width:100%;height:100%;object-fit:cover;display:block}
 .ms-hire{border:1px solid var(--ink);padding:18px 15px;text-align:center;margin-top:24px}
 .ms-hire .k{font-family:var(--mono);font-size:10px;letter-spacing:.13em;color:var(--sub);text-transform:uppercase}
 .ms-hire h3{font-family:var(--serif);font-weight:500;font-size:21px;line-height:1.15;letter-spacing:-.02em;margin:4px 0 0}
