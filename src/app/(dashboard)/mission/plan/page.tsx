@@ -10,9 +10,12 @@ import type { GrowthPlan, Lever, MathSeg } from '@/lib/mello/growth-plan'
 
 const CONF: Record<string, string> = { measured: 'measured', estimated: 'estimated', benchmark: 'benchmark', test: 'test', potential: 'potential' }
 
+type ProgItem = { key: string; label: string; done: boolean; value?: string; href: string }
+
 export default function GrowthPlanPage() {
   const [plan, setPlan] = useState<GrowthPlan | null>(null)
   const [loading, setLoading] = useState(true)
+  const [prog, setProg] = useState<{ items: ProgItem[]; done: number; total: number } | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -22,6 +25,7 @@ export default function GrowthPlanPage() {
       if (r.ok) setPlan(j as GrowthPlan)
       else setPlan(null)
     } catch { setPlan(null) }
+    try { const r = await fetch('/api/mello/gtm-progress'); const j = await r.json(); if (r.ok) setProg(j) } catch { /* ignore */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -59,6 +63,22 @@ export default function GrowthPlanPage() {
                 <div className="marks"><span><b>{money(plan.current)}</b> today <span className="ad">· ad-driven</span></span><span>the plan fills this gap →</span><span className="goal">{money(plan.goal)} goal</span></div>
               </div>
             </div>
+
+            {prog && prog.items.length > 0 && (
+              <div className="progress">
+                <div className="phead"><span className="plabel">Your progress</span><span className="pcount">{prog.done} / {prog.total} done</span></div>
+                <div className="pbar"><span className="pfill" style={{ width: `${Math.round((prog.done / prog.total) * 100)}%` }} /></div>
+                <div className="pitems">
+                  {prog.items.map((it) => (
+                    <a className={`pitem${it.done ? ' done' : ''}`} key={it.key} href={it.href}>
+                      <span className="pmark">{it.done ? '✓' : '○'}</span>
+                      <span className="ptext">{it.label}</span>
+                      {it.value && <span className="pval">{it.value}</span>}
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
 
             <div className="lead">{plan.levers.length} moves to close the {money(plan.gap)} gap</div>
             <div className="leadsub">Each number below comes from your real cost-per-sale, order value and buy rate — or a clearly-labelled estimate.</div>
@@ -124,6 +144,20 @@ const CSS = `
 .bar .planbar{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,rgba(255,90,44,.5),rgba(255,90,44,.5) 6px,rgba(255,90,44,.26) 6px,rgba(255,90,44,.26) 12px);border-radius:0 100px 100px 0}
 .marks{display:flex;justify-content:space-between;gap:10px;margin-top:8px;font-family:var(--mono);font-size:11px;color:var(--mut);flex-wrap:wrap}
 .marks b{color:var(--ink)} .marks .ad{color:var(--mut)} .marks .goal{color:var(--lime);font-weight:700}
+.progress{margin-top:30px;border:1px solid var(--line);border-radius:16px;background:var(--paper);padding:18px 20px}
+.phead{display:flex;align-items:baseline;justify-content:space-between}
+.phead .plabel{font-family:var(--serif);font-size:20px}
+.phead .pcount{font-family:var(--mono);font-size:11px;color:var(--sub)}
+.pbar{height:7px;border-radius:100px;background:var(--greenBg);margin:10px 0 14px;overflow:hidden}
+.pbar .pfill{display:block;height:100%;background:var(--live);border-radius:100px}
+.pitems{display:flex;flex-direction:column;gap:2px}
+.pitem{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--hair);font-size:13.5px;color:var(--sub)}
+.pitem:first-child{border-top:none}
+.pitem.done{color:var(--ink)}
+.pmark{font-family:var(--mono);font-weight:700;flex:none;color:var(--mut)}
+.pitem.done .pmark{color:var(--live)}
+.ptext{flex:1;min-width:0}
+.pval{font-family:var(--mono);font-size:11px;color:var(--live);flex:none}
 .lead{font-family:var(--serif);font-size:23px;margin:34px 0 4px;letter-spacing:-.005em}
 .leadsub{font-size:13.5px;color:var(--sub);margin-bottom:16px}
 .lever{border:1px solid var(--line);border-radius:16px;background:var(--card);padding:20px 22px;margin-bottom:14px;display:grid;grid-template-columns:1fr auto;gap:6px 24px;align-items:start}
