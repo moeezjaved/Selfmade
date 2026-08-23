@@ -54,7 +54,8 @@ export default function MissionPage() {
   const [open, setOpen] = useState<string | null>(null)
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
-  const [extra, setExtra] = useState<Task[]>([])   // more moves added to the backlog on demand
+  const [visible, setVisible] = useState<Task[]>([])   // the (up to 3) moves on screen
+  const [backlog, setBacklog] = useState<Task[]>([])   // shelved moves — live in the Sprint board
   const [adding, setAdding] = useState(false)
   // Inline Mello chat in the rail — the real streaming brain, no page change.
   const [ask, setAsk] = useState('')
@@ -113,36 +114,38 @@ export default function MissionPage() {
 
   const STEPS = ['Reviewing your funnel + backlog…', 'Benchmarking against your competitors…', 'Diagnosing your biggest constraint…', 'Drafting your highest-impact moves…']
 
-  // "+ Add to backlog" — ask Mello for a FRESH batch of moves, telling it what's already on the desk so it
-  // proposes genuinely different ones. Appends the new moves; each click grows the backlog.
+  // "+ Add to backlog" — bring in ONE fresh move (exclude what's already known) and shelf the top move
+  // into the Sprint board's backlog, so exactly 3 stay on screen. A conveyor: 1 in, 1 shelved.
   const [backlogNote, setBacklogNote] = useState<string | null>(null)
   const addToBacklog = async () => {
     if (adding) return
     setAdding(true); setBacklogNote(null)
     try {
-      const shown = [...(plan?.tasks || []).slice(0, 3), ...extra]
-      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 5, exclude: shown.map((t) => t.title) }) })
+      const known = [...visible, ...backlog]
+      const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 4, exclude: known.map((t) => t.title) }) })
       const j = await r.json()
       const incoming: Task[] = Array.isArray(j?.tasks) ? j.tasks : []
-      const seen = new Set(shown.map((t) => slugT(t.title)))
-      const fresh = incoming.filter((t) => t.title && !seen.has(slugT(t.title)))
-      if (fresh.length) setExtra((prev) => [...prev, ...fresh].slice(0, 30))
-      else setBacklogNote('That’s every high-impact move I can see right now — approve some, and I’ll find the next ones.')
+      const seen = new Set(known.map((t) => slugT(t.title)))
+      const next = incoming.find((t) => t.title && !seen.has(slugT(t.title)))
+      if (next) {
+        if (visible.length >= 3) { setBacklog((b) => [visible[0], ...b]); setVisible([...visible.slice(1), next]) }
+        else setVisible([...visible, next])
+      } else setBacklogNote('That’s every high-impact move I can see right now — approve some, and I’ll find the next ones.')
     } catch { setBacklogNote('Couldn’t reach Mello just now — try again.') }
     setAdding(false)
   }
 
   const fetchPlan = useCallback(async () => {
-    setLoading(true); setStep(0); setRuns({}); setExtra([])
+    setLoading(true); setStep(0); setRuns({}); setBacklog([]); setBacklogNote(null)
     const iv = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1600)
     try {
       // limit:3 — the desk shows the 3 highest-impact moves (Polsia-style), so the engine drafts exactly 3;
       // nothing Mello reasoned about is generated-then-hidden. Regenerate ("+ New moves") for a fresh set.
       const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 3 }) })
       const j = await r.json()
-      if (r.ok && Array.isArray(j?.tasks)) setPlan(j as Plan)
-      else setPlan({ stage: 'setup', headline: j?.error ? 'Mello couldn’t reach your data just now — try again.' : 'No plan yet.', tasks: [] })
-    } catch { setPlan({ stage: 'setup', headline: 'Something went wrong reaching Mello. Try again.', tasks: [] }) }
+      if (r.ok && Array.isArray(j?.tasks)) { setPlan(j as Plan); setVisible((j.tasks as Task[]).slice(0, 3)) }
+      else { setPlan({ stage: 'setup', headline: j?.error ? 'Mello couldn’t reach your data just now — try again.' : 'No plan yet.', tasks: [] }); setVisible([]) }
+    } catch { setPlan({ stage: 'setup', headline: 'Something went wrong reaching Mello. Try again.', tasks: [] }); setVisible([]) }
     clearInterval(iv); setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => { fetchPlan() }, [fetchPlan])
@@ -262,7 +265,7 @@ export default function MissionPage() {
             </div>
           )}
 
-          {!loading && plan && [...plan.tasks.slice(0, 3), ...extra].map((t, i) => {
+          {!loading && plan && visible.map((t, i) => {
             const isOpen = open === t.suggested_key
             const connect = t.needs ? CONNECT[t.needs] : null
             const run = runs[t.suggested_key] || { phase: 'idle' as const }
@@ -322,7 +325,7 @@ export default function MissionPage() {
             )
           })}
 
-          {!loading && plan && plan.tasks.length === 0 && (
+          {!loading && plan && visible.length === 0 && (
             <div className="ms-empty">No moves yet. Tap <b>+ New moves</b> and Mello drafts your highest-impact next steps.</div>
           )}
 
@@ -459,7 +462,7 @@ export default function MissionPage() {
 
       {/* the standup — tasks by status */}
       {boardOpen && (() => {
-        const todo = plan ? [...plan.tasks.slice(0, 3), ...extra] : []
+        const todo = [...visible, ...backlog]
         const rows: BoardRow[] = boardTab === 'todo'
           ? todo.map((t) => ({ id: t.suggested_key, title: t.title, why: t.why, kind: t.dept, status: 'todo', url: null, error: null, at: '' }))
           : (board?.[boardTab] || [])
