@@ -299,7 +299,7 @@ export default function MissionPage() {
           ? todo.map((t) => ({ id: t.suggested_key, title: t.title, why: t.why, kind: t.dept, status: 'todo', url: null, error: null, at: '' }))
           : (board?.[boardTab] || [])
         const TABS: [typeof boardTab, string, number][] = [
-          ['todo', 'To-do', todo.length],
+          ['todo', 'Backlog', todo.length],
           ['running', 'Running', board?.running.length ?? 0],
           ['done', 'Done', board?.done.length ?? 0],
           ['failed', 'Failed', board?.failed.length ?? 0],
