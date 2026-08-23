@@ -113,8 +113,11 @@ function ConnectShopifyInner() {
             <Stat label="Images w/o alt" value={h?.imagesMissingAlt ?? '—'} warn={!!h && h.imagesMissingAlt > 0} />
             <Stat label="Draft products" value={h?.drafts ?? '—'} />
           </div>
-          <div style={{ marginTop: 18, fontSize: 12.5, color: SUB }}>
-            {s.last_sync ? `Last synced ${new Date(s.last_sync).toLocaleString()}` : 'Not yet synced'} · these are the gaps the Catalog agents will fix.
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 12.5, color: SUB }}>
+              {s.last_sync ? `Last synced ${new Date(s.last_sync).toLocaleString()}` : 'Not yet synced'}
+            </div>
+            <a href="/mission/catalog" style={{ background: LIME, color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13.5, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Fix these gaps →</a>
           </div>
         </div>
       ) : (
