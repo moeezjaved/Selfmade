@@ -17,6 +17,11 @@ export type EngineAnswer = { engine: GeoEngine; text: string; grounded: boolean 
 
 export const ENGINE_LABEL: Record<GeoEngine, string> = { chatgpt: 'ChatGPT', gemini: 'Gemini', perplexity: 'Perplexity' }
 
+// Rough USD per single grounded query (tool/grounding fee + a short answer's tokens). Ballpark for the
+// "~$X this run" readout — labelled as an estimate in the UI, never billed off this.
+export const ENGINE_COST: Record<GeoEngine, number> = { chatgpt: 0.035, gemini: 0.02, perplexity: 0.008 }
+export const estimateCost = (engines: GeoEngine[], prompts: number) => engines.reduce((s, e) => s + (ENGINE_COST[e] || 0.02), 0) * Math.max(0, prompts)
+
 export function availableEngines(): GeoEngine[] {
   const out: GeoEngine[] = []
   if (process.env.OPENAI_API_KEY) out.push('chatgpt')
