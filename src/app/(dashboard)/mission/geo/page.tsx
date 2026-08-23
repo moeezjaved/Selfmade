@@ -70,6 +70,7 @@ export default function GeoPage() {
         <span className={`ast ${a.status}`}>{a.published_url ? 'published' : a.status}</span>
       </div>
       {a.target_prompt && a.kind === 'answer_page' && <div className="aq">answers: “{a.target_prompt}”</div>}
+      {a.kind === 'offsite' && a.target_prompt && <div className="aq">a helpful reply for a real discussion · <a href={a.target_prompt} target="_blank" rel="noopener noreferrer">open thread →</a></div>}
       {openAsset === (a.id || a.target_prompt) && (
         <div className="abody">
           <pre>{a.body_markdown}</pre>
@@ -83,6 +84,23 @@ export default function GeoPage() {
   )
   const answerAssets = assets.filter((a) => !a.kind || a.kind === 'answer_page')
   const crawlAssets = assets.filter((a) => a.kind && CRAWL_KINDS.includes(a.kind))
+  const offsiteAssets = assets.filter((a) => a.kind === 'offsite')
+
+  const [reaching, setReaching] = useState(false)
+  const [reachNote, setReachNote] = useState<string | null>(null)
+  const findDiscussions = async () => {
+    if (reaching) return
+    setReaching(true); setReachNote(null)
+    try {
+      const r = await fetch('/api/geo/reach', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      const j = await r.json()
+      if (r.ok) {
+        const rr = await fetch('/api/geo/answer'); const jj = await rr.json(); if (rr.ok && Array.isArray(jj?.assets)) setAssets(jj.assets)
+        setReachNote(j?.note || null)
+      }
+    } catch { setReachNote('Couldn’t reach out just now — try again.') }
+    setReaching(false)
+  }
 
   const [showFix, setShowFix] = useState(false)
   const [fixCat, setFixCat] = useState('')
@@ -226,6 +244,14 @@ export default function GeoPage() {
                 <button className="btn" disabled={building === 'fact_sheet'} onClick={() => buildAsset('fact_sheet')}>{building === 'fact_sheet' ? 'Writing…' : 'Generate fact sheet'}</button>
               </div>
               {crawlAssets.map(renderAsset)}
+            </div>
+
+            <div className="assets">
+              <div className="lead">Get mentioned where buyers ask</div>
+              <div className="assub">Real Reddit &amp; forum discussions where {status.brandName || 'your'} buyers are asking — with a genuinely-helpful reply drafted for you. You review &amp; post; nothing auto-posts, and it skips anywhere a mention would be spammy.</div>
+              <div className="crawlbtns"><button className="btn" disabled={reaching} onClick={findDiscussions}>{reaching ? 'Finding discussions…' : 'Find discussions →'}</button></div>
+              {reachNote && <div className="note">{reachNote}</div>}
+              {offsiteAssets.map(renderAsset)}
             </div>
 
             <div className="foot">
