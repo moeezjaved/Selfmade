@@ -47,6 +47,21 @@ export default function MissionPage() {
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
 
+  // The standup board — the founder's tasks by status (running/done/failed from mello_tasks; to-do = the plan).
+  type BoardRow = { id: string; title: string; why: string | null; kind: string; status: string; url: string | null; error: string | null; at: string }
+  type Board = { running: BoardRow[]; done: BoardRow[]; failed: BoardRow[] }
+  const [boardOpen, setBoardOpen] = useState(false)
+  const [board, setBoard] = useState<Board | null>(null)
+  const [boardTab, setBoardTab] = useState<'todo' | 'running' | 'done' | 'failed'>('todo')
+  const [boardLoading, setBoardLoading] = useState(false)
+  const openBoard = async () => {
+    setBoardOpen(true); setBoardTab('todo')
+    if (board) return
+    setBoardLoading(true)
+    try { const r = await fetch('/api/mello/tasks/board'); const j = await r.json(); if (r.ok) setBoard(j as Board) } catch { /* keep to-do usable even if the fetch fails */ }
+    setBoardLoading(false)
+  }
+
   const STEPS = ['Reviewing your funnel + backlog…', 'Benchmarking against your competitors…', 'Diagnosing your biggest constraint…', 'Drafting your highest-impact moves…']
 
   const fetchPlan = useCallback(async () => {
@@ -232,8 +247,8 @@ export default function MissionPage() {
 
           {!loading && plan && (
             <div className="ms-taskbtns">
-              <a href="/brief" className="ms-btn">+ Ask for a move</a>
-              <a href="/brief" className="ms-btn">▦ All moves</a>
+              <a href="/brief" className="ms-btn">✎ Brief the team</a>
+              <button className="ms-btn" onClick={openBoard}>▦ Standup</button>
             </div>
           )}
 
@@ -276,6 +291,59 @@ export default function MissionPage() {
           <div className="ms-approve">Approve mode · nothing runs or spends without your yes.</div>
         </div>
       </div>
+
+      {/* the standup — tasks by status */}
+      {boardOpen && (() => {
+        const todo = plan?.tasks || []
+        const rows: BoardRow[] = boardTab === 'todo'
+          ? todo.map((t) => ({ id: t.suggested_key, title: t.title, why: t.why, kind: t.dept, status: 'todo', url: null, error: null, at: '' }))
+          : (board?.[boardTab] || [])
+        const TABS: [typeof boardTab, string, number][] = [
+          ['todo', 'To-do', todo.length],
+          ['running', 'Running', board?.running.length ?? 0],
+          ['done', 'Done', board?.done.length ?? 0],
+          ['failed', 'Failed', board?.failed.length ?? 0],
+        ]
+        return (
+          <div className="ms-modal-wrap" onClick={() => setBoardOpen(false)}>
+            <div className="ms-modal" onClick={(e) => e.stopPropagation()}>
+              <div className="ms-modal-top">
+                <h3>Standup</h3>
+                <button className="ms-x" onClick={() => setBoardOpen(false)}>✕</button>
+              </div>
+              <div className="ms-tabs">
+                {TABS.map(([k, label, n]) => (
+                  <button key={k} className={`ms-tab${boardTab === k ? ' on' : ''}`} onClick={() => setBoardTab(k)}>
+                    {label}{n > 0 ? ` · ${n}` : ''}
+                  </button>
+                ))}
+              </div>
+              <div className="ms-modal-body">
+                {boardLoading && boardTab !== 'todo' && <div className="ms-empty small">Loading the board…</div>}
+                {!boardLoading && rows.length === 0 && (
+                  <div className="ms-empty small">
+                    {boardTab === 'todo' ? 'No moves on the desk — tap + New moves.'
+                      : boardTab === 'running' ? 'Nothing running right now.'
+                      : boardTab === 'done' ? 'Nothing shipped yet — approve a move to fill this.'
+                      : 'Nothing failed — clean board.'}
+                  </div>
+                )}
+                {rows.map((r) => (
+                  <div className="ms-brow" key={r.id}>
+                    <div className="ms-brow-head">
+                      <span className={`chip${r.status === 'running' ? ' run' : r.status === 'done' ? ' done' : r.status === 'failed' ? ' fail' : ''}`}>{r.kind}</span>
+                      <span className="ms-brow-title">{r.title}</span>
+                    </div>
+                    {r.why && <div className="ms-brow-why">{r.why}</div>}
+                    {r.status === 'done' && r.url && <a href={r.url} className="ms-brow-link">See the result →</a>}
+                    {r.status === 'failed' && r.error && <div className="ms-brow-err">{r.error}</div>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -366,6 +434,27 @@ const CSS = `
 .ms-mello li{margin-bottom:7px}
 .ms-mello .cta{border-top:1px solid var(--hair);margin-top:11px;padding-top:11px;font-weight:600}
 .ms-approve{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.04em;margin-top:14px}
+.ms-modal-wrap{position:fixed;inset:0;background:rgba(20,18,15,.34);display:flex;align-items:flex-start;justify-content:center;padding:6vh 18px;z-index:60}
+.ms-modal{background:var(--paper);border:1px solid var(--ink);width:100%;max-width:660px;max-height:82vh;display:flex;flex-direction:column;box-shadow:0 30px 80px -30px rgba(20,18,15,.5)}
+.ms-modal-top{display:flex;align-items:center;padding:18px 22px 14px;border-bottom:1px solid var(--rule)}
+.ms-modal-top h3{font-family:var(--serif);font-weight:600;font-size:23px;letter-spacing:-.01em;margin:0}
+.ms-x{margin-left:auto;background:none;border:none;font-size:16px;color:var(--sub);cursor:pointer;line-height:1;padding:4px}
+.ms-x:hover{color:var(--ink)}
+.ms-tabs{display:flex;gap:4px;padding:12px 22px 0;border-bottom:1px solid var(--hair);flex-wrap:wrap}
+.ms-tab{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;background:none;border:none;border-bottom:2px solid transparent;color:var(--mut);padding:7px 8px 10px;cursor:pointer}
+.ms-tab:hover{color:var(--ink)}
+.ms-tab.on{color:var(--ink);border-bottom-color:var(--flame)}
+.ms-modal-body{padding:16px 22px 22px;overflow-y:auto}
+.ms-brow{border:1px solid #e2ded4;background:var(--panel);padding:13px 15px;margin-bottom:10px}
+.ms-brow-head{display:flex;align-items:baseline;gap:10px}
+.ms-brow-head .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;border:1px solid #ded9cd;background:var(--paper);padding:3px 8px;color:var(--ink2);flex:none}
+.ms-brow-head .chip.run{color:var(--flame);border-color:var(--flame)}
+.ms-brow-head .chip.done{color:var(--live);border-color:var(--live)}
+.ms-brow-head .chip.fail{color:var(--flame)}
+.ms-brow-title{font-family:var(--serif);font-weight:600;font-size:15.5px;letter-spacing:-.01em;line-height:1.25}
+.ms-brow-why{font-size:12.5px;color:var(--sub);line-height:1.5;margin-top:6px}
+.ms-brow-link{display:inline-block;font-family:var(--mono);font-size:11px;font-weight:700;margin-top:8px}
+.ms-brow-err{font-size:12px;color:var(--flame);margin-top:6px}
 @media(max-width:1120px){.ms-sheet{grid-template-columns:1fr 1fr}.ms-col:nth-child(2){border-right:none}.ms-rail{grid-column:1/-1;border-top:1px solid var(--hair)}}
 @media(max-width:720px){.ms-sheet{grid-template-columns:1fr}.ms-col{border-right:none;border-bottom:1px solid var(--hair)}}
 `
