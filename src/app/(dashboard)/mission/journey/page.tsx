@@ -11,11 +11,18 @@ const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.0
 type Task = { key: string; label: string; done: boolean; value?: string; href: string; locked?: boolean }
 type Stage = { key: string; name: string; tagline: string; status: 'done' | 'active' | 'locked'; tasks: Task[]; impact?: string }
 type Ladder = { window: string; title: string; desc: string; reached: boolean }
+type Revenue = { total: number; aov: number; orders: number; currency: string | null; organic: number; organicShare: number; windowDays: number }
 type Data = {
   store?: { name: string } | null
   momentum: number; wins: number
   nextAction?: { label: string; href: string; stage: string } | null
+  revenue?: Revenue | null
   stages: Stage[]; ladder: Ladder[]
+}
+
+function money(n: number, cur?: string | null) {
+  const sym = cur === 'USD' ? '$' : cur === 'EUR' ? '€' : cur === 'GBP' ? '£' : (cur ? cur + ' ' : '')
+  return `${sym}${(n || 0).toLocaleString()}`
 }
 
 export default function JourneyPage() {
@@ -51,6 +58,16 @@ export default function JourneyPage() {
           <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', minWidth: 46, textAlign: 'right' }}>{data.momentum}%</div>
         </div>
       </div>
+
+      {/* Real revenue + SEO (organic) contribution */}
+      {data.revenue && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 18 }}>
+          <RevStat label={`Revenue · ${data.revenue.windowDays}d`} value={money(data.revenue.total, data.revenue.currency)} />
+          <RevStat label="Orders" value={String(data.revenue.orders)} />
+          <RevStat label="AOV" value={money(data.revenue.aov, data.revenue.currency)} />
+          <RevStat label="From organic (SEO)" value={money(data.revenue.organic, data.revenue.currency)} sub={`${data.revenue.organicShare}% of revenue`} accent />
+        </div>
+      )}
 
       {/* Next best action — the pull */}
       {data.nextAction && (
@@ -121,6 +138,16 @@ function Stage({ s, last }: { s: Stage; last: boolean }) {
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+function RevStat({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent?: boolean }) {
+  return (
+    <div style={{ border: `1px solid ${accent ? 'rgba(37,96,41,.25)' : LINE}`, borderRadius: 14, padding: '13px 15px', background: accent ? '#f2f8ef' : '#fff' }}>
+      <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: '-.02em', color: accent ? GOOD : INK }}>{value}</div>
+      <div style={{ fontSize: 11.5, color: SUB, marginTop: 2, fontWeight: 600 }}>{label}</div>
+      {sub && <div style={{ fontSize: 11, color: accent ? GOOD : SUB, marginTop: 1 }}>{sub}</div>}
     </div>
   )
 }

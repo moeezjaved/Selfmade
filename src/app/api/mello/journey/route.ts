@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveStore } from '@/lib/shopify/client'
+import { revenueSummary } from '@/lib/shopify/orders'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
@@ -111,9 +113,21 @@ export async function GET(_req: NextRequest) {
     { window: 'Months 6–12', title: 'Owning it', desc: 'Page-one presence and compounding organic traffic', reached: false },
   ]
 
+  // Real revenue + the organic (SEO) contribution, straight from synced orders (best-effort).
+  let revenue: any = null
+  if (storeConnected) {
+    try {
+      const storeRow = await resolveStore(admin, uid, brandId)
+      if (storeRow) {
+        const rev = await revenueSummary(admin, storeRow, 30)
+        if (rev.hasData) revenue = { total: rev.revenue, aov: rev.aov, orders: rev.orders, currency: rev.currency, organic: rev.organicRevenue, organicShare: rev.organicShare, windowDays: rev.windowDays }
+      }
+    } catch { /* orders may not be synced yet */ }
+  }
+
   return NextResponse.json({
     store: store ? { name: store.shop_name || store.shop_domain } : null,
-    momentum, wins, nextAction,
+    momentum, wins, nextAction, revenue,
     stages, ladder,
   })
 }
