@@ -12,11 +12,14 @@ type Task = { key: string; label: string; done: boolean; value?: string; href: s
 type Stage = { key: string; name: string; tagline: string; status: 'done' | 'active' | 'locked'; tasks: Task[]; impact?: string }
 type Ladder = { window: string; title: string; desc: string; reached: boolean }
 type Revenue = { total: number; aov: number; orders: number; currency: string | null; organic: number; organicShare: number; windowDays: number }
+type Milestone = { amount: number; label: string; reached: boolean }
 type Data = {
   store?: { name: string } | null
-  momentum: number; wins: number; banked?: number
+  momentum: number; wins: number; banked?: number; activeDays?: number
   nextAction?: { label: string; href: string; stage: string } | null
   revenue?: Revenue | null
+  milestones?: Milestone[]; nextMilestone?: { label: string; amount: number; remaining: number } | null
+  threat?: { title: string } | null
   stages: Stage[]; ladder: Ladder[]
 }
 
@@ -74,7 +77,7 @@ export default function JourneyPage() {
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: PAPER, padding: 20, marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 15, color: INK }}>Momentum</div>
-          <a href="/mission/wins" style={{ fontSize: 13, color: SUB, textDecoration: 'none' }}><b style={{ color: GOOD }}>{data.wins}</b> moves{data.banked ? <> · <b style={{ color: GOOD }}>{money(data.banked, data.revenue?.currency)}</b> banked</> : ''} →</a>
+          <a href="/mission/wins" style={{ fontSize: 13, color: SUB, textDecoration: 'none' }}><b style={{ color: GOOD }}>{data.wins}</b> moves{data.banked ? <> · <b style={{ color: GOOD }}>{money(data.banked, data.revenue?.currency)}</b> banked</> : ''}{data.activeDays && data.activeDays > 1 ? ` · active ${data.activeDays} days` : ''} →</a>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
           <div style={{ flex: 1, height: 10, borderRadius: 100, background: '#eaf0ea', overflow: 'hidden' }}>
@@ -94,6 +97,15 @@ export default function JourneyPage() {
         </div>
       )}
 
+      {/* The day's threat — loss-aversion, understated (from the ads-health watchdog) */}
+      {data.threat && (
+        <a href="/mission/ads" style={{ display: 'flex', alignItems: 'center', gap: 10, textDecoration: 'none', border: `1px solid rgba(192,57,43,.25)`, background: '#fdecea', borderRadius: 12, padding: '11px 15px', marginBottom: 12 }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: '#c0392b', letterSpacing: '.04em', textTransform: 'uppercase', flex: 'none' }}>Watch</span>
+          <span style={{ fontSize: 13.5, fontWeight: 700, color: INK, flex: 1, minWidth: 0 }}>{data.threat.title}</span>
+          <span style={{ color: '#c0392b', fontSize: 15 }}>→</span>
+        </a>
+      )}
+
       {/* Next best action — the pull */}
       {data.nextAction && (
         <a href={data.nextAction.href} style={{ display: 'block', textDecoration: 'none', border: 'none', borderRadius: 18, background: INK, padding: '18px 22px', marginBottom: 26 }}>
@@ -103,6 +115,27 @@ export default function JourneyPage() {
             <div style={{ fontSize: 22, color: LIME }}>→</div>
           </div>
         </a>
+      )}
+
+      {/* Revenue milestones — understated markers, real monthly revenue (Phase 3) */}
+      {data.milestones && data.milestones.length > 0 && (
+        <div style={{ marginBottom: 26 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+            <div style={{ fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>Revenue milestones</div>
+            {data.nextMilestone && <div style={{ fontSize: 12, color: SUB }}>{money(data.nextMilestone.remaining, data.revenue?.currency)} to {data.nextMilestone.label}</div>}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 0 }}>
+            {data.milestones.map((m, i) => (
+              <div key={m.label} style={{ display: 'flex', alignItems: 'center', flex: i === data.milestones!.length - 1 ? '0 0 auto' : 1 }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, flex: 'none' }}>
+                  <div style={{ width: 12, height: 12, borderRadius: 100, background: m.reached ? GOOD : '#fff', border: `2px solid ${m.reached ? GOOD : '#d7ddd7'}`, flex: 'none' }} />
+                  <div style={{ fontSize: 10.5, color: m.reached ? INK : SUB, fontWeight: m.reached ? 700 : 500, whiteSpace: 'nowrap' }}>{m.label}</div>
+                </div>
+                {i < data.milestones!.length - 1 && <div style={{ flex: 1, height: 2, background: m.reached ? GOOD : '#e6eae6', margin: '0 4px', marginBottom: 16 }} />}
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       {/* What Mello would do — the ranked GTM moves (paid + organic) unified onto mission */}

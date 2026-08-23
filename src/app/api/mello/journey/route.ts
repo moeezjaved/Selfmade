@@ -104,8 +104,20 @@ export async function GET(_req: NextRequest) {
   const nextAction = nextTask ? { label: nextTask.label, href: nextTask.href, stage: activeStage?.name || '' } : null
 
   // wins — the real ledger count (falls back to a derived estimate if the ledger is empty/not applied yet)
-  let wins = 0, banked = 0
-  try { const ws = await winsSummary(admin, uid, brandId, 365); wins = ws.moves; banked = ws.bankedTotal } catch { /* ledger optional */ }
+  let wins = 0, banked = 0, activeDays = 0
+  try {
+    const ws = await winsSummary(admin, uid, brandId, 365)
+    wins = ws.moves; banked = ws.bankedTotal
+    // active-days streak: consecutive calendar days (ending today or yesterday) with at least one move.
+    const dayset = new Set((ws.recent || []).map((r) => new Date(r.created_at).toISOString().slice(0, 10)))
+    let cursor = new Date(); const todayKey = cursor.toISOString().slice(0, 10)
+    if (!dayset.has(todayKey)) cursor = new Date(Date.now() - 86400000)   // allow the streak to count through yesterday
+    for (;;) {
+      const key = cursor.toISOString().slice(0, 10)
+      if (!dayset.has(key)) break
+      activeDays++; cursor = new Date(cursor.getTime() - 86400000)
+    }
+  } catch { /* ledger optional */ }
   if (!wins) wins = catalogApplied + contentLive + (geoAudit ? 1 : 0) + (seoAudit ? 1 : 0)
 
   // forward ladder (honest framing — outcomes, not promises)
@@ -128,9 +140,28 @@ export async function GET(_req: NextRequest) {
     } catch { /* orders may not be synced yet */ }
   }
 
+  // ── Phase 3: revenue milestones (understated markers, real monthly revenue) ──
+  const monthlyRev = revenue?.total ?? 0
+  const hasOrders = (revenue?.orders ?? 0) > 0
+  const MSTONES = [
+    { amount: 1, label: 'First sale' }, { amount: 1000, label: '€1k/mo' }, { amount: 5000, label: '€5k/mo' },
+    { amount: 10000, label: '€10k/mo' }, { amount: 50000, label: '€50k/mo' }, { amount: 100000, label: '€100k/mo' },
+  ]
+  const milestones = MSTONES.map((m) => ({ ...m, reached: m.amount === 1 ? hasOrders : monthlyRev >= m.amount }))
+  const nextIdx = milestones.findIndex((m) => !m.reached)
+  const nextMilestone = nextIdx >= 0 ? { label: MSTONES[nextIdx].label, amount: MSTONES[nextIdx].amount, remaining: Math.max(0, Math.round(MSTONES[nextIdx].amount - monthlyRev)) } : null
+
+  // ── Phase 4: the day's THREAT (latest ads-health alert) — the opportunity is nextAction above ──
+  let threat: { title: string } | null = null
+  try {
+    const { data: t } = await admin.from('brief_events').select('title').eq('user_id', uid).eq('kind', 'ads_health').order('created_at', { ascending: false }).limit(1).maybeSingle()
+    if (t?.title) threat = { title: t.title }
+  } catch { /* optional */ }
+
   return NextResponse.json({
     store: store ? { name: store.shop_name || store.shop_domain } : null,
-    momentum, wins, banked, nextAction, revenue,
+    momentum, wins, banked, activeDays, nextAction, revenue,
+    milestones, nextMilestone, threat,
     stages, ladder,
   })
 }
