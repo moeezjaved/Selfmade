@@ -5,7 +5,7 @@
  * asserted. Runs are user-triggered (metered cost); a full sweep = prompts × available engines calls.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { availableEngines, askEngine, ENGINE_LABEL, type GeoEngine } from './engines'
+import { availableEngines, askEngine, ENGINE_LABEL, ENGINE_COST, estimateCost, type GeoEngine } from './engines'
 import { fold } from '@/lib/mello/own-brand'
 
 export type PromptResult = {
@@ -27,6 +27,9 @@ export type GeoStatus = {
   gaps: { prompt: string; rivals: string[] }[]
   history: { date: string; score: number }[]
   lastRun: string | null
+  lastRunCalls?: number      // engine calls made in the last sweep
+  estCostUsd?: number        // ~cost of the last sweep (estimate)
+  perCheckEstUsd?: number    // ~cost of running a check now (available engines × prompt count)
   note?: string
 }
 
@@ -130,11 +133,13 @@ export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId
   } catch { /* best-effort */ }
 
   const history = await loadHistory(admin, userId, brandId)
+  const estCostUsd = checkRows.reduce((s, r) => s + (ENGINE_COST[r.engine as GeoEngine] || 0.02), 0)
   return {
     hasData: true, brandName: brand.brandName, score, shareOfVoice, promptsChecked: results.length,
     engines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
     availableEngines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
     results, gaps, history, lastRun: new Date().toISOString(),
+    lastRunCalls: checkRows.length, estCostUsd, perCheckEstUsd: estimateCost(engines, results.length || 8),
   }
 }
 
@@ -168,6 +173,9 @@ export async function loadGeoStatus(admin: SupabaseClient, userId: string, brand
       engines: (audit.engines || []).map((e: GeoEngine) => ({ engine: e, label: ENGINE_LABEL[e] || e })),
       availableEngines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
       results, gaps: audit.gaps || [], history: await loadHistory(admin, userId, brandId), lastRun: audit.created_at,
+      lastRunCalls: (audit.prompts_checked || results.length) * ((audit.engines || []).length || engines.length),
+      estCostUsd: estimateCost((audit.engines || engines) as GeoEngine[], audit.prompts_checked || results.length),
+      perCheckEstUsd: estimateCost(engines, audit.prompts_checked || 8),
     }
   } catch { return emptyStatus(engines, undefined, brand?.brandName || null) }
 }
@@ -185,6 +193,6 @@ function emptyStatus(engines: GeoEngine[], note?: string, brandName: string | nu
   return {
     hasData: false, brandName, score: 0, shareOfVoice: 0, promptsChecked: 0,
     engines: [], availableEngines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
-    results: [], gaps: [], history: [], lastRun: null, note,
+    results: [], gaps: [], history: [], lastRun: null, perCheckEstUsd: estimateCost(engines, 8), note,
   }
 }

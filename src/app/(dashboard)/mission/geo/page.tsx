@@ -12,8 +12,9 @@ type Status = {
   hasData: boolean; brandName: string | null; score: number; shareOfVoice: number; promptsChecked: number
   engines: { engine: string; label: string }[]; availableEngines: { engine: string; label: string }[]
   results: PromptResult[]; gaps: { prompt: string; rivals: string[] }[]; history: { date: string; score: number }[]
-  lastRun: string | null; note?: string
+  lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; note?: string
 }
+const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
 export default function GeoPage() {
   const [status, setStatus] = useState<Status | null>(null)
@@ -50,7 +51,12 @@ export default function GeoPage() {
             <h1>Are you in the AI answers?</h1>
             <p className="sub">When someone asks ChatGPT, Gemini or Perplexity to recommend {status?.brandName ? <b>a {status.brandName}-type product</b> : 'your kind of product'}, do you come up? Here’s the honest read — really asked, really checked.</p>
           </div>
-          <button className="btn lime" onClick={runCheck} disabled={running}>{running ? 'Asking the AIs…' : status?.hasData ? '↻ Run check again' : 'Run your first check →'}</button>
+          <div className="runbox">
+            <button className="btn lime" onClick={runCheck} disabled={running}>{running ? 'Asking the AIs…' : status?.hasData ? '↻ Run check again' : 'Run your first check →'}</button>
+            {status && (status.availableEngines?.length ?? 0) > 0 && (
+              <div className="runcost">{status.availableEngines.map((e) => e.label).join(' · ')}{status.perCheckEstUsd != null && <> · {usd(status.perCheckEstUsd)}/check</>}</div>
+            )}
+          </div>
         </div>
 
         {running && <div className="note">Asking {engines.map((e) => e.label).join(', ') || 'the AI engines'} your buyer questions — this takes a moment.</div>}
@@ -112,6 +118,9 @@ export default function GeoPage() {
             ))}
 
             <div className="foot">
+              {status.lastRunCalls != null && status.lastRunCalls > 0 && (
+                <div className="runstat">Last run: <b>{status.promptsChecked}</b> questions × <b>{status.engines.length}</b> engine{status.engines.length === 1 ? '' : 's'} = <b>{status.lastRunCalls}</b> checks · <b>{usd(status.estCostUsd)}</b> <span className="est">(estimate)</span></div>
+              )}
               {status.lastRun && <>Last checked {new Date(status.lastRun).toLocaleString()} · </>}
               Every ✓/✗ is a real answer we asked and stored — “model knowledge” means the engine answered without live web search. Nothing here is projected.
             </div>
@@ -136,6 +145,10 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .btn{font-family:var(--ui);font-size:13px;font-weight:600;border-radius:10px;padding:11px 17px;cursor:pointer;border:1px solid var(--line);background:var(--card);color:var(--ink)}
 .btn.lime{background:var(--lime);border-color:var(--lime);color:#fff}
 .btn:disabled{opacity:.55;cursor:default}
+.runbox{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
+.runcost{font-family:var(--mono);font-size:10.5px;color:var(--mut);letter-spacing:.02em;text-align:right}
+.runstat{font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:8px}
+.runstat b{color:var(--ink)} .runstat .est{color:var(--mut)}
 .note{font-family:var(--mono);font-size:12.5px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:18px}
 .empty{color:var(--sub);font-size:15px;padding:34px 0;max-width:560px}
 .score{display:flex;gap:24px;align-items:center;flex-wrap:wrap;margin:26px 0 6px;padding:20px 22px;background:var(--paper);border:1px solid var(--line);border-radius:16px}
