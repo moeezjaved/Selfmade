@@ -17,7 +17,23 @@ const CONNECT: Record<string, { label: string; href: string }> = {
   shopify: { label: 'Connect Shopify to fix this →', href: '/connect/shopify' },
   klaviyo: { label: 'Connect Klaviyo to send →', href: '/settings' },
 }
-type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[] }
+type Plan = { stage: string; headline: string; tasks: Task[]; grounding?: string[]; notice?: string }
+
+// The agent router's answer for one task: who runs it, how, and what it costs — confirm-before-run.
+type AgentInfo = { key: string; name: string; emoji: string; role: string }
+type Resolution =
+  | { action: 'run'; agent: AgentInfo; suggestion: any; cost: string; note: string }
+  | { action: 'run_existing'; agent: AgentInfo; taskId: string; title: string; cost: string; note: string }
+  | { action: 'connect'; agent: AgentInfo | null; needs: 'meta' | 'shopify' | 'klaviyo'; note: string }
+  | { action: 'brief'; agent: AgentInfo | null; note: string }
+type RunState =
+  | { phase: 'idle' }
+  | { phase: 'resolving' }
+  | { phase: 'confirm'; res: Resolution }
+  | { phase: 'note'; text: string }          // brief/connect explanation from the router
+  | { phase: 'running'; agent?: AgentInfo }
+  | { phase: 'done'; url?: string | null; agent?: AgentInfo }
+  | { phase: 'error'; text: string }
 
 const STAGE_LABEL: Record<string, string> = { setup: 'Setup', 'first-cycle': 'First cycle', running: 'Running', scaling: 'Scaling' }
 const LEVER_COLOR: Record<string, string> = { traffic: RUN, conversion: FLAME, aov: WAIT, retention: '#7a52c0', efficiency: LIVE, brand: '#b06a2c' }
@@ -27,11 +43,43 @@ export default function MissionPage() {
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
+  const [runs, setRuns] = useState<Record<string, RunState>>({})
+
+  const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
+
+  // Approve & run → ask the agent router WHO runs it and what it costs (read-only), then confirm.
+  const resolveTask = async (t: Task) => {
+    setRun(t.suggested_key, { phase: 'resolving' })
+    try {
+      const r = await fetch('/api/mello/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ task: t }) })
+      const j = await r.json()
+      const res: Resolution | undefined = j?.resolution
+      if (!r.ok || !res) throw new Error(j?.error || 'router failed')
+      if (res.action === 'run' || res.action === 'run_existing') setRun(t.suggested_key, { phase: 'confirm', res })
+      else { setRun(t.suggested_key, { phase: 'note', text: res.note }); if (res.action === 'brief') setOpen(t.suggested_key) }
+    } catch { setRun(t.suggested_key, { phase: 'error', text: 'Couldn’t reach the agent router — try again.' }) }
+  }
+
+  // The founder's second yes → the EXISTING run spine (credits, dedupe, approvals all live there).
+  const confirmRun = async (t: Task, res: Resolution) => {
+    if (res.action !== 'run' && res.action !== 'run_existing') return
+    setRun(t.suggested_key, { phase: 'running', agent: res.agent })
+    try {
+      const body = res.action === 'run' ? { suggestion: res.suggestion } : { id: res.taskId }
+      const r = await fetch('/api/mello/tasks/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+      const j = await r.json()
+      const task = j?.task
+      if (!r.ok || !task) throw new Error(j?.error || 'run failed')
+      if (task.status === 'done') setRun(t.suggested_key, { phase: 'done', url: task?.result?.url || null, agent: res.agent })
+      else if (task.status === 'failed') setRun(t.suggested_key, { phase: 'error', text: task?.error || 'The run failed — nothing was charged twice; try again.' })
+      else setRun(t.suggested_key, { phase: 'running', agent: res.agent })
+    } catch (e: any) { setRun(t.suggested_key, { phase: 'error', text: String(e?.message || 'The run failed.') }) }
+  }
 
   const STEPS = ['Reviewing your funnel + backlog…', 'Benchmarking against your competitors…', 'Diagnosing your biggest constraint…', 'Drafting your highest-impact moves…']
 
   const fetchPlan = useCallback(async () => {
-    setLoading(true); setStep(0)
+    setLoading(true); setStep(0); setRuns({})
     const iv = setInterval(() => setStep((s) => Math.min(s + 1, STEPS.length - 1)), 1600)
     try {
       const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: true }) })
@@ -66,6 +114,14 @@ export default function MissionPage() {
         {plan && !loading && plan.headline && (
           <div style={{ fontFamily: 'Fraunces,Georgia,serif', fontStyle: 'italic', fontWeight: 500, fontSize: 'clamp(19px,2.8vw,26px)', lineHeight: 1.25, letterSpacing: '-.01em', color: INK, margin: '4px 0 22px', maxWidth: 720 }}>
             “{plan.headline}”
+          </div>
+        )}
+
+        {/* honest system notice — e.g. the auto-crawl of the founder's own ads just got queued */}
+        {plan && !loading && plan.notice && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 9, fontFamily: 'ui-monospace,monospace', fontSize: 12, color: RUN, background: 'rgba(47,109,240,.07)', border: '1px solid rgba(47,109,240,.2)', borderRadius: 10, padding: '9px 13px', marginBottom: 16 }}>
+            <span style={{ width: 7, height: 7, borderRadius: '50%', background: RUN, flex: 'none' }} />
+            {plan.notice}
           </div>
         )}
 
@@ -106,14 +162,53 @@ export default function MissionPage() {
                 </div>
               )}
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                {connect
-                  ? <a href={connect.href} style={btnFlame()}>{connect.label}</a>
-                  : t.runnable
-                    ? <button style={btnFlame()}>Approve &amp; run →</button>
-                    : <button onClick={() => setOpen(t.suggested_key)} style={btnFlame()}>Get the brief →</button>}
-                <button onClick={() => setOpen(isOpen ? null : t.suggested_key)} style={btnGhost()}>{isOpen ? 'Hide brief' : 'Open brief'}</button>
-              </div>
+              {(() => {
+                const run = runs[t.suggested_key] || { phase: 'idle' as const }
+                // confirm card — WHO runs it + the honest cost, before anything happens
+                if (run.phase === 'confirm') {
+                  const res = run.res as Extract<Resolution, { action: 'run' | 'run_existing' }>
+                  return (
+                    <div style={{ background: CARD2, border: `1px solid ${LINE2}`, borderRadius: 11, padding: '13px 15px' }}>
+                      <div style={{ fontSize: 13.5, color: INK, lineHeight: 1.5, marginBottom: 10 }}>
+                        <b>{res.agent.emoji} {res.agent.name}</b> — {res.note}
+                        <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: SUB, marginLeft: 8 }}>({res.cost})</span>
+                      </div>
+                      <div style={{ display: 'flex', gap: 10 }}>
+                        <button onClick={() => confirmRun(t, res)} style={btnFlame()}>Yes, run it →</button>
+                        <button onClick={() => setRun(t.suggested_key, { phase: 'idle' })} style={btnGhost()}>Not now</button>
+                      </div>
+                    </div>
+                  )
+                }
+                if (run.phase === 'running') return (
+                  <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 13, color: RUN }}>▸ {run.agent ? `${run.agent.emoji} ${run.agent.name} is on it…` : 'Running…'}</div>
+                )
+                if (run.phase === 'done') return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, fontFamily: 'ui-monospace,monospace', fontSize: 13, color: LIVE }}>
+                    ✓ Done{run.agent ? ` — ${run.agent.name}` : ''}
+                    {run.url && <a href={run.url} style={{ color: RUN, fontWeight: 700 }}>See the result →</a>}
+                  </div>
+                )
+                if (run.phase === 'error') return (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13, color: FLAME }}>{run.text}</span>
+                    <button onClick={() => setRun(t.suggested_key, { phase: 'idle' })} style={btnGhost()}>Try again</button>
+                  </div>
+                )
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {run.phase === 'note' && <div style={{ fontSize: 13, color: SUB, fontStyle: 'italic' }}>{run.text}</div>}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      {connect
+                        ? <a href={connect.href} style={btnFlame()}>{connect.label}</a>
+                        : t.runnable && run.phase !== 'note'
+                          ? <button disabled={(run.phase as string) === 'resolving'} onClick={() => resolveTask(t)} style={btnFlame()}>{(run.phase as string) === 'resolving' ? 'Checking with the team…' : 'Approve & run →'}</button>
+                          : <button onClick={() => setOpen(t.suggested_key)} style={btnFlame()}>Get the brief →</button>}
+                      <button onClick={() => setOpen(isOpen ? null : t.suggested_key)} style={btnGhost()}>{isOpen ? 'Hide brief' : 'Open brief'}</button>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           )
         })}
