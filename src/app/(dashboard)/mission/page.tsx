@@ -271,6 +271,11 @@ export default function MissionPage() {
             ? <div className="ms-note sm">Watching <b>{sig.competitors}</b> rival{sig.competitors === 1 ? '' : 's'}. Their new-ad moves land in this feed next.</div>
             : <div className="ms-note sm">Spy a competitor and their moves appear here.</div>}
 
+          <h2 className="ms-sec sec2">Customer <small>live</small></h2>
+          <div className="ms-conn">💬 Support replies <span className="st"><a href="/inbox" className="ms-btn tiny">Inbox</a></span></div>
+          <div className="ms-conn">📣 Cold outreach &amp; win-backs <span className="st"><a href="/inbox" className="ms-btn tiny">Inbox</a></span></div>
+          <div className="ms-note sm">Mello drafts every reply and follow-up — you approve before anything sends. Email &amp; SMS unlock with Klaviyo below.</div>
+
           <h2 className="ms-sec sec2">Connect</h2>
           <div className="ms-conn">🛍️ Shopify <span className="st"><a href="/settings" className="ms-btn tiny">Connect</a></span></div>
           <div className="ms-conn">✉️ Klaviyo <span className="st"><a href="/settings" className="ms-btn tiny">Connect</a></span></div>
