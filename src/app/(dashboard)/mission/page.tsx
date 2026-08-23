@@ -13,8 +13,8 @@
  * (Meta / Rivals / Connect) are honest shells for now — state-correct, never fabricated numbers — wired in
  * a follow-up. Additive: only this page + the strategist plan shape changed.
  */
-import { useCallback, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useChatStream } from '@/components/mello/useChatStream'
 
 type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
 const CONNECT: Record<string, { label: string; href: string }> = {
@@ -53,8 +53,24 @@ export default function MissionPage() {
   const [open, setOpen] = useState<string | null>(null)
   const [runs, setRuns] = useState<Record<string, RunState>>({})
   const setRun = (key: string, s: RunState) => setRuns((r) => ({ ...r, [key]: s }))
+  // Inline Mello chat in the rail — the real streaming brain, no page change.
   const [ask, setAsk] = useState('')
-  const router = useRouter()
+  const [convId, setConvId] = useState<string | null>(null)
+  const { messages, streaming, sendMessage } = useChatStream({ surface: 'mission' })
+  const chatRef = useRef<HTMLDivElement>(null)
+  useEffect(() => { chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' }) }, [messages])
+  const ensureConv = useCallback(async (): Promise<string | null> => {
+    if (convId) return convId
+    try { const r = await fetch('/api/mello/conversations', { method: 'POST' }); const d = await r.json(); if (d?.conversation?.id) { setConvId(d.conversation.id); return d.conversation.id } } catch { /* ignore */ }
+    return null
+  }, [convId])
+  const askMello = async () => {
+    const q = ask.trim()
+    if (!q || streaming) return
+    setAsk('')
+    const id = await ensureConv()
+    if (id) await sendMessage(id, q)
+  }
 
   // Live desk panels (DB-only, fast) — load independently of the LLM plan so they populate immediately.
   type Rival = { name: string; pageId: string; newAds: number; thumbs: string[] }
@@ -362,7 +378,7 @@ export default function MissionPage() {
         {/* COL 4 — Mello rail (chat) */}
         <div className="ms-rail">
           <div className="stamp">Today</div>
-          <div className="ms-rail-body">
+          <div className="ms-rail-body" ref={chatRef}>
             <div className="ms-mello">
               <div className="ms-mello-who"><span className="dot">◍</span> Mello · Chief of Staff</div>
               <h5>Here’s where {brand} stands</h5>
@@ -373,12 +389,23 @@ export default function MissionPage() {
               </ul>
               <div className="cta">Approve the moves on the left, or ask me anything below — I’ll take it from there.</div>
             </div>
+
+            {messages.map((m, i) => (
+              <div className={`ms-msg ${m.role}`} key={i}>
+                {m.role === 'assistant' && <div className="who"><span className="dot">◍</span> Mello</div>}
+                <div className="bub">
+                  {m.content ? m.content : m.streaming ? <span className="think">thinking…</span> : ''}
+                  {m.error && <span className="err">{m.error}</span>}
+                </div>
+              </div>
+            ))}
           </div>
           <div className="ms-approve">Approve mode · nothing runs or spends without your yes.</div>
-          <form className="ms-ask" onSubmit={(e) => { e.preventDefault(); const q = ask.trim(); if (!q) return; try { sessionStorage.setItem('mello_prefill', q) } catch { /* ignore */ } router.push('/mello') }}>
-            <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Ask Mello anything…" aria-label="Ask Mello anything" />
-            <button type="submit">SEND</button>
+          <form className="ms-ask" onSubmit={(e) => { e.preventDefault(); askMello() }}>
+            <input value={ask} onChange={(e) => setAsk(e.target.value)} placeholder="Ask Mello anything…" aria-label="Ask Mello anything" disabled={streaming} />
+            <button type="submit" disabled={streaming || !ask.trim()}>{streaming ? '…' : 'SEND'}</button>
           </form>
+          <a href="/mello" className="ms-openfull">Open full Mello →</a>
         </div>
       </div>
 
@@ -460,7 +487,7 @@ const CSS = `
 .ms-btn.full{width:100%;margin-top:10px}
 .ms-btn.tiny{padding:5px 9px;font-size:10px}
 .ms-btn.open{margin:14px 0 0}
-.ms-sheet{display:grid;grid-template-columns:240px 1.3fr 1fr 280px}
+.ms-sheet{display:grid;grid-template-columns:230px 1fr 1fr 372px}
 .ms-col{padding:18px clamp(14px,1.6vw,22px);border-right:1px solid var(--hair);min-width:0}
 .ms-sec{font-family:var(--serif);font-weight:600;font-size:18px;letter-spacing:-.01em;padding-bottom:7px;border-bottom:1px solid var(--rule);margin:0 0 13px}
 .ms-sec.sec2{margin-top:28px}
@@ -567,7 +594,16 @@ const CSS = `
 .ms-conn .on{font-family:var(--mono);font-size:10.5px;color:var(--live);letter-spacing:.05em}
 .ms-rail{background:var(--panel);padding:18px clamp(14px,1.6vw,20px);display:flex;flex-direction:column;min-height:100%}
 .ms-rail .stamp{font-family:var(--mono);font-size:10px;color:var(--mut);letter-spacing:.14em;text-transform:uppercase;text-align:center;margin-bottom:12px}
-.ms-rail-body{flex:1;min-height:0}
+.ms-rail-body{flex:1;min-height:0;overflow-y:auto;max-height:62vh;display:flex;flex-direction:column;gap:10px}
+.ms-msg{display:flex;flex-direction:column;max-width:100%}
+.ms-msg.user{align-items:flex-end}
+.ms-msg.user .bub{background:var(--ink);color:var(--paper);border-radius:12px 12px 3px 12px;padding:9px 12px;font-size:13px;line-height:1.5;max-width:88%;white-space:pre-wrap;word-break:break-word}
+.ms-msg.assistant .who{display:flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:4px}
+.ms-msg.assistant .who .dot{color:var(--flame);font-size:11px}
+.ms-msg.assistant .bub{background:var(--paper);border:1px solid #e2ded4;border-radius:3px 12px 12px 12px;padding:10px 13px;font-size:13px;line-height:1.55;white-space:pre-wrap;word-break:break-word}
+.ms-msg .bub .think{color:var(--mut);font-style:italic}
+.ms-msg .bub .err{color:var(--flame);font-size:12px}
+.ms-openfull{font-family:var(--mono);font-size:10px;letter-spacing:.05em;color:var(--sub);text-align:center;margin-top:8px}
 .ms-mello{background:var(--paper);border:1px solid #e2ded4;padding:14px 15px;font-size:13px;line-height:1.55}
 .ms-mello .ms-mello-who{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:9px}
 .ms-mello .ms-mello-who .dot{color:var(--flame);font-size:12px}
