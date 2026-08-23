@@ -12,7 +12,7 @@ type Status = {
   hasData: boolean; brandName: string | null; score: number; shareOfVoice: number; promptsChecked: number
   engines: { engine: string; label: string }[]; availableEngines: { engine: string; label: string }[]
   results: PromptResult[]; gaps: { prompt: string; rivals: string[] }[]; history: { date: string; score: number }[]
-  lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; note?: string
+  lastRun: string | null; lastRunCalls?: number; estCostUsd?: number; perCheckEstUsd?: number; category?: string; note?: string
 }
 const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
@@ -48,10 +48,10 @@ export default function GeoPage() {
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
-  const runCheck = async () => {
+  const runCheck = async (regenerate = false) => {
     if (running) return
     setRunning(true)
-    try { const r = await fetch('/api/geo/sweep', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) setStatus(j as Status) } catch { /* keep prior */ }
+    try { const r = await fetch('/api/geo/sweep', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ regenerate }) }); const j = await r.json(); if (r.ok) setStatus(j as Status) } catch { /* keep prior */ }
     setRunning(false)
   }
 
@@ -71,12 +71,17 @@ export default function GeoPage() {
             <p className="sub">When someone asks ChatGPT, Gemini or Perplexity to recommend {status?.brandName ? <b>a {status.brandName}-type product</b> : 'your kind of product'}, do you come up? Here’s the honest read — really asked, really checked.</p>
           </div>
           <div className="runbox">
-            <button className="btn lime" onClick={runCheck} disabled={running}>{running ? 'Asking the AIs…' : status?.hasData ? '↻ Run check again' : 'Run your first check →'}</button>
+            <button className="btn lime" onClick={() => runCheck(false)} disabled={running}>{running ? 'Asking the AIs…' : status?.hasData ? '↻ Run check again' : 'Run your first check →'}</button>
             {status && (status.availableEngines?.length ?? 0) > 0 && (
               <div className="runcost">{status.availableEngines.map((e) => e.label).join(' · ')}{status.perCheckEstUsd != null && <> · {usd(status.perCheckEstUsd)}/check</>}</div>
             )}
+            {status?.hasData && <button className="regen" onClick={() => runCheck(true)} disabled={running}>↻ Re-read my site &amp; regenerate questions</button>}
           </div>
         </div>
+
+        {status?.category && (
+          <div className="understood">Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button></div>
+        )}
 
         {running && <div className="note">Asking {engines.map((e) => e.label).join(', ') || 'the AI engines'} your buyer questions — this takes a moment.</div>}
 
@@ -195,6 +200,11 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .btn:disabled{opacity:.55;cursor:default}
 .runbox{display:flex;flex-direction:column;align-items:flex-end;gap:6px;flex:none}
 .runcost{font-family:var(--mono);font-size:10.5px;color:var(--mut);letter-spacing:.02em;text-align:right}
+.regen{background:none;border:none;font-family:var(--mono);font-size:10.5px;color:var(--flame);cursor:pointer;padding:0}
+.regen:disabled{opacity:.5;cursor:default}
+.understood{font-size:13px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:10px 14px;margin-top:16px}
+.understood b{color:var(--ink)}
+.reglink{background:none;border:none;color:var(--flame);cursor:pointer;font-size:13px;padding:0}
 .runstat{font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:8px}
 .runstat b{color:var(--ink)} .runstat .est{color:var(--mut)}
 .note{font-family:var(--mono);font-size:12.5px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:18px}

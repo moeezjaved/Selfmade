@@ -7,6 +7,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { availableEngines, askEngine, ENGINE_LABEL, ENGINE_COST, estimateCost, type GeoEngine } from './engines'
 import { fold } from '@/lib/mello/own-brand'
+import { describeBrand, type BrandUnderstanding } from './understand'
 
 export type PromptResult = {
   promptId: string | null
@@ -30,6 +31,7 @@ export type GeoStatus = {
   lastRunCalls?: number      // engine calls made in the last sweep
   estCostUsd?: number        // ~cost of the last sweep (estimate)
   perCheckEstUsd?: number    // ~cost of running a check now (available engines × prompt count)
+  category?: string          // what we understood the brand to be (shown so the founder can correct it)
   note?: string
 }
 
@@ -42,19 +44,20 @@ const DEFAULT_PROMPTS = (niche: string) => [
   `What do people recommend for ${niche}?`,
 ]
 
-/** LLM-derive ~8 category buyer questions (no brand name — questions where we WANT the brand recommended). */
-async function derivePrompts(brandName: string, niche: string, competitors: string[]): Promise<string[]> {
+/** LLM-derive ~8 category buyer questions, anchored STRICTLY on the understood category (no drift). */
+async function derivePrompts(u: BrandUnderstanding): Promise<string[]> {
   try {
     const { llm } = await import('@/lib/llm')
-    const sys = 'You write the exact questions a potential customer types into ChatGPT or Perplexity when researching a purchase — the questions where a brand would love to be recommended. Return ONLY JSON {"prompts":[...]}. Give 8 questions. Mix "best X", "X alternatives", "how to choose X", "X for [use case]". Do NOT include any brand name — these are category questions. Keep them natural and specific to the niche.'
-    const user = JSON.stringify({ niche: niche || 'this product category', example_brands: [brandName, ...competitors].filter(Boolean).slice(0, 6) })
+    const sys = `You write the exact questions a potential customer types into ChatGPT or Perplexity when researching a purchase in a SPECIFIC category — the questions where a brand in that category would love to be recommended.
+Anchor STRICTLY on the category below. Do NOT drift to a different product world. Return ONLY JSON {"prompts":[...]}. Give 8 natural questions. Mix "best X", "alternatives to X", "how to choose X", "X for [use case]". Do NOT include any brand name.`
+    const user = JSON.stringify({ category: u.category, what_it_is: u.description || undefined, buyer_terms: u.buyerTerms.length ? u.buyerTerms : undefined, example_brands_in_this_category: [u.brandName, ...u.competitors].filter(Boolean).slice(0, 6) })
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 500, temperature: 0.4, messages: [{ role: 'user', content: `${sys}\n\n${user}` }] })
     const txt = res?.content?.[0]?.text || ''
     const parsed = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1))
     const prompts = (parsed?.prompts || []).map((p: any) => String(p).trim()).filter(Boolean).slice(0, 8)
     if (prompts.length >= 4) return prompts
   } catch { /* fall back to templates */ }
-  return DEFAULT_PROMPTS(niche || 'this product')
+  return DEFAULT_PROMPTS(u.category || 'this product')
 }
 
 /** Was the brand cited? Which competitors? — diacritic-insensitive substring match on folded names. */
@@ -81,23 +84,33 @@ export async function resolveBrand(admin: SupabaseClient, userId: string, brandI
   } catch { return null }
 }
 
-/** Run a full sweep: derive/reuse prompts × available engines, record checks, roll up an audit. */
-export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId: string | null): Promise<GeoStatus> {
+/** Run a full sweep: understand the brand, derive/reuse prompts × available engines, record checks, roll up. */
+export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId: string | null, opts?: { regenerate?: boolean }): Promise<GeoStatus> {
   const engines = availableEngines()
-  const brand = await resolveBrand(admin, userId, brandId)
-  if (!brand) return emptyStatus(engines, 'Add a brand first so I know who to check for.')
+  // UNDERSTAND the brand from real signals first — so questions match the actual product, not a guess.
+  // regenerate re-reads the landing page + re-derives (busts the Company-Brain cache).
+  const u = await describeBrand(admin, userId, brandId, { fresh: opts?.regenerate })
+  if (!u) return emptyStatus(engines, 'Add a brand first so I know who to check for.')
   if (!engines.length) return emptyStatus(engines, 'No AI engine is configured yet — add an OpenAI, Gemini or Perplexity key to run the check.')
+  const brand = { brandName: u.brandName, competitors: u.competitors }
 
-  // reuse this brand's active prompts, or derive + store a fresh set
+  // regenerate wipes the stored question set (e.g. an old wrong-category one) before re-deriving
+  if (opts?.regenerate) {
+    try { let d = (admin as any).from('geo_prompts').delete().eq('user_id', userId); if (brandId) d = d.eq('brand_id', brandId); await d } catch { /* ignore */ }
+  }
+
+  // reuse this brand's active prompts, or derive + store a fresh set from the understanding
   let prompts: { id: string | null; text: string }[] = []
-  try {
-    let q = (admin as any).from('geo_prompts').select('id, prompt_text').eq('user_id', userId).eq('active', true)
-    if (brandId) q = q.eq('brand_id', brandId)
-    const { data } = await q.limit(10)
-    prompts = ((data || []) as any[]).map((r) => ({ id: String(r.id), text: r.prompt_text }))
-  } catch { /* table may be empty */ }
+  if (!opts?.regenerate) {
+    try {
+      let q = (admin as any).from('geo_prompts').select('id, prompt_text').eq('user_id', userId).eq('active', true)
+      if (brandId) q = q.eq('brand_id', brandId)
+      const { data } = await q.limit(10)
+      prompts = ((data || []) as any[]).map((r) => ({ id: String(r.id), text: r.prompt_text }))
+    } catch { /* table may be empty */ }
+  }
   if (!prompts.length) {
-    const derived = await derivePrompts(brand.brandName, brand.niche, brand.competitors)
+    const derived = await derivePrompts(u)
     for (const text of derived) {
       try { const { data } = await (admin as any).from('geo_prompts').insert({ brand_id: brandId, user_id: userId, prompt_text: text }).select('id').maybeSingle(); prompts.push({ id: data?.id ? String(data.id) : null, text }) }
       catch { prompts.push({ id: null, text }) }
@@ -140,6 +153,7 @@ export async function runGeoSweep(admin: SupabaseClient, userId: string, brandId
     availableEngines: engines.map((e) => ({ engine: e, label: ENGINE_LABEL[e] })),
     results, gaps, history, lastRun: new Date().toISOString(),
     lastRunCalls: checkRows.length, estCostUsd, perCheckEstUsd: estimateCost(engines, results.length || 8),
+    category: u.category,
   }
 }
 
