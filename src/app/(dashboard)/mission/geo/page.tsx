@@ -49,6 +49,16 @@ export default function GeoPage() {
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
+  const [showFix, setShowFix] = useState(false)
+  const [fixCat, setFixCat] = useState('')
+  const [fixUrl, setFixUrl] = useState('')
+  const submitFix = async () => {
+    if (running || (!fixCat.trim() && !fixUrl.trim())) return
+    setRunning(true)
+    try { const r = await fetch('/api/geo/identity', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ category: fixCat.trim(), website: fixUrl.trim() }) }); const j = await r.json(); if (r.ok) { setStatus(j as Status); setShowFix(false) } } catch { /* keep prior */ }
+    setRunning(false)
+  }
+
   const runCheck = async (regenerate = false) => {
     if (running) return
     setRunning(true)
@@ -82,7 +92,14 @@ export default function GeoPage() {
 
         {status?.category && (
           <div className="understood">
-            <div>Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button></div>
+            <div>Checking you as: <b>{status.category}</b>. Not right? <button className="reglink" onClick={() => runCheck(true)} disabled={running}>re-read my site →</button> or <button className="reglink" onClick={() => setShowFix((s) => !s)} disabled={running}>tell me exactly →</button></div>
+            {showFix && (
+              <div className="fixform">
+                <input placeholder="Your category, e.g. nicotine-free vape / quit-vaping aid" value={fixCat} onChange={(e) => setFixCat(e.target.value)} />
+                <input placeholder="Your website (optional, so I read the right one)" value={fixUrl} onChange={(e) => setFixUrl(e.target.value)} />
+                <button className="btn lime" onClick={submitFix} disabled={running || (!fixCat.trim() && !fixUrl.trim())}>{running ? 'Fixing…' : 'Fix & re-check →'}</button>
+              </div>
+            )}
             {status.understanding && (
               <div className="howread">
                 How I read you: source <b>{status.understanding.websiteSource === 'meta_ads' ? 'your Meta ads' : status.understanding.websiteSource === 'brand_kit' ? 'your brand kit' : status.understanding.websiteSource === 'name_match' ? '⚠️ name match (may be a different brand)' : 'no site found'}</b>
@@ -217,6 +234,10 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .reglink{background:none;border:none;color:var(--flame);cursor:pointer;font-size:13px;padding:0}
 .howread{font-family:var(--mono);font-size:11px;color:var(--mut);margin-top:8px;line-height:1.6}
 .howread b{color:var(--sub)}
+.fixform{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.fixform input{flex:1;min-width:220px;border:1px solid var(--line);border-radius:9px;padding:9px 12px;font-family:var(--ui);font-size:13px;background:var(--card);color:var(--ink);outline:none}
+.fixform input:focus{border-color:var(--sub)}
+.fixform .btn{flex:none}
 .runstat{font-family:var(--mono);font-size:11px;color:var(--sub);margin-bottom:8px}
 .runstat b{color:var(--ink)} .runstat .est{color:var(--mut)}
 .note{font-family:var(--mono);font-size:12.5px;color:var(--sub);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-top:18px}
