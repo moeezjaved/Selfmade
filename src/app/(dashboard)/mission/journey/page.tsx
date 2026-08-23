@@ -35,12 +35,28 @@ export default function JourneyPage() {
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [moves, setMoves] = useState<Move[] | null>(null)
+  // Grounded revenue estimate per stage, from the Growth Plan lever math (honest — labeled 'est').
+  const [stageRev, setStageRev] = useState<Record<string, { text: string; est: boolean }>>({})
 
   const load = useCallback(async () => {
     try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setData(j) } catch { /* noop */ }
     setLoading(false)
     // Mello's ranked GTM moves (paid + organic) — the same brain that powers the Morning Brief.
     try { const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok && Array.isArray(j.tasks)) setMoves(j.tasks.slice(0, 3)) } catch { /* noop */ }
+    // Attach grounded £/$ estimates to stages from the growth-plan levers (only where the data supports it).
+    try {
+      const r = await fetch('/api/mello/growth-plan', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
+      const j = await r.json()
+      if (r.ok && Array.isArray(j.levers)) {
+        const by: Record<string, any> = {}; for (const l of j.levers) by[l.key] = l
+        const grounded = (k: string) => { const l = by[k]; return l && l.delta > 0 && ['measured', 'estimated'].includes(l.confidence) ? { text: `${l.deltaText}/mo`, est: l.confidence !== 'measured' } : null }
+        const map: Record<string, any> = {}
+        const fix = grounded('cvr_fix'); if (fix) map.fix = fix
+        const pub = grounded('seo'); if (pub) map.publish = pub
+        const grow = grounded('geo') || grounded('seo'); if (grow) map.grow = grow
+        setStageRev(map)
+      }
+    } catch { /* estimates optional */ }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -111,7 +127,7 @@ export default function JourneyPage() {
       {/* The quest chain */}
       <div style={{ position: 'relative', paddingLeft: 4 }}>
         {data.stages.map((s, i) => (
-          <Stage key={s.key} s={s} last={i === data.stages.length - 1} />
+          <Stage key={s.key} s={s} last={i === data.stages.length - 1} rev={stageRev[s.key]} />
         ))}
       </div>
 
@@ -135,7 +151,7 @@ export default function JourneyPage() {
   )
 }
 
-function Stage({ s, last }: { s: Stage; last: boolean }) {
+function Stage({ s, last, rev }: { s: Stage; last: boolean; rev?: { text: string; est: boolean } }) {
   const done = s.status === 'done', active = s.status === 'active', locked = s.status === 'locked'
   const dotBg = done ? GOOD : active ? LIME : '#fff'
   const dotBorder = done || active ? dotBg : LINE
@@ -153,7 +169,10 @@ function Stage({ s, last }: { s: Stage; last: boolean }) {
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: INK }}>{s.name}</div>
           <div style={{ fontSize: 13, color: SUB }}>{s.tagline}</div>
-          {s.impact && <div style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 700, color: done ? GOOD : LIME, background: done ? '#eaf6e6' : '#fff1ec', borderRadius: 20, padding: '2px 10px' }}>{s.impact}</div>}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+            {rev && !done && <div style={{ fontSize: 12, fontWeight: 800, color: GOOD, background: '#f2f8ef', borderRadius: 20, padding: '2px 10px' }}>≈ +{rev.text}{rev.est ? <span style={{ fontWeight: 600, color: SUB, fontSize: 10 }}> est</span> : ''}</div>}
+            {s.impact && <div style={{ fontSize: 12, fontWeight: 700, color: done ? GOOD : LIME, background: done ? '#eaf6e6' : '#fff1ec', borderRadius: 20, padding: '2px 10px' }}>{s.impact}</div>}
+          </div>
         </div>
         <div style={{ marginTop: 10, border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
           {s.tasks.map((t, i) => (
