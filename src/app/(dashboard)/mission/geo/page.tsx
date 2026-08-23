@@ -16,18 +16,37 @@ type Status = {
 }
 const usd = (n?: number) => (n == null ? '' : n < 0.01 ? '<$0.01' : `~$${n.toFixed(2)}`)
 
+type Asset = { id: string | null; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null }
+
 export default function GeoPage() {
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
+  const [assets, setAssets] = useState<Asset[]>([])
+  const [writing, setWriting] = useState<string | null>(null)   // the prompt currently being written
+  const [openAsset, setOpenAsset] = useState<string | null>(null)
+  const [copied, setCopied] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try { const r = await fetch('/api/geo/status'); const j = await r.json(); if (r.ok) setStatus(j as Status) } catch { /* empty state */ }
+    try { const r = await fetch('/api/geo/answer'); const j = await r.json(); if (r.ok && Array.isArray(j?.assets)) setAssets(j.assets) } catch { /* ignore */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  const writeAnswer = async (prompt: string, rivals: string[]) => {
+    if (writing) return
+    setWriting(prompt)
+    try {
+      const r = await fetch('/api/geo/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, rivals }) })
+      const j = await r.json()
+      if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || prompt) }
+    } catch { /* keep desk usable */ }
+    setWriting(null)
+  }
+  const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
   const runCheck = async () => {
     if (running) return
@@ -84,9 +103,13 @@ export default function GeoPage() {
               <div className="gaps">
                 <div className="gk">Answer gaps — rivals win these, you’re missing</div>
                 {status.gaps.slice(0, 6).map((g, i) => (
-                  <div className="gap" key={i}><span className="q">“{g.prompt}”</span>{g.rivals.length > 0 && <span className="r">→ {g.rivals.join(', ')} cited</span>}</div>
+                  <div className="gap" key={i}>
+                    <span className="q">“{g.prompt}”</span>
+                    {g.rivals.length > 0 && <span className="r">→ {g.rivals.join(', ')} cited</span>}
+                    <button className="btn tiny" disabled={writing === g.prompt} onClick={() => writeAnswer(g.prompt, g.rivals)}>{writing === g.prompt ? 'Writing…' : 'Write the answer →'}</button>
+                  </div>
                 ))}
-                <div className="gnote">Phase B: Mello writes + publishes the answer pages that win these back.</div>
+                <div className="gnote">Mello writes the answer page that wins each back. Drafts now — one-click publish to your Shopify blog once it’s connected.</div>
               </div>
             )}
 
@@ -116,6 +139,31 @@ export default function GeoPage() {
                 )}
               </div>
             ))}
+
+            {assets.length > 0 && (
+              <div className="assets">
+                <div className="lead">Answer pages Mello wrote</div>
+                <div className="assub">Review, tweak, and publish. Copy into your site now, or one-click to your Shopify blog once connected.</div>
+                {assets.map((a) => (
+                  <div className="asset" key={a.id || a.target_prompt}>
+                    <div className="ahead" onClick={() => setOpenAsset(openAsset === (a.id || a.target_prompt) ? null : (a.id || a.target_prompt))}>
+                      <span className="at">{a.title}</span>
+                      <span className={`ast ${a.status}`}>{a.published_url ? 'published' : a.status}</span>
+                    </div>
+                    <div className="aq">answers: “{a.target_prompt}”</div>
+                    {openAsset === (a.id || a.target_prompt) && (
+                      <div className="abody">
+                        <pre>{a.body_markdown}</pre>
+                        <div className="aact">
+                          <button className="btn tiny" onClick={() => copy(a)}>{copied === (a.id || a.target_prompt) ? 'Copied ✓' : 'Copy markdown'}</button>
+                          <button className="btn tiny" disabled title="Connect Shopify to publish to your blog">Publish to Shopify — soon</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="foot">
               {status.lastRunCalls != null && status.lastRunCalls > 0 && (
@@ -165,8 +213,23 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .gaps .gk{font-family:var(--mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:var(--flame);margin-bottom:10px}
 .gap{display:flex;gap:10px;flex-wrap:wrap;padding:7px 0;border-top:1px solid var(--hair);font-size:13.5px}
 .gap:first-of-type{border-top:none}
+.gap{align-items:center}
 .gap .q{font-style:italic;color:var(--ink)} .gap .r{font-family:var(--mono);font-size:11.5px;color:var(--sub)}
+.gap .btn.tiny{margin-left:auto}
 .gaps .gnote{font-family:var(--mono);font-size:11px;color:var(--mut);margin-top:10px}
+.btn.tiny{font-size:11.5px;padding:6px 11px;border-radius:8px}
+.assets{margin-top:32px}
+.assub{font-size:13.5px;color:var(--sub);margin:-6px 0 14px}
+.asset{border:1px solid var(--line);border-radius:12px;background:var(--card);padding:14px 16px;margin-bottom:10px}
+.ahead{display:flex;align-items:center;gap:10px;cursor:pointer}
+.ahead .at{font-family:var(--serif);font-size:18px;letter-spacing:-.005em;flex:1;min-width:0}
+.ast{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;border-radius:100px;padding:3px 9px;border:1px solid var(--line);color:var(--sub)}
+.ast.draft{color:var(--flame);border-color:#ffd9cc;background:#fff4f0}
+.ast.published{color:var(--live);border-color:#cfe6cf;background:var(--greenBg)}
+.aq{font-family:var(--mono);font-size:11.5px;color:var(--mut);margin-top:6px}
+.abody{margin-top:12px;border-top:1px solid var(--hair);padding-top:12px}
+.abody pre{white-space:pre-wrap;word-break:break-word;font-family:var(--ui);font-size:13.5px;line-height:1.6;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:14px 16px;max-height:420px;overflow-y:auto;margin:0}
+.aact{display:flex;gap:8px;margin-top:10px}
 .lead{font-family:var(--serif);font-size:23px;margin:30px 0 12px}
 .tablehd{display:grid;gap:8px;padding:0 6px 8px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:9.5px;letter-spacing:.05em;text-transform:uppercase;color:var(--mut)}
 .tablehd .eh{text-align:center}
