@@ -41,7 +41,7 @@ function domainRoot(d: string) { return d.replace(/^www\./, '').toLowerCase() }
  * and the exact brand-discovery queries a shopper types to find true alternatives. Grounding in the Brand-Kit
  * facts is what makes discovery accurate: it pins the specific product FORM (e.g. "non-electronic flavored-air
  * aromatherapy device"), not a loose category ("nicotine-free vape"). */
-async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; queries: string[] }> {
+async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; queries: string[]; adKeywords: string[] }> {
   const products = ctx.products.slice(0, 12).map((p) => p.title).join(' | ') || ctx.description
   const knowledge = facts.length ? facts.slice(0, 18).map((f) => `- ${f}`).join('\n') : '(none)'
   const prompt = `You are a DTC market analyst finding a store's TRUE competitors. Accuracy depends on pinning the PRECISE product form, not a loose category. Use the brand knowledge below — it describes what the product actually is.
@@ -59,18 +59,20 @@ Return ONLY JSON:
 {
  "category":"the precise 4-8 word product niche (the specific FORM, not the broad goal)",
  "market":"the primary country the store sells to (infer from signals; US/global if none)",
- "queries":["6-8 Google queries that surface COMPETING BRANDS making this exact kind of product. Mix: exact-form queries ('<precise form> brands', 'buy <precise form>'), close synonyms shoppers use for this form, and 'alternatives to <product/category>'. Prefer the specific form wording over the generic goal so you find same-kind makers, not loosely-related products."]
+ "queries":["6-8 Google queries that surface COMPETING BRANDS making this exact kind of product. Mix: exact-form queries ('<precise form> brands', 'buy <precise form>'), close synonyms shoppers use for this form, and 'alternatives to <product/category>'. Prefer the specific form wording over the generic goal so you find same-kind makers, not loosely-related products."],
+ "adKeywords":["3-4 SHORT keyword phrases (1-3 words EACH) naming the product FORM the way it appears in ad copy — e.g. 'flavored air', 'aromatherapy inhaler', 'nicotine free inhaler'. These are for a Meta Ad Library keyword search, so they must be short and broad — NOT full sentences, NOT 'brands'/'buy'/'best' queries. Just the core product noun phrase and its close synonyms."]
 }`
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 700, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 800, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
     return {
       category: String(j?.category || '').slice(0, 80),
       market: String(j?.market || '').slice(0, 40),
       queries: (Array.isArray(j?.queries) ? j.queries : []).map((q: any) => String(q).slice(0, 90)).filter(Boolean).slice(0, 8),
+      adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 4),
     }
-  } catch { return { category: '', market: '', queries: [] } }
+  } catch { return { category: '', market: '', queries: [], adKeywords: [] } }
 }
 
 /** Step 5 — LLM keeps only the real product competitors (same product FORM) and says why each competes. */
@@ -105,7 +107,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   // exact product niche (Lapis-level accuracy), instead of a loose category guess off the thin crawl.
   const [ctx, kit] = await Promise.all([crawlStore(domain), buildBrandKit(domain).catch(() => null)])
   const facts = kit?.facts ?? []
-  const { category, market, queries } = await seedQueries(ctx, facts)
+  const { category, market, queries, adKeywords } = await seedQueries(ctx, facts)
   if (!configured || !queries.length) return { seed: { name: ctx.siteName, category, market, queries }, competitors: [], configured }
 
   const loc = MARKET_LOCATION[market.trim().toLowerCase()] ?? 2840
@@ -132,9 +134,10 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
     return { domain: r.domain, name: r.name || r.domain, reason: r.reason, foundVia: category || 'category search', positions: c ? Math.round(c.positions / c.hits) : 0, pageId: null, liveAds: [] }
   })
 
-  // ── Meta Ad Library: search the niche → advertiser pool (live ads + BREADTH Google organic misses) ──
-  const country = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
-  const adQueries = [category, ...queries].filter(Boolean).slice(0, 2)
+  // ── Meta Ad Library: keyword-search the niche → advertiser pool (live ads + BREADTH Google organic misses).
+  // Short keywords + country=ALL (the Ad Library search wants broad phrases, not full Google queries). ──
+  const country = 'ALL'
+  const adQueries = (adKeywords.length ? adKeywords : [category]).filter(Boolean).slice(0, 2)
   const advByPage = new Map<string, Advertiser>()
   try {
     const found = (await Promise.all(adQueries.map((q) => searchAdLibrary(q, country).catch(() => [] as Advertiser[])))).flat()
