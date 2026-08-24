@@ -12,15 +12,25 @@
  */
 import { crawlStore, type StoreContext } from './store'
 import { buildBrandKit } from './brandkit'
+import { searchAdLibrary, type LiveAd, type Advertiser } from './adlibrary'
 import { serpDiscover, MARKET_LOCATION, dfsConfigured } from '@/lib/audit/dataforseo'
 import { llm } from '@/lib/llm'
 
-export type DiscoveredCompetitor = { domain: string; name: string; reason: string; foundVia: string; positions: number }
+export type DiscoveredCompetitor = { domain: string; name: string; reason: string; foundVia: string; positions: number; pageId: string | null; liveAds: LiveAd[] }
 export type DiscoveryResult = {
   seed: { name: string; category: string; market: string; queries: string[] }
   competitors: DiscoveredCompetitor[]
   configured: boolean
 }
+
+/** Market name → Meta Ad Library ISO-2 country (for local advertiser search). ALL = global fallback. */
+const MARKET_COUNTRY: Record<string, string> = {
+  pakistan: 'PK', india: 'IN', bangladesh: 'BD', 'united states': 'US', usa: 'US', us: 'US', 'united kingdom': 'GB', uk: 'GB',
+  uae: 'AE', 'united arab emirates': 'AE', 'saudi arabia': 'SA', canada: 'CA', australia: 'AU', nigeria: 'NG', kenya: 'KE',
+  'south africa': 'ZA', philippines: 'PH', indonesia: 'ID', malaysia: 'MY', turkey: 'TR', germany: 'DE', france: 'FR', brazil: 'BR', mexico: 'MX',
+}
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+const nameMatch = (a: string, b: string) => { const x = norm(a), y = norm(b); return x.length >= 4 && y.length >= 4 && (x.includes(y) || y.includes(x)) }
 
 // Sites that are never a DTC brand competitor — marketplaces, platforms, social, publishers, tools.
 const NON_BRAND = /(amazon|ebay|walmart|etsy|aliexpress|alibaba|daraz|flipkart|noon|jumia|temu|shein)\.|(shopify|myshopify|wix|squarespace|bigcommerce|godaddy|wordpress|webflow)\.|(facebook|instagram|tiktok|youtube|twitter|x\.com|pinterest|reddit|linkedin|quora|medium|tumblr)\.|(wikipedia|google|bing|yahoo|yelp|trustpilot|glassdoor|indeed|crunchbase)\.|(nytimes|forbes|businessinsider|techcrunch|theguardian|bbc|cnn|healthline|webmd|verywell)\.|\.gov|\.edu|(gumtree|olx|craigslist)\./i
@@ -119,7 +129,40 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   const ranked = await rankCompetitors(ctx, category, facts, candidates)
   const competitors: DiscoveredCompetitor[] = ranked.map((r) => {
     const c = pool.get(r.domain)
-    return { domain: r.domain, name: r.name || r.domain, reason: r.reason, foundVia: category || 'category search', positions: c ? Math.round(c.positions / c.hits) : 0 }
+    return { domain: r.domain, name: r.name || r.domain, reason: r.reason, foundVia: category || 'category search', positions: c ? Math.round(c.positions / c.hits) : 0, pageId: null, liveAds: [] }
   })
-  return { seed: { name: ctx.siteName, category, market, queries }, competitors, configured }
+
+  // ── Meta Ad Library: search the niche → advertiser pool (live ads + BREADTH Google organic misses) ──
+  const country = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
+  const adQueries = [category, ...queries].filter(Boolean).slice(0, 3)
+  const advByPage = new Map<string, Advertiser>()
+  try {
+    const found = (await Promise.all(adQueries.map((q) => searchAdLibrary(q, country).catch(() => [] as Advertiser[])))).flat()
+    for (const a of found) {
+      if (!a.pageId || !a.ads.length) continue
+      if (a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)) continue
+      const cur = advByPage.get(a.pageId)
+      if (cur) cur.ads.push(...a.ads.filter((x) => !cur.ads.some((y) => y.adId === x.adId)))
+      else advByPage.set(a.pageId, { ...a })
+    }
+  } catch { /* ad library best-effort */ }
+  const advertisers = Array.from(advByPage.values())
+
+  // Attach live ads to the Google-ranked rivals (match by destination domain, else advertiser name).
+  const usedPages = new Set<string>()
+  for (const c of competitors) {
+    const match = advertisers.find((a) => (a.domain && domainRoot(a.domain) === c.domain) || nameMatch(a.pageName || '', c.name))
+    if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 6); usedPages.add(match.pageId) }
+  }
+
+  // BREADTH: in-niche advertisers we didn't already surface via Google → add as competitors (they HAVE live ads).
+  const extra = advertisers
+    .filter((a) => !usedPages.has(a.pageId) && a.pageName && a.ads.length && !competitors.some((c) => nameMatch(c.name, a.pageName)))
+    .slice(0, Math.max(0, 12 - competitors.length))
+    .map((a): DiscoveredCompetitor => ({
+      domain: a.domain || '', name: a.pageName, reason: 'Active advertiser in your niche — found running ads in the Meta Ad Library.',
+      foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 6),
+    }))
+
+  return { seed: { name: ctx.siteName, category, market, queries }, competitors: [...competitors, ...extra], configured }
 }

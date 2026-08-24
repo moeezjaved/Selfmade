@@ -172,7 +172,7 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
 /* ── My Competitors (real ad-DNA data) ──────────────────────────────────── */
 type CompAd = { id: string; thumb: string | null; copy: string; format: string | null; active: boolean }
 type CompDna = { hooks: string[]; angles: string[]; personas: string[] }
-type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null }
+type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; adsSource?: 'corpus' | 'live' | null; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null }
 type CompSeed = { name: string; category: string; market: string; queries: string[] } | null
 function DnaRow({ label, items }: { label: string; items: string[] }) {
   if (!items?.length) return null
@@ -180,6 +180,57 @@ function DnaRow({ label, items }: { label: string; items: string[] }) {
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
       <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: SUB, flex: 'none' }}>{label}</span>
       {items.map((t) => <span key={t} style={{ fontSize: 12, fontWeight: 600, color: INK, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '3px 10px' }}>{t}</span>)}
+    </div>
+  )
+}
+
+function CompCard({ c, isMobile }: { c: Comp; isMobile: boolean }) {
+  const hasAds = c.ads.length > 0
+  const badge = c.adsSource === 'corpus' ? `${c.adCount.toLocaleString()} ads decoded` : `${c.adCount.toLocaleString()} live ad${c.adCount === 1 ? '' : 's'}`
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24, marginTop: 18 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{ width: 42, height: 42, borderRadius: 100, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, color: INK, flex: 'none', overflow: 'hidden' }}>
+          {c.domain /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={`https://www.google.com/s2/favicons?domain=${c.domain}&sz=64`} alt="" style={{ width: 24, height: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : (c.name[0]?.toUpperCase() || 'C')}
+        </div>
+        <div style={{ minWidth: 0, flex: 1 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontFamily: SERIF, fontSize: isMobile ? 17 : 20, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+            {c.source === 'spied' && <span style={{ fontSize: 10, fontWeight: 800, color: SUB, border: `1px solid ${LINE}`, borderRadius: 100, padding: '2px 8px', flex: 'none' }}>SPYING</span>}
+          </div>
+          <div style={{ fontSize: 12.5, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.domain || (c.adsSource === 'corpus' ? `${c.adCount.toLocaleString()} ads in our index` : '')}</div>
+        </div>
+        {hasAds
+          ? <span style={{ fontSize: 12, fontWeight: 800, color: ORANGE, background: '#ffe7df', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>{badge}</span>
+          : <button style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: ORANGE, border: 'none', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', flex: 'none' }}>Spy their ads →</button>}
+      </div>
+
+      {c.reason && <div style={{ fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginTop: 12 }}>{c.reason}</div>}
+
+      {c.dna && (c.dna.hooks.length + c.dna.angles.length + c.dna.personas.length > 0) && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14, padding: 14, background: CREAM, borderRadius: 12 }}>
+          <DnaRow label="Hooks" items={c.dna.hooks} />
+          <DnaRow label="Angles" items={c.dna.angles} />
+          <DnaRow label="Personas" items={c.dna.personas} />
+        </div>
+      )}
+
+      {hasAds ? (
+        <div style={{ display: 'flex', gap: 12, overflowX: 'auto', marginTop: 16, paddingBottom: 6 }}>
+          {c.ads.map((a) => (
+            <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+              <div style={{ aspectRatio: '4 / 5', background: PAPER, position: 'relative' }}>
+                {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
+                {a.format === 'video' && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 100, padding: '2px 8px' }}>▶ VIDEO</span>}
+              </div>
+              {a.copy && <div style={{ fontSize: 11.5, color: '#43403a', lineHeight: 1.4, padding: '9px 11px', maxHeight: 66, overflow: 'hidden' }}>{a.copy}</div>}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>We found this rival{c.domain ? ` (${c.domain})` : ''} but they don’t appear to be running Meta ads right now — hit <b style={{ color: INK }}>Spy their ads</b> to re-check.</div>
+      )}
     </div>
   )
 }
@@ -199,7 +250,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
     <div>
       <Header title="My Competitors" isMobile={isMobile} action="Add competitor" />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>
-        We found your real rivals across the web{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''}, then pulled their <b style={{ color: INK }}>ad strategy</b> from our ad-DNA crawl.
+        We found your real rivals{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''} across the web <b style={{ color: INK }}>and the Meta Ad Library</b>, then pulled their <b style={{ color: INK }}>live ads &amp; ad strategy</b>.
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
@@ -214,52 +265,24 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
           <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>{domain ? 'We couldn’t auto-discover rivals for this store. Add one and we’ll pull their live ads.' : 'Run an ads audit first so we know your store — then we auto-find your rivals and their ads.'}</div>
           <button style={primaryBtn}>Add a competitor</button>
         </div>
-      ) : shown.map((c) => (
-        <div key={c.pageId || c.domain || c.name} style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24, marginTop: 18 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 100, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, color: INK, flex: 'none', overflow: 'hidden' }}>
-              {c.domain /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={`https://www.google.com/s2/favicons?domain=${c.domain}&sz=64`} alt="" style={{ width: 24, height: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : (c.name[0]?.toUpperCase() || 'C')}
-            </div>
-            <div style={{ minWidth: 0, flex: 1 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{ fontFamily: SERIF, fontSize: isMobile ? 17 : 20, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
-                {c.source === 'spied' && <span style={{ fontSize: 10, fontWeight: 800, color: SUB, border: `1px solid ${LINE}`, borderRadius: 100, padding: '2px 8px', flex: 'none' }}>SPYING</span>}
+      ) : (() => {
+        const withAds = shown.filter((c) => c.ads.length > 0)
+        const withoutAds = shown.filter((c) => c.ads.length === 0)
+        return (
+          <>
+            {withAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} />)}
+            {withoutAds.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '26px 0 4px' }}>
+                <div style={{ height: 1, background: LINE, flex: 1 }} />
+                <span style={{ fontSize: 12.5, fontWeight: 800, color: SUB, whiteSpace: 'nowrap' }}>{withoutAds.length} competitor{withoutAds.length > 1 ? 's' : ''} without Meta ads</span>
+                <div style={{ height: 1, background: LINE, flex: 1 }} />
               </div>
-              <div style={{ fontSize: 12.5, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.domain || (c.hasAdDna ? `${c.adCount.toLocaleString()} ads in our index` : '')}</div>
-            </div>
-            {c.hasAdDna
-              ? <span style={{ fontSize: 12, fontWeight: 800, color: ORANGE, background: '#ffe7df', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>{c.adCount.toLocaleString()} ads decoded</span>
-              : <button style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: ORANGE, border: 'none', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', flex: 'none' }}>Spy their ads →</button>}
-          </div>
-
-          {c.reason && <div style={{ fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginTop: 12 }}>{c.reason}</div>}
-
-          {c.hasAdDna && c.dna && (c.dna.hooks.length + c.dna.angles.length + c.dna.personas.length > 0) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14, padding: 14, background: CREAM, borderRadius: 12 }}>
-              <DnaRow label="Hooks" items={c.dna.hooks} />
-              <DnaRow label="Angles" items={c.dna.angles} />
-              <DnaRow label="Personas" items={c.dna.personas} />
-            </div>
-          )}
-
-          {c.ads.length > 0 ? (
-            <div style={{ display: 'flex', gap: 12, overflowX: 'auto', marginTop: 16, paddingBottom: 6 }}>
-              {c.ads.map((a) => (
-                <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-                  <div style={{ aspectRatio: '4 / 5', background: PAPER, position: 'relative' }}>
-                    {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
-                    {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
-                  </div>
-                  {a.copy && <div style={{ fontSize: 11.5, color: '#43403a', lineHeight: 1.4, padding: '9px 11px', maxHeight: 66, overflow: 'hidden' }}>{a.copy}</div>}
-                </div>
-              ))}
-            </div>
-          ) : !c.hasAdDna ? (
-            <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>We found this rival on the web but haven’t crawled their ads yet — hit <b style={{ color: INK }}>Spy their ads</b> to pull their live creatives.</div>
-          ) : null}
-        </div>
-      ))}
-      <div style={{ fontSize: 13, color: SUB, marginTop: 18 }}>Rivals discovered from live Google results in your market, then decoded against our ad-DNA crawl (millions of classified ads).</div>
+            )}
+            {withoutAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} />)}
+          </>
+        )
+      })()}
+      <div style={{ fontSize: 13, color: SUB, marginTop: 18 }}>Rivals discovered from live Google results and the Meta Ad Library in your market, then decoded against our ad-DNA crawl (millions of classified ads).</div>
     </div>
   )
 }
