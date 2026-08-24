@@ -26,6 +26,13 @@ const Icon = ({ d, size = 19 }: { d: string; size?: number }) => (
 export default function AdsStudio() {
   const isMobile = useIsMobile()
   const [active, setActive] = useState<Key>('home')
+  const [domain, setDomain] = useState('')
+  useEffect(() => {
+    const u = new URLSearchParams(window.location.search).get('domain')
+    const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
+    const d = (u || (c ? decodeURIComponent(c) : '') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+    if (d) setDomain(d)
+  }, [])
 
   const Sidebar = (
     <aside style={{ width: isMobile ? '100%' : 250, flex: 'none', background: CREAM, borderRight: `1px solid ${LINE}`, padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 4, minHeight: isMobile ? 'auto' : '100dvh', boxSizing: 'border-box' }}>
@@ -67,8 +74,8 @@ export default function AdsStudio() {
             : active === 'ads' ? <YourAds isMobile={isMobile} />
               : active === 'competitors' ? <Competitors isMobile={isMobile} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
-                  : active === 'products' ? <Products isMobile={isMobile} />
-                    : active === 'audiences' ? <Audiences isMobile={isMobile} />
+                  : active === 'products' ? <Products isMobile={isMobile} domain={domain} />
+                    : active === 'audiences' ? <Audiences isMobile={isMobile} domain={domain} />
                       : active === 'brand' ? <BrandKit isMobile={isMobile} />
                         : active === 'calendar' ? <Gated title="Content Calendar" blurb="Plan and generate content across every platform — powered by AI that knows your brand." items={['AI content planning with themes, copy & creative prompts', 'Multi-platform: posts, stories, reels, carousels, email', 'Auto-generated creatives per post', 'Day / week / month views', 'Export as ZIP']} />
                           : active === 'google' ? <Gated title="Google Ads" blurb="Generate high-performing Google Ads campaigns — keywords, ad copy and bid strategy, powered by AI." items={['AI keyword research tailored to your brand', 'Campaign generation with ad groups & keywords', 'Ad copy: headlines & descriptions optimized for Google']} />
@@ -232,45 +239,90 @@ function Discover({ isMobile }: { isMobile: boolean }) {
   )
 }
 
-/* ── Products ───────────────────────────────────────────────────────────── */
-function Products({ isMobile }: { isMobile: boolean }) {
-  const names = ['Orange Flavour', 'Niko Armani', 'Lucien Da Vinci', 'Maple Pepper', 'White Cranberry', 'Stick Base', 'Flavour 8-Pack', 'Mint Flavour', 'Pink Journey Pack', 'Strawberry']
+/* ── Products (real catalog from the store) ─────────────────────────────── */
+type StoreProduct = { title: string; image: string | null; price: string | null; url: string }
+function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const [data, setData] = useState<{ products: StoreProduct[]; siteName: string } | null>(null)
+  const [sel, setSel] = useState<Record<string, boolean>>({})
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    if (!domain) { setData({ products: [], siteName: '' }); return }
+    let on = true; setData(null)
+    fetch(`/api/ads-studio/products?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setData({ products: Array.isArray(d.products) ? d.products : [], siteName: d.siteName || '' })).catch(() => on && setData({ products: [], siteName: '' }))
+    return () => { on = false }
+  }, [domain])
+  const products = (data?.products || []).filter((p) => !q.trim() || p.title.toLowerCase().includes(q.trim().toLowerCase()))
+  const selCount = Object.values(sel).filter(Boolean).length
   return (
     <div>
-      <Header title="Products" isMobile={isMobile} action="Import from Website" />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>Detected from your store — select products to generate ads for.</div>
-      <SearchBar placeholder="Search products…" />
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: 14, marginTop: 20 }}>
-        {names.map((n, i) => (
-          <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
-            <div style={{ aspectRatio: '1', background: `linear-gradient(150deg, ${['#f7ecd8', '#eceee9', '#efe6df', '#f0ece2', '#f6e9ea'][i % 5]}, #fff)`, position: 'relative' }}><span style={{ position: 'absolute', top: 8, right: 8, width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${LINE}`, background: '#fff' }} /></div>
-            <div style={{ padding: '10px 12px', fontSize: 13, fontWeight: 700 }}>{n}</div>
-          </div>
-        ))}
+      <Header title="Products" isMobile={isMobile} action={selCount ? `Generate ads (${selCount})` : 'Import from Website'} />
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>{domain ? `Detected from ${domain} — select products to generate ads for.` : 'Connect a store to detect your products.'}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
+        <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
       </div>
+      {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your catalog…</div>
+        : products.length === 0 ? <EmptyState title={domain ? 'No products found' : 'No store connected'} body={domain ? 'We couldn’t read products from this store — import manually or check the URL.' : 'Open this workspace from your ads audit and we’ll auto-detect your catalog.'} cta="Import from Website" />
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: 14, marginTop: 20 }}>
+              {products.map((p, i) => {
+                const on = !!sel[p.url]
+                return (
+                  <div key={p.url + i} onClick={() => setSel((s) => ({ ...s, [p.url]: !s[p.url] }))} style={{ border: `1px solid ${on ? ORANGE : LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', cursor: 'pointer', boxShadow: on ? `0 0 0 2px ${ORANGE}22` : 'none' }}>
+                    <div style={{ aspectRatio: '1', background: PAPER, position: 'relative' }}>
+                      {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                      <span style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? ORANGE : '#fff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{on ? '✓' : ''}</span>
+                    </div>
+                    <div style={{ padding: '10px 12px' }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>{p.price && <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>{p.price}</div>}</div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
     </div>
   )
 }
 
-/* ── Audiences ──────────────────────────────────────────────────────────── */
-function Audiences({ isMobile }: { isMobile: boolean }) {
-  const segs = [
-    { name: 'Urban buyers', insights: ['Young urban adults in major cities, 18–30, mobile-first and social.', 'Spend on delivery & convenience, follow local creators on IG/TikTok.', 'Value modern, discreet, well-designed products.', 'Shop online, comfortable with fast checkout and strong social proof.'] },
-    { name: 'Value seekers', insights: ['Budget-conscious but will pay for things that clearly help them.', 'Research via reviews, Reels and community groups before buying.', 'Respond to bundles, guarantees and limited-time offers.', 'Prefer cash-on-delivery or familiar local payment.'] },
-  ]
+/* ── Audiences (AI, grounded on real store signals) ─────────────────────── */
+type Aud = { name: string; insights: string[] }
+function Audiences({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const [data, setData] = useState<{ market: string; audiences: Aud[]; signals: string[] } | null>(null)
+  useEffect(() => {
+    if (!domain) { setData({ market: '', audiences: [], signals: [] }); return }
+    let on = true; setData(null)
+    fetch(`/api/ads-studio/audiences?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setData({ market: d.market || '', audiences: Array.isArray(d.audiences) ? d.audiences : [], signals: Array.isArray(d.signals) ? d.signals : [] })).catch(() => on && setData({ market: '', audiences: [], signals: [] }))
+    return () => { on = false }
+  }, [domain])
   return (
     <div>
       <Header title="Audiences" isMobile={isMobile} action="Add Audience" />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>We identify your target audiences from your store — each drives a tailored set of ads.</div>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: 16 }}>
-        {segs.map((s, i) => (
-          <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24 }}>
-            <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 6 }}>Audience {i + 1}</div>
-            <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 14 }}>{s.name}</div>
-            {s.insights.map((t, j) => <div key={j} style={{ display: 'flex', gap: 10, fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginBottom: 12 }}><span style={{ width: 6, height: 6, borderRadius: 100, background: ORANGE, marginTop: 7, flex: 'none' }} />{t}</div>)}
-          </div>
-        ))}
-      </div>
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 8 }}>We read your store’s real signals to identify who actually buys — each audience drives its own ads.</div>
+      {data?.market && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ffe7df', color: ORANGE, borderRadius: 100, padding: '6px 14px', fontSize: 13, fontWeight: 800, marginBottom: 18 }}>📍 Detected market: {data.market}</div>}
+      {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your store & building audiences…</div>
+        : data.audiences.length === 0 ? <EmptyState title={domain ? 'Couldn’t build audiences yet' : 'No store connected'} body={domain ? 'We couldn’t read enough from this store — try again in a moment.' : 'Open this workspace from your ads audit and we’ll auto-detect your audiences.'} cta="Add Audience" />
+          : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: 16 }}>
+                {data.audiences.map((s, i) => (
+                  <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24 }}>
+                    <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 6 }}>Audience {i + 1} · {s.insights.length} insights</div>
+                    <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 14 }}>{s.name}</div>
+                    {s.insights.map((t, j) => <div key={j} style={{ display: 'flex', gap: 10, fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginBottom: 12 }}><span style={{ width: 6, height: 6, borderRadius: 100, background: ORANGE, marginTop: 7, flex: 'none' }} />{t}</div>)}
+                  </div>
+                ))}
+              </div>
+              {data.signals.length > 0 && <div style={{ fontSize: 12.5, color: SUB, marginTop: 16 }}>Grounded on real signals from your site: {data.signals.join(' · ')}.</div>}
+            </>
+          )}
+    </div>
+  )
+}
+function EmptyState({ title, body, cta }: { title: string; body: string; cta: string }) {
+  return (
+    <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
+      <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{title}</div>
+      <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>{body}</div>
+      <button style={primaryBtn}>{cta}</button>
     </div>
   )
 }
