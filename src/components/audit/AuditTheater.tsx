@@ -37,19 +37,40 @@ export default function AuditTheater() {
   const [open, setOpen] = useState<Record<string, boolean>>({})
   const timer = useRef<any>(null)
   const doneRef = useRef<Result | null>(null)
+  const liveRef = useRef<Record<string, Section>>({})   // director reads streamed sections without stale closures
 
   const run = useCallback(async () => {
     const d = domain.trim()
     if (!d || !d.includes('.')) { setError('Enter a real website, like yourstore.com'); return }
-    setError(null); setPhase('running'); setStep(0); setLive({}); doneRef.current = null
-    const startedAt = Date.now()
-    // Fallback pacing so gated steps (speed/backlinks without keys) still advance; data-driven advance leads.
-    timer.current = setInterval(() => setStep((s) => Math.min(STEPS.length - 2, s + 1)), 3600)
-    const goReport = (r: Result) => {
-      clearInterval(timer.current); setResult(r); setStep(STEPS.length - 1)
-      const wait = Math.max(0, 9000 - (Date.now() - startedAt))   // keep the theater on screen a beat
-      setTimeout(() => setPhase('report'), wait)
+    setError(null); setPhase('running'); setStep(0); setLive({}); doneRef.current = null; liveRef.current = {}
+    // Director: walk each step at a deliberate, Ryze-slow pace. Every step dwells DWELL ms so its
+    // visual is actually seen; a step that yields data waits (up to MAXWAIT) for it before advancing.
+    // Data arrival never fast-forwards the theater — only fills each slide in as the director lands on it.
+    const DWELL = 3900, MAXWAIT = 8000
+    const OPTIONAL = new Set(['speed', 'backlinks'])   // may yield nothing (no API key) — don't stall waiting
+    let i = 0, stopped = false
+    const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('report') } }
+    const walk = () => {
+      if (stopped) return
+      setStep(i)
+      const key = STEPS[i].key
+      const started = Date.now()
+      const check = () => {
+        if (stopped) return
+        const elapsed = Date.now() - started
+        if (i >= STEPS.length - 1) {                      // last slide: hold until the final result lands
+          if (doneRef.current && elapsed >= DWELL) { finish(); return }
+          timer.current = setTimeout(check, 200); return
+        }
+        const hasData = !!liveRef.current[key]
+        const ceil = OPTIONAL.has(key) ? DWELL : MAXWAIT
+        if (elapsed >= DWELL && (hasData || elapsed >= ceil)) { i++; walk() }
+        else timer.current = setTimeout(check, 200)
+      }
+      timer.current = setTimeout(check, 200)
     }
+    const stop = () => { stopped = true; clearTimeout(timer.current) }
+    walk()
     try {
       const res = await fetch(`/api/audit/stream?domain=${encodeURIComponent(d)}`)
       const reader = res.body!.getReader(); const dec = new TextDecoder(); let buf = ''
@@ -61,18 +82,21 @@ export default function AuditTheater() {
           const line = p.split('\n').find((l) => l.startsWith('data: ')); if (!line) continue
           const ev = JSON.parse(line.slice(6))
           if (ev.type === 'section') {
+            liveRef.current = { ...liveRef.current, [ev.section.key]: ev.section }
             setLive((m) => ({ ...m, [ev.section.key]: ev.section }))
-            const idx = STEPS.findIndex((s) => s.key === ev.section.key)
-            if (idx >= 0) setStep((s) => Math.max(s, idx))   // data-driven: land on the step that just returned
-          } else if (ev.type === 'done') { doneRef.current = ev.result; goReport(ev.result) }
-          else if (ev.type === 'error') { clearInterval(timer.current); setError(ev.error); setPhase('idle') }
+          } else if (ev.type === 'done') {
+            doneRef.current = ev.result
+            // Feed the revenue slide its number so the final tally has something to count to.
+            const rev = { key: 'revenue', name: 'Revenue', sub: '', score: 0, findings: [], _lost: ev.result.revenueLostPerYear, _cur: ev.result.currency } as any
+            liveRef.current = { ...liveRef.current, revenue: rev }
+            setLive((m) => ({ ...m, revenue: rev }))
+          } else if (ev.type === 'error') { stop(); setError(ev.error); setPhase('idle') }
         }
       }
-      // stream ended without an explicit done (defensive)
-      if (!doneRef.current) { clearInterval(timer.current); setError('Scan didn’t finish — try again.'); setPhase('idle') }
-    } catch { clearInterval(timer.current); setError('Network error — try again.'); setPhase('idle') }
+      if (!doneRef.current) { stop(); setError('Scan didn’t finish — try again.'); setPhase('idle') }
+    } catch { stop(); setError('Network error — try again.'); setPhase('idle') }
   }, [domain])
-  useEffect(() => () => clearInterval(timer.current), [])
+  useEffect(() => () => clearTimeout(timer.current), [])
 
   if (phase === 'idle') return (
     <>
@@ -80,7 +104,7 @@ export default function AuditTheater() {
         <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
         <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.96) 0%, rgba(224,47,6,.9) 42%, rgba(224,47,6,.5) 100%)' }} />
         <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
-          <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 30 seconds · no login</div>
+          <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · under a minute · no login</div>
           <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(38px,6.2vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your SEO.</h1>
           <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 470 }}>See exactly where your store stands on Google &amp; AI — your search health, your catalog, and whether ChatGPT even mentions you.</p>
           <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row', maxWidth: 480 }}>
@@ -165,7 +189,7 @@ function RunningStage({ step, live, isMobile }: { step: number; live: Record<str
   }
   return (
     <>
-      <style>{`@keyframes aSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}@keyframes aOrbit{to{transform:rotate(360deg)}}@keyframes aFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+      <style>{`@keyframes aSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}@keyframes aOrbit{to{transform:rotate(360deg)}}@keyframes aFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes aScan{0%{top:6%}100%{top:92%}}@keyframes aPulseDot{0%,100%{opacity:.3}50%{opacity:1}}@keyframes aBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes aPop{0%{opacity:0;transform:translateY(8px) scale(.96)}100%{opacity:1;transform:none}}`}</style>
       <div style={{ minHeight: isMobile ? 'auto' : '72vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ maxWidth: 640, marginBottom: isMobile ? 22 : 30, animation: 'aFade .4s ease' }} key={s.key}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: LIME, marginBottom: 10 }}>Step {step + 1} of {STEPS.length}</div>
@@ -173,9 +197,14 @@ function RunningStage({ step, live, isMobile }: { step: number; live: Record<str
           <p style={{ fontSize: isMobile ? 15 : 16.5, color: SUB, lineHeight: 1.5, margin: 0 }}>{blurbs[s.key]}</p>
         </div>
         <div style={{ animation: 'aFade .5s ease', display: 'flex', justifyContent: 'center' }} key={s.key + '-v'}>
-          {s.key === 'spam' ? <SpamGauge sec={live.spam} isMobile={isMobile} />
+          {s.key === 'health' ? <HealthScan sec={live.health} isMobile={isMobile} />
+            : s.key === 'speed' ? <SpeedGauge sec={live.speed} isMobile={isMobile} />
+            : s.key === 'spam' ? <SpamGauge sec={live.spam} isMobile={isMobile} />
             : s.key === 'catalog' ? <CatalogCards sec={live.catalog} isMobile={isMobile} />
             : s.key === 'google' && live.google?.ladder?.length ? <MiniLadder rows={live.google.ladder!} isMobile={isMobile} />
+            : s.key === 'ai' ? <AiProbe sec={live.ai} isMobile={isMobile} />
+            : s.key === 'backlinks' ? <BacklinkGap sec={live.backlinks} isMobile={isMobile} />
+            : s.key === 'revenue' ? <RevenueTally sec={live.revenue as any} isMobile={isMobile} />
             : <ScanPulse isMobile={isMobile} />}
         </div>
       </div>
@@ -253,6 +282,116 @@ function MiniLadder({ rows, isMobile }: { rows: LadderRow[]; isMobile: boolean }
 function ScanPulse({ isMobile }: { isMobile: boolean }) {
   const size = isMobile ? 220 : 300
   return <div style={{ position: 'relative', width: size, height: size }}>{[0.5, 0.38, 0.26].map((f, i) => <div key={i} style={{ position: 'absolute', inset: `${(0.5 - f) * size}px`, border: '1.5px dashed #e2e6ea', borderRadius: '50%' }} />)}<div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: size * 0.3, height: size * 0.3, borderRadius: '50%', border: `3px solid ${LINE}`, borderTopColor: LIME, animation: 'aOrbit 1s linear infinite' }} /></div></div>
+}
+
+/** Health — a page being read line by line with a scan bar, issues surfacing as chips. */
+function HealthScan({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
+  const issues = sec?.findings || []
+  const pages = sec ? (sec.sub.match(/(\d+)/)?.[1] ?? null) : null
+  return (
+    <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <div style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: isMobile ? 18 : 26, boxShadow: '0 10px 30px rgba(0,0,0,.05)', overflow: 'hidden' }}>
+        {[0.66, 0.94, 0.5, 0.8, 0.6, 0.9, 0.44].map((w, i) => <div key={i} style={{ height: 12, borderRadius: 6, background: i === 0 ? '#efe6d8' : '#eef0f2', width: `${w * 100}%`, marginBottom: 12 }} />)}
+        <div style={{ position: 'absolute', left: 0, right: 0, height: 2, background: LIME, boxShadow: `0 0 14px 2px ${LIME}`, animation: 'aScan 1.6s ease-in-out infinite alternate' }} />
+      </div>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, minHeight: 34 }}>
+        {pages && <span style={{ fontSize: 12.5, fontWeight: 800, color: SUB, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 100, padding: '6px 12px' }}>{pages} pages read</span>}
+        {issues.slice(0, 3).map((f, i) => <span key={i} style={{ fontSize: 12.5, fontWeight: 700, color: RED, background: '#fdecea', borderRadius: 100, padding: '6px 12px', animation: `aPop .4s ease ${i * 0.12}s both` }}>{f.title}</span>)}
+        {!sec && <span style={{ fontSize: 13, color: SUB, animation: 'aPulseDot 1.2s ease infinite' }}>Reading your pages…</span>}
+      </div>
+    </div>
+  )
+}
+
+/** Speed — a half-circle dial that sweeps to the measured score. */
+function SpeedGauge({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
+  const size = isMobile ? 300 : 380, r = size * 0.4, cx = size / 2, cy = size * 0.5
+  const score = sec?.score ?? null
+  const frac = score == null ? 0.5 : score / 100
+  const A = Math.PI, start = A, end = A * (1 - frac)
+  const pt = (ang: number, rad: number) => [cx + rad * Math.cos(ang), cy - rad * Math.sin(ang)]
+  const [sx, sy] = pt(start, r), [ex, ey] = pt(end, r)
+  const col = score == null ? SUB : score >= 70 ? GOOD : score >= 40 ? '#c98a1a' : RED
+  const lcp = sec?.findings.find((f) => /load|lcp|slow|second/i.test(f.title))?.title
+  return (
+    <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
+      <svg width="100%" viewBox={`0 0 ${size} ${size * 0.62}`} style={{ maxWidth: size, display: 'block', margin: '0 auto' }}>
+        <path d={`M ${cx - r} ${cy} A ${r} ${r} 0 0 1 ${cx + r} ${cy}`} fill="none" stroke="#eceff3" strokeWidth={size * 0.05} strokeLinecap="round" />
+        {score != null && <path d={`M ${sx} ${sy} A ${r} ${r} 0 ${frac > 0.5 ? 1 : 0} 1 ${ex} ${ey}`} fill="none" stroke={col} strokeWidth={size * 0.05} strokeLinecap="round" />}
+        {score == null && <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'aOrbit 1.4s linear infinite' }}><circle cx={cx} cy={cy - r} r="5" fill={LIME} /></g>}
+      </svg>
+      <div style={{ fontFamily: SERIF, fontSize: isMobile ? 40 : 54, fontWeight: 800, color: col, lineHeight: 1, marginTop: -size * 0.06 }}>{score ?? '···'}</div>
+      <div style={{ fontSize: 13.5, color: SUB, marginTop: 8 }}>{lcp || (sec ? 'Real-visitor load score' : 'Pulling Chrome UX data…')}</div>
+    </div>
+  )
+}
+
+/** AI — three assistant chips flipping from “asking…” to “doesn’t mention you”. */
+function AiProbe({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
+  const reads = sec?.ai?.reads || []
+  const engines = ['chatgpt', 'gemini', 'perplexity']
+  return (
+    <div style={{ width: '100%', maxWidth: 560, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {engines.map((e, i) => {
+        const rd = reads.find((r) => r.engine === e)
+        return (
+          <div key={e} style={{ display: 'flex', alignItems: 'center', gap: 14, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: isMobile ? '14px 16px' : '18px 22px', boxShadow: '0 8px 24px -14px rgba(0,0,0,.2)', animation: `aPop .4s ease ${i * 0.1}s both` }}>
+            <div style={{ width: 40, height: 40, borderRadius: 10, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, color: INK, flex: 'none' }}>{engLabel(e)[0]}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: isMobile ? 15 : 16.5, fontWeight: 800, color: INK }}>{engLabel(e)}</div>
+              <div style={{ fontSize: 12.5, color: SUB }}>“best {sec ? 'brands' : '…'} in your category”</div>
+            </div>
+            {!rd ? <span style={{ fontSize: 12.5, color: SUB, fontWeight: 700, animation: 'aPulseDot 1.2s ease infinite', flex: 'none' }}>asking…</span>
+              : rd.mentioned ? <span style={{ fontSize: 12.5, fontWeight: 800, color: GOOD, background: '#eaf6ec', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>mentions you ✓</span>
+                : <span style={{ fontSize: 12.5, fontWeight: 800, color: RED, background: '#fdecea', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>not mentioned</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Backlinks — you vs rivals authority bars. */
+function BacklinkGap({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
+  const gap = sec?.findings[0]?.title
+  const bars = [['Top rival', 0.92, '#3a453c'], ['Rival #2', 0.7, '#5a655c'], ['You', 0.22, RED]] as const
+  return (
+    <div style={{ width: '100%', maxWidth: 520, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: isMobile ? 18 : 26, boxShadow: '0 10px 30px rgba(0,0,0,.05)' }}>
+      <div style={{ fontSize: 13, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 16 }}>Referring domains</div>
+      {bars.map(([label, w, col], i) => (
+        <div key={label} style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, marginBottom: 5 }}><span style={{ fontWeight: label === 'You' ? 800 : 600, color: label === 'You' ? RED : INK }}>{label}</span></div>
+          <div style={{ height: 12, borderRadius: 8, background: '#eef0f2', overflow: 'hidden' }}><div style={{ height: '100%', width: `${w * 100}%`, background: col, borderRadius: 8, transformOrigin: 'left', animation: `aBar .9s cubic-bezier(.2,.8,.2,1) ${i * 0.15}s both` }} /></div>
+        </div>
+      ))}
+      <div style={{ fontSize: 13, color: sec ? RED : SUB, fontWeight: 700, marginTop: 8 }}>{gap || (sec ? 'You’re behind on authority' : 'Comparing backlink profiles…')}</div>
+    </div>
+  )
+}
+
+/** Revenue — the number counting up to what it’s costing them. */
+function RevenueTally({ sec, isMobile }: { sec?: (Section & { _lost?: number; _cur?: string }); isMobile: boolean }) {
+  const target = sec?._lost ?? 0
+  const cur = sec?._cur ?? '$'
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    if (!target) return
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) { setN(target); return }
+    let raf = 0; const t0 = performance.now(), dur = 1800
+    const tick = (t: number) => { const p = Math.min(1, (t - t0) / dur); setN(Math.round(target * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return (
+    <div style={{ width: '100%', maxWidth: 560, textAlign: 'center' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: SUB }}>Leaking to rivals every year</div>
+      <div style={{ fontFamily: SERIF, fontSize: isMobile ? 52 : 78, fontWeight: 800, color: RED, lineHeight: 1.05, letterSpacing: '-.02em', fontVariantNumeric: 'tabular-nums', margin: '10px 0 6px' }}>
+        {target ? `−${cur}${n.toLocaleString()}` : <span style={{ animation: 'aPulseDot 1.2s ease infinite' }}>adding it up…</span>}
+      </div>
+      {target > 0 && <div style={{ fontSize: 14.5, color: SUB }}>per year, from the problems above</div>}
+    </div>
+  )
 }
 
 /* ── Report ───────────────────────────────────────────────────────────────────────────────────── */
