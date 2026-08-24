@@ -7,7 +7,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
-const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', LIME = '#ef4a1e', PAPER = '#fbf4e2', CREAM = '#f4efe1', ORANGE = '#e02f06'
+const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', LIME = '#ef4a1e', PAPER = '#fbf4e2', ORANGE = '#e02f06'
 const SERIF = 'Fraunces, Georgia, serif'
 
 /** Fade-up on scroll. */
@@ -94,7 +94,7 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
       <AgentsAtWork isMobile={isMobile} />
 
       {/* Get found on Google & AI */}
-      <section style={{ background: CREAM, padding: isMobile ? '52px 0' : '76px 0' }}>
+      <section style={{ background: '#fff', padding: isMobile ? '52px 0' : '76px 0' }}>
         <div style={{ ...wrap, textAlign: 'center' }}>
           <Reveal><h2 style={{ ...H2, fontSize: isMobile ? 26 : 38 }}>Get found on Google, ChatGPT &amp; Perplexity</h2></Reveal>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: isMobile ? 26 : 54, marginTop: isMobile ? 30 : 44 }}>
@@ -113,28 +113,39 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
         </div>
       </section>
 
-      {/* 30-day timeline */}
-      <section style={{ padding: isMobile ? '54px 0' : '84px 0' }}>
+      {/* 30-day timeline — white, one clear connected path */}
+      <section style={{ background: '#fff', padding: isMobile ? '54px 0' : '84px 0' }}>
         <div style={wrap}>
           <Reveal><h2 style={H2}>From scan to first rankings &mdash; in 30 days.</h2></Reveal>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: isMobile ? 30 : 44, maxWidth: 820 }}>
-            {timeline.map((t, i) => (
-              <Reveal key={i} delay={i * 70}>
-                <div style={{ display: 'flex', gap: isMobile ? 14 : 26, border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: isMobile ? '16px 18px' : '22px 26px', alignItems: 'flex-start' }}>
-                  <div style={{ minWidth: isMobile ? 66 : 92, fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: LIME, paddingTop: 3 }}>{t.when}</div>
-                  <div><div style={{ fontFamily: SERIF, fontSize: isMobile ? 19 : 23, fontWeight: 700, color: INK }}>{t.title}</div><div style={{ fontSize: 14.5, color: SUB, marginTop: 4, lineHeight: 1.5 }}>{t.body}</div></div>
-                </div>
-              </Reveal>
-            ))}
+          <Reveal delay={60}><p style={{ fontSize: isMobile ? 15.5 : 17, color: SUB, margin: '12px 0 0', maxWidth: 620, lineHeight: 1.5 }}>Here&rsquo;s exactly what happens after you scan — step by step, nothing hidden.</p></Reveal>
+          <div style={{ position: 'relative', marginTop: isMobile ? 34 : 50, maxWidth: 820 }}>
+            {/* the path */}
+            <div style={{ position: 'absolute', left: isMobile ? 15 : 19, top: 8, bottom: 8, width: 2, background: `linear-gradient(${LIME}, ${LIME}33)` }} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? 16 : 22 }}>
+              {timeline.map((t, i) => (
+                <Reveal key={i} delay={i * 70}>
+                  <div style={{ display: 'flex', gap: isMobile ? 16 : 24, alignItems: 'flex-start' }}>
+                    <div style={{ position: 'relative', zIndex: 1, width: isMobile ? 32 : 40, height: isMobile ? 32 : 40, borderRadius: 100, background: LIME, color: '#fff', fontFamily: SERIF, fontWeight: 800, fontSize: isMobile ? 15 : 18, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none', boxShadow: '0 0 0 5px #fff' }}>{i + 1}</div>
+                    <div style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: isMobile ? '14px 16px' : '18px 24px', boxShadow: '0 14px 34px -24px rgba(0,0,0,.4)' }}>
+                      <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: LIME, marginBottom: 4 }}>{t.when}</div>
+                      <div style={{ fontFamily: SERIF, fontSize: isMobile ? 19 : 23, fontWeight: 700, color: INK }}>{t.title}</div>
+                      <div style={{ fontSize: 14.5, color: SUB, marginTop: 4, lineHeight: 1.5 }}>{t.body}</div>
+                    </div>
+                  </div>
+                </Reveal>
+              ))}
+            </div>
           </div>
         </div>
       </section>
 
-      {/* FAQ */}
-      <section style={{ background: CREAM, padding: isMobile ? '54px 0' : '84px 0' }}>
-        <div style={{ ...wrap, maxWidth: 860 }}>
-          <Reveal><h2 style={{ ...H2, textAlign: 'center', marginBottom: isMobile ? 26 : 40 }}>Frequently asked questions</h2></Reveal>
-          {faqs.map(([q, a], i) => <Faq key={i} q={q} a={a} />)}
+      {/* FAQ — orange, white cards */}
+      <section style={{ background: ORANGE, padding: isMobile ? '54px 0' : '84px 0' }}>
+        <div style={{ ...wrap, maxWidth: 820 }}>
+          <Reveal><h2 style={{ ...H2, color: '#fff', textAlign: 'center', marginBottom: isMobile ? 26 : 40 }}>Frequently asked questions</h2></Reveal>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {faqs.map(([q, a], i) => <Faq key={i} q={q} a={a} />)}
+          </div>
         </div>
       </section>
 
@@ -168,8 +179,11 @@ function AgentsAtWork({ isMobile }: { isMobile: boolean }) {
   ]
   const links = [['forbes.com', 'DA 95'], ['wsj.com', 'DA 94'], ['techcrunch.com', 'DA 93'], ['businessinsider.com', 'DA 92'], ['axios.com', 'DA 89'], ['fortune.com', 'DA 88']]
   const STATES = ['Queued', 'Drafting', 'Published']
-  const stateFor = (i: number) => STATES[Math.min(STATES.length - 1, Math.max(0, tick - i))]
-  const liveFor = (i: number) => tick - i >= 2
+  const CYCLE = content.length + 3           // fill the wave, hold, then restart so all 3 columns keep moving
+  const w = tick % CYCLE
+  const stateFor = (i: number) => STATES[Math.min(STATES.length - 1, Math.max(0, w - i))]
+  const liveFor = (i: number) => w - i >= 2
+  const shown = (i: number) => w >= i
 
   const card: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: isMobile ? 20 : 26, boxShadow: '0 24px 60px -30px rgba(0,0,0,.4)' }
   const kicker: React.CSSProperties = { fontFamily: SERIF, fontSize: isMobile ? 26 : 32, fontWeight: 700, color: INK, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 12px' }
@@ -186,7 +200,7 @@ function AgentsAtWork({ isMobile }: { isMobile: boolean }) {
       <div style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '0 22px' : '0 40px' }}>
         <Reveal><div style={{ textAlign: 'center', color: '#fff', marginBottom: isMobile ? 30 : 52 }}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, marginBottom: 12 }}>While you sleep</div>
-          <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 46, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Your agents are already working.</h2>
+          <h2 style={{ fontFamily: SERIF, color: '#fff', fontSize: isMobile ? 30 : 46, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Your agents are already working.</h2>
         </div></Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 26 : 30 }}>
           {/* Programmatic SEO */}
@@ -206,7 +220,7 @@ function AgentsAtWork({ isMobile }: { isMobile: boolean }) {
             <div style={bullet}>{dot}Scans and fixes your pages 24/7</div>
             <div style={{ marginTop: 16 }}>
               {content.map(([t, title], i) => (
-                <div key={i} style={{ ...rowBox, opacity: tick >= i ? 1 : 0.35, transition: 'opacity .5s ease' }}>
+                <div key={i} style={{ ...rowBox, opacity: shown(i) ? 1 : 0.35, transition: 'opacity .5s ease' }}>
                   <span style={tag}>{t}</span>
                   <span style={{ fontSize: 13.5, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
                   {pill(stateFor(i), stateFor(i) === 'Published')}
@@ -220,7 +234,7 @@ function AgentsAtWork({ isMobile }: { isMobile: boolean }) {
             <div style={bullet}>{dot}Guest posts, PR, Reddit — real authority</div>
             <div style={{ marginTop: 16 }}>
               {links.map(([site, da], i) => (
-                <div key={i} style={{ ...rowBox, opacity: tick >= i ? 1 : 0.35, transition: 'opacity .5s ease' }}>
+                <div key={i} style={{ ...rowBox, opacity: shown(i) ? 1 : 0.35, transition: 'opacity .5s ease' }}>
                   <span style={{ fontSize: 13.5, color: INK, fontWeight: 600 }}>{site}</span>
                   <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: SUB }}>{da}</span>
                   {pill(liveFor(i) ? 'Live' : 'Pending', liveFor(i))}
@@ -238,12 +252,14 @@ function Faq({ q, a }: { q: string; a: string }) {
   const [open, setOpen] = useState(false)
   return (
     <Reveal>
-      <div style={{ borderBottom: `1px solid ${LINE}` }}>
-        <button onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '20px 4px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
-          <span style={{ fontSize: 17, fontWeight: 700, color: INK }}>{q}</span>
-          <span style={{ color: LIME, fontSize: 22, transform: open ? 'rotate(45deg)' : 'none', transition: 'transform .2s', flex: 'none' }}>+</span>
+      <div style={{ background: open ? '#fff' : 'rgba(255,255,255,.1)', border: '1px solid rgba(255,255,255,.28)', borderRadius: 16, overflow: 'hidden', transition: 'background .25s' }}>
+        <button onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, padding: '18px 22px', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+          <span style={{ fontSize: 16.5, fontWeight: 700, color: open ? INK : '#fff' }}>{q}</span>
+          <span style={{ color: open ? LIME : '#fff', fontSize: 24, lineHeight: 1, transform: open ? 'rotate(45deg)' : 'none', transition: 'transform .25s, color .25s', flex: 'none' }}>+</span>
         </button>
-        {open && <div style={{ fontSize: 15, color: SUB, lineHeight: 1.6, padding: '0 4px 20px', maxWidth: 720 }}>{a}</div>}
+        <div style={{ maxHeight: open ? 260 : 0, overflow: 'hidden', transition: 'max-height .3s ease' }}>
+          <div style={{ fontSize: 15, color: '#5a5248', lineHeight: 1.6, padding: '0 22px 20px', maxWidth: 720 }}>{a}</div>
+        </div>
       </div>
     </Reveal>
   )
