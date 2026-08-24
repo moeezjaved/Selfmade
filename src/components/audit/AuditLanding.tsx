@@ -28,13 +28,14 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
   const isMobile = useIsMobile()
   const cta = () => { onScan?.(); const el = document.getElementById('audit-top'); el?.scrollIntoView({ behavior: 'smooth' }) }
 
+  const TINT = '#fbe9e3'
   const included = [
-    { head: 'Site fixes', tint: '#fbe9e3', items: ['Title tags', 'Meta descriptions', 'Image alt text', 'Schema markup', 'Internal links', 'Broken links'] },
-    { head: 'Content', tint: '#efe7f3', items: ['Blogs written for you', 'Programmatic SEO pages', 'Buyer-intent articles', 'FAQ + answer pages', 'Published to your store'] },
-    { head: 'AI & backlinks', tint: '#e3f0ea', items: ['Cited in ChatGPT & Perplexity', 'llms.txt + schema', 'Competitor content gaps', 'Backlink-gap analysis'] },
-    { head: 'Reporting', tint: '#faf3dc', items: ['Daily rank tracking', 'AI search citations', 'Revenue banked per fix', 'Weekly wins summary'] },
+    { head: 'Site fixes', items: ['Title tags', 'Meta descriptions', 'Image alt text', 'Schema markup', 'Internal links', 'Broken links'] },
+    { head: 'Content', items: ['Blogs written for you', 'Programmatic SEO pages', 'Buyer-intent articles', 'FAQ + answer pages', 'Published to your store'] },
+    { head: 'AI & backlinks', items: ['Cited in ChatGPT & Perplexity', 'llms.txt + schema', 'Competitor content gaps', 'Backlink-gap analysis'] },
+    { head: 'Reporting', items: ['Daily rank tracking', 'AI search citations', 'Revenue banked per fix', 'Weekly wins summary'] },
   ]
-  const brands = [['Google', '#4285F4'], ['Bing', '#008373'], ['ChatGPT', '#10a37f'], ['Claude', '#d97757'], ['Perplexity', '#20808d'], ['Shopify', '#95BF47']] as const
+  const brands = [['Google', '/logos/google.svg'], ['Bing', '/logos/bing.svg'], ['ChatGPT', '/logos/openai.svg'], ['Claude', '/logos/claude.svg'], ['Perplexity', '/logos/perplexity.svg'], ['Shopify', '/logos/shopify.svg']] as const
   const timeline = [
     { when: 'Day 0', title: 'Plug in', body: 'Enter your domain — the agents scan everything and connect your store in one click.' },
     { when: 'Day 0', title: 'An audit that ranks', body: 'Findings ranked by traffic potential and revenue — not a 40-slide deck.' },
@@ -78,7 +79,7 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {col.items.map((it) => (
                     <div key={it} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                      <span style={{ width: 30, height: 30, borderRadius: 8, background: col.tint, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon d="M20 6 9 17l-5-5" /></span>
+                      <span style={{ width: 30, height: 30, borderRadius: 8, background: TINT, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon d="M20 6 9 17l-5-5" /></span>
                       <span style={{ fontSize: 14.5, color: '#3a352c' }}>{it}</span>
                     </div>
                   ))}
@@ -89,15 +90,21 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
         </div>
       </section>
 
+      {/* Agents at work — orange, live animation */}
+      <AgentsAtWork isMobile={isMobile} />
+
       {/* Get found on Google & AI */}
       <section style={{ background: CREAM, padding: isMobile ? '52px 0' : '76px 0' }}>
         <div style={{ ...wrap, textAlign: 'center' }}>
           <Reveal><h2 style={{ ...H2, fontSize: isMobile ? 26 : 38 }}>Get found on Google, ChatGPT &amp; Perplexity</h2></Reveal>
           <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: isMobile ? 26 : 54, marginTop: isMobile ? 30 : 44 }}>
-            {brands.map(([name, col], i) => (
+            {brands.map(([name, src], i) => (
               <Reveal key={name} delay={i * 60}>
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
-                  <div style={{ width: 52, height: 52, borderRadius: 14, background: '#fff', boxShadow: '0 8px 22px -12px rgba(0,0,0,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontSize: 22, fontWeight: 700, color: col }}>{name[0]}</div>
+                  <div style={{ width: 56, height: 56, borderRadius: 15, background: '#fff', boxShadow: '0 8px 22px -12px rgba(0,0,0,.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    { /* eslint-disable-next-line @next/next/no-img-element */ }
+                    <img src={src} alt={name} width={30} height={30} style={{ width: 30, height: 30, objectFit: 'contain' }} />
+                  </div>
                   <div style={{ fontSize: 13.5, color: SUB, fontWeight: 600 }}>{name}</div>
                 </div>
               </Reveal>
@@ -140,6 +147,90 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
         </Reveal>
       </section>
     </div>
+  )
+}
+
+/** Three columns of AI agents working live — on orange, with a wave of status changes. */
+function AgentsAtWork({ isMobile }: { isMobile: boolean }) {
+  const [tick, setTick] = useState(0)
+  const [pages, setPages] = useState(0)
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) { setTick(99); setPages(1000); return }
+    const t = setInterval(() => setTick((n) => n + 1), 950)
+    const p = setInterval(() => setPages((n) => (n >= 1000 ? 0 : Math.min(1000, n + 137))), 950)
+    return () => { clearInterval(t); clearInterval(p) }
+  }, [])
+
+  const content = [
+    ['BLOG', 'How AI is changing SEO in 2026'], ['BLOG', 'Programmatic SEO: a complete guide'], ['REDDIT', '10 best SEO tools for agencies'],
+    ['GUEST', 'Schema markup for ecommerce'], ['BLOG', 'Core Web Vitals fixes that ship'], ['PR', 'AI Overviews: what changed in Q1'],
+  ]
+  const links = [['forbes.com', 'DA 95'], ['wsj.com', 'DA 94'], ['techcrunch.com', 'DA 93'], ['businessinsider.com', 'DA 92'], ['axios.com', 'DA 89'], ['fortune.com', 'DA 88']]
+  const STATES = ['Queued', 'Drafting', 'Published']
+  const stateFor = (i: number) => STATES[Math.min(STATES.length - 1, Math.max(0, tick - i))]
+  const liveFor = (i: number) => tick - i >= 2
+
+  const card: React.CSSProperties = { background: '#fff', borderRadius: 20, padding: isMobile ? 20 : 26, boxShadow: '0 24px 60px -30px rgba(0,0,0,.4)' }
+  const kicker: React.CSSProperties = { fontFamily: SERIF, fontSize: isMobile ? 26 : 32, fontWeight: 700, color: INK, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 12px' }
+  const bullet: React.CSSProperties = { display: 'flex', gap: 10, fontSize: 14.5, color: '#3a352c', marginBottom: 8 }
+  const dot = <span style={{ width: 5, height: 5, borderRadius: 9, background: LIME, marginTop: 8, flex: 'none' }} />
+  const rowBox: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderBottom: `1px solid ${LINE}` }
+  const tag: React.CSSProperties = { fontSize: 10, fontWeight: 800, letterSpacing: '.1em', color: SUB, width: 52, flex: 'none' }
+  const pill = (label: string, on: boolean) => (
+    <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, padding: '4px 10px', borderRadius: 100, flex: 'none', transition: 'all .4s ease', background: on ? INK : '#efe9df', color: on ? '#fff' : SUB }}>{label}</span>
+  )
+
+  return (
+    <section style={{ background: ORANGE, padding: isMobile ? '54px 0' : '90px 0' }}>
+      <div style={{ maxWidth: 1180, margin: '0 auto', padding: isMobile ? '0 22px' : '0 40px' }}>
+        <Reveal><div style={{ textAlign: 'center', color: '#fff', marginBottom: isMobile ? 30 : 52 }}>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', opacity: .85, marginBottom: 12 }}>While you sleep</div>
+          <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 46, fontWeight: 700, letterSpacing: '-.02em', margin: 0 }}>Your agents are already working.</h2>
+        </div></Reveal>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: isMobile ? 26 : 30 }}>
+          {/* Programmatic SEO */}
+          <Reveal delay={0}><div style={card}>
+            <h3 style={kicker}>Programmatic SEO</h3>
+            <div style={bullet}>{dot}Builds 1000+ pages so people find you</div>
+            <div style={bullet}>{dot}All live on your site — no work from you</div>
+            <div style={{ marginTop: 18, background: PAPER, borderRadius: 14, padding: 18, textAlign: 'center' }}>
+              <div style={{ fontSize: 12, color: SUB, fontWeight: 700, letterSpacing: '.04em', textTransform: 'uppercase' }}>Pages generated</div>
+              <div style={{ fontFamily: SERIF, fontSize: isMobile ? 40 : 52, fontWeight: 800, color: LIME, lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>{pages.toLocaleString()}+</div>
+              <div style={{ fontSize: 12.5, color: SUB }}>from live keyword research</div>
+            </div>
+          </div></Reveal>
+          {/* Technical / content */}
+          <Reveal delay={100}><div style={card}>
+            <h3 style={kicker}>Technical SEO fixes</h3>
+            <div style={bullet}>{dot}Scans and fixes your pages 24/7</div>
+            <div style={{ marginTop: 16 }}>
+              {content.map(([t, title], i) => (
+                <div key={i} style={{ ...rowBox, opacity: tick >= i ? 1 : 0.35, transition: 'opacity .5s ease' }}>
+                  <span style={tag}>{t}</span>
+                  <span style={{ fontSize: 13.5, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{title}</span>
+                  {pill(stateFor(i), stateFor(i) === 'Published')}
+                </div>
+              ))}
+            </div>
+          </div></Reveal>
+          {/* Backlinks */}
+          <Reveal delay={200}><div style={card}>
+            <h3 style={kicker}>DA 40+ backlinks</h3>
+            <div style={bullet}>{dot}Guest posts, PR, Reddit — real authority</div>
+            <div style={{ marginTop: 16 }}>
+              {links.map(([site, da], i) => (
+                <div key={i} style={{ ...rowBox, opacity: tick >= i ? 1 : 0.35, transition: 'opacity .5s ease' }}>
+                  <span style={{ fontSize: 13.5, color: INK, fontWeight: 600 }}>{site}</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: SUB }}>{da}</span>
+                  {pill(liveFor(i) ? 'Live' : 'Pending', liveFor(i))}
+                </div>
+              ))}
+            </div>
+          </div></Reveal>
+        </div>
+      </div>
+    </section>
   )
 }
 
