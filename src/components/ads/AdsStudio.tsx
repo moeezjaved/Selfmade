@@ -60,7 +60,10 @@ export default function AdsStudio() {
         </div>
       ))}
       <div style={{ marginTop: 'auto', paddingTop: 16 }}>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: SUB, textAlign: 'center', marginBottom: 12 }}>⚡ 10 credits</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
+          <div style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: '10px 12px', fontSize: 13, fontWeight: 700, color: SUB, textAlign: 'center' }}>⚡ 10 credits</div>
+          <a href="/hire" style={{ ...primaryBtn, padding: '10px 12px', fontSize: 13, borderRadius: 12, textAlign: 'center', textDecoration: 'none', display: 'block' }}>Hire the team →</a>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
           <div style={{ width: 34, height: 34, borderRadius: 100, background: INK, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800 }}>YO</div>
           <div style={{ minWidth: 0 }}><div style={{ fontSize: 14, fontWeight: 700, color: INK }}>Your brand</div><div style={{ fontSize: 12, color: SUB }}>yourstore.com</div></div>
