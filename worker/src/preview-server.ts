@@ -81,7 +81,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    if (url.pathname !== '/preview') {
+    if (url.pathname !== '/preview' && url.pathname !== '/search') {
       res.statusCode = 404
       res.end('not found')
       return
@@ -92,6 +92,25 @@ const server = createServer(async (req, res) => {
     if (auth !== SECRET) {
       res.statusCode = 401
       res.end(JSON.stringify({ error: 'unauthorized' }))
+      return
+    }
+
+    // ── Keyword search across the whole Ad Library (advertiser DISCOVERY) ──
+    if (url.pathname === '/search') {
+      const q = (url.searchParams.get('q') || '').trim()
+      if (!q) {
+        res.statusCode = 400
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: 'q (query) required' }))
+        return
+      }
+      const country = (url.searchParams.get('country') || 'ALL').toUpperCase().replace(/[^A-Z]/g, '') || 'ALL'
+      const cap = Math.min(parseInt(url.searchParams.get('limit') || '60', 10), 120)
+      console.log(`[search] "${q}" country=${country} cap=${cap}`)
+      const data = await fetchSearch(q, country, cap)
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify(data))
       return
     }
 
@@ -239,6 +258,81 @@ async function fetchPreview(pageId: string, limit: number) {
       total_returned: ads.length,
       total_found: adObjects.length,
     }
+  } finally {
+    await browser?.close().catch(() => {})
+    if (proxy) await proxy.close().catch(() => {})
+  }
+}
+
+/**
+ * Keyword search across the ENTIRE Ad Library (all advertisers), grouped by page.
+ * This is how we DISCOVER in-niche competitors Google organic misses — same Playwright + IPRoyal
+ * session as the preview, but the search URL + a few scrolls to load more results.
+ */
+async function fetchSearch(query: string, country: string, cap: number) {
+  const sessionId = randomBytes(4).toString('hex').slice(0, 8)
+  let proxy: { url: string; close: () => Promise<void> } | null = null
+  let browser: Browser | null = null
+  try {
+    if (proxyChainEnabled) proxy = await startProxyChain({ sessionId, lifetime: '5m', country: 'us' })
+    browser = await chromiumExtra.launch({
+      headless: false,
+      args: ['--headless=new', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled', '--disable-gpu'],
+      proxy: proxy ? { server: proxy.url } : undefined,
+    }) as unknown as Browser
+    const context = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 900 }, locale: 'en-US' })
+    await context.route('**/*', (route) => {
+      const u = route.request().url()
+      if (u.includes('static.xx.fbcdn.net')) return route.abort()
+      if (u.includes('/ajax/bz?') || u.includes('/log_clientside_error')) return route.abort()
+      if (u.includes('/groups/') || u.includes('/messenger/') || u.includes('/marketplace/')) return route.abort()
+      return route.continue()
+    })
+    const page = await context.newPage()
+    const adObjects: any[] = []
+    page.on('response', async (response: PlaywrightResponse) => {
+      try {
+        const t = response.request().resourceType()
+        if (!['xhr', 'fetch', 'document'].includes(t)) return
+        const text = await response.text().catch(() => '')
+        if (!text || !text.includes('"ad_archive_id"')) return
+        for (const obj of extractAdsBraceMatched(text)) {
+          if (!adObjects.find(a => a.ad_archive_id === obj.ad_archive_id)) adObjects.push(obj)
+        }
+      } catch { /* ignore */ }
+    })
+    const searchUrl = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${encodeURIComponent(country)}&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`
+    await page.goto(searchUrl, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+    await new Promise(r => setTimeout(r, 6_000))
+    // Scroll to trigger more result batches until we hit the cap or stop growing.
+    let last = 0, stable = 0
+    for (let i = 0; i < 12 && adObjects.length < cap && stable < 3; i++) {
+      await page.mouse.wheel(0, 4000).catch(() => {})
+      await new Promise(r => setTimeout(r, 2_500))
+      if (adObjects.length === last) stable++; else { stable = 0; last = adObjects.length }
+    }
+    await context.close()
+
+    // Group by advertiser page.
+    const byPage = new Map<string, { page_id: string; page_name: string; domain: string | null; ads: any[] }>()
+    for (const obj of adObjects) {
+      const snap = obj.snapshot || {}
+      const pid = String(obj.page_id || snap.page_id || '')
+      if (!pid) continue
+      const media = extractMediaUrls(snap)
+      const link = snap.link_url || snap.caption || snap.page_profile_uri || ''
+      let domain: string | null = null
+      try { const h = new URL(link.startsWith('http') ? link : `https://${link}`).hostname.replace(/^www\./, '').toLowerCase(); if (h && !h.includes('facebook.com') && !h.includes('fb.com')) domain = h } catch { /* skip */ }
+      const entry = byPage.get(pid) || { page_id: pid, page_name: snap.page_name || '', domain: null, ads: [] as any[] }
+      if (!entry.page_name && snap.page_name) entry.page_name = snap.page_name
+      if (!entry.domain && domain) entry.domain = domain
+      if (entry.ads.length < 6) entry.ads.push({
+        ad_id: String(obj.ad_archive_id), body: snap.body?.text || '', title: snap.title || snap.link_description || '',
+        is_active: !!obj.is_active, image_urls: media.images, video_urls: media.videos, link,
+      })
+      byPage.set(pid, entry)
+    }
+    return { query, country, total_ads: adObjects.length, advertisers: Array.from(byPage.values()) }
   } finally {
     await browser?.close().catch(() => {})
     if (proxy) await proxy.close().catch(() => {})

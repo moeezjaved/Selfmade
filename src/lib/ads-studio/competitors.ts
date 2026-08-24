@@ -134,7 +134,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
 
   // ── Meta Ad Library: search the niche → advertiser pool (live ads + BREADTH Google organic misses) ──
   const country = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
-  const adQueries = [category, ...queries].filter(Boolean).slice(0, 3)
+  const adQueries = [category, ...queries].filter(Boolean).slice(0, 2)
   const advByPage = new Map<string, Advertiser>()
   try {
     const found = (await Promise.all(adQueries.map((q) => searchAdLibrary(q, country).catch(() => [] as Advertiser[])))).flat()

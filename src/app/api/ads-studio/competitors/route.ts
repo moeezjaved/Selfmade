@@ -13,7 +13,7 @@ import { discoverCompetitors } from '@/lib/ads-studio/competitors'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 90
+export const maxDuration = 180   // Ad Library search runs on the droplet (Playwright) — allow headroom
 
 const AD_COLS = 'ad_id, page_id, page_name, thumbnail_url, raw_image_urls, body, title, format, days_running, is_active, hook_type, angle, persona'
 
