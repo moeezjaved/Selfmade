@@ -76,7 +76,7 @@ export default function AdsStudio() {
                 : active === 'discover' ? <Discover isMobile={isMobile} />
                   : active === 'products' ? <Products isMobile={isMobile} domain={domain} />
                     : active === 'audiences' ? <Audiences isMobile={isMobile} domain={domain} />
-                      : active === 'brand' ? <BrandKit isMobile={isMobile} />
+                      : active === 'brand' ? <BrandKit isMobile={isMobile} domain={domain} />
                         : active === 'calendar' ? <Gated title="Content Calendar" blurb="Plan and generate content across every platform — powered by AI that knows your brand." items={['AI content planning with themes, copy & creative prompts', 'Multi-platform: posts, stories, reels, carousels, email', 'Auto-generated creatives per post', 'Day / week / month views', 'Export as ZIP']} />
                           : active === 'google' ? <Gated title="Google Ads" blurb="Generate high-performing Google Ads campaigns — keywords, ad copy and bid strategy, powered by AI." items={['AI keyword research tailored to your brand', 'Campaign generation with ad groups & keywords', 'Ad copy: headlines & descriptions optimized for Google']} />
                             : <Search isMobile={isMobile} />}
@@ -327,23 +327,96 @@ function EmptyState({ title, body, cta }: { title: string; body: string; cta: st
   )
 }
 
-/* ── Brand Kit ──────────────────────────────────────────────────────────── */
-function BrandKit({ isMobile }: { isMobile: boolean }) {
+/* ── Brand Kit (derived from the website — no Shopify needed) ────────────── */
+type BrandKitData = { siteName: string; logo: string | null; colors: { hex: string; primary: boolean }[]; fonts: string[]; facts: string[]; voice: { tone: string; energy: string; audience: string } | null; visualPages: string[]; empty?: boolean }
+function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const [tab, setTab] = useState<'visual' | 'knowledge'>('visual')
+  const [data, setData] = useState<BrandKitData | null>(null)
+  const [showAll, setShowAll] = useState(false)
+  useEffect(() => {
+    if (!domain) { setData({ empty: true } as any); return }
+    let on = true; setData(null)
+    fetch(`/api/ads-studio/brand-kit?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setData(d)).catch(() => on && setData({ empty: true } as any))
+    return () => { on = false }
+  }, [domain])
+  const shotUrl = (u: string) => `https://s0.wp.com/mshots/v1/${encodeURIComponent(u)}?w=640&h=480`
+  const facts = data?.facts || []
+
   return (
     <div>
       <Header title="Brand Kit" isMobile={isMobile} />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The visual identity and knowledge we use for your brand.</div>
-      <div style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${LINE}`, marginBottom: 20 }}>{['Visual Brand Kit', 'Knowledge Base'].map((t, i) => <div key={t} style={{ padding: '8px 0', fontSize: 15, fontWeight: 700, color: i === 0 ? INK : SUB, borderBottom: i === 0 ? `2px solid ${ORANGE}` : 'none' }}>{t}</div>)}</div>
-      <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: 22, marginBottom: 16 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 16, fontWeight: 800 }}>Your logo</span><button style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>Change</button></div>
-        <div style={{ fontSize: 13.5, color: SUB, marginBottom: 14 }}>We use this across your creatives.</div>
-        <div style={{ width: 120, height: 120, borderRadius: 12, border: `1px dashed ${LINE}`, background: PAPER }} />
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The visual identity and knowledge we learned from {domain || 'your site'} — no setup, no Shopify needed.</div>
+      <div style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${LINE}`, marginBottom: 22 }}>
+        {(['visual', 'knowledge'] as const).map((t) => <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 2px', fontSize: 15, fontWeight: 700, color: tab === t ? INK : SUB, borderBottom: tab === t ? `2px solid ${ORANGE}` : '2px solid transparent', background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>{t === 'visual' ? 'Visual Brand Kit' : 'Knowledge Base'}</button>)}
       </div>
-      <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: 22 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}><span style={{ fontSize: 16, fontWeight: 800 }}>Your visual world</span><button style={{ ...primaryBtn, padding: '7px 16px', fontSize: 13, borderRadius: 8 }}>Add</button></div>
-        <div style={{ fontSize: 13.5, color: SUB, marginBottom: 14 }}>These images shape how we design for you.</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12 }}>{[0, 1, 2].map((i) => <div key={i} style={{ aspectRatio: '4/3', borderRadius: 10, background: PAPER, border: `1px solid ${LINE}` }} />)}</div>
-      </div>
+
+      {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your brand from the site…</div>
+        : data.empty ? <EmptyState title={domain ? 'Couldn’t read your brand yet' : 'No store connected'} body={domain ? 'We couldn’t read enough from this site — try again shortly.' : 'Open this workspace from your ads audit and we’ll learn your brand automatically.'} cta="Retry" />
+          : tab === 'visual' ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <Card title="Your logo" sub="We use this across your creatives." action="Change">
+                <div style={{ width: 110, height: 110, borderRadius: 12, border: `1px solid ${LINE}`, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                  {data.logo /* eslint-disable-next-line @next/next/no-img-element */ && <img src={data.logo} alt="" style={{ maxWidth: '80%', maxHeight: '80%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />}
+                </div>
+              </Card>
+              <Card title="Your visual world" sub="These images shape how we design for you." action="Add">
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
+                  {(data.visualPages || []).map((u, i) => (
+                    <div key={i} style={{ aspectRatio: '4/3', borderRadius: 10, background: PAPER, border: `1px solid ${LINE}`, overflow: 'hidden' }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={shotUrl(u)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+                    </div>
+                  ))}
+                </div>
+              </Card>
+              <Card title="Your visual language" sub={`${data.colors.length} colors · ${data.fonts.length} typefaces extracted from your brand`} action="Add">
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+                  {data.colors.map((c) => (
+                    <div key={c.hex} style={{ width: 120, height: 120, borderRadius: 12, background: c.hex, border: `1px solid ${LINE}`, position: 'relative', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 12 }}>
+                      {c.primary && <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: '.08em', color: lum(c.hex) > 0.6 ? '#00000099' : '#ffffffaa' }}>PRIMARY</span>}
+                      <span style={{ fontSize: 12.5, fontWeight: 700, color: lum(c.hex) > 0.6 ? '#000000cc' : '#ffffffdd' }}>{c.hex.toUpperCase()}</span>
+                    </div>
+                  ))}
+                </div>
+                {data.fonts.length > 0 && <div style={{ display: 'flex', gap: 12, marginTop: 14, flexWrap: 'wrap' }}>{data.fonts.map((f) => <div key={f} style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '12px 18px' }}><div style={{ fontSize: 11, color: SUB, fontWeight: 700 }}>Typeface</div><div style={{ fontSize: 20, fontWeight: 700 }}>{f}</div></div>)}</div>}
+              </Card>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+              <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: isMobile ? 20 : 26 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                  <div><div style={{ fontSize: 16, fontWeight: 800 }}>What we know about you</div><div style={{ fontSize: 13, color: SUB, marginTop: 2 }}>{facts.length} things we’ve learned — edit or add more</div></div>
+                  <button style={{ ...primaryBtn, padding: '8px 16px', fontSize: 13, borderRadius: 8 }}>Add</button>
+                </div>
+                <div style={{ marginTop: 18 }}>
+                  {(showAll ? facts : facts.slice(0, 8)).map((f, i) => (
+                    <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 0', borderTop: i ? `1px solid ${LINE}` : 'none', fontSize: 14.5, color: '#37332c', lineHeight: 1.55 }}><span style={{ width: 6, height: 6, borderRadius: 100, background: ORANGE, marginTop: 8, flex: 'none' }} />{f}</div>
+                  ))}
+                  {facts.length > 8 && <button onClick={() => setShowAll((s) => !s)} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>{showAll ? 'Show less' : `Show all ${facts.length}`}</button>}
+                </div>
+              </div>
+              {data.voice && (
+                <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: isMobile ? 20 : 26 }}>
+                  <div style={{ fontSize: 16, fontWeight: 800 }}>This is how you sound</div><div style={{ fontSize: 13, color: SUB, marginTop: 2, marginBottom: 16 }}>Your brand voice and personality</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
+                    {[['Tone', data.voice.tone], ['Energy', data.voice.energy], ['Audience', data.voice.audience]].map(([k, v]) => (
+                      <div key={k} style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: 16 }}><div style={{ fontSize: 11, color: SUB, fontWeight: 700, background: PAPER, display: 'inline-block', borderRadius: 6, padding: '2px 8px', marginBottom: 8 }}>{k}</div><div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{v || '—'}</div></div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+    </div>
+  )
+}
+const lum = (hex: string) => { const r = parseInt(hex.slice(1, 3), 16) / 255, g = parseInt(hex.slice(3, 5), 16) / 255, b = parseInt(hex.slice(5, 7), 16) / 255; return 0.299 * r + 0.587 * g + 0.114 * b }
+function Card({ title, sub, action, children }: { title: string; sub: string; action?: string; children: React.ReactNode }) {
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: 22 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 6 }}><span style={{ fontSize: 16, fontWeight: 800 }}>{title}</span>{action && <button style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>{action}</button>}</div>
+      <div style={{ fontSize: 13.5, color: SUB, marginBottom: 16 }}>{sub}</div>
+      {children}
     </div>
   )
 }
