@@ -34,7 +34,7 @@ const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 const nameMatch = (a: string, b: string) => { const x = norm(a), y = norm(b); return x.length >= 4 && y.length >= 4 && (x.includes(y) || y.includes(x)) }
 
 // Sites that are never a DTC brand competitor — marketplaces, platforms, social, publishers, tools.
-const NON_BRAND = /(amazon|ebay|walmart|etsy|aliexpress|alibaba|daraz|flipkart|noon|jumia|temu|shein)\.|(shopify|myshopify|wix|squarespace|bigcommerce|godaddy|wordpress|webflow)\.|(facebook|instagram|tiktok|youtube|twitter|x\.com|pinterest|reddit|linkedin|quora|medium|tumblr)\.|(wikipedia|google|bing|yahoo|yelp|trustpilot|glassdoor|indeed|crunchbase)\.|(nytimes|forbes|businessinsider|techcrunch|theguardian|bbc|cnn|healthline|webmd|verywell)\.|\.gov|\.edu|(gumtree|olx|craigslist)\./i
+const NON_BRAND = /(amazon|ebay|walmart|etsy|aliexpress|alibaba|daraz|flipkart|noon|jumia|temu|shein)\.|(kickstarter|indiegogo|gofundme)\.|(shopify|myshopify|wix|squarespace|bigcommerce|godaddy|wordpress|webflow)\.|(facebook|instagram|tiktok|youtube|twitter|x\.com|pinterest|reddit|linkedin|quora|medium|tumblr)\.|(wikipedia|google|bing|yahoo|yelp|trustpilot|glassdoor|indeed|crunchbase)\.|(nytimes|forbes|businessinsider|techcrunch|theguardian|bbc|cnn|healthline|webmd|verywell)\.|\.gov|\.edu|(gumtree|olx|craigslist)\./i
 
 function domainRoot(d: string) { return d.replace(/^www\./, '').toLowerCase() }
 
@@ -159,14 +159,27 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
     if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 6); usedPages.add(match.pageId) }
   }
 
-  // BREADTH: in-niche advertisers we didn't already surface via Google → add as competitors (they HAVE live ads).
-  const extra = advertisers
-    .filter((a) => !usedPages.has(a.pageId) && a.pageName && a.ads.length && !competitors.some((c) => nameMatch(c.name, a.pageName)))
-    .slice(0, Math.max(0, 12 - competitors.length))
-    .map((a): DiscoveredCompetitor => ({
-      domain: a.domain || '', name: a.pageName, reason: 'Active advertiser in your niche — found running ads in the Meta Ad Library.',
-      foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 6),
-    }))
+  // BREADTH: advertisers we didn't already surface via Google. The keyword search is broad, so it also
+  // pulls unrelated brands (Whole Foods, phone cases, Kickstarter…) — LLM-filter to TRUE niche competitors
+  // (same-product-form judgement) before adding them.
+  const unmatched = advertisers.filter((a) => !usedPages.has(a.pageId) && a.pageName && a.ads.length && !competitors.some((c) => nameMatch(c.name, a.pageName)))
+  let extra: DiscoveredCompetitor[] = []
+  if (unmatched.length) {
+    const advCandidates = unmatched.map((a) => ({ domain: a.domain || a.pageName, title: a.pageName, snippet: (a.ads[0]?.body || a.ads[0]?.title || '').slice(0, 160) }))
+    const relevant = await rankCompetitors(ctx, category, facts, advCandidates)
+    const keptDomains = new Set(relevant.map((r) => r.domain))
+    extra = unmatched
+      .map((a) => {
+        const r = relevant.find((r) => (a.domain && r.domain === domainRoot(a.domain)) || nameMatch(r.name, a.pageName))
+        return r ? { a, r } : null
+      })
+      .filter((x): x is { a: Advertiser; r: { domain: string; name: string; reason: string } } => !!x && (keptDomains.size > 0))
+      .slice(0, Math.max(0, 12 - competitors.length))
+      .map(({ a, r }): DiscoveredCompetitor => ({
+        domain: a.domain || '', name: r.name || a.pageName, reason: r.reason || 'Active advertiser in your niche — found in the Meta Ad Library.',
+        foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 6),
+      }))
+  }
 
   return {
     seed: { name: ctx.siteName, category, market, queries },
