@@ -4,7 +4,8 @@
  * PREVIEW/BRANCH — no login (lead magnet).
  */
 import { NextRequest } from 'next/server'
-import { scanStream, normalizeDomain } from '@/lib/audit/scan'
+import { scanStream, normalizeDomain, saveScan } from '@/lib/audit/scan'
+import { createAdminClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -17,7 +18,11 @@ export async function GET(req: NextRequest) {
     async start(controller) {
       const send = (obj: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
       try {
-        for await (const ev of scanStream(domain)) send(ev)
+        for await (const ev of scanStream(domain)) {
+          send(ev)
+          // Persist the finished scan so it carries into the logged-in product (theater → dashboard).
+          if (ev.type === 'done') { try { await saveScan(createAdminClient() as any, ev.result) } catch { /* best-effort */ } }
+        }
       } catch (e: any) {
         send({ type: 'error', error: String(e?.message || e).slice(0, 160) })
       } finally {

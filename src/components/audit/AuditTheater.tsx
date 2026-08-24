@@ -18,7 +18,7 @@ type Result = { domain: string; siteName: string; category: string; score: numbe
 
 const STEPS = [
   { key: 'health', label: 'Website health' }, { key: 'speed', label: 'Website speed' }, { key: 'spam', label: 'Spam-update check' },
-  { key: 'catalog', label: 'Your catalog' }, { key: 'google', label: 'Google visibility' }, { key: 'ai', label: 'AI visibility' }, { key: 'revenue', label: 'Revenue you’re losing' },
+  { key: 'catalog', label: 'Your catalog' }, { key: 'google', label: 'Google visibility' }, { key: 'backlinks', label: 'Backlinks' }, { key: 'ai', label: 'AI visibility' }, { key: 'revenue', label: 'Revenue you’re losing' },
 ]
 const engLabel = (e: string) => e === 'chatgpt' ? 'ChatGPT' : e === 'gemini' ? 'Gemini' : e === 'perplexity' ? 'Perplexity' : e
 
@@ -133,13 +133,14 @@ export default function AuditTheater() {
 /* ── Running stage (real data when it has streamed in) ─────────────────────────────────────────── */
 function RunningStage({ step, live, isMobile }: { step: number; live: Record<string, Section>; isMobile: boolean }) {
   const s = STEPS[step]
-  const titles: Record<string, string> = { health: 'Reading your pages', speed: 'How fast do you load?', spam: 'Did Google’s spam update target you?', catalog: 'Your catalog, product by product', google: 'Where do buyers find you?', ai: 'Do the AIs mention you?', revenue: 'What it’s costing you' }
+  const titles: Record<string, string> = { health: 'Reading your pages', speed: 'How fast do you load?', spam: 'Did Google’s spam update target you?', catalog: 'Your catalog, product by product', google: 'Where do buyers find you?', backlinks: 'Who links to you?', ai: 'Do the AIs mention you?', revenue: 'What it’s costing you' }
   const blurbs: Record<string, string> = {
     health: 'Reading your meta descriptions, headings and image alt text across your pages.',
     speed: 'Pulling real-visitor load times from Chrome UX data.',
     spam: 'Google’s spam update demotes scaled, template-generated content. We read your sitemap and estimate how much of your site matches that pattern.',
     catalog: 'We open your product pages and check what Google and shoppers need to see.',
     google: 'Checking where buyers find you first, and who’s taking the click.',
+    backlinks: 'Comparing your backlink profile to the rivals who outrank you.',
     ai: 'Really asking ChatGPT, Gemini & Perplexity for your category — do you come up?',
     revenue: 'Adding up what all of this is costing you.',
   }
