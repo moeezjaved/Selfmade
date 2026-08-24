@@ -446,11 +446,11 @@ function SerpBrowser({ rows, domain, isMobile }: { rows: LadderRow[]; domain: st
         <span style={{ fontSize: 12, color: SUB }}>🔒</span>
         <span style={{ fontSize: 12.5, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>google.com/search?q={kw.replace(/ /g, '+')}</span>
       </div>
-      <div style={{ height: isMobile ? 230 : 300, overflow: 'hidden', padding: isMobile ? '16px 16px 0' : '22px 26px 0' }}>
-        <div key={idx} style={{ animation: rows.length ? 'aScrollUp 3.2s ease-in-out both' : 'none' }}>
+      <div style={{ padding: isMobile ? '16px 16px 18px' : '22px 26px 24px' }}>
+        <div key={idx} style={{ animation: 'aFade .5s ease both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
             <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#4285F4' }}>Google</span>
-            <span style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 100, padding: '8px 16px', fontSize: 13.5, color: INK, boxShadow: '0 1px 4px rgba(0,0,0,.06)' }}>{kw}</span>
+            <span style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 100, padding: '8px 16px', fontSize: 13.5, color: INK, boxShadow: '0 1px 4px rgba(0,0,0,.06)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kw}</span>
           </div>
           <div style={{ display: 'flex', gap: 20, borderBottom: `1px solid ${LINE}`, paddingBottom: 8, marginBottom: 16, fontSize: 12.5 }}>
             <span style={{ color: '#4285F4', fontWeight: 700, borderBottom: '2px solid #4285F4', paddingBottom: 8 }}>All</span>
@@ -460,16 +460,16 @@ function SerpBrowser({ rows, domain, isMobile }: { rows: LadderRow[]; domain: st
             [0, 1, 2].map((i) => <div key={i} style={{ marginBottom: 18 }}><div style={{ height: 10, width: '30%', borderRadius: 4, background: '#eef0f2', marginBottom: 8 }} /><div style={{ height: 14, width: '60%', borderRadius: 4, background: '#e6ecf6', marginBottom: 6 }} /><div style={{ height: 9, width: '90%', borderRadius: 4, background: '#f0f1f3' }} /></div>)
           ) : (
             <>
-              {results.map((t, i) => (
-                <div key={i} style={{ marginBottom: 16 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}><span style={{ width: 22, height: 22, borderRadius: 100, background: '#f0f1f3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: SUB }}>{t.domain[0]?.toUpperCase()}</span><span style={{ fontSize: 12.5, color: '#3a3a3a' }}>{t.domain.replace(/^www\./, '')}</span></div>
-                  <div style={{ fontSize: isMobile ? 15 : 17, color: '#1a0dab' }}>{titleCase(t.domain)} — {kw}</div>
-                  <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>Ranks #{t.position} for this search.</div>
+              {results.slice(0, 3).map((t, i) => (
+                <div key={i} style={{ marginBottom: 15, animation: `aPop .4s ease ${i * 0.12}s both` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}><span style={{ width: 22, height: 22, borderRadius: 100, background: '#f0f1f3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: SUB }}>{t.domain[0]?.toUpperCase()}</span><span style={{ fontSize: 12.5, color: '#3a3a3a' }}>{t.domain.replace(/^www\./, '')}</span><span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: GOOD }}>#{t.position}</span></div>
+                  <div style={{ fontSize: isMobile ? 15 : 17, color: '#1a0dab', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(t.domain)} — {kw}</div>
                 </div>
               ))}
-              <div style={{ borderLeft: `3px solid ${ENTRY_BG}`, background: '#fff2ee', borderRadius: '0 10px 10px 0', padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                <div style={{ minWidth: 0 }}><div style={{ fontSize: 12.5, color: '#3a3a3a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{you}</div><div style={{ fontSize: isMobile ? 15 : 17, color: '#1a0dab' }}>{you}</div></div>
-                <span style={{ flex: 'none', fontSize: 11.5, fontWeight: 800, color: ENTRY_BG, background: '#ffe1d7', borderRadius: 100, padding: '4px 11px' }}>{r?.yourPosition == null ? 'NOT IN TOP 50' : `#${r?.yourPosition}`}</span>
+              {/* the reveal: your row lands last, with the rank badge */}
+              <div style={{ borderLeft: `3px solid ${ENTRY_BG}`, background: '#fff2ee', borderRadius: '0 10px 10px 0', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8, animation: 'aPop .5s ease .5s both' }}>
+                <div style={{ minWidth: 0 }}><div style={{ fontSize: 12.5, color: '#3a3a3a' }}>you</div><div style={{ fontSize: isMobile ? 15 : 17, color: ENTRY_BG, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{you}</div></div>
+                <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, color: '#fff', background: ENTRY_BG, borderRadius: 100, padding: '5px 13px' }}>{r?.yourPosition == null ? 'NOT IN TOP 50' : `#${r?.yourPosition}`}</span>
               </div>
             </>
           )}
