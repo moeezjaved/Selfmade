@@ -156,10 +156,17 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
       const fonts = kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined
       const aspectRatio = aspect !== 'Auto' ? aspect : plan.aspect
-      const res = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productImages, newHeadline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' }) })
-      const d = await res.json()
+      const gaBody = JSON.stringify({ productImages, newHeadline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' })
+      // Retry the transient image-model overload (pro_model_busy); generate-ad refunds on failure so no double-charge.
+      let res: Response, d: any
+      for (let attempt = 0; ; attempt++) {
+        res = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: gaBody })
+        d = await res.json()
+        if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
+        await new Promise((r) => setTimeout(r, 5000))
+      }
       if (!res.ok) {
-        const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : (d.error || 'Generation failed. Try again.')
+        const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : d.error === 'pro_model_busy' ? 'The image model is busy right now — please try again in a moment.' : (d.error || 'Generation failed. Try again.')
         setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
       } else {
         setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: plan.caption, format: fmt }))
@@ -300,10 +307,15 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   const genOne = async (i: number, force = false) => {
     if (!hero) return
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
-    try {
-      const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(genBody(i, force)) }).then((r) => r.json())
-      setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image || x.image || null, generating: false } : x))
-    } catch { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x)) }
+    // Retry transient image-model overload (pro_model_busy) so cards fill in when capacity returns.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      try {
+        const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(genBody(i, force)) }).then((r) => r.json())
+        if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false } : x)); return }
+      } catch { /* retry */ }
+      await new Promise((r) => setTimeout(r, 5000))   // model busy → wait, then retry
+    }
+    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x))
   }
 
   // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
