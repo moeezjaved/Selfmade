@@ -267,21 +267,49 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         </div>
       )}
 
-      {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
+      {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
+      {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
     </div>
   )
 }
 
 /** A CSS-rendered ad template card (our generic templates, brand-fillable). */
-type Template = { title: string; concept: string; image?: string | null }
-function PersonalizedTemplates({ isMobile, domain, onUse }: { isMobile: boolean; domain: string; onUse: (t: { title: string; image?: string | null }) => void }) {
+type Template = { title: string; concept: string; image?: string | null; headline?: string; angle?: string; generating?: boolean }
+function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isMobile: boolean; domain: string; kit: BrandKitLite | null; products: { title: string; image: string | null }[]; onUse: (t: { title: string; image?: string | null }) => void }) {
   const [tpls, setTpls] = useState<Template[] | null>(null)
+  const [canGen, setCanGen] = useState(false)
+  const started = useRef(false)
+
   useEffect(() => {
     if (!domain) return
     let on = true
-    fetch(`/api/ads-studio/templates?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setTpls(Array.isArray(d.templates) ? d.templates : [])).catch(() => on && setTpls([]))
+    fetch(`/api/ads-studio/templates?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => { if (!on) return; setTpls(Array.isArray(d.templates) ? d.templates : []); setCanGen(!!d.canGenerate) }).catch(() => on && setTpls([]))
     return () => { on = false }
   }, [domain])
+
+  // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
+  useEffect(() => {
+    if (started.current || !tpls || !canGen || !kit) return
+    const hero = products.find((p) => p.image)?.image
+    if (!hero) return
+    const todo = tpls.map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
+    if (!todo.length) return
+    started.current = true
+    const body = (i: number) => ({ domain, index: i, productImages: [hero], colors: (kit.colors || []).map((c) => c.hex), fonts: kit.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit.logo || undefined, brandName: kit.siteName, productDesc: (kit.facts || [])[0] })
+    let cursor = 0
+    const worker = async () => {
+      while (cursor < todo.length) {
+        const { i } = todo[cursor++]
+        setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
+        try {
+          const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(i)) }).then((r) => r.json())
+          setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image || null, generating: false } : x))
+        } catch { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x)) }
+      }
+    }
+    worker(); worker()   // concurrency 2
+  }, [tpls, canGen, kit, products, domain])
+
   if (tpls !== null && tpls.length === 0) return null
   const grad = ['#f4ede2', '#e9efe6', '#eef2f8', '#f7f0e0', '#efe7ea', '#eef3ee']
   return (
@@ -291,14 +319,75 @@ function PersonalizedTemplates({ isMobile, domain, onUse }: { isMobile: boolean;
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
           <button key={i} onClick={() => t && onUse({ title: t.title, image: t.image })} disabled={!t} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t ? 'pointer' : 'default', padding: 0, fontFamily: SANS }}>
-            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-              {t?.image /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: INK, padding: 20, textAlign: 'center' }}>{t?.title || ''}</span>}
+            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10 }}>
+              {t?.image ? (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              ) : t?.generating ? (
+                <>
+                  <span style={{ width: 26, height: 26, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>Generating…</span>
+                </>
+              ) : (
+                <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: INK, padding: 20, textAlign: 'center' }}>{t?.title || ''}</span>
+              )}
             </div>
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t?.title || '…'}</div>
               {t?.concept && <div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.45, maxHeight: 54, overflow: 'hidden' }}>{t.concept}</div>}
             </div>
           </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+type ElementItem = { id: string; label: string; url: string }
+function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: string; onUse: (e: ElementItem) => void }) {
+  const [els, setEls] = useState<ElementItem[] | null>(null)
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+  useEffect(() => {
+    if (!domain) return
+    let on = true
+    fetch(`/api/ads-studio/elements?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setEls(Array.isArray(d.elements) ? d.elements : [])).catch(() => on && setEls([]))
+    return () => { on = false }
+  }, [domain])
+  const add = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    const reader = new FileReader()
+    reader.onload = async () => {
+      setBusy(true)
+      try {
+        const d = await fetch('/api/ads-studio/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, label: f.name.replace(/\.[^.]+$/, '').slice(0, 30), dataUrl: String(reader.result) }) }).then((r) => r.json())
+        if (Array.isArray(d.elements)) setEls(d.elements)
+        else if (d.error) alert(d.error)
+      } finally { setBusy(false) }
+    }
+    reader.readAsDataURL(f)
+  }
+  const del = async (id: string) => { const d = await fetch('/api/ads-studio/elements', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, id }) }).then((r) => r.json()).catch(() => null); if (d && Array.isArray(d.elements)) setEls(d.elements) }
+  if (els === null) return null
+  return (
+    <div style={{ marginTop: 40 }}>
+      <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>Elements</h2>
+      <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>People &amp; props to drop into your creative. Add a face or scene, then tag it in the chat.</p>
+      <input ref={fileRef} type="file" accept="image/*" onChange={add} style={{ display: 'none' }} />
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3,1fr)' : 'repeat(6,1fr)', gap: 12 }}>
+        <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ aspectRatio: '1', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+          {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
+          <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
+        </button>
+        {els.map((e) => (
+          <div key={e.id} className="sf-disc" style={{ position: 'relative', aspectRatio: '1', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, cursor: 'pointer' }} onClick={() => onUse(e)}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={e.url} alt={e.label} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 55%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 7, opacity: 0, transition: 'opacity .15s' }}>
+              <button onClick={(ev) => { ev.stopPropagation(); del(e.id) }} title="Remove" style={{ alignSelf: 'flex-end', border: 'none', background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: 100, width: 22, height: 22, cursor: 'pointer', fontSize: 13 }}>×</button>
+              <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.label}</div>
+            </div>
+          </div>
         ))}
       </div>
     </div>
