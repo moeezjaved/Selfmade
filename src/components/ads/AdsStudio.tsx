@@ -238,22 +238,26 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
           {msgs.map((m, i) => m.role === 'user' ? (
             <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
           ) : (
-            <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '86%' }}>
-              {m.loading ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14 }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Mello is designing your {m.format} ad…</div>
-              ) : m.error ? (
-                <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2' }}>{m.error}</div>
-              ) : (
-                <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff', maxWidth: 340 }}>
-                  {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', display: 'block' }} />}
-                  <div style={{ padding: 12 }}>
-                    {m.caption && <div style={{ fontSize: 13, color: '#43403a', lineHeight: 1.45, marginBottom: 10 }}>{m.caption}</div>}
-                    <div style={{ display: 'flex', gap: 8 }}>
-                      {m.image && <a href={m.image} download style={{ ...primaryBtn, padding: '7px 14px', fontSize: 12.5, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
+            <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '92%', display: 'flex', gap: 11 }}>
+              <div style={{ width: 30, height: 30, borderRadius: 100, background: ORANGE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, fontSize: 15, flex: 'none', marginTop: 2 }}>M</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>Mello</div>
+                {m.loading ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14, padding: '4px 0' }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Designing your {m.format} ad… this takes ~30–60s.</div>
+                ) : m.error ? (
+                  <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
+                ) : (
+                  <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff', maxWidth: 360 }}>
+                    {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', display: 'block' }} />}
+                    <div style={{ padding: 12 }}>
+                      {m.caption && <div style={{ fontSize: 13, color: '#43403a', lineHeight: 1.45, marginBottom: 10 }}>{m.caption}</div>}
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        {m.image && <a href={m.image} download style={{ ...primaryBtn, padding: '7px 14px', fontSize: 12.5, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
+                      </div>
                     </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))}
         </div>
