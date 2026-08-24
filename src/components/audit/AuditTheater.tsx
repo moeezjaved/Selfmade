@@ -17,7 +17,7 @@ const SERIF = 'Fraunces, Georgia, serif'
 type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 type AiRead = { engine: string; mentioned: boolean; question: string; answer: string }
-type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
+type CatalogProduct = { title: string; price: number | null; image: string | null; url: string; missingAlt: number; thin: boolean; noSchema: boolean }
 type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 type RevenueModel = { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
 type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
@@ -410,9 +410,8 @@ function CatalogCards({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
           {depth === 0 && (
             <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 16 : 26, padding: isMobile ? 16 : 26, height: '100%', animation: 'aPop .45s ease both', boxSizing: 'border-box' }}>
               <div style={{ width: isMobile ? 110 : 150, height: isMobile ? 110 : 150, borderRadius: 16, background: '#f6f2ec', flex: 'none', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
-                {p?.image
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                {p?.image || p?.url
+                  ? <PageThumb full={p.url} og={p.image} i={0} />
                   : <span style={{ fontSize: 36 }}>🛍️</span>}
               </div>
               <div style={{ minWidth: 0, flex: 1 }}>
