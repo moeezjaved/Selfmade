@@ -42,9 +42,6 @@ const CATALOG: { title: string; concept: string; style: string }[] = [
   { title: 'Product Showcase', concept: 'A clean premium studio shot of the hero product.', style: 'STYLE: a clean premium STUDIO PRODUCT photograph (no human) — the hero product on a minimal brand-colored surface, soft directional light, elegant shadows, one short benefit line and a "Shop now" button.' },
 ]
 
-// Applied to every template so common image-model quirks don't slip through.
-const GUARDRAILS = 'CRITICAL RULES — follow exactly.\nTEXT: the HEADLINE appears EXACTLY ONCE as one clean phrase — do NOT repeat, echo, mirror, stutter, or restart any word of it (never "Hear from / Hear from Satisfied Users"; it reads once as "Hear from Satisfied Users"). Every text element (headline, subtext, CTA label, badges) appears ONCE. Exactly ONE call-to-action button. Render the LOGO once. All text correctly spelled, cleanly laid out, legible.\nPRODUCT: show the product at a natural, realistic scale for what it actually is and the scene — well-composed and balanced, not artificially enlarged to dominate the frame. Keep clear room for the headline, copy and CTA.'
-
 async function briefs(siteName: string, facts: string[], voice: any): Promise<Tpl[]> {
   const fixed = (contents: Record<string, { headline: string; content: string }>): Tpl[] =>
     CATALOG.map((c) => {
@@ -131,11 +128,11 @@ export async function POST(req: NextRequest) {
     if (tpls[index].image && !body.force) return NextResponse.json({ image: tpls[index].image })   // already generated (unless force-regenerate)
 
     const t = tpls[index]
-    // FREE generation — same Pro engine, no credit reserve. Guardrails appended at render time so the
-    // latest rules always apply (incl. to a force-regenerate of an older cached template).
+    // FREE generation — the SAME Nano Banana Pro engine + buildStudioPrompt rules as the real studio
+    // (generate-ad), which already handles product sizing/composition correctly. No extra hardcoded rules.
     const out = await renderAdFree(admin, user.id, brandId, {
       productImages: (body.productImages || []).filter(Boolean),
-      headline: t.headline, angle: `${t.angle}\n${GUARDRAILS}`, aspectRatio: '4:5',
+      headline: t.headline, angle: t.angle, aspectRatio: '4:5',
       colors: body.colors, fonts: body.fonts, logo: body.logo, brandName: body.brandName, productDesc: body.productDesc,
     })
     if (!out?.url && !out?.image) return NextResponse.json({ error: 'generation-failed' }, { status: 502 })
