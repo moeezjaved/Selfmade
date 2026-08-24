@@ -37,9 +37,12 @@ export default function GrowPage() {
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<TabKey>('overview')
 
+  const [scan, setScan] = useState<{ domain: string; score: number; grade: string; problemCount: number } | null>(null)
   const load = useCallback(async () => {
     try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setD(j) } catch { /* noop */ }
     setLoading(false)
+    // The free scan they arrived from (theater → dashboard continuity).
+    try { const r = await fetch('/api/audit/claim'); const j = await r.json(); if (r.ok && j.scan) setScan(j.scan) } catch { /* optional */ }
   }, [])
   useEffect(() => { load() }, [load])
 
@@ -66,6 +69,18 @@ export default function GrowPage() {
         <div style={{ marginBottom: 16 }}>
           <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Growth</h1>
         </div>
+
+        {/* Continuity banner — the free scan they came in from */}
+        {scan && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, border: `1px solid ${LINE}`, borderLeft: `3px solid ${LIME}`, borderRadius: 14, padding: '14px 18px', marginBottom: 14, flexWrap: 'wrap' }}>
+            <div style={{ fontSize: 26, fontWeight: 800, color: scan.score >= 60 ? GOOD : scan.score >= 40 ? '#c98a1a' : '#e5484d', letterSpacing: '-.02em' }}>{scan.score}<span style={{ fontSize: 13, color: SUB, fontWeight: 500 }}>/100</span></div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>Your free X-ray of {scan.domain}</div>
+              <div style={{ fontSize: 12.5, color: SUB, marginTop: 1 }}>{scan.problemCount} problems found · your agents can fix these</div>
+            </div>
+            <a href="/mission/seo" style={{ background: LIME, color: '#fff', padding: '9px 16px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>Fix them →</a>
+          </div>
+        )}
 
         {loading ? <div style={{ color: SUB }}>Loading…</div> : d && (
           <>

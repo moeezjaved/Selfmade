@@ -318,6 +318,8 @@ function SubScore({ label, value }: { label: string; value: number }) {
 
 function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => void; isMobile: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
+  // Stash the scanned domain, then hand off to signup (Gmail OK) — the app claims the scan on login.
+  const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; window.location.href = '/signup?ref=seo-scan' }
   return (
     <div style={{ minHeight: '100dvh', background: PAPER, fontFamily: 'Inter, system-ui, sans-serif', padding: isMobile ? '20px 16px 60px' : '40px 48px' }}>
       <button onClick={onBack} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>← Back to report</button>
@@ -336,8 +338,8 @@ function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => voi
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontSize: 19, fontWeight: 800 }}>Growth</div><div style={{ fontSize: 26, fontWeight: 800 }}>$149<span style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/mo</span></div></div>
           <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4 }}>Founding-100 price — locked for life</div>
           <div style={{ margin: '18px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>{['Every SEO problem found & fixed for you', 'Blog + programmatic pages published monthly', 'Get cited in ChatGPT, Gemini & Perplexity', 'Competitor intel — take their traffic', 'Works with Shopify, WordPress & more'].map((t, i) => <div key={i} style={{ display: 'flex', gap: 9, fontSize: 13.5, color: 'rgba(255,255,255,.9)' }}><span style={{ color: GOOD }}>✓</span>{t}</div>)}</div>
-          <button style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Start — fix my site →</button>
-          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>First-Win Guarantee · cancel anytime</div>
+          <button onClick={start} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Start free — fix my site →</button>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>Sign up free · we pick up right where this report left off</div>
         </div>
       </div>
     </div>
