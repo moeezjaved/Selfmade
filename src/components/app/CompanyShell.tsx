@@ -30,8 +30,12 @@ const NAV: Group[] = [
     { href: '/documents', label: 'Documents', icon: FileText },
   ] },
   { label: 'Ads', items: [
-    { href: '/ads-studio', label: 'Ad Studio', icon: Wand2 },
-    { href: '/creative-studio', label: 'My Creatives', icon: ImageIcon },
+    { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
+    { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
+    { href: '/ads-workspace/discover', label: 'Discover', icon: Radar },
+    { href: '/ads-workspace/products', label: 'Products', icon: Store },
+    { href: '/ads-workspace/brand', label: 'Brand Kit', icon: Wand2 },
+    { href: '/ads-workspace/audiences', label: 'Audiences', icon: Users },
     { href: '/reports', label: 'Reports', icon: BarChart2 },
     { href: '/m4', label: 'Launch Ads', icon: Rocket },
     { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
@@ -52,7 +56,11 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const { plan } = useCredits()
   const isPaid = !!plan && plan !== 'free'
 
-  const isActive = (href: string) => href === '/mission' ? (pathname === '/mission' || pathname === '/') : pathname === href || pathname.startsWith(href + '/')
+  // Most-specific match wins, so /ads-workspace/competitors lights "My Competitors", not "Ad Studio".
+  const bestMatch = NAV.flatMap((g) => g.items.map((i) => i.href))
+    .filter((h) => pathname === h || pathname.startsWith(h + '/'))
+    .sort((a, b) => b.length - a.length)[0]
+  const isActive = (href: string) => href === bestMatch || (href === '/mission' && pathname === '/' && !bestMatch)
 
   const Sidebar = (
     <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: '100dvh', boxSizing: 'border-box', overflowY: 'auto' }}>

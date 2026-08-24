@@ -26,13 +26,15 @@ const Icon = ({ d, size = 19 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>{d.split('|').map((p, i) => <path key={i} d={p} />)}</svg>
 )
 
-export default function AdsStudio() {
+export default function AdsStudio({ embedded = false, section, domainOverride }: { embedded?: boolean; section?: Key; domainOverride?: string } = {}) {
   const isMobile = useIsMobile()
-  const [active, setActive] = useState<Key>('home')
-  const [domain, setDomain] = useState('')
+  const [active, setActive] = useState<Key>(section || 'home')
+  const [domain, setDomain] = useState((domainOverride || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim())
   const [chatTags, setChatTags] = useState<StudioTag[]>([])
   const addToChat = (t: StudioTag) => { setChatTags((x) => (x.some((y) => y.label === t.label && y.image === t.image) ? x : [...x, t])); setActive('home') }
+  useEffect(() => { if (section) setActive(section) }, [section])
   useEffect(() => {
+    if (domainOverride) return   // embedded in the app shell → domain comes from the active brand
     const u = new URLSearchParams(window.location.search).get('domain')
     const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
     const d = (u || (c ? decodeURIComponent(c) : '') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
@@ -74,9 +76,9 @@ export default function AdsStudio() {
 
   return (
     <StudioCtx.Provider value={{ addToChat }}>
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: embedded ? 'auto' : '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
       <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}`}</style>
-      {Sidebar}
+      {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
           {active === 'home' ? <Home isMobile={isMobile} domain={domain} tags={chatTags} setTags={setChatTags} />

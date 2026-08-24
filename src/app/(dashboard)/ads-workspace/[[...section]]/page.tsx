@@ -1,0 +1,40 @@
+/**
+ * /ads-workspace/[section] — the ads-studio workspace mounted INSIDE the app shell (Phase 2). Each ADS
+ * sidebar item deep-links here (…/competitors, …/products, …/brand, …/audiences); AdsStudio renders in
+ * `embedded` mode (no internal sidebar), driven by the section, with the domain taken from the active
+ * brand's website. The standalone /ads-studio?domain=… (audit-funnel landing) is unchanged.
+ */
+import AdsStudio from '@/components/ads/AdsStudio'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { resolveActiveBrandId } from '@/lib/brand/active'
+
+export const dynamic = 'force-dynamic'
+
+type Key = 'home' | 'search' | 'ads' | 'competitors' | 'discover' | 'products' | 'calendar' | 'brand' | 'audiences' | 'google'
+const SEG_TO_SECTION: Record<string, Key> = {
+  '': 'home', competitors: 'competitors', discover: 'discover', products: 'products',
+  'brand-kit': 'brand', brand: 'brand', audiences: 'audiences', 'your-ads': 'ads', ads: 'ads',
+  calendar: 'calendar', search: 'search', google: 'google',
+}
+
+export default async function AdsWorkspacePage({ params }: { params: Promise<{ section?: string[] }> }) {
+  const { section: segs } = await params
+  const seg = (segs?.[0] || '').toLowerCase()
+  const section: Key = SEG_TO_SECTION[seg] || 'home'
+
+  let website = ''
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (user) {
+      const admin = createAdminClient() as any
+      const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+      if (brandId) {
+        const { data } = await admin.from('brands').select('website').eq('id', brandId).maybeSingle()
+        website = (data?.website || '').trim()
+      }
+    }
+  } catch { /* AdsStudio falls back to the sf_scan_domain cookie */ }
+
+  return <AdsStudio embedded section={section} domainOverride={website || undefined} />
+}
