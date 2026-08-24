@@ -15,7 +15,7 @@ import { ProxyAgent, fetch as undiciFetch } from 'undici'
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36'
 
-export type LiveAd = { adId: string; pageId: string; pageName: string; body: string; title: string; isActive: boolean; images: string[]; videos: string[]; link: string }
+export type LiveAd = { adId: string; pageId: string; pageName: string; body: string; title: string; isActive: boolean; images: string[]; videos: string[]; videoPreviews: string[]; link: string }
 export type Advertiser = { pageId: string; pageName: string; domain: string | null; ads: LiveAd[] }
 
 const rootDomain = (u: string): string | null => { try { return new URL(u.startsWith('http') ? u : `https://${u}`).hostname.replace(/^www\./, '').toLowerCase() } catch { return null } }
@@ -51,16 +51,17 @@ function extractAdsBraceMatched(text: string): any[] {
   return found
 }
 
-function extractMediaUrls(snap: any): { images: string[]; videos: string[] } {
-  const images = new Set<string>(), videos = new Set<string>()
+function extractMediaUrls(snap: any): { images: string[]; videos: string[]; videoPreviews: string[] } {
+  const images = new Set<string>(), videos = new Set<string>(), previews = new Set<string>()
   const img = (...cs: any[]) => { for (const c of cs) if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) { images.add(c); return } }
   const vid = (...cs: any[]) => { for (const c of cs) if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) { videos.add(c); return } }
+  const prev = (...cs: any[]) => { for (const c of cs) if (typeof c === 'string' && c.startsWith('http') && c.includes('fbcdn')) { previews.add(c); return } }
   for (const i of (snap?.images || [])) img(i?.original_image_url, i?.resized_image_url)
-  for (const v of (snap?.videos || [])) vid(v?.video_hd_url, v?.video_sd_url)
-  for (const c of (snap?.cards || [])) { img(c?.original_image_url, c?.resized_image_url); vid(c?.video_hd_url, c?.video_sd_url) }
+  for (const v of (snap?.videos || [])) { vid(v?.video_hd_url, v?.video_sd_url); prev(v?.video_preview_image_url) }
+  for (const c of (snap?.cards || [])) { img(c?.original_image_url, c?.resized_image_url); vid(c?.video_hd_url, c?.video_sd_url); prev(c?.video_preview_image_url) }
   for (const i of (snap?.extra_images || [])) img(i?.original_image_url, i?.resized_image_url)
-  for (const v of (snap?.extra_videos || [])) vid(v?.video_hd_url, v?.video_sd_url)
-  return { images: Array.from(images), videos: Array.from(videos) }
+  for (const v of (snap?.extra_videos || [])) { vid(v?.video_hd_url, v?.video_sd_url); prev(v?.video_preview_image_url) }
+  return { images: Array.from(images), videos: Array.from(videos), videoPreviews: Array.from(previews) }
 }
 
 function normalizeAd(obj: any): LiveAd {
@@ -75,6 +76,7 @@ function normalizeAd(obj: any): LiveAd {
     isActive: !!obj.is_active,
     images: media.images,
     videos: media.videos,
+    videoPreviews: media.videoPreviews,
     link: snap.link_url || snap.caption || snap.page_profile_uri || '',
   }
 }
@@ -109,7 +111,7 @@ export async function fetchLiveAdsByPage(pageId: string, limit = 8): Promise<Liv
         return ads.slice(0, limit).map((a: any) => ({
           adId: String(a.ad_id), pageId: String(data?.page?.page_id || pageId), pageName: a.page_name || data?.page?.name || '',
           body: (a.body || '').slice(0, 400), title: (a.title || '').slice(0, 200), isActive: a.is_active ?? true,
-          images: a.image_urls || [], videos: a.video_urls || [], link: a.snapshot_url || '',
+          images: a.image_urls || [], videos: a.video_urls || [], videoPreviews: a.video_preview_urls || [], link: a.snapshot_url || '',
         }))
       }
     } catch { /* fall through to proxy */ }
@@ -134,7 +136,7 @@ export async function searchAdLibrary(query: string, country = 'ALL', perPageLim
           ads: (a.ads || []).slice(0, perPageLimit).map((ad: any): LiveAd => ({
             adId: String(ad.ad_id), pageId: String(a.page_id), pageName: a.page_name || '',
             body: (ad.body || '').slice(0, 400), title: (ad.title || '').slice(0, 200), isActive: ad.is_active ?? true,
-            images: ad.image_urls || [], videos: ad.video_urls || [], link: ad.link || '',
+            images: ad.image_urls || [], videos: ad.video_urls || [], videoPreviews: ad.video_preview_urls || [], link: ad.link || '',
           })),
         }))
       }
