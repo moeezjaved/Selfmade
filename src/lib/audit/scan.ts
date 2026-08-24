@@ -9,7 +9,7 @@
  */
 import { fetchHtml } from '@/lib/seo/crawl-audit'
 import { availableEngines, askEngine } from '@/lib/geo/engines'
-import { dfsConfigured, serpGoogle, searchVolume } from '@/lib/audit/dataforseo'
+import { dfsConfigured, serpGoogle, searchVolume, backlinksSummary } from '@/lib/audit/dataforseo'
 import { llm } from '@/lib/llm'
 
 export type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
@@ -152,6 +152,19 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
   return { key: 'google', name: 'Google visibility', sub: 'Where buyers find you first', score: rows.length ? scoreFrom(f) : 0, findings: f, ladder: rows }
 }
 
+async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {
+  if (!dfsConfigured()) return null
+  const rivalDomain = ladder.find((r) => r.top[0]?.domain && r.top[0].domain !== ctx.domain)?.top[0]?.domain
+  const [mine, rival] = await Promise.all([backlinksSummary(ctx.domain), rivalDomain ? backlinksSummary(rivalDomain) : Promise.resolve(null)])
+  const f: Finding[] = []
+  if (mine && rival && rival.referringDomains > mine.referringDomains * 1.5) {
+    f.push({ id: 'bl-gap', title: `${rivalDomain} has ${rival.referringDomains.toLocaleString()} linking domains — you have ${mine.referringDomains.toLocaleString()}`, detail: 'Backlinks are Google’s strongest ranking signal. That gap is a big reason they outrank you.', severity: 'high', fixable: true })
+  } else if (mine && mine.referringDomains < 25) {
+    f.push({ id: 'bl-thin', title: `Only ${mine.referringDomains.toLocaleString()} domains link to you`, detail: 'Too few for competitive terms. We build high-quality backlinks every month to close the gap.', severity: 'medium', fixable: true })
+  }
+  return { key: 'backlinks', name: 'Backlinks', sub: 'Who vouches for you across the web', score: f.length ? scoreFrom(f) : 100, findings: f }
+}
+
 /* ── Stream ────────────────────────────────────────────────────────────────────────────────────── */
 export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   const domain = normalizeDomain(domain0)
@@ -167,13 +180,15 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   yield emit(stepHealth(ctx))
   yield emit(stepSpam(ctx))
   yield emit(stepCatalog(ctx))
-  yield emit(await stepGoogle(ctx))
+  const google = await stepGoogle(ctx); yield emit(google)
+  const bl = await stepBacklinks(ctx, google.ladder || []); if (bl) yield emit(bl)
   const ai = await stepAi(ctx); yield emit(ai)
 
   // Scores + revenue
   const get = (k: string) => sections.find((s) => s.key === k)!
+  const opt = (k: string) => sections.find((s) => s.key === k)?.score ?? 100
   const websiteScore = Math.round((get('health').score + get('catalog').score + get('spam').score) / 3)
-  const visibilityScore = Math.round((get('ai').score + get('google').score) / 2)
+  const visibilityScore = Math.round((get('ai').score + get('google').score + opt('backlinks')) / (bl ? 3 : 2))
   const score = Math.round(websiteScore * 0.55 + visibilityScore * 0.45)
   const grade: ScanResult['grade'] = score >= 80 ? 'Great' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Poor'
   const problemCount = sections.reduce((a, s) => a + s.findings.filter((f) => f.fixable).length, 0)
@@ -187,6 +202,25 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
 
   const result: ScanResult = { domain, siteName: ctx.siteName, category: ctx.category, score, grade, websiteScore, visibilityScore, sections, ai: ai.ai!, revenueLostPerYear, currency: '$', problemCount }
   yield { type: 'done', result }
+}
+
+/** Persist a scan by domain — the bridge into the logged-in product (best-effort). */
+export async function saveScan(admin: any, result: ScanResult): Promise<void> {
+  try {
+    await admin.from('audit_scans').upsert({
+      domain: result.domain, site_name: result.siteName, category: result.category, score: result.score,
+      result, updated_at: new Date().toISOString(),
+    }, { onConflict: 'domain' })
+  } catch { /* additive; never break the scan */ }
+}
+
+/** Load a stored scan for a domain — the logged-in SEO surface reads this so numbers carry over from the theater. */
+export async function loadScanForDomain(admin: any, domain0: string): Promise<ScanResult | null> {
+  try {
+    const domain = normalizeDomain(domain0)
+    const { data } = await admin.from('audit_scans').select('result').eq('domain', domain).maybeSingle()
+    return data?.result || null
+  } catch { return null }
 }
 
 /** Collect the stream into one result (non-streaming callers + cache). */

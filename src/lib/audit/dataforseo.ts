@@ -43,6 +43,17 @@ export async function serpGoogle(keyword: string, yourDomain: string): Promise<S
   } catch { return null }
 }
 
+export type BacklinkSummary = { backlinks: number; referringDomains: number; rank: number }
+/** Backlink profile for a domain — for the backlink-gap finding. */
+export async function backlinksSummary(domain: string): Promise<BacklinkSummary | null> {
+  try {
+    const j = await post('/backlinks/summary/live', [{ target: domain, internal_list_limit: 1, backlinks_status_type: 'live' }])
+    const r = j?.tasks?.[0]?.result?.[0]
+    if (!r) return null
+    return { backlinks: Number(r.backlinks) || 0, referringDomains: Number(r.referring_domains) || 0, rank: Number(r.rank) || 0 }
+  } catch { return null }
+}
+
 /** Search volume for a batch of keywords. */
 export async function searchVolume(keywords: string[]): Promise<Record<string, number>> {
   const out: Record<string, number> = {}
