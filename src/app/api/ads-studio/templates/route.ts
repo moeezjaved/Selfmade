@@ -42,11 +42,14 @@ const CATALOG: { title: string; concept: string; style: string }[] = [
   { title: 'Product Showcase', concept: 'A clean premium studio shot of the hero product.', style: 'STYLE: a clean premium STUDIO PRODUCT photograph (no human) — the hero product on a minimal brand-colored surface, soft directional light, elegant shadows, one short benefit line and a "Shop now" button.' },
 ]
 
+// Applied to every template so common image-model quirks don't slip through.
+const GUARDRAILS = 'IMPORTANT: render the product at a natural, well-proportioned scale — it must NOT dominate or look oversized; leave clear room for the headline and CTA. Show the headline text ONCE and include EXACTLY ONE call-to-action button — never duplicate any text, logo, or button. Keep all text legible and correctly spelled.'
+
 async function briefs(siteName: string, facts: string[], voice: any): Promise<Tpl[]> {
   const fixed = (contents: Record<string, { headline: string; content: string }>): Tpl[] =>
     CATALOG.map((c) => {
       const cc = contents[c.title] || { headline: '', content: '' }
-      return { title: c.title, concept: c.concept, headline: cc.headline || '', angle: `${c.style}\nBRAND CONTENT (adapt to this brand, keep the STYLE above): ${cc.content || c.concept}` }
+      return { title: c.title, concept: c.concept, headline: cc.headline || '', angle: `${c.style}\nBRAND CONTENT (adapt to this brand, keep the STYLE above): ${cc.content || c.concept}\n${GUARDRAILS}` }
     })
   if (!facts.length) return fixed({})
   const prompt = `You are Mello, a world-class creative director. For EACH of these fixed ad-template TYPES, write the brand-specific COPY and SUBJECT — grounded entirely in the brand's real knowledge (never invent offers, prices or claims). Do NOT change the template's visual style; only adapt what it says and what it shows for THIS brand.
@@ -72,7 +75,7 @@ Return ONLY JSON: {"templates":{"Free Trial CTA":{"headline":"...","content":"..
   } catch { return fixed({}) }
 }
 
-const TEMPLATES_VERSION = 'v2-catalog-10'   // bump to invalidate cached templates when the catalog/styles change
+const TEMPLATES_VERSION = 'v3-guardrails'   // bump to invalidate cached templates when the catalog/styles change
 async function readCached(admin: any, brandId: string): Promise<Tpl[] | null> {
   const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
   const ads = data?.brand_kit?.adsStudio
@@ -124,7 +127,7 @@ export async function POST(req: NextRequest) {
 
     const tpls = await readCached(admin, brandId)
     if (!tpls || !tpls[index]) return NextResponse.json({ error: 'no-template' }, { status: 404 })
-    if (tpls[index].image) return NextResponse.json({ image: tpls[index].image })   // already generated
+    if (tpls[index].image && !body.force) return NextResponse.json({ image: tpls[index].image })   // already generated (unless force-regenerate)
 
     const t = tpls[index]
     // FREE generation — same Pro engine, no credit reserve.
