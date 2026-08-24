@@ -43,13 +43,14 @@ const CATALOG: { title: string; concept: string; style: string }[] = [
 ]
 
 // Applied to every template so common image-model quirks don't slip through.
-const GUARDRAILS = 'IMPORTANT: render the product at a natural, well-proportioned scale — it must NOT dominate or look oversized; leave clear room for the headline and CTA. Show the headline text ONCE and include EXACTLY ONE call-to-action button — never duplicate any text, logo, or button. Keep all text legible and correctly spelled.'
+const GUARDRAILS = 'CRITICAL RULES — follow exactly.\nTEXT: the HEADLINE appears EXACTLY ONCE as one clean phrase — do NOT repeat, echo, mirror, stutter, or restart any word of it (never "Hear from / Hear from Satisfied Users"; it reads once as "Hear from Satisfied Users"). Every text element (headline, subtext, CTA label, badges) appears ONCE. Exactly ONE call-to-action button. Render the LOGO once. All text correctly spelled, cleanly laid out, legible.\nPRODUCT SIZE: keep the product SMALL-to-MEDIUM — it must occupy at most ~25-30% of the frame, shown at realistic scale relative to the hand/scene. It must NEVER fill or dominate the frame. When unsure, make it SMALLER. Leave generous room for the headline, copy and CTA.'
 
 async function briefs(siteName: string, facts: string[], voice: any): Promise<Tpl[]> {
   const fixed = (contents: Record<string, { headline: string; content: string }>): Tpl[] =>
     CATALOG.map((c) => {
       const cc = contents[c.title] || { headline: '', content: '' }
-      return { title: c.title, concept: c.concept, headline: cc.headline || '', angle: `${c.style}\nBRAND CONTENT (adapt to this brand, keep the STYLE above): ${cc.content || c.concept}\n${GUARDRAILS}` }
+      // Guardrails are appended at RENDER time (see POST), so tweaking them never needs a cache bump.
+      return { title: c.title, concept: c.concept, headline: cc.headline || '', angle: `${c.style}\nBRAND CONTENT (adapt to this brand, keep the STYLE above): ${cc.content || c.concept}` }
     })
   if (!facts.length) return fixed({})
   const prompt = `You are Mello, a world-class creative director. For EACH of these fixed ad-template TYPES, write the brand-specific COPY and SUBJECT — grounded entirely in the brand's real knowledge (never invent offers, prices or claims). Do NOT change the template's visual style; only adapt what it says and what it shows for THIS brand.
@@ -75,7 +76,7 @@ Return ONLY JSON: {"templates":{"Free Trial CTA":{"headline":"...","content":"..
   } catch { return fixed({}) }
 }
 
-const TEMPLATES_VERSION = 'v3-guardrails'   // bump to invalidate cached templates when the catalog/styles change
+const TEMPLATES_VERSION = 'v3-guardrails'   // guardrails now appended at RENDER time (see POST) → tweaking them needs NO bump
 async function readCached(admin: any, brandId: string): Promise<Tpl[] | null> {
   const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
   const ads = data?.brand_kit?.adsStudio
@@ -130,10 +131,11 @@ export async function POST(req: NextRequest) {
     if (tpls[index].image && !body.force) return NextResponse.json({ image: tpls[index].image })   // already generated (unless force-regenerate)
 
     const t = tpls[index]
-    // FREE generation — same Pro engine, no credit reserve.
+    // FREE generation — same Pro engine, no credit reserve. Guardrails appended at render time so the
+    // latest rules always apply (incl. to a force-regenerate of an older cached template).
     const out = await renderAdFree(admin, user.id, brandId, {
       productImages: (body.productImages || []).filter(Boolean),
-      headline: t.headline, angle: t.angle, aspectRatio: '4:5',
+      headline: t.headline, angle: `${t.angle}\n${GUARDRAILS}`, aspectRatio: '4:5',
       colors: body.colors, fonts: body.fonts, logo: body.logo, brandName: body.brandName, productDesc: body.productDesc,
     })
     if (!out?.url && !out?.image) return NextResponse.json({ error: 'generation-failed' }, { status: 502 })
