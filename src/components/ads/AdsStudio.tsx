@@ -5,8 +5,11 @@
  * pre-populated from the same crawl (products, brand, audiences, competitors). Phase 1 = shell + Home
  * (personalized templates) + section screens in our design language. Data wiring lands incrementally.
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
+
+type StudioTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
+const StudioCtx = createContext<{ addToChat: (t: StudioTag) => void }>({ addToChat: () => {} })
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', LIME = '#ef4a1e', ORANGE = '#e02f06', PAPER = '#fbf4e2', CREAM = '#fbf7ef'
 const SERIF = 'Fraunces, Georgia, serif'
@@ -27,6 +30,8 @@ export default function AdsStudio() {
   const isMobile = useIsMobile()
   const [active, setActive] = useState<Key>('home')
   const [domain, setDomain] = useState('')
+  const [chatTags, setChatTags] = useState<StudioTag[]>([])
+  const addToChat = (t: StudioTag) => { setChatTags((x) => (x.some((y) => y.label === t.label && y.image === t.image) ? x : [...x, t])); setActive('home') }
   useEffect(() => {
     const u = new URLSearchParams(window.location.search).get('domain')
     const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
@@ -65,12 +70,13 @@ export default function AdsStudio() {
   )
 
   return (
+    <StudioCtx.Provider value={{ addToChat }}>
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}`}</style>
       {Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
-          {active === 'home' ? <Home isMobile={isMobile} domain={domain} />
+          {active === 'home' ? <Home isMobile={isMobile} domain={domain} tags={chatTags} setTags={setChatTags} />
             : active === 'ads' ? <YourAds isMobile={isMobile} />
               : active === 'competitors' ? <Competitors isMobile={isMobile} domain={domain} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
@@ -89,6 +95,7 @@ export default function AdsStudio() {
         )}
       </main>
     </div>
+    </StudioCtx.Provider>
   )
 }
 
@@ -101,10 +108,10 @@ const LANGS = ['English', 'Urdu', 'Hindi', 'Bengali', 'Arabic', 'Spanish', 'Fren
 const CHANNELS: AdFormat[] = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
 type AdFormat = 'Banner Ad' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'LinkedIn'
 type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat }
-type HomeTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
+type HomeTag = StudioTag
 type BrandKitLite = { siteName?: string; logo?: string | null; colors?: { hex: string }[]; fonts?: string[]; facts?: string[]; voice?: any }
 
-function Home({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: string; tags: HomeTag[]; setTags: React.Dispatch<React.SetStateAction<HomeTag[]>> }) {
   const [kit, setKit] = useState<BrandKitLite | null>(null)
   const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
   const [format, setFormat] = useState<AdFormat>('Instagram')
@@ -112,7 +119,6 @@ function Home({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [aspect, setAspect] = useState('Auto')
   const [lang, setLang] = useState('English')
   const [open, setOpen] = useState<'' | 'aspect' | 'lang' | 'add'>('')
-  const [tags, setTags] = useState<HomeTag[]>([])
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -482,16 +488,41 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   )
 }
 
-/* ── Discover ───────────────────────────────────────────────────────────── */
+/* ── Discover (trending ad creatives from our library → Create Similar into chat) ── */
+type DiscoverAd = { id: string; brand: string; thumb: string | null; copy: string; format: string }
 function Discover({ isMobile }: { isMobile: boolean }) {
+  const { addToChat } = useContext(StudioCtx)
+  const [ads, setAds] = useState<DiscoverAd[] | null>(null)
+  const [q, setQ] = useState('')
+  useEffect(() => {
+    let on = true
+    fetch('/api/ads-studio/discover?limit=24').then((r) => r.json()).then((d) => on && setAds(Array.isArray(d.ads) ? d.ads : [])).catch(() => on && setAds([]))
+    return () => { on = false }
+  }, [])
+  const shown = (ads || []).filter((a) => !q.trim() || a.brand.toLowerCase().includes(q.trim().toLowerCase()) || a.copy.toLowerCase().includes(q.trim().toLowerCase()))
   return (
     <div>
       <Header title="Discover" isMobile={isMobile} />
-      <SearchBar placeholder="Search ads by brand, product, style…" />
-      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>{['Industry', 'Theme', 'Brand'].map((f) => <button key={f} style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 16px', fontSize: 13.5, cursor: 'pointer' }}>{f} ▾</button>)}</div>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginTop: 20 }}>
-        {Array.from({ length: 8 }, (_, i) => <div key={i} style={{ aspectRatio: '3/4', borderRadius: 12, background: `linear-gradient(150deg, ${['#f4ede2', '#efe7ea', '#e9efe6', '#eef2f8', '#f7f0e0', '#eef3ee'][i % 6]}, #fff)`, border: `1px solid ${LINE}` }} />)}
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>Trending creative from across the community — hit <b style={{ color: INK }}>Create Similar</b> and Mello builds your version in the chat.</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
+        <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search ads by brand, product, style…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
       </div>
+      {ads === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Loading trending ads…</div>
+        : shown.length === 0 ? <EmptyState title="Nothing to show yet" body="We couldn’t load trending ads right now — try again shortly." cta="Retry" />
+          : (
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginTop: 20 }}>
+              {shown.map((a) => (
+                <div key={a.id} className="sf-disc" style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                  <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
+                    <div style={{ color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
+                    <button onClick={() => addToChat({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
     </div>
   )
 }
@@ -499,9 +530,11 @@ function Discover({ isMobile }: { isMobile: boolean }) {
 /* ── Products (real catalog from the store) ─────────────────────────────── */
 type StoreProduct = { title: string; image: string | null; price: string | null; url: string }
 function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const { addToChat } = useContext(StudioCtx)
   const [data, setData] = useState<{ products: StoreProduct[]; siteName: string } | null>(null)
   const [sel, setSel] = useState<Record<string, boolean>>({})
   const [q, setQ] = useState('')
+  const useSelected = () => { (data?.products || []).filter((p) => sel[p.url]).forEach((p) => addToChat({ label: p.title.slice(0, 24), image: p.image, kind: 'product' })) }
   useEffect(() => {
     if (!domain) { setData({ products: [], siteName: '' }); return }
     let on = true; setData(null)
@@ -512,7 +545,7 @@ function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const selCount = Object.values(sel).filter(Boolean).length
   return (
     <div>
-      <Header title="Products" isMobile={isMobile} action={selCount ? `Generate ads (${selCount})` : 'Import from Website'} />
+      <Header title="Products" isMobile={isMobile} action={selCount ? `Use in chat (${selCount})` : 'Import from Website'} onAction={selCount ? useSelected : undefined} />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>{domain ? `Detected from ${domain} — select products to generate ads for.` : 'Connect a store to detect your products.'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
@@ -728,8 +761,8 @@ function Search({ isMobile }: { isMobile: boolean }) {
 }
 
 /* ── shared bits ────────────────────────────────────────────────────────── */
-function Header({ title, isMobile, action }: { title: string; isMobile: boolean; action?: string }) {
-  return <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}><h1 style={H1(isMobile)}>{title}</h1>{action && <button style={{ ...primaryBtn, whiteSpace: 'nowrap' }}>{action}</button>}</div>
+function Header({ title, isMobile, action, onAction }: { title: string; isMobile: boolean; action?: string; onAction?: () => void }) {
+  return <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 18 }}><h1 style={H1(isMobile)}>{title}</h1>{action && <button onClick={onAction} style={{ ...primaryBtn, whiteSpace: 'nowrap' }}>{action}</button>}</div>
 }
 function SearchBar({ placeholder }: { placeholder: string }) {
   return <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}><Icon d="M11 4a7 7 0 105 12l4 4" size={18} /><span style={{ color: SUB, fontSize: 15 }}>{placeholder}</span></div>
