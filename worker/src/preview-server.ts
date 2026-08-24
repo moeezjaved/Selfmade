@@ -328,7 +328,7 @@ async function fetchSearch(query: string, country: string, cap: number) {
       if (!entry.domain && domain) entry.domain = domain
       if (entry.ads.length < 6) entry.ads.push({
         ad_id: String(obj.ad_archive_id), body: snap.body?.text || '', title: snap.title || snap.link_description || '',
-        is_active: !!obj.is_active, image_urls: media.images, video_urls: media.videos, link,
+        is_active: !!obj.is_active, image_urls: media.images, video_urls: media.videos, video_preview_urls: media.videoPreviews, link,
       })
       byPage.set(pid, entry)
     }

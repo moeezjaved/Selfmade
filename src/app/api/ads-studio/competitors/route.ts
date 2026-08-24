@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
           // Richest source first: our ad-DNA corpus (hooks/personas), matched by the rival's DOMAIN. Else live ads.
           const dna = await adDnaFor(admin, c.name, c.domain)
           const liveAds = (!dna && c.liveAds?.length)
-            ? c.liveAds.map((a) => ({ id: a.adId, thumb: a.images[0] || null, copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
+            ? c.liveAds.map((a) => ({ id: a.adId, thumb: a.images[0] || a.videoPreviews[0] || null, copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
             : []
           const ads = dna?.ads ?? liveAds
           return {

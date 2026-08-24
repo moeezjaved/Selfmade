@@ -5,7 +5,7 @@
  * the rivals we didn't already have ads for.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { searchAdLibrary } from '@/lib/ads-studio/adlibrary'
+import { searchAdLibrary, fetchLiveAdsByPage, type LiveAd } from '@/lib/ads-studio/adlibrary'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -30,8 +30,15 @@ export async function GET(req: NextRequest) {
     if (!match && found.length === 1) match = found[0]
     if (!match) return NextResponse.json({ ads: [], adCount: 0, pageId: null })
 
-    const ads = match.ads.map((a) => ({
-      id: a.adId, thumb: a.images[0] || null, copy: (a.body || a.title || '').slice(0, 220),
+    // The search is non-deterministic and returns only a few ads per advertiser. Once we have the page_id,
+    // fetch their FULL active set deterministically via /preview (droplet) — more reliable + complete.
+    let liveAds: LiveAd[] = match.ads
+    if (match.pageId) {
+      const full = await fetchLiveAdsByPage(match.pageId, 8).catch(() => [])
+      if (full.length) liveAds = full
+    }
+    const ads = liveAds.map((a) => ({
+      id: a.adId, thumb: a.images[0] || a.videoPreviews[0] || null, copy: (a.body || a.title || '').slice(0, 220),
       format: a.videos.length ? 'video' : 'image', active: a.isActive,
     })).filter((a) => a.thumb)
     return NextResponse.json({ ads, adCount: ads.length, pageId: match.pageId, domain: match.domain || domain || null })
