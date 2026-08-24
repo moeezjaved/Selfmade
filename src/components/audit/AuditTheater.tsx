@@ -7,6 +7,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
+import AuditLanding from '@/components/audit/AuditLanding'
 
 // Matches the ads audit: orange accent, cream paper, dark sidebar, Fraunces serif headings, /hero.mp4 entry.
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', GOOD = '#1f8f4e', RED = '#e5484d', LIME = '#ef4a1e', PAPER = '#fbf4e2', DARK = '#1c1611'
@@ -64,22 +65,25 @@ export default function AuditTheater() {
   useEffect(() => { if (phase === 'running' && step >= STEPS.length - 1 && doneRef.current) { setResult(doneRef.current); setTimeout(() => setPhase('report'), 500) } }, [step, phase])
 
   if (phase === 'idle') return (
-    <div style={{ position: 'relative', minHeight: '100vh', background: ENTRY_BG, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: 'clamp(32px,6vw,80px)', color: '#fff', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
-      <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.96) 0%, rgba(224,47,6,.9) 42%, rgba(224,47,6,.5) 100%)' }} />
-      <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
-        <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 30 seconds · no login</div>
-        <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(38px,6.2vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your SEO.</h1>
-        <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 470 }}>See exactly where your store stands on Google &amp; AI — your search health, your catalog, and whether ChatGPT even mentions you.</p>
-        <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row', maxWidth: 480 }}>
-          <input value={domain} onChange={(e) => setDomain(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="yourstore.com" autoFocus
-            style={{ flex: 1, padding: '16px 18px', fontSize: 16, borderRadius: 100, border: 'none', background: '#fff', color: INK, fontFamily: 'inherit', outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
-          <button onClick={run} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
+    <>
+      <section id="audit-top" style={{ position: 'relative', minHeight: '92vh', background: ENTRY_BG, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: 'clamp(32px,6vw,80px)', color: '#fff', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
+        <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+        <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.96) 0%, rgba(224,47,6,.9) 42%, rgba(224,47,6,.5) 100%)' }} />
+        <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
+          <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 30 seconds · no login</div>
+          <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(38px,6.2vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your SEO.</h1>
+          <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 470 }}>See exactly where your store stands on Google &amp; AI — your search health, your catalog, and whether ChatGPT even mentions you.</p>
+          <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row', maxWidth: 480 }}>
+            <input id="audit-domain" value={domain} onChange={(e) => setDomain(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="yourstore.com" autoFocus
+              style={{ flex: 1, padding: '16px 18px', fontSize: 16, borderRadius: 100, border: 'none', background: '#fff', color: INK, fontFamily: 'inherit', outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
+            <button onClick={run} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
+          </div>
+          {error && <div style={{ color: '#ffe0d6', fontSize: 14, marginTop: 12 }}>{error}</div>}
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 16 }}>Reads only what’s public. No account, no card.</div>
         </div>
-        {error && <div style={{ color: '#ffe0d6', fontSize: 14, marginTop: 12 }}>{error}</div>}
-        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 16 }}>Reads only what’s public. No account, no card.</div>
-      </div>
-    </div>
+      </section>
+      <AuditLanding onScan={() => document.getElementById('audit-domain')?.focus()} />
+    </>
   )
 
   const Sidebar = () => (
