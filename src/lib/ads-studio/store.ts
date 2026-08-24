@@ -13,7 +13,9 @@ const decode = (s: string) => s
   .replace(/&#x([0-9a-f]+);/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)) } catch { return _ } })
   .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)) } catch { return _ } })
   .replace(/&([a-z]+);/gi, (_, n) => NAMED[n.toLowerCase()] ?? _)
-const strip = (h: string) => decode(h.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()
+// Strip <script>/<style> FIRST — otherwise minified JS (the word "try", "classList.add", etc.)
+// leaks into currency/geo signal detection and hallucinates the wrong market.
+const strip = (h: string) => decode(h.replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()
 const tag = (html: string, re: RegExp) => { const m = html.match(re); return m ? decode(m[1]).trim() : '' }
 const abs = (l: string, domain: string) => (l.startsWith('http') ? l : `https://${domain}${l.startsWith('/') ? '' : '/'}${l}`)
 
@@ -31,9 +33,16 @@ function parseProduct(url: string, html: string): StoreProduct {
   const title = strip(tag(html, /<title[^>]*>([^<]{0,140})/i)).replace(/\s*[|–—-].*$/, '').trim() || slugName(url) || 'Product'
   let image = tag(html, /property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || tag(html, /name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
   if (image && image.startsWith('//')) image = 'https:' + image
+  // Shopify's JS money is integer CENTS (e.g. 994800 = 9948.00); JSON-LD / og:price is decimal major units.
+  // Heuristic: an integer with no decimal point is cents → divide by 100; a value with a "." is already major.
   const priceRaw = tag(html, /"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)/i) || tag(html, /property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([0-9.]+)/i)
   const cur = tag(html, /"priceCurrency"\s*:\s*"([A-Z]{3})"/i)
-  const price = priceRaw ? `${cur ? cur + ' ' : ''}${priceRaw}` : null
+  let price: string | null = null
+  if (priceRaw) {
+    const val = priceRaw.includes('.') ? parseFloat(priceRaw) : parseInt(priceRaw, 10) / 100
+    const num = val % 1 === 0 ? String(val) : val.toFixed(2)
+    price = `${cur ? cur + ' ' : ''}${num}`
+  }
   return { title, image: image || null, price, url }
 }
 
@@ -52,7 +61,7 @@ function extractSignals(pages: { url: string; html: string }[]): string[] {
     [/₱|\bPHP\b/i, 'currency: PHP (Philippines)'], [/Rp\s?\d|\bIDR\b/i, 'currency: IDR (Indonesia)'], [/\bMYR\b|RM\s?\d/i, 'currency: MYR (Malaysia)'], [/฿|\bTHB\b/i, 'currency: THB (Thailand)'], [/\bVND\b|₫/i, 'currency: VND (Vietnam)'],
     [/Rs\.?\s?\d|\bLKR\b/i, 'currency: LKR (Sri Lanka)'], [/\bNPR\b/i, 'currency: NPR (Nepal)'],
     [/£|\bGBP\b/i, 'currency: GBP (UK)'], [/€|\bEUR\b/i, 'currency: EUR (Eurozone)'], [/\bCAD\b|C\$/i, 'currency: CAD (Canada)'], [/\bAUD\b|A\$/i, 'currency: AUD (Australia)'], [/\bNZD\b/i, 'currency: NZD'],
-    [/₺|\bTRY\b/i, 'currency: TRY (Turkey)'], [/R\$|\bBRL\b/i, 'currency: BRL (Brazil)'], [/\bMXN\b/i, 'currency: MXN (Mexico)'], [/¥|\bJPY\b/i, 'currency: JPY'], [/\bCNY\b|\bRMB\b/i, 'currency: CNY'],
+    [/₺|\bTRY\b/, 'currency: TRY (Turkey)'], [/R\$|\bBRL\b/, 'currency: BRL (Brazil)'], [/\bMXN\b/, 'currency: MXN (Mexico)'], [/¥|\bJPY\b/, 'currency: JPY'], [/\bCNY\b|\bRMB\b/, 'currency: CNY'],
     [/\bUSD\b|(?<![A-Za-z])\$\s?\d/i, 'currency: USD'],
   ]
   const curs = curSyms.filter(([re]) => re.test(text)).map(([, l]) => l)
