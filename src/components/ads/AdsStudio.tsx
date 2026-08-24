@@ -287,26 +287,25 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
     return () => { on = false }
   }, [domain])
 
+  const hero = products.find((p) => p.image)?.image
+  const genBody = (i: number, force = false) => ({ domain, index: i, force, productImages: hero ? [hero] : [], colors: (kit?.colors || []).map((c) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] })
+  const genOne = async (i: number, force = false) => {
+    if (!hero) return
+    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
+    try {
+      const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(genBody(i, force)) }).then((r) => r.json())
+      setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image || x.image || null, generating: false } : x))
+    } catch { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x)) }
+  }
+
   // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
   useEffect(() => {
-    if (started.current || !tpls || !canGen || !kit) return
-    const hero = products.find((p) => p.image)?.image
-    if (!hero) return
+    if (started.current || !tpls || !canGen || !kit || !hero) return
     const todo = tpls.map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
     if (!todo.length) return
     started.current = true
-    const body = (i: number) => ({ domain, index: i, productImages: [hero], colors: (kit.colors || []).map((c) => c.hex), fonts: kit.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit.logo || undefined, brandName: kit.siteName, productDesc: (kit.facts || [])[0] })
     let cursor = 0
-    const worker = async () => {
-      while (cursor < todo.length) {
-        const { i } = todo[cursor++]
-        setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
-        try {
-          const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body(i)) }).then((r) => r.json())
-          setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image || null, generating: false } : x))
-        } catch { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x)) }
-      }
-    }
+    const worker = async () => { while (cursor < todo.length) { await genOne(todo[cursor++].i) } }
     worker(); worker()   // concurrency 2
   }, [tpls, canGen, kit, products, domain])
 
@@ -318,8 +317,8 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
       <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <button key={i} onClick={() => t && onUse({ title: t.title, image: t.image })} disabled={!t} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t ? 'pointer' : 'default', padding: 0, fontFamily: SANS }}>
-            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10 }}>
+          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
+            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
               {t?.image ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -331,12 +330,15 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
               ) : (
                 <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: INK, padding: 20, textAlign: 'center' }}>{t?.title || ''}</span>
               )}
+              {t?.image && !t.generating && (
+                <button className="sf-disc-over" onClick={(e) => { e.stopPropagation(); genOne(i, true) }} title="Regenerate" style={{ position: 'absolute', top: 8, right: 8, opacity: 0, transition: 'opacity .15s', border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>↻ Regenerate</button>
+              )}
             </div>
             <div style={{ padding: 14 }}>
               <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t?.title || '…'}</div>
               {t?.concept && <div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.45, maxHeight: 54, overflow: 'hidden' }}>{t.concept}</div>}
             </div>
-          </button>
+          </div>
         ))}
       </div>
     </div>
