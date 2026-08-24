@@ -340,11 +340,35 @@ function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => voi
           </div>
         </div>
         <div style={{ background: DARK, borderRadius: 20, padding: 24, color: '#fff', alignSelf: 'start' }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontSize: 19, fontWeight: 800 }}>Growth</div><div style={{ fontSize: 26, fontWeight: 800 }}>$149<span style={{ fontSize: 13, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/mo</span></div></div>
-          <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 4 }}>Founding-100 price — locked for life</div>
-          <div style={{ margin: '18px 0', display: 'flex', flexDirection: 'column', gap: 10 }}>{['Every SEO problem found & fixed for you', 'Blog + programmatic pages published monthly', 'Get cited in ChatGPT, Gemini & Perplexity', 'Competitor intel — take their traffic', 'Works with Shopify, WordPress & more'].map((t, i) => <div key={i} style={{ display: 'flex', gap: 9, fontSize: 13.5, color: 'rgba(255,255,255,.9)' }}><span style={{ color: GOOD }}>✓</span>{t}</div>)}</div>
-          <button onClick={start} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Start free — fix my site →</button>
-          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>Sign up free · we pick up right where this report left off</div>
+          {/* Starter — the trial (most popular) */}
+          <div style={{ position: 'relative', border: '1px solid rgba(255,255,255,.12)', borderRadius: 14, padding: 18, marginBottom: 12 }}>
+            <div style={{ position: 'absolute', top: -10, right: 14, background: LIME, color: '#fff', fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: '3px 10px' }}>MOST POPULAR</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700 }}>Starter</div><div style={{ fontSize: 20, fontWeight: 800 }}>Free<span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/3 days</span></div></div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>3-day free trial — cancel anytime</div>
+            <div style={{ margin: '14px 0 2px', display: 'flex', flexDirection: 'column', gap: 9 }}>
+              {['Every SEO problem on your store — found & fixed for you', 'Blog + programmatic pages published for you', 'Get cited in ChatGPT, Gemini & Perplexity', 'Competitor intel — take their traffic', 'Works with Shopify, WordPress & more'].map((t, i) => <div key={i} style={{ display: 'flex', gap: 9, fontSize: 13, color: 'rgba(255,255,255,.9)', lineHeight: 1.4 }}><span style={{ color: GOOD, flex: 'none' }}>✓</span>{t}</div>)}
+            </div>
+          </div>
+          {/* Growth */}
+          <div style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 700 }}>Growth</div><div style={{ fontSize: 20, fontWeight: 800 }}>$149<span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/mo</span></div></div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>Founding-100 price — locked for life</div>
+          </div>
+          <button onClick={start} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Start free 3-day trial →</button>
+          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>$1 setup for 3 days, then $149/mo · First-Win Guarantee · cancel anytime</div>
+        </div>
+      </div>
+
+      {/* Testimonials — like Ryze's "Hear from other website owners" */}
+      <div style={{ maxWidth: 1080, marginTop: 34 }}>
+        <div style={{ fontSize: 13, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>Hear from other store owners</div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12 }}>
+          {[['Set it up on a Tuesday, forgot about it. Three months later organic is our second-biggest channel.', 'DTC skincare'], ['Clicks tripled in a quarter. I check the dashboard once a week and it just keeps climbing.', 'Supplements brand']].map(([q, who], i) => (
+            <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 18 }}>
+              <div style={{ fontSize: 15, color: INK, lineHeight: 1.5 }}>“{q}”</div>
+              <div style={{ fontSize: 12.5, color: SUB, marginTop: 10, fontWeight: 700 }}>— {who}</div>
+            </div>
+          ))}
         </div>
       </div>
     </div>
