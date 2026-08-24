@@ -85,12 +85,23 @@ async function seedKeywords(category: string): Promise<string[]> {
 
 type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number> }; pages: Page[]; productPages: Page[] }
 
+function productLinksFrom(html: string, domain: string): string[] {
+  const abs = (l: string) => (l.startsWith('http') ? l : `https://${domain}${l.startsWith('/') ? '' : '/'}${l}`)
+  const links = Array.from(html.matchAll(/href=["']([^"']*\/products\/[^"'?#]+)/gi)).map((m) => abs(m[1]))
+  return Array.from(new Set(links))
+}
+
 async function buildContext(domain: string, home: string): Promise<Ctx> {
   const siteName = (tag(home, /<title[^>]*>([^<|–-]{0,60})/i) || domain).trim()
   const [sm, category] = await Promise.all([sitemap(domain), deriveCategory(home, siteName)])
-  const productUrls = sm.urls.filter((u) => /\/products?\//i.test(u)).slice(0, 8)
+  let productUrls = sm.urls.filter((u) => /\/products?\//i.test(u))
+  // Fallback: many Shopify sitemaps split products out or block bots — read product links off the homepage,
+  // then off /collections/all, so the catalog check actually has products to inspect.
+  if (!productUrls.length) productUrls = productLinksFrom(home, domain)
+  if (!productUrls.length) { const coll = await fetchHtml(`https://${domain}/collections/all`); if (coll) productUrls = productLinksFrom(coll, domain) }
+  productUrls = productUrls.slice(0, 8)
   const contentUrls = sm.urls.filter((u) => !/\/products?\//i.test(u)).slice(0, 6)
-  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...contentUrls, ...productUrls])).slice(0, 14)
+  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 15)
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
   return { domain, siteName, category, sm, pages, productPages: pages.filter((p) => /\/products?\//i.test(p.url)) }
 }
@@ -114,13 +125,18 @@ function stepSpam(ctx: Ctx): Section {
 }
 function stepCatalog(ctx: Ctx): Section {
   const f: Finding[] = []
-  if (ctx.productPages.length) {
-    const noAltProd = ctx.productPages.filter((p) => p.imgsNoAlt > 0)
-    if (noAltProd.length) f.push({ id: 'prodalt', title: `${noAltProd.reduce((a, p) => a + p.imgsNoAlt, 0)} product images missing alt text`, detail: 'Google can’t see your product photos — invisible in image search.', severity: 'high', sample: noAltProd.map((p) => strip(p.title).slice(0, 60)), fixable: true })
-    const thin = ctx.productPages.filter((p) => p.words < 120)
+  const P = ctx.productPages
+  if (P.length) {
+    const noAlt = P.filter((p) => p.imgsNoAlt > 0)
+    if (noAlt.length) f.push({ id: 'prodalt', title: `${noAlt.reduce((a, p) => a + p.imgsNoAlt, 0)} product images missing alt text`, detail: 'Google can’t see your product photos — invisible in image search.', severity: 'high', sample: noAlt.map((p) => strip(p.title).slice(0, 60)), fixable: true })
+    const thin = P.filter((p) => p.words < 200)
     if (thin.length) f.push({ id: 'thin', title: `${thin.length} products with thin descriptions`, detail: 'Not enough for Google or a hesitant buyer.', severity: 'medium', sample: thin.map((p) => strip(p.title).slice(0, 60)), fixable: true })
+    const noSchema = P.filter((p) => !p.schema)
+    if (noSchema.length) f.push({ id: 'prodschema', title: `${noSchema.length} products missing product schema`, detail: 'Without structured data you lose rich results — price, rating and stock in Google.', severity: 'high', sample: noSchema.map((p) => strip(p.title).slice(0, 60)), fixable: true })
+    const noMeta = P.filter((p) => !p.metaDesc)
+    if (noMeta.length) f.push({ id: 'prodmeta', title: `${noMeta.length} products missing a meta description`, detail: 'Google writes its own snippet — usually worse than yours.', severity: 'medium', sample: noMeta.map((p) => strip(p.title).slice(0, 60)), fixable: true })
   }
-  return { key: 'catalog', name: 'Your catalog', sub: ctx.productPages.length ? 'Products checked one by one' : 'No product pages found in the sitemap', score: ctx.productPages.length ? scoreFrom(f) : 100, findings: f }
+  return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : 100, findings: f }
 }
 async function stepAi(ctx: Ctx): Promise<Section> {
   const engines = availableEngines().slice(0, 4)

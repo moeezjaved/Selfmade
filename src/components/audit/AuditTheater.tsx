@@ -42,7 +42,14 @@ export default function AuditTheater() {
     const d = domain.trim()
     if (!d || !d.includes('.')) { setError('Enter a real website, like yourstore.com'); return }
     setError(null); setPhase('running'); setStep(0); setLive({}); doneRef.current = null
-    timer.current = setInterval(() => setStep((s) => Math.min(STEPS.length - 1, s + 1)), 2800)
+    const startedAt = Date.now()
+    // Fallback pacing so gated steps (speed/backlinks without keys) still advance; data-driven advance leads.
+    timer.current = setInterval(() => setStep((s) => Math.min(STEPS.length - 2, s + 1)), 3600)
+    const goReport = (r: Result) => {
+      clearInterval(timer.current); setResult(r); setStep(STEPS.length - 1)
+      const wait = Math.max(0, 9000 - (Date.now() - startedAt))   // keep the theater on screen a beat
+      setTimeout(() => setPhase('report'), wait)
+    }
     try {
       const res = await fetch(`/api/audit/stream?domain=${encodeURIComponent(d)}`)
       const reader = res.body!.getReader(); const dec = new TextDecoder(); let buf = ''
@@ -53,16 +60,19 @@ export default function AuditTheater() {
         for (const p of parts) {
           const line = p.split('\n').find((l) => l.startsWith('data: ')); if (!line) continue
           const ev = JSON.parse(line.slice(6))
-          if (ev.type === 'section') setLive((m) => ({ ...m, [ev.section.key]: ev.section }))
-          else if (ev.type === 'done') { doneRef.current = ev.result; clearInterval(timer.current); setStep(STEPS.length - 1) }
+          if (ev.type === 'section') {
+            setLive((m) => ({ ...m, [ev.section.key]: ev.section }))
+            const idx = STEPS.findIndex((s) => s.key === ev.section.key)
+            if (idx >= 0) setStep((s) => Math.max(s, idx))   // data-driven: land on the step that just returned
+          } else if (ev.type === 'done') { doneRef.current = ev.result; goReport(ev.result) }
           else if (ev.type === 'error') { clearInterval(timer.current); setError(ev.error); setPhase('idle') }
         }
       }
+      // stream ended without an explicit done (defensive)
+      if (!doneRef.current) { clearInterval(timer.current); setError('Scan didn’t finish — try again.'); setPhase('idle') }
     } catch { clearInterval(timer.current); setError('Network error — try again.'); setPhase('idle') }
   }, [domain])
   useEffect(() => () => clearInterval(timer.current), [])
-  // when the timer reaches the end AND we have a result, go to report
-  useEffect(() => { if (phase === 'running' && step >= STEPS.length - 1 && doneRef.current) { setResult(doneRef.current); setTimeout(() => setPhase('report'), 500) } }, [step, phase])
 
   if (phase === 'idle') return (
     <>
