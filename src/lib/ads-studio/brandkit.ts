@@ -71,20 +71,27 @@ function extractLogo(html: string, domain: string): string | null {
 
 /* ── knowledge base (LLM over the real site text) ── */
 async function generateKnowledge(siteName: string, domain: string, sections: { label: string; text: string }[]): Promise<{ facts: string[]; voice: BrandKitData['voice'] }> {
-  const corpus = sections.filter((s) => s.text).map((s) => `[${s.label}]\n${s.text.slice(0, 3200)}`).join('\n\n').slice(0, 14000)
-  const prompt = `You are building a brand knowledge base by reading a store's real website content. Extract what the site ACTUALLY says — never invent.
+  const corpus = sections.filter((s) => s.text).map((s) => `[${s.label}]\n${s.text.slice(0, 4200)}`).join('\n\n').slice(0, 20000)
+  const prompt = `You are a senior brand analyst building a "What we know about you" knowledge base by carefully reading a store's REAL website content. This is read back to the store owner, so it must sound like a sharp analyst who actually studied their site — not a bland bullet list.
 
 STORE: ${siteName} (${domain})
-SITE CONTENT:
+SITE CONTENT (crawled from their homepage, about/FAQ/policies, and product pages):
 ${corpus}
 
-Produce:
-1. "facts": 18-28 atomic facts, one sentence each, covering: positioning & what the product is, how it physically works, product variants & materials, offers/bundles/subscriptions, pricing angles, platform/checkout, use cases & who it's for, pain points it addresses, differentiation vs alternatives, marketing claims & proof (report claims as claims), brand language/mindset, outcomes promised, and anything geographic. Each fact must be traceable to the content above.
-2. "voice": {"tone": one-or-two-word brand tone (e.g. "Modern", "Playful premium"), "energy": "Low"|"Medium"|"High", "audience": a short phrase naming the core audience}.
+Write "facts": 22-30 RICH, self-contained observations. Follow these rules exactly — they are what separates an excellent knowledge base from a mediocre one:
+- Each fact is 1-3 full sentences of dense analyst prose that BUNDLES related details together — NOT a terse one-liner. (Bad: "Aura is a wellness device." Good: "Aura, accessed via ${domain}, is positioned as a nicotine-free, smoke-free, vape-free wellness and habit-change device that uses flavored air and aromatherapy as a healthy alternative to vaping and smoking.")
+- Quote the brand's OWN terminology in double quotes when they use distinctive names (product names, bundle names, program names, section labels, taglines).
+- Capture FRAMING and EMPHASIS, not just facts: note how the site positions itself and what it stresses (e.g. "the site repeatedly emphasizes…", "it is positioned as…", "it frames X as…").
+- When something is IMPLIED but not fully stated, say so explicitly and flag the gap (e.g. "there is a 'Cores Club,' implying a subscription, though the pricing and mechanics are not described in the visible content"). Never invent the missing detail.
+- The FIRST fact must be a full positioning statement that names the domain and captures what the brand fundamentally is.
+- Cover as many of these dimensions as the content supports, in a sensible order: positioning; the core product with its materials and build; what it explicitly is NOT / how it differs from alternatives; the mechanism (how it works); how a customer actually uses it step by step; the specific product variants with their distinguishing details; bundles/packs/quantities (cite the FAQ when it gives numbers or durations); subscription or recurring offers; the e-commerce platform and standard flows (Shopify, "Shop All", cart, checkout, etc.); pricing angles and value claims; guarantees, shipping and returns; primary use cases and the problem being solved; the target audience; proof and marketing claims (report claims AS claims, e.g. "the site claims…"); brand voice and mindset; and any geography or market signals.
+- Every fact must be traceable to the content above. If a detail isn't in the content, omit it — do not guess.
 
-Return ONLY JSON: {"facts":["..."],"voice":{"tone":"...","energy":"...","audience":"..."}}`
+Also write "voice": {"tone": one-or-two-word brand tone (e.g. "Mindful premium"), "energy": "Low"|"Medium"|"High", "audience": a short phrase naming the core audience}.
+
+Return ONLY JSON: {"facts":["...","..."],"voice":{"tone":"...","energy":"...","audience":"..."}}`
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 2200, temperature: 0.3, messages: [{ role: 'user', content: prompt }] })
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 4000, temperature: 0.3, messages: [{ role: 'user', content: prompt }] })
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
     const facts = Array.isArray(j?.facts) ? j.facts.map((f: any) => String(f).trim()).filter(Boolean).slice(0, 30) : []
@@ -97,10 +104,13 @@ export async function buildBrandKit(domain: string): Promise<BrandKitData> {
   const home = (await fetchHtml(`https://${domain}/`)) || ''
   const siteName = strip(tag(home, /<title[^>]*>([^<|–-]{0,60})/i)) || domain
 
-  // Pages: fixed candidates + first product links off the homepage.
+  // Pages: fixed candidates + product links off the homepage AND the catalog (for bundles/offers detail).
   const root = domain.replace(/^www\./, '')
-  const prodLinks = Array.from(new Set(Array.from(home.matchAll(/href=["']([^"']*\/products\/[^"'?#]+)/gi)).map((m) => abs(m[1], domain)).filter((u) => u.includes(root)))).slice(0, 3)
-  const candidates = ['pages/about', 'about', 'pages/faq', 'pages/faqs', 'pages/contact', 'policies/shipping-policy', 'pages/how-it-works']
+  const collectAll = (await fetchHtml(`https://${domain}/collections/all`).catch(() => null)) || ''
+  const prodLinks = Array.from(new Set(
+    Array.from((home + collectAll).matchAll(/href=["']([^"']*\/products\/[^"'?#]+)/gi)).map((m) => abs(m[1], domain)).filter((u) => u.includes(root))
+  )).slice(0, 6)
+  const candidates = ['pages/about', 'about', 'pages/faq', 'pages/faqs', 'pages/contact', 'policies/shipping-policy', 'policies/refund-policy', 'pages/how-it-works']
   const extras = await Promise.all(candidates.map((p) => fetchHtml(`https://${domain}/${p}`).catch(() => null)))
   const prodHtmls = await Promise.all(prodLinks.map((u) => fetchHtml(u).catch(() => null)))
 
@@ -113,6 +123,7 @@ export async function buildBrandKit(domain: string): Promise<BrandKitData> {
 
   const sections = [
     { label: 'HOME', text: strip(home) },
+    { label: 'CATALOG', text: collectAll ? strip(collectAll).slice(0, 2500) : '' },
     ...extras.map((h, i) => ({ label: candidates[i].toUpperCase(), text: h ? strip(h) : '' })),
     ...prodHtmls.map((h, i) => ({ label: `PRODUCT ${i + 1}`, text: h ? strip(h) : '' })),
   ]
