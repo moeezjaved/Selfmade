@@ -118,8 +118,28 @@ export async function fetchLiveAdsByPage(pageId: string, limit = 8): Promise<Liv
   return objs.slice(0, limit).map(normalizeAd)
 }
 
-/** Keyword search → advertisers (grouped by page), each with destination domain + sample ads. Proxy only. */
+/** Keyword search → advertisers (grouped by page), each with destination domain + sample ads.
+ * Droplet /search primary (Playwright + IPRoyal — beats Meta's cloud-IP gating), bare proxy fallback. */
 export async function searchAdLibrary(query: string, country = 'ALL', perPageLimit = 4): Promise<Advertiser[]> {
+  const dropletUrl = process.env.DROPLET_PREVIEW_URL, dropletSecret = process.env.PREVIEW_SECRET
+  if (dropletUrl && dropletSecret) {
+    try {
+      const u = new URL('/search', dropletUrl)
+      u.searchParams.set('q', query); u.searchParams.set('country', country); u.searchParams.set('limit', '60')
+      const r = await undiciFetch(u.toString(), { headers: { 'X-Preview-Secret': dropletSecret }, signal: AbortSignal.timeout(70_000) })
+      if (r.ok) {
+        const data: any = await r.json()
+        return (Array.isArray(data?.advertisers) ? data.advertisers : []).map((a: any): Advertiser => ({
+          pageId: String(a.page_id), pageName: a.page_name || '', domain: a.domain || null,
+          ads: (a.ads || []).slice(0, perPageLimit).map((ad: any): LiveAd => ({
+            adId: String(ad.ad_id), pageId: String(a.page_id), pageName: a.page_name || '',
+            body: (ad.body || '').slice(0, 400), title: (ad.title || '').slice(0, 200), isActive: ad.is_active ?? true,
+            images: ad.image_urls || [], videos: ad.video_urls || [], link: ad.link || '',
+          })),
+        }))
+      }
+    } catch { /* fall through to bare proxy */ }
+  }
   const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=${encodeURIComponent(country)}&q=${encodeURIComponent(query)}&search_type=keyword_unordered&media_type=all`
   const objs = await fetchLibraryHtml(url)
   const byPage = new Map<string, LiveAd[]>()
