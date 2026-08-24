@@ -159,7 +159,15 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
       const fonts = kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined
       const aspectRatio = aspect !== 'Auto' ? aspect : plan.aspect
-      const gaBody = JSON.stringify({ productImages, newHeadline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' })
+      // When a person/element is tagged, tell the engine to preserve that exact person (it's product-centric
+      // by default and will otherwise invent its own model). Person image goes FIRST so it's the subject.
+      let finalAngle = plan.angle
+      let finalImages = productImages
+      if (refTags.length) {
+        finalImages = Array.from(new Set([...refTags, ...baseProduct])).slice(0, 3)
+        finalAngle = `CRITICAL: the FIRST reference image is a specific real PERSON provided by the user — you MUST use that exact person as the human subject of the ad and preserve their face, likeness, skin tone, hair, and outfit faithfully. Do NOT invent, swap, or beautify them into a different person. Feature the actual ${kit?.siteName || 'brand'} product (from the other reference image) with them, in-hand or in use. ${plan.angle}`
+      }
+      const gaBody = JSON.stringify({ productImages: finalImages, newHeadline: plan.headline, angle: finalAngle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' })
       // Retry the transient image-model overload (pro_model_busy); generate-ad refunds on failure so no double-charge.
       let res: Response, d: any
       for (let attempt = 0; ; attempt++) {
