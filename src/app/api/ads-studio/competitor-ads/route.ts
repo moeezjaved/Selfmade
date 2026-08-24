@@ -37,8 +37,9 @@ export async function GET(req: NextRequest) {
       const full = await fetchLiveAdsByPage(match.pageId, 8).catch(() => [])
       if (full.length) liveAds = full
     }
+    const mediaUrl = (u?: string | null) => (u ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : null)
     const ads = liveAds.map((a) => ({
-      id: a.adId, thumb: a.images[0] || a.videoPreviews[0] || null, copy: (a.body || a.title || '').slice(0, 220),
+      id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220),
       format: a.videos.length ? 'video' : 'image', active: a.isActive,
     })).filter((a) => a.thumb)
     return NextResponse.json({ ads, adCount: ads.length, pageId: match.pageId, domain: match.domain || domain || null })

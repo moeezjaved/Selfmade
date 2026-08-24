@@ -29,6 +29,8 @@ const cleanAd = (a: any) => ({
   format: a.format || null,
   active: a.is_active ?? true,
 })
+// Live fbcdn media → permanent R2 cache (never hotlink fbcdn); corpus thumbs are already R2, left as-is.
+const mediaUrl = (u?: string | null) => (u ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : null)
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -81,7 +83,7 @@ export async function GET(req: NextRequest) {
           // Richest source first: our ad-DNA corpus (hooks/personas), matched by the rival's DOMAIN. Else live ads.
           const dna = await adDnaFor(admin, c.name, c.domain)
           const liveAds = (!dna && c.liveAds?.length)
-            ? c.liveAds.map((a) => ({ id: a.adId, thumb: a.images[0] || a.videoPreviews[0] || null, copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
+            ? c.liveAds.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
             : []
           const ads = dna?.ads ?? liveAds
           return {
