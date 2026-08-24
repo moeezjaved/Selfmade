@@ -83,12 +83,17 @@ async function deriveCategory(homeHtml: string, fallback: string): Promise<strin
   } catch { return fallback }
 }
 
-async function seedKeywords(category: string): Promise<string[]> {
+async function seedKeywords(category: string, products: string[], siteName: string): Promise<string[]> {
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 100, temperature: 0.3, messages: [{ role: 'user', content: `3 high-intent buyer search queries someone types into Google before buying a "${category}". Return ONLY JSON {"kw":["...","...","..."]}` }] })
+    const sample = products.slice(0, 8).join(' | ') || category
+    const prompt = `A store called "${siteName}" sells these products: ${sample}. Category: ${category}.\nGive 3 realistic, high-intent Google searches a BUYER types before buying this kind of product — generic category/problem searches, NOT the brand name and NOT a full product title. Keep each 2-5 words. Return ONLY JSON {"kw":["...","...","..."]}`
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.3, messages: [{ role: 'user', content: prompt }] })
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
-    return Array.isArray(j?.kw) ? j.kw.map((x: any) => String(x)).slice(0, 3) : []
+    const kw = Array.isArray(j?.kw) ? j.kw.map((x: any) => String(x).trim()).filter(Boolean).slice(0, 3) : []
+    // Drop any that leaked the brand name (keeps searches buyer-generic, like Ryze).
+    const brand = siteName.toLowerCase().split(/\s|[|–-]/)[0]
+    return kw.filter((k: string) => !(brand.length > 3 && k.toLowerCase().includes(brand)))
   } catch { return [] }
 }
 
@@ -175,7 +180,8 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
   if (!dfsConfigured()) {
     return { key: 'google', name: 'Google visibility', sub: 'Where buyers find you first', score: 0, findings: [{ id: 'serp', title: 'Connect a search source to see your ranks', detail: `We’ll show exactly where ${ctx.domain} ranks for your buyer searches, and who’s taking the click.`, severity: 'medium', fixable: false }] }
   }
-  const kws = await seedKeywords(ctx.category)
+  const productTitles = ctx.productPages.map((p) => strip(p.title).replace(/\s*[|–—-].*$/, '').trim()).filter((t) => t.length > 2)
+  const kws = await seedKeywords(ctx.category, productTitles, ctx.siteName)
   const [ladders, volumes] = await Promise.all([
     Promise.all(kws.map((k) => serpGoogle(k, ctx.domain))),
     searchVolume(kws),
