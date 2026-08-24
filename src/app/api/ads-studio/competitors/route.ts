@@ -69,11 +69,17 @@ export async function GET(req: NextRequest) {
       if (res) {
         seed = res.seed; configured = res.configured
         discovered = await Promise.all(res.competitors.map(async (c) => {
+          // Richest source first: our ad-DNA corpus (hooks/personas). Else the LIVE Meta Ad Library ads.
           const dna = await adDnaFor(admin, c.name)
+          const liveAds = (!dna && c.liveAds?.length)
+            ? c.liveAds.map((a) => ({ id: a.adId, thumb: a.images[0] || null, copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
+            : []
+          const ads = dna?.ads ?? liveAds
           return {
             source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
-            hasAdDna: !!dna, spyable: !dna,
-            adCount: dna?.adCount ?? 0, ads: dna?.ads ?? [], dna: dna?.dna ?? null, pageId: dna?.pageId ?? null,
+            hasAdDna: !!dna, adsSource: dna ? 'corpus' : (liveAds.length ? 'live' : null),
+            spyable: ads.length === 0,
+            adCount: dna?.adCount ?? c.liveAds?.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
           }
         }))
       }
@@ -100,7 +106,7 @@ export async function GET(req: NextRequest) {
           return {
             source: 'spied', pageId, domain: null,
             name: nameMap.get(pageId) || (follows || []).find((f: any) => String(f.page_id) === pageId)?.brand_name || 'Competitor',
-            reason: 'You are spying this brand', hasAdDna: list.length > 0, spyable: false,
+            reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource: 'corpus', spyable: false,
             adCount: count ?? list.length, ads: list.map(cleanAd).filter((a: any) => a.thumb),
             dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) },
           }
