@@ -5,7 +5,7 @@
  * pre-populated from the same crawl (products, brand, audiences, competitors). Phase 1 = shell + Home
  * (personalized templates) + section screens in our design language. Data wiring lands incrementally.
  */
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', LIME = '#ef4a1e', ORANGE = '#e02f06', PAPER = '#fbf4e2', CREAM = '#fbf7ef'
@@ -70,7 +70,7 @@ export default function AdsStudio() {
       {Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
-          {active === 'home' ? <Home isMobile={isMobile} />
+          {active === 'home' ? <Home isMobile={isMobile} domain={domain} />
             : active === 'ads' ? <YourAds isMobile={isMobile} />
               : active === 'competitors' ? <Competitors isMobile={isMobile} domain={domain} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
@@ -96,44 +96,209 @@ const H1 = (isMobile: boolean): React.CSSProperties => ({ fontFamily: SERIF, fon
 const primaryBtn: React.CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: SANS }
 
 /* ── Home ───────────────────────────────────────────────────────────────── */
-function Home({ isMobile }: { isMobile: boolean }) {
-  const channels = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
+const ASPECTS = ['Auto', '1:1', '4:5', '9:16', '16:9']
+const LANGS = ['English', 'Urdu', 'Hindi', 'Bengali', 'Arabic', 'Spanish', 'French', 'German', 'Portuguese', 'Indonesian']
+const CHANNELS: AdFormat[] = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
+type AdFormat = 'Banner Ad' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'LinkedIn'
+type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat }
+type HomeTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
+type BrandKitLite = { siteName?: string; logo?: string | null; colors?: { hex: string }[]; fonts?: string[]; facts?: string[]; voice?: any }
+
+function Home({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const [kit, setKit] = useState<BrandKitLite | null>(null)
+  const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
+  const [format, setFormat] = useState<AdFormat>('Instagram')
+  const [input, setInput] = useState('')
+  const [aspect, setAspect] = useState('Auto')
+  const [lang, setLang] = useState('English')
+  const [open, setOpen] = useState<'' | 'aspect' | 'lang' | 'add'>('')
+  const [tags, setTags] = useState<HomeTag[]>([])
+  const [msgs, setMsgs] = useState<ChatMsg[]>([])
+  const [busy, setBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!domain) return
+    fetch(`/api/ads-studio/brand-kit?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => !d?.empty && setKit(d)).catch(() => {})
+    fetch(`/api/ads-studio/products?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => setProducts(Array.isArray(d.products) ? d.products : [])).catch(() => {})
+  }, [domain])
+
+  const onFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0]; if (!f) return
+    const reader = new FileReader()
+    reader.onload = () => setTags((t) => [...t, { label: f.name.slice(0, 24), image: String(reader.result), kind: 'upload' }])
+    reader.readAsDataURL(f); setOpen('')
+  }
+
+  const send = async (text?: string) => {
+    const message = (text ?? input).trim()
+    if (!message || busy) return
+    setBusy(true); setInput('')
+    const fmt = format
+    setMsgs((m) => [...m, { role: 'user', text: message, format: fmt }, { role: 'assistant', loading: true, format: fmt }])
+    try {
+      const plan = await fetch('/api/ads-studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, format: fmt, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json())
+      // Product images: tagged refs (product/upload/discover/element) first, else the planned product.
+      const tagImgs = tags.map((t) => t.image).filter(Boolean) as string[]
+      const planned = plan.productIndex >= 0 ? products[plan.productIndex]?.image : products[0]?.image
+      const productImages = (tagImgs.length ? tagImgs : [planned]).filter(Boolean)
+      if (!productImages.length) throw new Error('no-product')
+      const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
+      const fonts = kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined
+      const aspectRatio = aspect !== 'Auto' ? aspect : plan.aspect
+      const res = await fetch('/api/discovery/generate-ad', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ productImages, newHeadline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' }) })
+      const d = await res.json()
+      if (!res.ok) {
+        const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : (d.error || 'Generation failed. Try again.')
+        setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
+      } else {
+        setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: plan.caption, format: fmt }))
+      }
+      setTags([])
+    } catch {
+      setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Couldn’t generate — make sure your store has product images.', format: fmt }))
+    } finally { setBusy(false) }
+  }
+  const replaceLast = (m: ChatMsg[], next: ChatMsg) => { const c = [...m]; c[c.length - 1] = next; return c }
+
   const chips = ['Create an Instagram ad campaign', 'Generate ad creatives for my product', 'Design a product launch campaign', 'Make a WhatsApp promotional banner', 'Design a seasonal sale campaign', 'Create a LinkedIn thought-leadership post']
+  const started = msgs.length > 0
+  const dd = (label: string, val: string, which: 'aspect' | 'lang', opts: string[]) => (
+    <div style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(open === which ? '' : which)} style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 14px', fontSize: 13.5, color: INK, cursor: 'pointer' }}>{val === 'Auto' && which === 'aspect' ? 'Aspect Ratio' : val} ▾</button>
+      {open === which && (
+        <div style={{ position: 'absolute', bottom: 44, left: 0, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 16px 40px -18px rgba(0,0,0,.4)', padding: 6, zIndex: 20, minWidth: 150, maxHeight: 240, overflowY: 'auto' }}>
+          {opts.map((o) => <button key={o} onClick={() => { which === 'aspect' ? setAspect(o) : setLang(o); setOpen('') }} style={{ display: 'block', width: '100%', textAlign: 'left', border: 'none', background: (which === 'aspect' ? aspect : lang) === o ? PAPER : 'transparent', borderRadius: 8, padding: '8px 12px', fontSize: 13.5, cursor: 'pointer', color: INK }}>{o}</button>)}
+        </div>
+      )}
+    </div>
+  )
+
+  const composer = (
+    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 16, boxShadow: started ? 'none' : '0 20px 50px -34px rgba(0,0,0,.4)' }}>
+      {tags.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
+          {tags.map((t, i) => (
+            <span key={i} style={{ display: 'inline-flex', alignItems: 'center', gap: 7, border: `1px solid ${LINE}`, borderRadius: 100, padding: '5px 8px 5px 6px', fontSize: 12.5, fontWeight: 600 }}>
+              {t.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={t.image} alt="" style={{ width: 20, height: 20, borderRadius: 5, objectFit: 'cover' }} />}
+              {t.label}<button onClick={() => setTags((x) => x.filter((_, j) => j !== i))} style={{ border: 'none', background: 'none', cursor: 'pointer', color: SUB, fontSize: 14, lineHeight: 1 }}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+      <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} placeholder={started ? 'Describe changes or a new ad…' : `Describe your ${format} ad…`} rows={started ? 1 : 2} style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', fontSize: 15.5, color: INK, fontFamily: SANS, background: 'transparent', lineHeight: 1.5 }} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+        <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
+        <div style={{ position: 'relative' }}>
+          <button onClick={() => setOpen(open === 'add' ? '' : 'add')} style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${LINE}`, background: '#fff', fontSize: 20, color: SUB, cursor: 'pointer' }}>+</button>
+          {open === 'add' && (
+            <div style={{ position: 'absolute', bottom: 48, left: 0, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 16px 40px -18px rgba(0,0,0,.4)', padding: 8, zIndex: 20, width: 240, maxHeight: 300, overflowY: 'auto' }}>
+              <button onClick={() => fileRef.current?.click()} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none', background: 'transparent', padding: '9px 10px', borderRadius: 8, fontSize: 13.5, fontWeight: 600, cursor: 'pointer', color: INK }}>⬆ Upload from computer</button>
+              {products.length > 0 && <div style={{ fontSize: 11, fontWeight: 800, color: SUB, padding: '8px 10px 4px', textTransform: 'uppercase', letterSpacing: .4 }}>Your products</div>}
+              {products.slice(0, 12).map((p, i) => (
+                <button key={i} onClick={() => { setTags((t) => [...t, { label: p.title.slice(0, 24), image: p.image, kind: 'product' }]); setOpen('') }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', border: 'none', background: 'transparent', padding: '7px 10px', borderRadius: 8, fontSize: 13, cursor: 'pointer', color: INK, textAlign: 'left' }}>
+                  {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" style={{ width: 26, height: 26, borderRadius: 6, objectFit: 'cover', flex: 'none' }} />}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {dd('Aspect', aspect, 'aspect', ASPECTS)}
+        {dd('Language', lang, 'lang', LANGS)}
+        <button onClick={() => send()} disabled={busy || !input.trim()} style={{ marginLeft: 'auto', width: 40, height: 40, borderRadius: 100, background: busy || !input.trim() ? '#e7c4b8' : ORANGE, color: '#fff', border: 'none', fontSize: 18, cursor: busy || !input.trim() ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {busy ? <span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,.5)', borderTopColor: '#fff', borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : '↑'}
+        </button>
+      </div>
+    </div>
+  )
+
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}>
-        <h1 style={{ ...H1(isMobile), fontSize: isMobile ? 40 : 58 }}>Start with an idea</h1>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', margin: '28px 0 18px' }}>
-        {channels.map((c) => <button key={c} style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 12, padding: '11px 18px', fontSize: 14, fontWeight: 600, color: INK, cursor: 'pointer', fontFamily: SANS }}>{c}</button>)}
-      </div>
-      <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 18, boxShadow: '0 20px 50px -34px rgba(0,0,0,.4)' }}>
-        <div style={{ fontSize: 15.5, color: SUB, minHeight: 44 }}>A vibrant summer-sale banner with tropical colors and palm leaves…</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
-          <button style={{ width: 40, height: 40, borderRadius: 10, border: `1px solid ${LINE}`, background: '#fff', fontSize: 20, color: SUB, cursor: 'pointer' }}>+</button>
-          <button style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 14px', fontSize: 13.5, color: INK, cursor: 'pointer' }}>Aspect Ratio ▾</button>
-          <button style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 14px', fontSize: 13.5, color: INK, cursor: 'pointer' }}>English ▾</button>
-          <button style={{ marginLeft: 'auto', width: 40, height: 40, borderRadius: 100, background: ORANGE, color: '#fff', border: 'none', fontSize: 18, cursor: 'pointer' }}>↑</button>
-        </div>
-      </div>
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 20 }}>
-        {chips.map((c) => <button key={c} style={{ border: `1px solid ${LINE}`, background: 'transparent', borderRadius: 100, padding: '9px 15px', fontSize: 13.5, color: '#43403a', cursor: 'pointer', fontFamily: SANS }}>{c} ↗</button>)}
+      {!started && <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}><h1 style={{ ...H1(isMobile), fontSize: isMobile ? 40 : 58 }}>Start with an idea</h1></div>}
+
+      {/* format selector */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', margin: started ? '0 0 16px' : '28px 0 18px' }}>
+        {CHANNELS.map((c) => {
+          const on = format === c
+          const ic: Record<AdFormat, string> = { 'Banner Ad': '🖥', WhatsApp: '💬', Instagram: '📷', Facebook: 'f', LinkedIn: 'in' }
+          return <button key={c} onClick={() => setFormat(c)} style={{ border: `1px solid ${on ? ORANGE : LINE}`, background: on ? '#fdeee9' : '#fff', color: on ? ORANGE : INK, borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: on ? 800 : 600, cursor: 'pointer', fontFamily: SANS, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13 }}>{ic[c]}</span>{c}</button>
+        })}
       </div>
 
-      <div style={{ marginTop: 48 }}>
-        <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
-        <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>These match your Brand Kit and company style.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
-          <TemplateCard label="Product Showcase" variant="showcase" />
-          <TemplateCard label="Social Media Story" variant="story" />
-          <TemplateCard label="Sale Campaign" variant="sale" />
+      {/* conversation */}
+      {started && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 18 }}>
+          {msgs.map((m, i) => m.role === 'user' ? (
+            <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
+          ) : (
+            <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '86%' }}>
+              {m.loading ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14 }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Mello is designing your {m.format} ad…</div>
+              ) : m.error ? (
+                <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2' }}>{m.error}</div>
+              ) : (
+                <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff', maxWidth: 340 }}>
+                  {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', display: 'block' }} />}
+                  <div style={{ padding: 12 }}>
+                    {m.caption && <div style={{ fontSize: 13, color: '#43403a', lineHeight: 1.45, marginBottom: 10 }}>{m.caption}</div>}
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      {m.image && <a href={m.image} download style={{ ...primaryBtn, padding: '7px 14px', fontSize: 12.5, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          ))}
         </div>
-      </div>
+      )}
+
+      {composer}
+
+      {!started && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', marginTop: 20 }}>
+          {chips.map((c) => <button key={c} onClick={() => send(c)} style={{ border: `1px solid ${LINE}`, background: 'transparent', borderRadius: 100, padding: '9px 15px', fontSize: 13.5, color: '#43403a', cursor: 'pointer', fontFamily: SANS }}>{c} ↗</button>)}
+        </div>
+      )}
+
+      {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
     </div>
   )
 }
 
 /** A CSS-rendered ad template card (our generic templates, brand-fillable). */
+type Template = { title: string; concept: string; image?: string | null }
+function PersonalizedTemplates({ isMobile, domain, onUse }: { isMobile: boolean; domain: string; onUse: (t: { title: string; image?: string | null }) => void }) {
+  const [tpls, setTpls] = useState<Template[] | null>(null)
+  useEffect(() => {
+    if (!domain) return
+    let on = true
+    fetch(`/api/ads-studio/templates?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setTpls(Array.isArray(d.templates) ? d.templates : [])).catch(() => on && setTpls([]))
+    return () => { on = false }
+  }, [domain])
+  if (tpls !== null && tpls.length === 0) return null
+  const grad = ['#f4ede2', '#e9efe6', '#eef2f8', '#f7f0e0', '#efe7ea', '#eef3ee']
+  return (
+    <div style={{ marginTop: 48 }}>
+      <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
+      <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
+        {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
+          <button key={i} onClick={() => t && onUse({ title: t.title, image: t.image })} disabled={!t} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t ? 'pointer' : 'default', padding: 0, fontFamily: SANS }}>
+            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              {t?.image /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: INK, padding: 20, textAlign: 'center' }}>{t?.title || ''}</span>}
+            </div>
+            <div style={{ padding: 14 }}>
+              <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t?.title || '…'}</div>
+              {t?.concept && <div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.45, maxHeight: 54, overflow: 'hidden' }}>{t.concept}</div>}
+            </div>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function TemplateCard({ label, variant }: { label: string; variant: 'showcase' | 'story' | 'sale' }) {
   const bg = variant === 'showcase' ? 'linear-gradient(160deg,#eef1e8,#e3e9dc)' : variant === 'story' ? 'linear-gradient(160deg,#1f9b8e,#37b0a0)' : 'linear-gradient(160deg,#ff5a1f,#ffd21e)'
   const fg = variant === 'showcase' ? '#2f3a24' : '#fff'
