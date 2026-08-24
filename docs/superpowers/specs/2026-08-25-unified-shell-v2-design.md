@@ -23,8 +23,7 @@ delete).
 ## The sidebar (light, our orange)
 Top: logo + brand switcher (active brand, e.g. "Aura ·").
 
-- **Home** — NEW chat-first landing (see below)
-- **Mission** — the existing mission control (growth engine, next moves, revenue)
+- **Home** — chat-first landing (Mello chat + the Mission dashboard, one screen — see below)
 - **Inbox**
 
 **COMPANY**
@@ -33,8 +32,7 @@ Top: logo + brand switcher (active brand, e.g. "Aura ·").
 - Company Brain
 - Documents
 
-**ADS** *(= the Lapis workspace we built — merged into the shell)*
-- Ads Chat (the "Start with an idea" generator)
+**ADS** *(= the workspace we built — assets & insight, NOT a chat)*
 - Your Ads
 - My Competitors
 - Discover
@@ -42,39 +40,35 @@ Top: logo + brand switcher (active brand, e.g. "Aura ·").
 - Brand Kit
 - Audiences
 - Calendar
-- Google Ads
 
 **SEO** *(Grow's hidden tabs, flattened — each a visible item)*
-- Overview
-- Store
-- Content
-- Pages at scale
-- SEO
-- AI Search
-- SEO Competitors
+- Overview · Store · Content · Pages at scale · SEO & AI Search · SEO Competitors
 
 **INTEL** *(Spy/Discovery stays its own group)*
-- Discovery
-- Brand Spy
-- Boards
-- Studio (classic)
+- Discovery · Brand Spy · Boards · Studio (classic)
 
-Bottom: credits chip → "Hire the team →" (/hire) · Settings · Account.
+Bottom: credits/usage (paid) OR "Hire the team →" (/hire, free) — context-aware · Settings · Account.
 
-Notes:
-- Sections are labels, not accordions — everything visible, one click to anywhere (Result pattern).
-- Locked/coming items render dimmed with a lock (like ads-studio's ChatGPT Ads) — roadmap as desire.
-- Mobile: the same list in an off-canvas drawer (existing useIsMobile pattern).
+### Refinements folded in (a, b, c — founder-approved)
+- **(a) ONE chat — Mello — everywhere.** There is no separate "Ads Chat". Users make ads by talking to
+  Mello on Home (it generates inline via the existing ads engine / create_ad tool). The ADS group is
+  assets + insight only. Kills the "which chat do I type in?" confusion.
+- **(b) Mission is MERGED into Home** (not a separate item) — one command center, not two overlapping
+  dashboards.
+- **(c) Progressive disclosure by STAGE.** The sidebar surfaces the departments the user is actually
+  using; the rest sit dimmed below a "Grows with your stage" divider with a gentle unlock. Connecting a
+  store / running ads / publishing pages lights up more of the company. Groups are labels (Result
+  pattern), not accordions; the dimming is stage-driven, not collapsed-by-default.
+- Mobile: the same (stage-filtered) list in an off-canvas drawer (existing useIsMobile pattern).
 
-## Chat-first Home (decided)
-Landing = talking to your AI company, not a dashboard:
+## Chat-first Home (decided) — Mission merged in
+Landing = talking to your AI company, WITH the numbers on the same screen:
 - Full-width **Mello chat** ("What should we work on?") reusing the EXISTING Mello agent + tools
-  (grounded router, create_ad, brain recall) — not a new brain.
-- Above the chat: the Mission **NEXT MOVE** banner + 3 stat cards (revenue / content live / share of
-  voice) so the company's standing is one glance.
+  (grounded router, create_ad, brain recall) — not a new brain, and the ONLY chat in the app.
+- **Directly below the chat**, the Mission dashboard: the **NEXT MOVE** banner + revenue / content-live /
+  share-of-voice cards. (Mission is folded in — there is no separate Mission page competing with Home.)
 - Prompt chips: "What should I do today?" · "Make an ad" · "Fix my product SEO" · "Who are my
-  competitors?" — each seeds the chat; ad requests hand off into Ads Chat with context.
-- Mission remains one click away as its own item (it is NOT removed).
+  competitors?" — each seeds the same Mello chat; ad requests generate inline / open the ads canvas.
 
 ## SEO flattening (phase-cheap)
 Sidebar SEO items deep-link to the existing /grow surfaces (`/grow?tab=…`) — zero page rewrites in
