@@ -64,7 +64,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
 
       {NAV.map((g, gi) => (
         <div key={gi} style={{ marginTop: g.label ? 12 : 0 }}>
-          {g.stage && gi > 0 && (
+          {g.stage && gi === NAV.findIndex((x) => x.stage) && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 9, margin: '14px 4px 4px', fontSize: 9.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED }}>
               <span style={{ height: 1, flex: 1, background: LINE }} />Grows with your stage<span style={{ height: 1, flex: 1, background: LINE }} />
             </div>
