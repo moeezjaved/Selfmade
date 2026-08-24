@@ -144,10 +144,14 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     setMsgs((m) => [...m, { role: 'user', text: message, format: fmt }, { role: 'assistant', loading: true, format: fmt }])
     try {
       const plan = await fetch('/api/ads-studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, format: fmt, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json())
-      // Product images: tagged refs (product/upload/discover/element) first, else the planned product.
-      const tagImgs = tags.map((t) => t.image).filter(Boolean) as string[]
+      // References: a product tag/upload IS the product; an element/discover/template is a person/style
+      // reference to composite ALONGSIDE the product — so always keep the actual product in the mix
+      // (e.g. "put Aura in her hand" needs both the doctor element AND the Aura product).
+      const productTags = tags.filter((t) => t.kind === 'product' || t.kind === 'upload').map((t) => t.image).filter(Boolean) as string[]
+      const refTags = tags.filter((t) => t.kind === 'element' || t.kind === 'discover' || t.kind === 'template').map((t) => t.image).filter(Boolean) as string[]
       const planned = plan.productIndex >= 0 ? products[plan.productIndex]?.image : products[0]?.image
-      const productImages = (tagImgs.length ? tagImgs : [planned]).filter(Boolean)
+      const baseProduct = productTags.length ? productTags : [planned].filter(Boolean) as string[]
+      const productImages = Array.from(new Set([...baseProduct, ...refTags])).slice(0, 3)
       if (!productImages.length) throw new Error('no-product')
       const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
       const fonts = kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined
