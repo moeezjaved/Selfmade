@@ -30,16 +30,25 @@ const cleanAd = (a: any) => ({
   active: a.is_active ?? true,
 })
 
-/** Look up a discovered brand in our ad-DNA corpus by (distinctive) name. Returns ads + DNA, or null. */
-async function adDnaFor(admin: any, name: string) {
-  if (!name || name.replace(/[^a-z0-9]/gi, '').length < 4) return null
+/** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
+ * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
+ * to an EXACT page-name match only when we have no domain (e.g. a user's manually-spied brand). */
+async function adDnaFor(admin: any, name: string, domain?: string | null) {
+  const nameOk = !!name && name.replace(/[^a-z0-9]/gi, '').length >= 4
+  if (!domain && !nameOk) return null
   try {
-    let { data: ads } = await admin.from('discovery_ads_index').select(AD_COLS)
-      .ilike('page_name', name).eq('has_creative', true)
-      .order('performance_score', { ascending: false, nullsFirst: false }).limit(6)
-    if (!ads?.length) {
+    let ads: any[] | null = null
+    if (domain) {
+      const d = domain.replace(/^www\./, '')
+      const like = `*${d}*`
       const r = await admin.from('discovery_ads_index').select(AD_COLS)
-        .ilike('page_name', `%${name}%`).eq('has_creative', true)
+        .or(`link_url.ilike.${like},landing.ilike.${like},website.ilike.${like}`)
+        .eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(6)
+      ads = r.data
+    }
+    if (!ads?.length && nameOk) {
+      const r = await admin.from('discovery_ads_index').select(AD_COLS)
+        .ilike('page_name', name).eq('has_creative', true)
         .order('performance_score', { ascending: false, nullsFirst: false }).limit(6)
       ads = r.data
     }
@@ -69,8 +78,8 @@ export async function GET(req: NextRequest) {
       if (res) {
         seed = res.seed; configured = res.configured
         discovered = await Promise.all(res.competitors.map(async (c) => {
-          // Richest source first: our ad-DNA corpus (hooks/personas). Else the LIVE Meta Ad Library ads.
-          const dna = await adDnaFor(admin, c.name)
+          // Richest source first: our ad-DNA corpus (hooks/personas), matched by the rival's DOMAIN. Else live ads.
+          const dna = await adDnaFor(admin, c.name, c.domain)
           const liveAds = (!dna && c.liveAds?.length)
             ? c.liveAds.map((a) => ({ id: a.adId, thumb: a.images[0] || null, copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
             : []
