@@ -6,6 +6,7 @@
  * Programmatic SEO land in later phases.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useEmbedded } from '@/lib/ui/embedded'
 
 type Issue = { severity: 'high' | 'medium' | 'low'; title: string; detail: string; pages: string[] }
 type Audit = { hasData: boolean; site?: string; score?: number; pagesCrawled?: number; issues?: Issue[]; note?: string }
@@ -14,6 +15,7 @@ type Kw = { hasData: boolean; clusters: KwCluster[]; total: number; note?: strin
 type Brief = { id: string | null; keyword: string; title: string; body_markdown: string; status: string }
 
 export default function SeoPage() {
+  const embedded = useEmbedded()
   const [audit, setAudit] = useState<Audit | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -82,8 +84,9 @@ export default function SeoPage() {
   const counts = { high: issues.filter((i) => i.severity === 'high').length, medium: issues.filter((i) => i.severity === 'medium').length, low: issues.filter((i) => i.severity === 'low').length }
 
   return (
-    <div className="seo">
+    <div className={`seo${embedded ? ' embedded' : ''}`}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style>{`.seo.embedded .back{display:none}.seo.embedded .top>div:first-child{display:none}.seo.embedded .wrap{padding:6px 0 30px;max-width:100%}`}</style>
       <div className="wrap">
         <a href="/mission" className="back">← Back to your desk</a>
         <div className="top">
