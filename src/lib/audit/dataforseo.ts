@@ -43,6 +43,27 @@ export async function serpGoogle(keyword: string, yourDomain: string): Promise<S
   } catch { return null }
 }
 
+export type SerpOrganicItem = { domain: string; url: string; title: string; snippet: string; position: number }
+/** DataForSEO location_code for the big DTC markets — used to discover competitors in the store's own market. */
+export const MARKET_LOCATION: Record<string, number> = {
+  pakistan: 2586, india: 2356, bangladesh: 2050, 'united states': 2840, usa: 2840, us: 2840,
+  'united kingdom': 2826, uk: 2826, uae: 2784, 'united arab emirates': 2784, 'saudi arabia': 2682,
+  canada: 2124, australia: 2036, nigeria: 2566, kenya: 2404, 'south africa': 2710, philippines: 2608,
+  indonesia: 2360, malaysia: 2458, turkey: 2792, germany: 2276, france: 2250, brazil: 2076, mexico: 2484,
+}
+/** Live Google organic SERP with title + snippet for competitor DISCOVERY. locationCode defaults to US. */
+export async function serpDiscover(keyword: string, locationCode = 2840): Promise<SerpOrganicItem[]> {
+  try {
+    const j = await post('/serp/google/organic/live/advanced', [{ keyword, location_code: locationCode, language_code: 'en', depth: 30 }])
+    const items = j?.tasks?.[0]?.result?.[0]?.items || []
+    return items.filter((it: any) => it.type === 'organic' && it.domain).map((it: any) => ({
+      domain: String(it.domain).replace(/^www\./, ''), url: it.url || '',
+      title: String(it.title || ''), snippet: String(it.description || it.snippet || ''),
+      position: it.rank_absolute || it.rank_group || 0,
+    }))
+  } catch { return [] }
+}
+
 export type BacklinkSummary = { backlinks: number; referringDomains: number; rank: number }
 /** Backlink profile for a domain — for the backlink-gap finding. */
 export async function backlinksSummary(domain: string): Promise<BacklinkSummary | null> {
