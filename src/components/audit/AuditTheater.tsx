@@ -131,22 +131,118 @@ export default function AuditTheater() {
 /* ── Running-stage big visual ─────────────────────────────────────────────────────────────────── */
 function RunningStage({ step, isMobile }: { step: number; isMobile: boolean }) {
   const s = STEPS[step]
+  const titles: Record<string, string> = {
+    health: 'Reading your pages', speed: 'How fast do you load?', spam: 'Did Google’s spam update target you?',
+    catalog: 'Your catalog, product by product', google: 'Where do buyers find you?', ai: 'Do the AIs mention you?', revenue: 'What it’s costing you',
+  }
   const blurbs: Record<string, string> = {
     health: 'Reading your meta descriptions, headings and image alt text across your pages.',
     speed: 'Pulling real-visitor load times from Chrome UX data.',
-    spam: 'Reading your sitemap — is any of it scaled, template-looking content Google now demotes?',
-    catalog: 'Opening your product pages one by one — titles, descriptions, images, structured data.',
+    spam: 'Google’s spam update demotes scaled, template-generated content. We read your sitemap and estimate how much of your site matches that pattern.',
+    catalog: 'We open your product pages and check what Google and shoppers need to see — title, description, images, structured data.',
     google: 'Checking where buyers find you first, and who’s taking the click.',
     ai: 'Really asking ChatGPT, Gemini & Perplexity for your category — do you come up?',
     revenue: 'Adding up what all of this is costing you.',
   }
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: isMobile ? '50vh' : '70vh', maxWidth: 620 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: LIME, marginBottom: 12 }}>Step {step + 1} of {STEPS.length}</div>
-      <h1 style={{ fontSize: isMobile ? 30 : 44, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 0 16px', color: INK }}>{s.label}</h1>
-      <p style={{ fontSize: 17, color: SUB, lineHeight: 1.5, margin: 0 }}>{blurbs[s.key]}</p>
-      <div style={{ marginTop: 28, display: 'flex', gap: 6 }}>
-        {STEPS.map((_, i) => <div key={i} style={{ width: 26, height: 4, borderRadius: 100, background: i <= step ? LIME : '#e6e6e6' }} />)}
+    <>
+      <style>{`
+        @keyframes auditSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}
+        @keyframes auditOrbit{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+        @keyframes auditFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+        @keyframes auditFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+      `}</style>
+      <div style={{ minHeight: isMobile ? 'auto' : '72vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+        <div style={{ maxWidth: 640, marginBottom: isMobile ? 22 : 30, animation: 'auditFade .4s ease' }} key={s.key}>
+          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: LIME, marginBottom: 10 }}>Step {step + 1} of {STEPS.length}</div>
+          <h1 style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 0 12px', color: INK }}>{titles[s.key]}</h1>
+          <p style={{ fontSize: isMobile ? 15 : 16.5, color: SUB, lineHeight: 1.5, margin: 0 }}>{blurbs[s.key]}</p>
+        </div>
+        <div style={{ animation: 'auditFade .5s ease', display: 'flex', justifyContent: 'center' }} key={s.key + '-v'}>
+          {s.key === 'spam' ? <SpamGauge isMobile={isMobile} />
+            : s.key === 'catalog' ? <CatalogCards isMobile={isMobile} />
+            : <ScanPulse label={titles[s.key]} isMobile={isMobile} />}
+        </div>
+      </div>
+    </>
+  )
+}
+
+/* Spam-update radial gauge (Ryze-style): concentric dotted rings + a donut reading LOW, with callouts. */
+function SpamGauge({ isMobile }: { isMobile: boolean }) {
+  const size = isMobile ? 280 : 360, cx = size / 2, cy = size / 2
+  const r = size * 0.28, C = 2 * Math.PI * r
+  const risk = 0.08 // low-risk share (illustrative during scan)
+  const off = C * (1 - risk)
+  return (
+    <div style={{ position: 'relative', width: '100%', maxWidth: 640 }}>
+      <svg width="100%" viewBox={`0 0 ${size} ${size}`} style={{ display: 'block', margin: '0 auto', maxWidth: size }}>
+        {[0.46, 0.38, 0.30].map((f, i) => <circle key={i} cx={cx} cy={cy} r={size * f} fill="none" stroke="#e7ebf0" strokeWidth="1.5" strokeDasharray="2 6" />)}
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="#eceff3" strokeWidth={size * 0.055} />
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke={DARK} strokeWidth={size * 0.055} strokeLinecap="round"
+          strokeDasharray={C} strokeDashoffset={off} transform={`rotate(-90 ${cx} ${cy})`} style={{ ['--c' as any]: C, ['--off' as any]: off, animation: 'auditSweep 1.1s ease forwards' }} />
+        {/* orbiting dot */}
+        <g style={{ transformOrigin: `${cx}px ${cy}px`, animation: 'auditOrbit 6s linear infinite' }}>
+          <circle cx={cx} cy={cy - size * 0.46} r="4" fill={RED} />
+        </g>
+      </svg>
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}>
+        <div style={{ background: '#eaf6ec', color: GOOD, fontWeight: 800, fontSize: isMobile ? 15 : 18, borderRadius: 10, padding: '6px 16px' }}>LOW</div>
+      </div>
+      {!isMobile && <>
+        <Callout style={{ top: '28%', left: 0 }} label="Healthy pages" big="92%" sub="36 pages" col={GOOD} />
+        <Callout style={{ top: '18%', right: 0 }} label="Suspicious" big="0%" sub="0 pages" col={RED} align="right" />
+        <Callout style={{ bottom: '20%', right: 0 }} label="Low risk" big="8%" sub="3 pages" col="#c98a1a" align="right" />
+      </>}
+    </div>
+  )
+}
+function Callout({ style, label, big, sub, col, align }: { style: React.CSSProperties; label: string; big: string; sub: string; col: string; align?: 'right' }) {
+  return (
+    <div style={{ position: 'absolute', textAlign: align || 'left', ...style }}>
+      <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: SUB }}>{label}</div>
+      <div style={{ fontSize: 26, fontWeight: 800, color: col, lineHeight: 1 }}>{big}</div>
+      <div style={{ fontSize: 11.5, color: SUB }}>{sub}</div>
+    </div>
+  )
+}
+
+/* Catalog product-card stack (Ryze-style): shuffled cards, top one flagging a real-looking gap. */
+function CatalogCards({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ position: 'relative', width: '100%', maxWidth: 560, height: isMobile ? 220 : 260 }}>
+      {[2, 1, 0].map((depth) => (
+        <div key={depth} style={{
+          position: 'absolute', inset: 0, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18,
+          boxShadow: '0 10px 30px rgba(0,0,0,.06)', transform: `translate(${depth * 10}px, ${depth * -10}px) rotate(${depth * 1.4}deg)`,
+          opacity: depth === 0 ? 1 : 0.55 - depth * 0.12, zIndex: 10 - depth,
+        }}>
+          {depth === 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 18, padding: isMobile ? 16 : 26, height: '100%', animation: 'auditFloat 3s ease-in-out infinite' }}>
+              <div style={{ width: isMobile ? 92 : 130, height: isMobile ? 92 : 130, borderRadius: 14, background: 'linear-gradient(135deg,#f5efe8,#efe6f0)', flex: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 34 }}>🧴</div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: isMobile ? 18 : 24, fontWeight: 800, color: INK, letterSpacing: '-.01em' }}>Journey Pack</div>
+                <div style={{ fontSize: isMobile ? 15 : 18, color: SUB, marginTop: 2 }}>$109.48</div>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, marginTop: 14, background: '#fdecea', color: RED, borderRadius: 100, padding: '7px 14px', fontSize: isMobile ? 12.5 : 14, fontWeight: 700 }}>
+                  <span style={{ width: 7, height: 7, borderRadius: 100, background: RED }} /> 7 images missing alt text
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/* Generic pulse for the other steps. */
+function ScanPulse({ label, isMobile }: { label: string; isMobile: boolean }) {
+  const size = isMobile ? 240 : 320
+  return (
+    <div style={{ position: 'relative', width: size, height: size }}>
+      {[0.5, 0.38, 0.26].map((f, i) => <div key={i} style={{ position: 'absolute', inset: `${(0.5 - f) * size}px`, border: `1.5px dashed #e2e6ea`, borderRadius: '50%' }} />)}
+      <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ width: size * 0.32, height: size * 0.32, borderRadius: '50%', border: `3px solid ${LINE}`, borderTopColor: LIME, animation: 'auditOrbit 1s linear infinite' }} />
       </div>
     </div>
   )
