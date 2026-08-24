@@ -17,7 +17,7 @@ export type Finding = { id: string; title: string; detail: string; severity: 'hi
 export type SerpLadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 export type AiEngineRead = { engine: string; mentioned: boolean; question: string; answer: string }
 export type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
-export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
+export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
 export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
   websiteScore: number; visibilityScore: number; sections: Section[]
@@ -108,9 +108,9 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
   // then off /collections/all, so the catalog check actually has products to inspect.
   if (!productUrls.length) productUrls = productLinksFrom(home, domain)
   if (!productUrls.length) { const coll = await fetchHtml(`https://${domain}/collections/all`); if (coll) productUrls = productLinksFrom(coll, domain) }
-  productUrls = productUrls.slice(0, 8)
-  const contentUrls = sm.urls.filter((u) => !/\/products?\//i.test(u)).slice(0, 6)
-  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 15)
+  productUrls = productUrls.slice(0, 14)
+  const contentUrls = sm.urls.filter((u) => !/\/products?\//i.test(u)).slice(0, 8)
+  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 21)
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
   return { domain, siteName, category, sm, pages, productPages: pages.filter((p) => /\/products?\//i.test(p.url)) }
 }
@@ -125,8 +125,9 @@ function stepHealth(ctx: Ctx): Section {
   const badH1 = ctx.pages.filter((p) => p.h1 !== 1)
   if (badH1.length) f.push({ id: 'h1', title: `${badH1.length} pages with a missing or duplicate H1`, detail: 'The H1 tells Google the page’s main topic.', severity: 'medium', sample: badH1.map((p) => new URL(p.url).pathname), fixable: true })
   const urls = ctx.pages.map((p) => { try { return new URL(p.url).pathname } catch { return p.url } })
+  const thumbs = ctx.pages.map((p) => p.image)
   const total = Math.max(ctx.pages.length, ctx.sm.urls.length || ctx.pages.length)
-  return { key: 'health', name: 'Website health', sub: 'Meta, headings and images across your pages', score: scoreFrom(f), findings: f, read: { urls, total, metaMissing: noMeta.length, h1Missing: badH1.length, altMissing: noAlt } }
+  return { key: 'health', name: 'Website health', sub: 'Meta, headings and images across your pages', score: scoreFrom(f), findings: f, read: { urls, thumbs, total, metaMissing: noMeta.length, h1Missing: badH1.length, altMissing: noAlt } }
 }
 function stepSpam(ctx: Ctx): Section {
   const f: Finding[] = []
