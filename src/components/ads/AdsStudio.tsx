@@ -72,7 +72,7 @@ export default function AdsStudio() {
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
           {active === 'home' ? <Home isMobile={isMobile} />
             : active === 'ads' ? <YourAds isMobile={isMobile} />
-              : active === 'competitors' ? <Competitors isMobile={isMobile} />
+              : active === 'competitors' ? <Competitors isMobile={isMobile} domain={domain} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
                   : active === 'products' ? <Products isMobile={isMobile} domain={domain} />
                     : active === 'audiences' ? <Audiences isMobile={isMobile} domain={domain} />
@@ -171,40 +171,77 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
 
 /* ── My Competitors (real ad-DNA data) ──────────────────────────────────── */
 type CompAd = { id: string; thumb: string | null; copy: string; format: string | null; active: boolean }
-type Comp = { pageId: string; name: string; adCount: number; activeCount: number | null; ads: CompAd[] }
-function Competitors({ isMobile }: { isMobile: boolean }) {
+type CompDna = { hooks: string[]; angles: string[]; personas: string[] }
+type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null }
+type CompSeed = { name: string; category: string; market: string; queries: string[] } | null
+function DnaRow({ label, items }: { label: string; items: string[] }) {
+  if (!items?.length) return null
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+      <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: 0.4, textTransform: 'uppercase', color: SUB, flex: 'none' }}>{label}</span>
+      {items.map((t) => <span key={t} style={{ fontSize: 12, fontWeight: 600, color: INK, background: PAPER, border: `1px solid ${LINE}`, borderRadius: 100, padding: '3px 10px' }}>{t}</span>)}
+    </div>
+  )
+}
+
+function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [comps, setComps] = useState<Comp[] | null>(null)
+  const [seed, setSeed] = useState<CompSeed>(null)
   const [q, setQ] = useState('')
   useEffect(() => {
     let on = true
-    fetch('/api/ads-studio/competitors').then((r) => r.json()).then((d) => { if (on) setComps(Array.isArray(d.competitors) ? d.competitors : []) }).catch(() => on && setComps([]))
+    setComps(null)
+    fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => { if (!on) return; setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null) }).catch(() => on && setComps([]))
     return () => { on = false }
-  }, [])
-  const shown = (comps || []).filter((c) => !q.trim() || c.name.toLowerCase().includes(q.trim().toLowerCase()))
+  }, [domain])
+  const shown = (comps || []).filter((c) => !q.trim() || c.name.toLowerCase().includes(q.trim().toLowerCase()) || (c.domain || '').includes(q.trim().toLowerCase()))
   return (
     <div>
       <Header title="My Competitors" isMobile={isMobile} action="Add competitor" />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>The rivals winning in your niche — their <b>real running ads</b>, straight from our ad-DNA crawl.</div>
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>
+        We found your real rivals across the web{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''}, then pulled their <b style={{ color: INK }}>ad strategy</b> from our ad-DNA crawl.
+      </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search competitors…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
       </div>
 
       {comps === null ? (
-        <div style={{ color: SUB, fontSize: 14, padding: '40px 0', textAlign: 'center' }}>Loading your competitors…</div>
+        <div style={{ color: SUB, fontSize: 14, padding: '40px 0', textAlign: 'center' }}>Scanning the web for your competitors…</div>
       ) : shown.length === 0 ? (
         <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No competitors yet</div>
-          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>Add a rival and we’ll pull their live ads from the Meta ad library and our crawl — the hooks, angles and offers actually working in your niche.</div>
-          <button style={primaryBtn}>Add your first competitor</button>
+          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No competitors found yet</div>
+          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>{domain ? 'We couldn’t auto-discover rivals for this store. Add one and we’ll pull their live ads.' : 'Run an ads audit first so we know your store — then we auto-find your rivals and their ads.'}</div>
+          <button style={primaryBtn}>Add a competitor</button>
         </div>
       ) : shown.map((c) => (
-        <div key={c.pageId} style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24, marginTop: 18 }}>
+        <div key={c.pageId || c.domain || c.name} style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24, marginTop: 18 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 42, height: 42, borderRadius: 100, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, color: INK, flex: 'none' }}>{c.name[0]?.toUpperCase() || 'C'}</div>
-            <div style={{ minWidth: 0 }}><div style={{ fontFamily: SERIF, fontSize: isMobile ? 18 : 21, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</div><div style={{ fontSize: 12.5, color: SUB }}>{c.adCount.toLocaleString()} ads in our index{c.activeCount != null ? ` · ${c.activeCount} live now` : ''}</div></div>
-            <span style={{ marginLeft: 'auto', fontSize: 12, fontWeight: 800, color: ORANGE, background: '#ffe7df', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>{c.ads.length} shown</span>
+            <div style={{ width: 42, height: 42, borderRadius: 100, background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, color: INK, flex: 'none', overflow: 'hidden' }}>
+              {c.domain /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={`https://www.google.com/s2/favicons?domain=${c.domain}&sz=64`} alt="" style={{ width: 24, height: 24 }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} /> : (c.name[0]?.toUpperCase() || 'C')}
+            </div>
+            <div style={{ minWidth: 0, flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ fontFamily: SERIF, fontSize: isMobile ? 17 : 20, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.name}</span>
+                {c.source === 'spied' && <span style={{ fontSize: 10, fontWeight: 800, color: SUB, border: `1px solid ${LINE}`, borderRadius: 100, padding: '2px 8px', flex: 'none' }}>SPYING</span>}
+              </div>
+              <div style={{ fontSize: 12.5, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.domain || (c.hasAdDna ? `${c.adCount.toLocaleString()} ads in our index` : '')}</div>
+            </div>
+            {c.hasAdDna
+              ? <span style={{ fontSize: 12, fontWeight: 800, color: ORANGE, background: '#ffe7df', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>{c.adCount.toLocaleString()} ads decoded</span>
+              : <button style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: ORANGE, border: 'none', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', flex: 'none' }}>Spy their ads →</button>}
           </div>
+
+          {c.reason && <div style={{ fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginTop: 12 }}>{c.reason}</div>}
+
+          {c.hasAdDna && c.dna && (c.dna.hooks.length + c.dna.angles.length + c.dna.personas.length > 0) && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 14, padding: 14, background: CREAM, borderRadius: 12 }}>
+              <DnaRow label="Hooks" items={c.dna.hooks} />
+              <DnaRow label="Angles" items={c.dna.angles} />
+              <DnaRow label="Personas" items={c.dna.personas} />
+            </div>
+          )}
+
           {c.ads.length > 0 ? (
             <div style={{ display: 'flex', gap: 12, overflowX: 'auto', marginTop: 16, paddingBottom: 6 }}>
               {c.ads.map((a) => (
@@ -217,10 +254,12 @@ function Competitors({ isMobile }: { isMobile: boolean }) {
                 </div>
               ))}
             </div>
-          ) : <div style={{ fontSize: 13, color: SUB, marginTop: 12 }}>Crawling their ads — check back shortly.</div>}
+          ) : !c.hasAdDna ? (
+            <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>We found this rival on the web but haven’t crawled their ads yet — hit <b style={{ color: INK }}>Spy their ads</b> to pull their live creatives.</div>
+          ) : null}
         </div>
       ))}
-      <div style={{ fontSize: 13, color: SUB, marginTop: 18 }}>Powered by our ad-DNA crawl (millions of classified ads) — deeper than a generic scrape.</div>
+      <div style={{ fontSize: 13, color: SUB, marginTop: 18 }}>Rivals discovered from live Google results in your market, then decoded against our ad-DNA crawl (millions of classified ads).</div>
     </div>
   )
 }
