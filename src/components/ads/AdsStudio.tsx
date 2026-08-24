@@ -35,7 +35,7 @@ export default function AdsStudio() {
   }, [])
 
   const Sidebar = (
-    <aside style={{ width: isMobile ? '100%' : 250, flex: 'none', background: CREAM, borderRight: `1px solid ${LINE}`, padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 4, minHeight: isMobile ? 'auto' : '100dvh', boxSizing: 'border-box' }}>
+    <aside style={{ width: isMobile ? '100%' : 250, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 4, minHeight: isMobile ? 'auto' : '100dvh', boxSizing: 'border-box' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px 16px' }}>
         <div style={{ width: 34, height: 34, borderRadius: 9, background: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: SERIF, fontWeight: 800, fontSize: 18 }}>S</div>
         <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 17, color: INK }}>Selfmade</span>
@@ -47,7 +47,7 @@ export default function AdsStudio() {
             const on = active === it.key && !it.locked
             return (
               <button key={`${it.key}-${ii}`} onClick={() => !it.locked && setActive(it.key)} disabled={it.locked}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: 'none', background: on ? '#fff' : 'transparent', color: it.locked ? '#bcb3a4' : on ? ORANGE : '#43403a', fontWeight: on ? 800 : 600, fontSize: 14.5, cursor: it.locked ? 'default' : 'pointer', fontFamily: SANS, textAlign: 'left', boxShadow: on ? '0 4px 14px -8px rgba(0,0,0,.25)' : 'none', transition: 'background .15s' }}>
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', borderRadius: 10, border: 'none', background: on ? '#fdeee9' : 'transparent', color: it.locked ? '#bcb3a4' : on ? ORANGE : '#43403a', fontWeight: on ? 800 : 600, fontSize: 14.5, cursor: it.locked ? 'default' : 'pointer', fontFamily: SANS, textAlign: 'left', transition: 'background .15s' }}>
                 <Icon d={it.icon} />{it.label}{it.locked && <span style={{ marginLeft: 'auto', fontSize: 11 }}>🔒</span>}
               </button>
             )
@@ -65,7 +65,7 @@ export default function AdsStudio() {
   )
 
   return (
-    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: PAPER, fontFamily: SANS, color: INK }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
       <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}`}</style>
       {Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
