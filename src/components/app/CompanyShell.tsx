@@ -22,7 +22,7 @@ type Item = { href: string; label: string; icon?: React.ElementType }
 type Group = { label?: string; stage?: boolean; items: Item[] }
 
 const NAV: Group[] = [
-  { items: [{ href: '/mission', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
+  { items: [{ href: '/home', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
   { label: 'Company', items: [
     { href: '/mission/journey', label: 'Journey', icon: Map },
     { href: '/company', label: 'Your Team', icon: Users },
