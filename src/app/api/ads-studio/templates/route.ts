@@ -73,7 +73,7 @@ Return ONLY JSON: {"templates":{"Free Trial CTA":{"headline":"...","content":"..
   } catch { return fixed({}) }
 }
 
-const TEMPLATES_VERSION = 'v3-guardrails'   // guardrails now appended at RENDER time (see POST) → tweaking them needs NO bump
+const TEMPLATES_VERSION = 'v4-clean'   // final flush: briefs are now clean (style + copy only, no baked guardrails) → matches the studio's own rules
 async function readCached(admin: any, brandId: string): Promise<Tpl[] | null> {
   const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
   const ads = data?.brand_kit?.adsStudio
