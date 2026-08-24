@@ -57,7 +57,7 @@ export async function GET(req: NextRequest) {
           user_id: t.userId, kind: 'proof_receipt', importance: 82,
           title: `Your organic work just banked ${money(res.newlyBanked, res.currency)}.`,
           body: `Real organic revenue is up ${money(res.lift, res.currency)} since you started publishing and fixing your store — verified from your orders, not an estimate. It's in your ledger.`,
-          cta_label: 'See the ledger', cta_href: '/mission/wins',
+          cta_label: 'See your growth', cta_href: '/grow',
         }).then(() => {}, () => {})
       }
     } catch { /* one brand must not stop the run */ }
