@@ -224,9 +224,19 @@ export default function AuditTheater() {
           <Gauge score={result.score} grade={result.grade} />
           <SubScore label="Your website" value={result.websiteScore} />
           <SubScore label="Search visibility" value={result.visibilityScore} />
+          <div style={{ background: ENTRY_BG, borderRadius: 14, padding: 16, marginTop: 6 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: 'rgba(255,255,255,.82)' }}>Revenue at stake</div>
+            <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 800, color: '#fff', lineHeight: 1.05, marginTop: 5 }}>−{result.currency}{result.revenueLostPerYear.toLocaleString()}<span style={{ fontSize: 15, fontWeight: 700, opacity: .8 }}>/yr</span></div>
+            <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.9)', marginTop: 3 }}>{result.problemCount} problems · all fixable</div>
+          </div>
+          <div style={{ marginTop: 18 }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginBottom: 11 }}>Your agent will</div>
+            {['Fix titles, metas, schema & alt text', 'Publish content that ranks', 'Get you cited in AI answers', 'Build DA 40+ backlinks', 'Track every rank daily'].map((t) => (
+              <div key={t} style={{ display: 'flex', gap: 9, fontSize: 13, color: 'rgba(255,255,255,.82)', marginBottom: 9, lineHeight: 1.35 }}><span style={{ color: GOOD, flex: 'none' }}>✓</span>{t}</div>
+            ))}
+          </div>
           <div style={{ marginTop: 'auto', paddingTop: 24 }}>
-            <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 10 }}>Fix everything in minutes</div>
-            <button onClick={() => setPhase('offer')} style={{ width: '100%', background: '#fff', color: DARK, border: 'none', borderRadius: 12, padding: '14px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Fix in 30 minutes</button>
+            <button onClick={() => setPhase('offer')} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Fix in 30 minutes</button>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>Read-only until you approve each fix</div>
           </div>
         </>
@@ -286,6 +296,9 @@ export default function AuditTheater() {
 /* ── Running stage (real data when it has streamed in) ─────────────────────────────────────────── */
 function RunningStage({ step, live, isMobile, domain }: { step: number; live: Record<string, Section>; isMobile: boolean; domain: string }) {
   const s = STEPS[step]
+  // The verdict stripe only appears once the step has had time to "work" — never the instant it opens.
+  const [showRemark, setShowRemark] = useState(false)
+  useEffect(() => { setShowRemark(false); const t = setTimeout(() => setShowRemark(true), 5200); return () => clearTimeout(t) }, [step])
   const titles: Record<string, string> = { health: 'Reading your key pages', speed: 'How fast your site really loads', spam: 'Did Google’s spam update target you?', catalog: 'Your catalog, product by product', google: 'Where you rank on Google', backlinks: 'Who links to you?', ai: 'Do the AIs recommend you?', revenue: 'What it’s costing you' }
   const blurbs: Record<string, string> = {
     health: 'A sample of your collections, products and pages — opened, rendered and measured the way a real buyer loads them.',
@@ -321,8 +334,8 @@ function RunningStage({ step, live, isMobile, domain }: { step: number; live: Re
                 : s.key === 'revenue' ? <RevenueTally sec={live.revenue as any} live={live} domain={domain} isMobile={isMobile} />
                 : <ScanPulse isMobile={isMobile} />}
             </div>
-            {/* Remark — orange stripe, white text: the verdict for this step */}
-            {(() => { const rk = remark(s.key, live[s.key] as any); return rk ? (
+            {/* Remark — orange stripe, white text: the verdict, revealed only after the step has worked */}
+            {(() => { const rk = remark(s.key, live[s.key] as any); return showRemark && rk ? (
               <div style={{ width: '100%', background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 26px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)', animation: 'aPop .5s ease both' }}>
                 <span style={{ width: 32, height: 32, borderRadius: 100, flex: 'none', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17 }}>{rk.ok ? '✓' : '!'}</span>
                 <div style={{ minWidth: 0 }}>
@@ -470,11 +483,12 @@ function ScanPulse({ isMobile }: { isMobile: boolean }) {
   return <div style={{ position: 'relative', width: size, height: size }}>{[0.5, 0.38, 0.26].map((f, i) => <div key={i} style={{ position: 'absolute', inset: `${(0.5 - f) * size}px`, border: '1.5px dashed #e2e6ea', borderRadius: '50%' }} />)}<div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: size * 0.3, height: size * 0.3, borderRadius: '50%', border: `3px solid ${LINE}`, borderTopColor: LIME, animation: 'aOrbit 1s linear infinite' }} /></div></div>
 }
 
-/** Live screenshot of a page via a free render service, falling back to og:image then a skeleton. */
-const shotUrl = (full: string) => `https://image.thum.io/get/width/640/crop/480/noanimate/${full}`
+/** Page thumbnail: the real og:image first (reliable — product photos), then a live screenshot, then skeleton. */
+const shotUrl = (full: string) => `https://s0.wp.com/mshots/v1/${encodeURIComponent(full)}?w=640&h=480`
 function PageThumb({ full, og, i }: { full: string; og: string | null; i: number }) {
-  const [stage, setStage] = useState(0)   // 0 = live screenshot, 1 = og:image, 2 = skeleton
-  const src = stage === 0 ? shotUrl(full) : stage === 1 && og ? og : null
+  const chain = og ? [og, shotUrl(full)] : [shotUrl(full)]
+  const [idx, setIdx] = useState(0)
+  const src = idx < chain.length ? chain[idx] : null
   if (!src) return (
     <>
       <div style={{ position: 'absolute', left: '12%', right: '14%', top: '20%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.08)' }} />
@@ -483,7 +497,7 @@ function PageThumb({ full, og, i }: { full: string; og: string | null; i: number
     </>
   )
   // eslint-disable-next-line @next/next/no-img-element
-  return <img key={stage} src={src} alt="" loading={i < 8 ? undefined : 'lazy'} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} onError={() => setStage((s) => (s === 0 && og ? 1 : 2))} />
+  return <img key={idx} src={src} alt="" loading={i < 8 ? undefined : 'lazy'} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} onError={() => setIdx((n) => n + 1)} />
 }
 
 /** Health — a big live grid of your key pages being opened and rendered, with a huge counter (Ryze-style). */
@@ -687,12 +701,20 @@ function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; op
   return (
     <>
       <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 26 : 34, fontWeight: 700, letterSpacing: '-.02em', margin: '0 0 6px', color: INK }}>Your full report — {result.problemCount} problems found</h1>
-      <p style={{ fontSize: 15.5, color: SUB, margin: '0 0 30px', lineHeight: 1.5, maxWidth: 640 }}>Everything we found across Google, your catalog, AI assistants and your site — and what fixing it is worth.</p>
+      <p style={{ fontSize: 15.5, color: SUB, margin: '0 0 18px', lineHeight: 1.5, maxWidth: 640 }}>Everything we found across Google, your catalog, AI assistants and your site — and what fixing it is worth.</p>
+      <div style={{ background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: isMobile ? 14 : 28, marginBottom: 34, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)' }}>
+        {[[`${result.problemCount}`, 'problems found'], [`−${money(result.revenueLostPerYear)}/yr`, 'at stake'], ['30 min', 'to first fixes'], ['You', 'approve each one']].map(([big, sub], i) => (
+          <div key={i} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <span style={{ fontFamily: SERIF, fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{big}</span>
+            <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,.85)', marginTop: 3 }}>{sub}</span>
+          </div>
+        ))}
+      </div>
 
       {result.sections.map((sec, si) => (
         <section key={sec.key} style={{ marginBottom: 34 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, borderBottom: `1px solid ${LINE}`, paddingBottom: 10, marginBottom: 14 }}>
-            <div><div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: SUB, fontWeight: 600, marginRight: 8 }}>{si + 1}.</span>{sec.name}</div><div style={{ fontSize: 13.5, color: SUB, marginTop: 2 }}>{sec.sub}</div></div>
+            <div><div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: LIME, fontWeight: 800, marginRight: 8 }}>{si + 1}.</span>{sec.name}</div><div style={{ fontSize: 13.5, color: SUB, marginTop: 2 }}>{sec.sub}</div></div>
             <div style={{ fontSize: 18, fontWeight: 800, color: sec.score >= 70 ? GOOD : sec.score >= 40 ? '#c98a1a' : RED, flex: 'none' }}>{sec.score}/100</div>
           </div>
           {sec.findings.length === 0 ? (
@@ -735,7 +757,7 @@ function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; op
 
       <section style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderBottom: `1px solid ${LINE}`, paddingBottom: 10, marginBottom: 14 }}>
-          <div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: SUB, fontWeight: 600, marginRight: 8 }}>{result.sections.length + 1}.</span>What it’s costing you</div>
+          <div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: LIME, fontWeight: 800, marginRight: 8 }}>{result.sections.length + 1}.</span>What it’s costing you</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: LIME }}>−{money(result.revenueLostPerYear)}/yr</div>
         </div>
         {(() => {

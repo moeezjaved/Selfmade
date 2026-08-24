@@ -94,25 +94,31 @@ async function seedKeywords(category: string): Promise<string[]> {
 
 type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number> }; pages: Page[]; productPages: Page[] }
 
-function productLinksFrom(html: string, domain: string): string[] {
+const isProduct = (u: string) => /\/products?\//i.test(u)
+function internalLinksFrom(html: string, domain: string): string[] {
   const abs = (l: string) => (l.startsWith('http') ? l : `https://${domain}${l.startsWith('/') ? '' : '/'}${l}`)
-  const links = Array.from(html.matchAll(/href=["']([^"']*\/products\/[^"'?#]+)/gi)).map((m) => abs(m[1]))
+  const links = Array.from(html.matchAll(/href=["'](\/(?:products|collections|pages|blogs)\/[^"'?#]+|https?:\/\/[^"']*\/(?:products|collections|pages|blogs)\/[^"'?#]+)["']/gi))
+    .map((m) => abs(m[1])).filter((u) => u.includes(domain.replace(/^www\./, '')))
   return Array.from(new Set(links))
 }
 
 async function buildContext(domain: string, home: string): Promise<Ctx> {
   const siteName = (tag(home, /<title[^>]*>([^<|–-]{0,60})/i) || domain).trim()
   const [sm, category] = await Promise.all([sitemap(domain), deriveCategory(home, siteName)])
-  let productUrls = sm.urls.filter((u) => /\/products?\//i.test(u))
-  // Fallback: many Shopify sitemaps split products out or block bots — read product links off the homepage,
-  // then off /collections/all, so the catalog check actually has products to inspect.
-  if (!productUrls.length) productUrls = productLinksFrom(home, domain)
-  if (!productUrls.length) { const coll = await fetchHtml(`https://${domain}/collections/all`); if (coll) productUrls = productLinksFrom(coll, domain) }
-  productUrls = productUrls.slice(0, 14)
-  const contentUrls = sm.urls.filter((u) => !/\/products?\//i.test(u)).slice(0, 8)
-  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 21)
+  // Discover as many real URLs as we can: sitemap + homepage nav + /collections/all (for thin sitemaps / bot blocks).
+  const discovered = new Set<string>([...sm.urls, ...internalLinksFrom(home, domain)])
+  if (Array.from(discovered).filter(isProduct).length < 8) {
+    const coll = await fetchHtml(`https://${domain}/collections/all`)
+    if (coll) internalLinksFrom(coll, domain).forEach((u) => discovered.add(u))
+  }
+  const all = Array.from(discovered)
+  const productUrls = all.filter(isProduct).slice(0, 14)
+  const contentUrls = all.filter((u) => !isProduct(u)).slice(0, 10)
+  const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 24)
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
-  return { domain, siteName, category, sm, pages, productPages: pages.filter((p) => /\/products?\//i.test(p.url)) }
+  // Use the richer discovered set for the page-count total (Ryze shows the full crawl size, not just the sample).
+  const richSm = { urls: all.length > sm.urls.length ? all : sm.urls, byDay: sm.byDay }
+  return { domain, siteName, category, sm: richSm, pages, productPages: pages.filter((p) => isProduct(p.url)) }
 }
 
 /* ── Steps ─────────────────────────────────────────────────────────────────────────────────────── */
@@ -194,7 +200,9 @@ async function stepSpeed(ctx: Ctx): Promise<Section | null> {
     f.push({ id: 'perf', title: `Performance score ${ps.perf}/100`, detail: 'Room to speed up your pages.', severity: ps.perf < 50 ? 'high' : 'medium', fixable: true })
   }
   const score = ps.lcpMs != null ? (ps.lcpMs <= 2500 ? 100 : ps.lcpMs < 4000 ? 60 : 30) : (ps.perf ?? 100)
-  return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Lab performance (not enough real-visitor data yet)', score, findings: f, speed: { lcpS: ps.lcpMs != null ? +(ps.lcpMs / 1000).toFixed(1) : null, cls: ps.clsScore != null ? +ps.clsScore.toFixed(2) : null } }
+  // Speedometer needs a load-time value. Prefer real CrUX LCP; else estimate seconds from the lab perf score.
+  const lcpS = ps.lcpMs != null ? +(ps.lcpMs / 1000).toFixed(1) : (ps.perf != null ? +(1 + ((100 - ps.perf) / 100) * 5).toFixed(1) : null)
+  return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Estimated from lab performance', score, findings: f, speed: { lcpS, cls: ps.clsScore != null ? +ps.clsScore.toFixed(2) : null } }
 }
 
 async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {
