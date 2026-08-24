@@ -18,7 +18,7 @@ type Finding = { id: string; title: string; detail: string; severity: 'high' | '
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 type AiRead = { engine: string; mentioned: boolean; question: string; answer: string }
 type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
-type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
+type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
 type RevenueModel = { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
 type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
 
@@ -122,7 +122,7 @@ function remark(key: string, sec?: Section & { _lost?: number; _cur?: string }):
 
 export default function AuditTheater() {
   const isMobile = useIsMobile()
-  const [phase, setPhase] = useState<'idle' | 'running' | 'report' | 'offer'>('idle')
+  const [phase, setPhase] = useState<'idle' | 'running' | 'ready' | 'report' | 'offer'>('idle')
   const [domain, setDomain] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -140,10 +140,10 @@ export default function AuditTheater() {
     // Director: walk each step at a deliberate, Ryze-slow pace. Every step dwells DWELL ms so its
     // visual is actually seen; a step that yields data waits (up to MAXWAIT) for it before advancing.
     // Data arrival never fast-forwards the theater — only fills each slide in as the director lands on it.
-    const DWELL = 6000, MAXWAIT = 9500
+    const DWELL = 8000, MAXWAIT = 11000
     const OPTIONAL = new Set(['speed', 'backlinks'])   // may yield nothing (no API key) — don't stall waiting
     let i = 0, stopped = false
-    const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('report') } }
+    const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('ready') } }
     const walk = () => {
       if (stopped) return
       setStep(i)
@@ -259,13 +259,14 @@ export default function AuditTheater() {
           </div>
           <div style={{ marginTop: 'auto', paddingTop: 24 }}>
             <div style={{ height: 6, borderRadius: 100, background: 'rgba(255,255,255,.12)', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.round(((step + 1) / STEPS.length) * 100)}%`, background: LIME, transition: 'width .5s' }} /></div>
-            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.45)', marginTop: 8 }}>About {Math.max(3, (STEPS.length - 1 - step) * 6)} seconds remaining · {Math.round(((step + 1) / STEPS.length) * 100)}%</div>
+            <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.45)', marginTop: 8 }}>About {Math.max(3, (STEPS.length - 1 - step) * 8)} seconds remaining · {Math.round(((step + 1) / STEPS.length) * 100)}%</div>
           </div>
         </>
       )}
     </aside>
   )
 
+  if (phase === 'ready' && result) return <Ready result={result} onSee={() => setPhase('report')} isMobile={isMobile} />
   if (phase === 'offer' && result) return <Offer result={result} onBack={() => setPhase('report')} isMobile={isMobile} />
 
   return (
@@ -296,33 +297,39 @@ function RunningStage({ step, live, isMobile, domain }: { step: number; live: Re
   return (
     <>
       <style>{`@keyframes aSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}@keyframes aOrbit{to{transform:rotate(360deg)}}@keyframes aFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes aScan{0%{top:6%}100%{top:92%}}@keyframes aPulseDot{0%,100%{opacity:.3}50%{opacity:1}}@keyframes aBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes aPop{0%{opacity:0;transform:translateY(8px) scale(.96)}100%{opacity:1;transform:none}}@keyframes aScrollUp{0%,12%{transform:translateY(0)}88%,100%{transform:translateY(-44%)}}`}</style>
-      <div style={{ minHeight: isMobile ? 'auto' : '72vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-        <div style={{ maxWidth: 640, marginBottom: isMobile ? 22 : 30, animation: 'aFade .4s ease' }} key={s.key}>
-          <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: LIME, marginBottom: 10 }}>Step {step + 1} of {STEPS.length}</div>
-          <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 28 : 42, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 12px', color: INK }}>{titles[s.key]}</h1>
-          <p style={{ fontSize: isMobile ? 15 : 16.5, color: SUB, lineHeight: 1.5, margin: 0 }}>{blurbs[s.key]}</p>
-        </div>
-        <div style={{ animation: 'aFade .5s ease', display: 'flex', justifyContent: 'center' }} key={s.key + '-v'}>
-          {s.key === 'health' ? <HealthGrid sec={live.health} isMobile={isMobile} />
-            : s.key === 'speed' ? <Speedometer sec={live.speed} isMobile={isMobile} />
-            : s.key === 'spam' ? <SpamGauge sec={live.spam} isMobile={isMobile} />
-            : s.key === 'catalog' ? <CatalogCards sec={live.catalog} isMobile={isMobile} />
-            : s.key === 'google' ? <SerpBrowser rows={live.google?.ladder || []} domain={domain} isMobile={isMobile} />
-            : s.key === 'ai' ? <AiGrid sec={live.ai} domain={domain} isMobile={isMobile} />
-            : s.key === 'backlinks' ? <BacklinkGap sec={live.backlinks} isMobile={isMobile} />
-            : s.key === 'revenue' ? <RevenueTally sec={live.revenue as any} live={live} domain={domain} isMobile={isMobile} />
-            : <ScanPulse isMobile={isMobile} />}
-        </div>
-        {/* Remark — orange stripe, white text: the verdict for this step (Ryze gives one per screen) */}
-        {(() => { const rk = remark(s.key, live[s.key] as any); return rk ? (
-          <div style={{ maxWidth: 760, margin: isMobile ? '22px auto 0' : '30px auto 0', width: '100%', background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 24px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)', animation: 'aPop .5s ease both' }}>
-            <span style={{ width: 30, height: 30, borderRadius: 100, flex: 'none', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 16 }}>{rk.ok ? '✓' : '!'}</span>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: isMobile ? 15 : 17, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{rk.title}</div>
-              <div style={{ fontSize: isMobile ? 12.5 : 13.5, color: 'rgba(255,255,255,.9)', marginTop: 2 }}>{rk.sub}</div>
+      <div style={{ minHeight: isMobile ? 'auto' : 'calc(100dvh - 120px)', display: 'flex' }}>
+        <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', background: '#fff', border: `1px solid ${LINE}`, borderRadius: isMobile ? 18 : 26, boxShadow: '0 40px 100px -60px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', padding: isMobile ? '26px 20px 24px' : 'clamp(32px,3.5vw,52px)' }}>
+          {/* faint blueprint grid, like Ryze */}
+          <div aria-hidden style={{ position: 'absolute', inset: 0, backgroundImage: 'linear-gradient(rgba(26,20,16,.04) 1px, transparent 1px), linear-gradient(90deg, rgba(26,20,16,.04) 1px, transparent 1px)', backgroundSize: '36px 36px', WebkitMaskImage: 'radial-gradient(circle at 55% 42%, #000 55%, transparent 92%)', maskImage: 'radial-gradient(circle at 55% 42%, #000 55%, transparent 92%)' }} />
+          <div style={{ position: 'relative', zIndex: 1, display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
+            <div style={{ maxWidth: 760, animation: 'aFade .4s ease' }} key={s.key}>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: LIME, marginBottom: 12 }}>Step {step + 1} of {STEPS.length}</div>
+              <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 'clamp(38px,4vw,52px)', fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.0, margin: '0 0 12px', color: INK }}>{titles[s.key]}</h1>
+              <p style={{ fontSize: isMobile ? 15 : 18, color: SUB, lineHeight: 1.45, margin: 0, maxWidth: 720 }}>{blurbs[s.key]}</p>
             </div>
+            <div style={{ flex: 1, minHeight: isMobile ? 260 : 0, animation: 'aFade .5s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '22px 0' : '18px 0' }} key={s.key + '-v'}>
+              {s.key === 'health' ? <HealthGrid sec={live.health} isMobile={isMobile} />
+                : s.key === 'speed' ? <Speedometer sec={live.speed} isMobile={isMobile} />
+                : s.key === 'spam' ? <SpamGauge sec={live.spam} isMobile={isMobile} />
+                : s.key === 'catalog' ? <CatalogCards sec={live.catalog} isMobile={isMobile} />
+                : s.key === 'google' ? <SerpBrowser rows={live.google?.ladder || []} domain={domain} isMobile={isMobile} />
+                : s.key === 'ai' ? <AiGrid sec={live.ai} domain={domain} isMobile={isMobile} />
+                : s.key === 'backlinks' ? <BacklinkGap sec={live.backlinks} isMobile={isMobile} />
+                : s.key === 'revenue' ? <RevenueTally sec={live.revenue as any} live={live} domain={domain} isMobile={isMobile} />
+                : <ScanPulse isMobile={isMobile} />}
+            </div>
+            {/* Remark — orange stripe, white text: the verdict for this step */}
+            {(() => { const rk = remark(s.key, live[s.key] as any); return rk ? (
+              <div style={{ width: '100%', background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 26px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)', animation: 'aPop .5s ease both' }}>
+                <span style={{ width: 32, height: 32, borderRadius: 100, flex: 'none', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17 }}>{rk.ok ? '✓' : '!'}</span>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: isMobile ? 15.5 : 18, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{rk.title}</div>
+                  <div style={{ fontSize: isMobile ? 12.5 : 14, color: 'rgba(255,255,255,.9)', marginTop: 2 }}>{rk.sub}</div>
+                </div>
+              </div>
+            ) : null })()}
           </div>
-        ) : null })()}
+        </div>
       </div>
     </>
   )
@@ -460,41 +467,43 @@ function ScanPulse({ isMobile }: { isMobile: boolean }) {
   return <div style={{ position: 'relative', width: size, height: size }}>{[0.5, 0.38, 0.26].map((f, i) => <div key={i} style={{ position: 'absolute', inset: `${(0.5 - f) * size}px`, border: '1.5px dashed #e2e6ea', borderRadius: '50%' }} />)}<div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: size * 0.3, height: size * 0.3, borderRadius: '50%', border: `3px solid ${LINE}`, borderTopColor: LIME, animation: 'aOrbit 1s linear infinite' }} /></div></div>
 }
 
-/** Health — a live grid of your key pages being opened and rendered, with a counter (Ryze-style). */
+/** Health — a big live grid of your key pages being opened and rendered, with a huge counter (Ryze-style). */
 function HealthGrid({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
   const urls = sec?.read?.urls || []
-  const total = sec?.read?.total || urls.length || 12
-  const target = urls.length || Math.min(total, 14)
+  const thumbs = sec?.read?.thumbs || []
+  const total = sec?.read?.total || urls.length || 0
   const [n, setN] = useState(0)
   useEffect(() => {
-    if (!target) return
+    if (!total) return
     const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
-    if (reduce) { setN(target); return }
-    let raf = 0; const t0 = performance.now(), dur = 1600
-    const tick = (t: number) => { const p = Math.min(1, (t - t0) / dur); setN(Math.round(target * p)); if (p < 1) raf = requestAnimationFrame(tick) }
+    if (reduce) { setN(total); return }
+    let raf = 0; const t0 = performance.now(), dur = 1800
+    const tick = (t: number) => { const p = Math.min(1, (t - t0) / dur); setN(Math.round(total * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(tick) }
     raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf)
-  }, [target])
-  const cells = urls.length ? urls : Array.from({ length: 12 }, () => '')
-  const cols = isMobile ? 3 : 6
-  const tints = ['#f6efe6', '#efe7f1', '#e7f1ea', '#fdecea', '#eef2f8', '#f7f0e0']
+  }, [total])
+  const cols = isMobile ? 3 : 7
+  const cellCount = Math.min(Math.max(urls.length, cols * 3), isMobile ? 12 : 21)   // fill at least 3 rows
+  const cells = Array.from({ length: cellCount }, (_, i) => ({ url: urls[i] || '', thumb: thumbs[i] || null }))
+  const tints = ['#f6efe6', '#efe7f1', '#e7f1ea', '#eef2f8', '#f7f0e0', '#eef3ee', '#f5eef0']
   return (
-    <div style={{ width: '100%', maxWidth: 760 }}>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 8, marginBottom: 14 }}>
-        <span style={{ fontFamily: SERIF, fontSize: isMobile ? 40 : 54, fontWeight: 800, color: INK, lineHeight: 1, fontVariantNumeric: 'tabular-nums' }}>{urls.length ? n : '··'}</span>
-        <span style={{ fontSize: 13, color: SUB }}>of {total} pages</span>
+    <div style={{ width: '100%', maxWidth: 980 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'baseline', gap: 8, marginBottom: 18 }}>
+        <span style={{ fontFamily: SERIF, fontSize: isMobile ? 48 : 72, fontWeight: 800, color: INK, lineHeight: .9, fontVariantNumeric: 'tabular-nums' }}>{total ? n.toLocaleString() : '··'}</span>
+        <span style={{ fontSize: 14, color: SUB }}>of {total ? total.toLocaleString() : '···'} pages</span>
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols},1fr)`, gap: isMobile ? 8 : 12 }}>
-        {cells.map((u, i) => {
-          const shown = !urls.length || i < Math.max(n, 1)
+        {cells.map((c, i) => {
+          const real = !!c.url
           return (
-            <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 6px 16px -12px rgba(0,0,0,.3)', opacity: shown ? 1 : 0.35, transform: shown ? 'none' : 'scale(.97)', transition: 'opacity .45s ease, transform .45s ease' }}>
-              <div style={{ aspectRatio: '4 / 3', background: `linear-gradient(135deg, ${tints[i % tints.length]}, #ffffff)`, position: 'relative' }}>
-                <div style={{ position: 'absolute', left: '12%', right: '12%', top: '18%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.08)' }} />
-                <div style={{ position: 'absolute', left: '12%', right: '30%', top: '34%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.06)' }} />
-                <div style={{ position: 'absolute', left: '12%', right: '44%', top: '50%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.05)' }} />
+            <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 8px 18px -12px rgba(0,0,0,.3)', animation: real ? `aPop .4s ease ${Math.min(i, 20) * 0.06}s both` : 'none', opacity: real ? 1 : 0.4 }}>
+              <div style={{ aspectRatio: '4 / 3', background: `linear-gradient(135deg, ${tints[i % tints.length]}, #ffffff)`, position: 'relative', overflow: 'hidden' }}>
+                {c.thumb
+                  // eslint-disable-next-line @next/next/no-img-element
+                  ? <img src={c.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                  : <><div style={{ position: 'absolute', left: '12%', right: '14%', top: '20%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.08)' }} /><div style={{ position: 'absolute', left: '12%', right: '34%', top: '38%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.06)' }} /><div style={{ position: 'absolute', left: '12%', right: '48%', top: '56%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.05)' }} /></>}
                 <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 8, fontWeight: 800, letterSpacing: '.08em', color: '#fff', background: LIME, borderRadius: 4, padding: '1px 5px' }}>SM</span>
               </div>
-              <div style={{ fontSize: 10.5, color: SUB, padding: '6px 8px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{u ? shorten(u, isMobile ? 13 : 18) : '…'}</div>
+              <div style={{ fontSize: 10, color: SUB, padding: '5px 7px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{real ? shorten(c.url, isMobile ? 11 : 15) : '…'}</div>
             </div>
           )
         })}
@@ -772,6 +781,38 @@ function Gauge({ score, grade }: { score: number; grade: string }) {
 function SubScore({ label, value }: { label: string; value: number }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: 'rgba(255,255,255,.03)' }}><div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{label}</div><div style={{ fontSize: 13, color: value >= 60 ? GOOD : value >= 40 ? '#e0a92b' : RED, fontWeight: 800 }}>{value} of 100</div></div>
 }
+
+/** Completion gate — the theater stops here; the report opens only on click (Ryze-style). */
+function Ready({ result, onSee, isMobile }: { result: Result; onSee: () => void; isMobile: boolean }) {
+  const money = (n: number) => `${result.currency}${n.toLocaleString()}`
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+    if (reduce) { setN(result.score); return }
+    let raf = 0; const t0 = performance.now(), dur = 1100
+    const tick = (t: number) => { const p = Math.min(1, (t - t0) / dur); setN(Math.round(result.score * (1 - Math.pow(1 - p, 3)))); if (p < 1) raf = requestAnimationFrame(tick) }
+    raf = requestAnimationFrame(tick); return () => cancelAnimationFrame(raf)
+  }, [result.score])
+  const R = 78, C = 2 * Math.PI * R, off = C * (1 - n / 100)
+  return (
+    <div style={{ minHeight: '100dvh', background: ENTRY_BG, position: 'relative', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '40px 22px' : 60, fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(180deg, rgba(224,47,6,.92), rgba(224,47,6,.97))' }} />
+      <div style={{ position: 'relative', zIndex: 2, textAlign: 'center', maxWidth: 560, animation: 'aPop .5s ease both' }}>
+        <div style={{ fontFamily: MONO_G, fontSize: 12, letterSpacing: '.18em', textTransform: 'uppercase', color: 'rgba(255,255,255,.85)', marginBottom: 22 }}>Scan complete</div>
+        <div style={{ position: 'relative', width: 190, height: 190, margin: '0 auto 26px' }}>
+          <svg width="190" height="190" style={{ transform: 'rotate(-90deg)' }}><circle cx="95" cy="95" r={R} fill="none" stroke="rgba(255,255,255,.22)" strokeWidth="12" /><circle cx="95" cy="95" r={R} fill="none" stroke="#fff" strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={off} /></svg>
+          <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}><div style={{ fontFamily: SERIF, fontSize: 56, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{n}</div><div style={{ fontSize: 12, color: 'rgba(255,255,255,.7)' }}>of 100 · {result.grade}</div></div>
+        </div>
+        <h1 style={{ fontFamily: SERIF, color: '#fff', fontSize: isMobile ? 34 : 46, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 12px' }}>Your report is ready.</h1>
+        <p style={{ fontSize: 17, color: 'rgba(255,255,255,.9)', lineHeight: 1.5, margin: '0 0 30px' }}>We found <b style={{ color: '#fff' }}>{result.problemCount} problems</b> across your site, catalog, Google and AI — worth about <b style={{ color: '#fff' }}>{money(result.revenueLostPerYear)}/yr</b>.</p>
+        <button onClick={onSee} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: isMobile ? '15px 30px' : '17px 38px', fontSize: 17, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>See your full report →</button>
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.7)', marginTop: 16 }}>Free · no login · read-only until you approve a fix</div>
+      </div>
+    </div>
+  )
+}
+const MONO_G = 'ui-monospace, "Space Mono", Menlo, monospace'
 
 function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => void; isMobile: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
