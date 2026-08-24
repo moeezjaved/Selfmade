@@ -1,18 +1,22 @@
+/**
+ * /hire — the employment-agreement paywall for the ads workspace ("hire your AI marketing team").
+ * Separate-from-prod while building: noindex, not linked from production nav.
+ */
 import type { Metadata } from 'next'
-import HireKeynote from './HireKeynote'
-
-const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Hire Mello — your first AI marketer'
-const DESC = 'Mello reads millions of ads while you sleep, watches your competitors, and reports for work every morning. Read its offer, and countersign to hire your first AI marketer.'
+import HireAgreement from '@/components/ads/HireAgreement'
 
 export const metadata: Metadata = {
-  title: { absolute: TITLE },
-  description: DESC,
-  alternates: { canonical: '/hire' },
-  openGraph: { type: 'website', siteName: 'Selfmade', url: `${SITE}/hire`, title: TITLE, description: DESC },
-  twitter: { card: 'summary_large_image', title: TITLE, description: DESC },
+  title: { absolute: 'Hire your AI marketing team | Selfmade' },
+  description: 'Your AI marketing team’s employment agreement — SEO, ads, and more, reporting to you.',
+  robots: { index: false, follow: false },
 }
 
 export default function HirePage() {
-  return <HireKeynote />
+  return (
+    <>
+      {/* eslint-disable-next-line @next/next/no-page-custom-font */}
+      <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,600;0,9..144,700&display=swap" />
+      <HireAgreement />
+    </>
+  )
 }
