@@ -21,6 +21,7 @@ export type DiscoveryResult = {
   seed: { name: string; category: string; market: string; queries: string[] }
   competitors: DiscoveredCompetitor[]
   configured: boolean
+  debug?: { dropletEnv: boolean; adKeywords: string[]; advertisers: number }
 }
 
 /** Market name → Meta Ad Library ISO-2 country (for local advertiser search). ALL = global fallback. */
@@ -167,5 +168,10 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
       foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 6),
     }))
 
-  return { seed: { name: ctx.siteName, category, market, queries }, competitors: [...competitors, ...extra], configured }
+  return {
+    seed: { name: ctx.siteName, category, market, queries },
+    competitors: [...competitors, ...extra],
+    configured,
+    debug: { dropletEnv: !!(process.env.DROPLET_PREVIEW_URL && process.env.PREVIEW_SECRET), adKeywords: adQueries, advertisers: advertisers.length },
+  }
 }
