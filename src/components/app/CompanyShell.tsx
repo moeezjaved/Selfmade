@@ -40,7 +40,15 @@ const NAV: Group[] = [
     { href: '/m4', label: 'Launch Ads', icon: Rocket },
     { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
   ] },
-  { label: 'SEO', stage: true, items: [{ href: '/grow', label: 'Growth', icon: BarChart2 }] },
+  { label: 'SEO', stage: true, items: [
+    { href: '/grow', label: 'Overview', icon: BarChart2 },
+    { href: '/mission/catalog', label: 'Store', icon: Store },
+    { href: '/mission/blog', label: 'Content', icon: FileText },
+    { href: '/mission/programmatic', label: 'Pages at scale', icon: FileText },
+    { href: '/mission/seo', label: 'SEO', icon: Radar },
+    { href: '/mission/geo', label: 'AI Search', icon: Brain },
+    { href: '/mission/competitors', label: 'SEO Competitors', icon: Eye },
+  ] },
   { label: 'Intel', stage: true, items: [
     { href: '/discovery', label: 'All ads', icon: Radar },
     { href: '/discovery/brand-spy', label: 'Brand Spy', icon: Eye },
