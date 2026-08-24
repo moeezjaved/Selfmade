@@ -364,19 +364,20 @@ function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => voi
           <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 40, fontWeight: 700, letterSpacing: '-.01em', margin: '0 0 4px', color: INK }}>Employment Agreement</h2>
           <div style={{ fontFamily: MONO, fontSize: 12, color: SUB, marginBottom: 18 }}>Prepared this morning · for {result.domain}</div>
           <Row k="Employee" v="Mello" />
-          <Row k="Position" v="Your AI SEO team" />
+          <Row k="Position" v="Your AI growth team" />
+          <Row k="Handles" v="SEO · ads · content · your store" />
           <Row k="First task" v={`Fix ${result.problemCount} problems on ${result.domain}`} />
           <Row k="Working hours" v="24/7 — nights included" />
           <Row k="Reports to" v="You" />
           <Row k="Approvals" v="Every change — nothing ships without your yes" />
           <Row k="Salary" v="$1 to start · then $149/mo" />
           <Row k="Starts" v="In the next 30 minutes" />
-          <p style={{ fontSize: 14.5, color: '#4a453b', lineHeight: 1.6, margin: '18px 0 24px', borderTop: `1px solid ${LINE}`, paddingTop: 18 }}>I&rsquo;ll fix your site, publish your pages, and get you cited in AI answers — you approve everything. <b style={{ color: INK }}>First-Win Guarantee: 30 days or your money back, and you keep the work.</b></p>
+          <p style={{ fontSize: 14.5, color: '#4a453b', lineHeight: 1.6, margin: '18px 0 24px', borderTop: `1px solid ${LINE}`, paddingTop: 18 }}>I&rsquo;ll run your growth end to end — fix your site, publish your pages, launch your ads, and get you cited in AI answers — you approve everything. <b style={{ color: INK }}>First-Win Guarantee: 30 days or your money back, and you keep the work.</b></p>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 22 }}>
-            <div><div style={{ fontFamily: SERIF, fontSize: 24, color: INK, borderBottom: `1px solid ${INK}`, paddingBottom: 6 }}>Mello</div><div style={{ fontFamily: MONO, fontSize: 10.5, color: SUB, marginTop: 6, letterSpacing: '.04em' }}>MELLO · YOUR SEO MANAGER</div></div>
+            <div><div style={{ fontFamily: SERIF, fontSize: 24, color: INK, borderBottom: `1px solid ${INK}`, paddingBottom: 6 }}>Mello</div><div style={{ fontFamily: MONO, fontSize: 10.5, color: SUB, marginTop: 6, letterSpacing: '.04em' }}>MELLO · YOUR AI GROWTH TEAM</div></div>
             <div><input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && start()} placeholder="Type your name to sign" style={{ width: '100%', fontFamily: SERIF, fontSize: 22, color: INK, border: 'none', borderBottom: `1px solid ${INK}`, background: 'transparent', outline: 'none', paddingBottom: 6 }} /><div style={{ fontFamily: MONO, fontSize: 10.5, color: SUB, marginTop: 6, letterSpacing: '.04em' }}>YOU · EMPLOYER</div></div>
           </div>
-          <button onClick={start} disabled={!name.trim()} style={{ width: '100%', background: name.trim() ? LIME : '#d8cdb4', color: '#fff', border: 'none', borderRadius: 12, padding: '16px', fontSize: 16.5, fontWeight: 800, cursor: name.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background .2s' }}>Hire Mello — fix my site →</button>
+          <button onClick={start} disabled={!name.trim()} style={{ width: '100%', background: name.trim() ? LIME : '#d8cdb4', color: '#fff', border: 'none', borderRadius: 12, padding: '16px', fontSize: 16.5, fontWeight: 800, cursor: name.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background .2s' }}>Hire Mello — run my growth →</button>
           <div style={{ fontSize: 12, color: SUB, textAlign: 'center', marginTop: 10 }}>$1 for 3 days, then $149/mo · cancel in one email · we pick up where this report left off</div>
         </div>
       </div>
