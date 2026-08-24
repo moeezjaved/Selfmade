@@ -62,9 +62,8 @@ export default function GrowPage() {
     <div style={{ background: '#fff', width: '100%', minHeight: '100%' }}>
       <style>{`.gcard{transition:border-color .12s, box-shadow .12s, transform .12s} .gcard:hover{border-color:${LIME}!important;box-shadow:0 4px 16px rgba(0,0,0,.06);transform:translateY(-1px)} .gcard:hover .garrow{opacity:1;transform:translateX(0)} .gtab{transition:background .12s,color .12s}`}</style>
       <div style={{ maxWidth: 980, margin: '0 auto', padding: '26px 24px 70px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ marginBottom: 16 }}>
           <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-.02em', margin: 0 }}>Growth</h1>
-          <a href="/mission/wins" style={{ fontSize: 13, color: GOOD, fontWeight: 700, textDecoration: 'none' }}>Impact ledger →</a>
         </div>
 
         {loading ? <div style={{ color: SUB }}>Loading…</div> : d && (
@@ -76,7 +75,7 @@ export default function GrowPage() {
                   <div><span style={{ fontSize: 26, fontWeight: 800, letterSpacing: '-.02em' }}>{money(rev.total, rev.currency)}</span><span style={{ fontSize: 12, color: SUB, marginLeft: 6 }}>revenue · 30d</span></div>
                   <div style={{ fontSize: 13, color: GOOD, fontWeight: 700 }}>{money(rev.organic, rev.currency)} organic <span style={{ color: SUB, fontWeight: 500 }}>({rev.organicShare}%)</span></div>
                 </> : <div style={{ fontSize: 15, color: SUB }}>Connect your store to track revenue →</div>}
-                <a href="/mission/wins" style={{ marginLeft: 'auto', fontSize: 12.5, color: SUB, textDecoration: 'none' }}><b style={{ color: INK }}>{d.wins}</b> moves{d.banked ? <> · <b style={{ color: GOOD }}>{money(d.banked, rev?.currency)}</b> banked</> : ''}</a>
+                <span style={{ marginLeft: 'auto', fontSize: 12.5, color: SUB }}><b style={{ color: INK }}>{d.wins}</b> moves{d.banked ? <> · <b style={{ color: GOOD }}>{money(d.banked, rev?.currency)}</b> banked</> : ''}</span>
               </div>
               <div style={{ height: 7, borderRadius: 100, background: '#eef2ee', overflow: 'hidden', marginTop: 12 }}>
                 <div style={{ height: '100%', width: `${d.momentum}%`, background: `linear-gradient(90deg,${GOOD},${LIME})`, borderRadius: 100 }} />

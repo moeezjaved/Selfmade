@@ -77,7 +77,7 @@ export default function JourneyPage() {
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: PAPER, padding: 20, marginBottom: 18 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
           <div style={{ fontFamily: '"Instrument Serif", Georgia, serif', fontSize: 15, color: INK }}>Momentum</div>
-          <a href="/mission/wins" style={{ fontSize: 13, color: SUB, textDecoration: 'none' }}><b style={{ color: GOOD }}>{data.wins}</b> moves{data.banked ? <> · <b style={{ color: GOOD }}>{money(data.banked, data.revenue?.currency)}</b> banked</> : ''}{data.activeDays && data.activeDays > 1 ? ` · active ${data.activeDays} days` : ''} →</a>
+          <span style={{ fontSize: 13, color: SUB }}><b style={{ color: GOOD }}>{data.wins}</b> moves{data.banked ? <> · <b style={{ color: GOOD }}>{money(data.banked, data.revenue?.currency)}</b> banked</> : ''}{data.activeDays && data.activeDays > 1 ? ` · active ${data.activeDays} days` : ''}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 8 }}>
           <div style={{ flex: 1, height: 10, borderRadius: 100, background: '#eaf0ea', overflow: 'hidden' }}>

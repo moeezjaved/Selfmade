@@ -51,8 +51,7 @@ const AREAS: { key: string; label: string; railLabel: string; railIcon: React.El
     // from its cards, not the rail — no menu soup.
     key: 'grow', label: 'Grow', railLabel: 'Grow', railIcon: TrendingUp, defaultHref: '/grow',
     items: [
-      { href: '/grow',          icon: TrendingUp, label: 'Growth' },
-      { href: '/mission/wins',  icon: Trophy,     label: 'Impact ledger' },
+      { href: '/grow', icon: TrendingUp, label: 'Growth' },
     ],
   },
   {
