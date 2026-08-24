@@ -16,7 +16,7 @@ import { llm } from '@/lib/llm'
 export type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
 export type SerpLadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 export type AiEngineRead = { engine: string; mentioned: boolean; question: string; answer: string }
-export type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
+export type CatalogProduct = { title: string; price: number | null; image: string | null; url: string; missingAlt: number; thin: boolean; noSchema: boolean }
 export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
@@ -159,7 +159,8 @@ function stepCatalog(ctx: Ctx): Section {
     const noMeta = P.filter((p) => !p.metaDesc)
     if (noMeta.length) f.push({ id: 'prodmeta', title: `${noMeta.length} products missing a meta description`, detail: 'Google writes its own snippet — usually worse than yours.', severity: 'medium', sample: noMeta.map((p) => strip(p.title).slice(0, 60)), fixable: true })
   }
-  const products: CatalogProduct[] = P.map((p) => ({ title: strip(p.title).replace(/\s*[|–-]\s*[^|–-]*$/, '').slice(0, 60) || strip(p.title).slice(0, 60), price: p.price, image: p.image, missingAlt: p.imgsNoAlt, thin: p.words < 200, noSchema: !p.schema }))
+  const slugName = (url: string) => { try { const s = new URL(url).pathname.split('/').filter(Boolean).pop() || ''; return s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 60) } catch { return '' } }
+  const products: CatalogProduct[] = P.map((p) => { const t = strip(p.title).replace(/\s*[|–—-]\s*[^|–—-]*$/, '').trim(); return { title: t || slugName(p.url) || 'Product', price: p.price, image: p.image, url: p.url, missingAlt: p.imgsNoAlt, thin: p.words < 200, noSchema: !p.schema } })
   return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : 100, findings: f, products }
 }
 async function stepAi(ctx: Ctx): Promise<Section> {
@@ -191,7 +192,8 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
     id: `serp-${r.keyword}`, title: `“${r.keyword}” — ${r.yourPosition == null ? 'not in top 50' : `ranked #${r.yourPosition}`}`,
     detail: `${r.volume ? `${r.volume.toLocaleString()} searches/mo · ` : ''}${r.top[0]?.domain || 'a rival'} takes the click uncontested.`, severity: 'high', fixable: true,
   }))
-  return { key: 'google', name: 'Google visibility', sub: 'Where buyers find you first', score: rows.length ? scoreFrom(f) : 0, findings: f, ladder: rows }
+  const sub = rows.length ? 'Where buyers find you first' : 'We couldn’t pull live rankings for your keywords'
+  return { key: 'google', name: 'Google visibility', sub, score: rows.length ? scoreFrom(f) : 100, findings: f, ladder: rows }
 }
 
 async function stepSpeed(ctx: Ctx): Promise<Section | null> {
@@ -254,8 +256,11 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   const grade: ScanResult['grade'] = score >= 80 ? 'Great' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Poor'
   const problemCount = sections.reduce((a, s) => a + s.findings.filter((f) => f.fixable).length, 0)
 
-  const prices = ctx.productPages.map((p) => p.price).filter((p): p is number => !!p).sort((a, b) => a - b)
-  const aov = prices.length ? prices[Math.floor(prices.length / 2)] : 60
+  const prices = ctx.productPages.map((p) => p.price).filter((p): p is number => !!p && p > 0)
+    .map((p) => (p > 2000 ? p / 100 : p))          // JSON-LD/meta sometimes reports the price in cents
+    .filter((p) => p >= 3 && p <= 3000)             // drop outliers (bundles, mis-parses)
+    .sort((a, b) => a - b)
+  const aov = prices.length ? Math.min(1500, Math.max(10, prices[Math.floor(prices.length / 2)])) : 60
   const CONV = 0.009
   const ladder = get('google').ladder || []
   const lostRows = ladder.filter((r) => r.yourPosition == null || r.yourPosition > 10)
