@@ -327,39 +327,47 @@ function SubScore({ label, value }: { label: string; value: number }) {
 
 function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => void; isMobile: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
+  const [name, setName] = useState('')
   // Stash the scanned domain, then hand off to signup (Gmail OK) — the app claims the scan on login.
-  const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; window.location.href = `/signup?ref=seo-scan&next=${encodeURIComponent('/mission/seo')}` }
+  const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; if (name.trim()) document.cookie = `sf_scan_signer=${encodeURIComponent(name.trim())}; path=/; max-age=2592000`; window.location.href = `/signup?ref=seo-scan&next=${encodeURIComponent('/mission/seo')}` }
+  const MONO = 'ui-monospace, "Space Mono", Menlo, monospace'
+  const Row = ({ k, v }: { k: string; v: string }) => (
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, padding: '14px 0', borderTop: `1px solid ${LINE}` }}>
+      <span style={{ fontSize: 15, color: SUB }}>{k}</span><span style={{ fontSize: 15.5, fontWeight: 800, color: INK, textAlign: 'right' }}>{v}</span>
+    </div>
+  )
   return (
     <div style={{ minHeight: '100dvh', background: PAPER, fontFamily: 'Inter, system-ui, sans-serif', padding: isMobile ? '20px 16px 60px' : '40px 48px' }}>
       <button onClick={onBack} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>← Back to report</button>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) 380px', gap: 28, maxWidth: 1080 }}>
-        <div>
-          <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 32 : 46, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.0, margin: '0 0 14px', color: INK }}>Fix all {result.problemCount} problems on {result.domain}</h1>
-          <p style={{ fontSize: 16.5, color: SUB, lineHeight: 1.5, margin: '0 0 26px' }}>These problems cost {result.domain} ≈{money(result.revenueLostPerYear)}/yr. Your AI marketing team starts fixing them in the next 30 minutes — you approve every change.</p>
-          <div style={{ fontSize: 13, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>What you get — priced like hiring it out</div>
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: 12 }}>
-            {[['$5,000/mo of work', 'SEO, content, catalog, competitor intel — a whole team'], ['Fixes in 30 min', 'Meta, alt text, schema — you approve each'], ['Real revenue', 'We bank the organic revenue against every fix'], ['First-Win Guarantee', '30 days or your money back — you keep the work']].map(([t, d], i) => (
-              <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 14 }}><div style={{ color: GOOD, fontSize: 18, marginBottom: 6 }}>✓</div><div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t}</div><div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.4 }}>{d}</div></div>
-            ))}
-          </div>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
+        <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 32 : 46, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.0, margin: '0 0 14px', color: INK }}>Fix all {result.problemCount} problems on {result.domain}</h1>
+        <p style={{ fontSize: 16.5, color: SUB, lineHeight: 1.5, margin: '0 0 26px', maxWidth: 620 }}>These problems cost {result.domain} ≈{money(result.revenueLostPerYear)}/yr. Sign below and your AI SEO team starts fixing them in the next 30 minutes — you approve every change.</p>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: 12, marginBottom: 34 }}>
+          {[['$5,000/mo of work', 'SEO, content, catalog, competitor intel — a whole team'], ['Fixes in 30 min', 'Meta, alt text, schema — you approve each'], ['Real revenue', 'We bank the organic revenue against every fix'], ['First-Win Guarantee', '30 days or your money back — you keep the work']].map(([t, d], i) => (
+            <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 14 }}><div style={{ color: GOOD, fontSize: 18, marginBottom: 6 }}>✓</div><div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t}</div><div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.4 }}>{d}</div></div>
+          ))}
         </div>
-        <div style={{ background: DARK, borderRadius: 20, padding: 24, color: '#fff', alignSelf: 'start' }}>
-          {/* Starter — the trial (most popular) */}
-          <div style={{ position: 'relative', border: '1px solid rgba(255,255,255,.12)', borderRadius: 14, padding: 18, marginBottom: 12 }}>
-            <div style={{ position: 'absolute', top: -10, right: 14, background: LIME, color: '#fff', fontSize: 10.5, fontWeight: 800, borderRadius: 100, padding: '3px 10px' }}>MOST POPULAR</div>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700 }}>Starter</div><div style={{ fontSize: 20, fontWeight: 800 }}>Free<span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/3 days</span></div></div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>3-day free trial — cancel anytime</div>
-            <div style={{ margin: '14px 0 2px', display: 'flex', flexDirection: 'column', gap: 9 }}>
-              {['Every SEO problem on your store — found & fixed for you', 'Blog + programmatic pages published for you', 'Get cited in ChatGPT, Gemini & Perplexity', 'Competitor intel — take their traffic', 'Works with Shopify, WordPress & more'].map((t, i) => <div key={i} style={{ display: 'flex', gap: 9, fontSize: 13, color: 'rgba(255,255,255,.9)', lineHeight: 1.4 }}><span style={{ color: GOOD, flex: 'none' }}>✓</span>{t}</div>)}
-            </div>
+
+        {/* Employment Agreement — the sign moment (from the landing) */}
+        <div style={{ maxWidth: 660, margin: '0 auto', background: '#f4efe1', border: `1px solid ${LINE}`, borderRadius: 18, padding: isMobile ? '24px 20px' : '38px 40px', boxShadow: '0 30px 60px -30px rgba(0,0,0,.25)' }}>
+          <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', color: LIME, marginBottom: 12 }}>EMPLOYMENT AGREEMENT · FOR YOUR SIGNATURE</div>
+          <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 40, fontWeight: 700, letterSpacing: '-.01em', margin: '0 0 4px', color: INK }}>Employment Agreement</h2>
+          <div style={{ fontFamily: MONO, fontSize: 12, color: SUB, marginBottom: 18 }}>Prepared this morning · for {result.domain}</div>
+          <Row k="Employee" v="Mello" />
+          <Row k="Position" v="Your AI SEO team" />
+          <Row k="First task" v={`Fix ${result.problemCount} problems on ${result.domain}`} />
+          <Row k="Working hours" v="24/7 — nights included" />
+          <Row k="Reports to" v="You" />
+          <Row k="Approvals" v="Every change — nothing ships without your yes" />
+          <Row k="Salary" v="$1 to start · then $149/mo" />
+          <Row k="Starts" v="In the next 30 minutes" />
+          <p style={{ fontSize: 14.5, color: '#4a453b', lineHeight: 1.6, margin: '18px 0 24px', borderTop: `1px solid ${LINE}`, paddingTop: 18 }}>I&rsquo;ll fix your site, publish your pages, and get you cited in AI answers — you approve everything. <b style={{ color: INK }}>First-Win Guarantee: 30 days or your money back, and you keep the work.</b></p>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 20, marginBottom: 22 }}>
+            <div><div style={{ fontFamily: SERIF, fontSize: 24, color: INK, borderBottom: `1px solid ${INK}`, paddingBottom: 6 }}>Mello</div><div style={{ fontFamily: MONO, fontSize: 10.5, color: SUB, marginTop: 6, letterSpacing: '.04em' }}>MELLO · YOUR SEO MANAGER</div></div>
+            <div><input value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && name.trim() && start()} placeholder="Type your name to sign" style={{ width: '100%', fontFamily: SERIF, fontSize: 22, color: INK, border: 'none', borderBottom: `1px solid ${INK}`, background: 'transparent', outline: 'none', paddingBottom: 6 }} /><div style={{ fontFamily: MONO, fontSize: 10.5, color: SUB, marginTop: 6, letterSpacing: '.04em' }}>YOU · EMPLOYER</div></div>
           </div>
-          {/* Growth */}
-          <div style={{ border: '1px solid rgba(255,255,255,.1)', borderRadius: 14, padding: '14px 18px', marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}><div style={{ fontFamily: SERIF, fontSize: 18, fontWeight: 700 }}>Growth</div><div style={{ fontSize: 20, fontWeight: 800 }}>$149<span style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', fontWeight: 500 }}>/mo</span></div></div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 2 }}>Founding-100 price — locked for life</div>
-          </div>
-          <button onClick={start} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Start free 3-day trial →</button>
-          <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>$1 setup for 3 days, then $149/mo · First-Win Guarantee · cancel anytime</div>
+          <button onClick={start} disabled={!name.trim()} style={{ width: '100%', background: name.trim() ? LIME : '#d8cdb4', color: '#fff', border: 'none', borderRadius: 12, padding: '16px', fontSize: 16.5, fontWeight: 800, cursor: name.trim() ? 'pointer' : 'default', fontFamily: 'inherit', transition: 'background .2s' }}>Hire Mello — fix my site →</button>
+          <div style={{ fontSize: 12, color: SUB, textAlign: 'center', marginTop: 10 }}>$1 for 3 days, then $149/mo · cancel in one email · we pick up where this report left off</div>
         </div>
       </div>
 
