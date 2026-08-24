@@ -66,7 +66,7 @@ export default function AdsStudio() {
 
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: PAPER, fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}`}</style>
       {Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -172,7 +172,7 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
 /* ── My Competitors (real ad-DNA data) ──────────────────────────────────── */
 type CompAd = { id: string; thumb: string | null; copy: string; format: string | null; active: boolean }
 type CompDna = { hooks: string[]; angles: string[]; personas: string[] }
-type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; adsSource?: 'corpus' | 'live' | null; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null }
+type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; adsSource?: 'corpus' | 'live' | null; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null; checked?: boolean }
 type CompSeed = { name: string; category: string; market: string; queries: string[] } | null
 function DnaRow({ label, items }: { label: string; items: string[] }) {
   if (!items?.length) return null
@@ -184,9 +184,11 @@ function DnaRow({ label, items }: { label: string; items: string[] }) {
   )
 }
 
-function CompCard({ c, isMobile }: { c: Comp; isMobile: boolean }) {
+function CompCard({ c, isMobile, onSpy }: { c: Comp; isMobile: boolean; onSpy?: (c: Comp) => Promise<void> }) {
+  const [spying, setSpying] = useState(false)
   const hasAds = c.ads.length > 0
   const badge = c.adsSource === 'corpus' ? `${c.adCount.toLocaleString()} ads decoded` : `${c.adCount.toLocaleString()} live ad${c.adCount === 1 ? '' : 's'}`
+  const spy = async () => { if (spying) return; setSpying(true); try { await onSpy?.(c) } finally { setSpying(false) } }
   return (
     <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? 18 : 24, marginTop: 18 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -202,7 +204,10 @@ function CompCard({ c, isMobile }: { c: Comp; isMobile: boolean }) {
         </div>
         {hasAds
           ? <span style={{ fontSize: 12, fontWeight: 800, color: ORANGE, background: '#ffe7df', borderRadius: 100, padding: '5px 12px', flex: 'none' }}>{badge}</span>
-          : <button style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: ORANGE, border: 'none', borderRadius: 100, padding: '7px 14px', cursor: 'pointer', flex: 'none' }}>Spy their ads →</button>}
+          : <button onClick={spy} disabled={spying} style={{ fontSize: 12, fontWeight: 800, color: '#fff', background: spying ? '#c9927f' : ORANGE, border: 'none', borderRadius: 100, padding: '7px 14px', cursor: spying ? 'default' : 'pointer', flex: 'none', display: 'flex', alignItems: 'center', gap: 6 }}>
+              {spying && <span style={{ width: 11, height: 11, border: '2px solid rgba(255,255,255,.5)', borderTopColor: '#fff', borderRadius: '50%', display: 'inline-block', animation: 'sfspin .7s linear infinite' }} />}
+              {spying ? 'Spying…' : c.checked ? 'Re-check' : 'Spy their ads →'}
+            </button>}
       </div>
 
       {c.reason && <div style={{ fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginTop: 12 }}>{c.reason}</div>}
@@ -229,22 +234,40 @@ function CompCard({ c, isMobile }: { c: Comp; isMobile: boolean }) {
           ))}
         </div>
       ) : (
-        <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>We found this rival{c.domain ? ` (${c.domain})` : ''} but they don’t appear to be running Meta ads right now — hit <b style={{ color: INK }}>Spy their ads</b> to re-check.</div>
+        <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>
+          {spying ? <>Pulling their live creatives from the Meta Ad Library…</>
+            : c.checked ? <>No live Meta ads found for this brand right now.</>
+              : <>We found this rival{c.domain ? ` (${c.domain})` : ''} — hit <b style={{ color: INK }}>Spy their ads</b> to pull their live creatives from the Meta Ad Library.</>}
+        </div>
       )}
     </div>
   )
 }
 
+const SCAN_STEPS = ['Reading your store…', 'Pinpointing your exact niche…', 'Searching Google for rival brands…', 'Sweeping the Meta Ad Library (all countries)…', 'Pulling competitors’ live ads…', 'Decoding their ad strategy…']
+
 function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [comps, setComps] = useState<Comp[] | null>(null)
   const [seed, setSeed] = useState<CompSeed>(null)
   const [q, setQ] = useState('')
+  const [step, setStep] = useState(0)
   useEffect(() => {
     let on = true
-    setComps(null)
+    setComps(null); setStep(0)
+    const tick = setInterval(() => on && setStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1)), 11000)
     fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => { if (!on) return; setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null) }).catch(() => on && setComps([]))
-    return () => { on = false }
+    return () => { on = false; clearInterval(tick) }
   }, [domain])
+
+  const spy = async (c: Comp) => {
+    const p = new URLSearchParams()
+    if (c.name) p.set('name', c.name)
+    if (c.domain) p.set('domain', c.domain)
+    const d = await fetch(`/api/ads-studio/competitor-ads?${p.toString()}`).then((r) => r.json()).catch(() => null)
+    const ads: CompAd[] = Array.isArray(d?.ads) ? d.ads : []
+    const key = (x: Comp) => x.pageId || x.domain || x.name
+    setComps((prev) => (prev || []).map((x) => key(x) === key(c) ? { ...x, ads, adsSource: ads.length ? 'live' : x.adsSource, adCount: ads.length || x.adCount, spyable: ads.length ? false : x.spyable, checked: true, pageId: d?.pageId || x.pageId } : x))
+  }
   const shown = (comps || []).filter((c) => !q.trim() || c.name.toLowerCase().includes(q.trim().toLowerCase()) || (c.domain || '').includes(q.trim().toLowerCase()))
   return (
     <div>
@@ -258,7 +281,14 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
       </div>
 
       {comps === null ? (
-        <div style={{ color: SUB, fontSize: 14, padding: '40px 0', textAlign: 'center' }}>Scanning the web for your competitors…</div>
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: '38px 28px', marginTop: 20, textAlign: 'center' }}>
+          <div style={{ width: 34, height: 34, margin: '0 auto 16px', border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+          <div style={{ fontFamily: SERIF, fontSize: isMobile ? 18 : 21, fontWeight: 700, marginBottom: 6 }}>{SCAN_STEPS[step]}</div>
+          <div style={{ color: SUB, fontSize: 13.5, lineHeight: 1.5, maxWidth: 440, margin: '0 auto' }}>Finding your real rivals across Google and the Meta Ad Library, then decoding their live ads. This takes a minute — worth the wait.</div>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginTop: 18 }}>
+            {SCAN_STEPS.map((_, i) => <span key={i} style={{ width: i === step ? 22 : 7, height: 7, borderRadius: 100, background: i <= step ? ORANGE : LINE, transition: 'width .3s, background .3s' }} />)}
+          </div>
+        </div>
       ) : shown.length === 0 ? (
         <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
           <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No competitors found yet</div>
@@ -270,7 +300,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
         const withoutAds = shown.filter((c) => c.ads.length === 0)
         return (
           <>
-            {withAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} />)}
+            {withAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} />)}
             {withoutAds.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '26px 0 4px' }}>
                 <div style={{ height: 1, background: LINE, flex: 1 }} />
@@ -278,7 +308,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
                 <div style={{ height: 1, background: LINE, flex: 1 }} />
               </div>
             )}
-            {withoutAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} />)}
+            {withoutAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} />)}
           </>
         )
       })()}
