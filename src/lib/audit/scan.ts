@@ -10,6 +10,7 @@
 import { fetchHtml } from '@/lib/seo/crawl-audit'
 import { availableEngines, askEngine } from '@/lib/geo/engines'
 import { dfsConfigured, serpGoogle, searchVolume, backlinksSummary } from '@/lib/audit/dataforseo'
+import { pagespeedConfigured, pageSpeed } from '@/lib/audit/pagespeed'
 import { llm } from '@/lib/llm'
 
 export type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
@@ -152,6 +153,21 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
   return { key: 'google', name: 'Google visibility', sub: 'Where buyers find you first', score: rows.length ? scoreFrom(f) : 0, findings: f, ladder: rows }
 }
 
+async function stepSpeed(ctx: Ctx): Promise<Section | null> {
+  if (!pagespeedConfigured()) return null
+  const ps = await pageSpeed(`https://${ctx.domain}/`)
+  if (!ps) return null
+  const f: Finding[] = []
+  if (ps.lcpMs != null) {
+    const sec = (ps.lcpMs / 1000).toFixed(1)
+    if (ps.lcpMs > 2500) f.push({ id: 'lcp', title: `Pages load in ${sec}s on real devices — over Google’s 2.5s bar`, detail: 'Slow pages lose rankings and buyers on mobile.', severity: ps.lcpMs > 4000 ? 'high' : 'medium', fixable: true })
+  } else if (ps.perf != null && ps.perf < 70) {
+    f.push({ id: 'perf', title: `Performance score ${ps.perf}/100`, detail: 'Room to speed up your pages.', severity: ps.perf < 50 ? 'high' : 'medium', fixable: true })
+  }
+  const score = ps.lcpMs != null ? (ps.lcpMs <= 2500 ? 100 : ps.lcpMs < 4000 ? 60 : 30) : (ps.perf ?? 100)
+  return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Lab performance (not enough real-visitor data yet)', score, findings: f }
+}
+
 async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {
   if (!dfsConfigured()) return null
   const rivalDomain = ladder.find((r) => r.top[0]?.domain && r.top[0].domain !== ctx.domain)?.top[0]?.domain
@@ -178,6 +194,7 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   const sections: Section[] = []
   const emit = (s: Section) => { sections.push(s); return { type: 'section', section: s } as ScanEvent }
   yield emit(stepHealth(ctx))
+  const speed = await stepSpeed(ctx); if (speed) yield emit(speed)
   yield emit(stepSpam(ctx))
   yield emit(stepCatalog(ctx))
   const google = await stepGoogle(ctx); yield emit(google)
@@ -187,7 +204,7 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   // Scores + revenue
   const get = (k: string) => sections.find((s) => s.key === k)!
   const opt = (k: string) => sections.find((s) => s.key === k)?.score ?? 100
-  const websiteScore = Math.round((get('health').score + get('catalog').score + get('spam').score) / 3)
+  const websiteScore = Math.round((get('health').score + get('catalog').score + get('spam').score + (speed ? speed.score : 0)) / (speed ? 4 : 3))
   const visibilityScore = Math.round((get('ai').score + get('google').score + opt('backlinks')) / (bl ? 3 : 2))
   const score = Math.round(websiteScore * 0.55 + visibilityScore * 0.45)
   const grade: ScanResult['grade'] = score >= 80 ? 'Great' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Poor'
