@@ -104,7 +104,8 @@ export async function GET(req: NextRequest) {
     if (brandId) await writeCached(admin, brandId, tpls).catch(() => {})
     return NextResponse.json({ templates: tpls, canGenerate: !!user })
   } catch (e: any) {
-    return NextResponse.json({ templates: FALLBACK, canGenerate: false, error: String(e?.message || e).slice(0, 160) })
+    const fallback = CATALOG.map((c) => ({ title: c.title, concept: c.concept, headline: '', angle: c.style }))
+    return NextResponse.json({ templates: fallback, canGenerate: false, error: String(e?.message || e).slice(0, 160) })
   }
 }
 
