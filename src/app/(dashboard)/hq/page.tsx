@@ -1,6 +1,6 @@
 'use client'
 /**
- * /home — chat-first Home (Unified Shell v2, Phase 4). Talking to Mello IS the landing, with a compact
+ * /hq — chat-first Home (Unified Shell v2, Phase 4). Talking to Mello IS the landing, with a compact
  * "company standing" strip on top and the full Mission one click away. Reuses the EXISTING Mello agent
  * (useChatStream → /api/mello/*) and chat components — not a new brain. Shown as "Home" in CompanyShell.
  */
