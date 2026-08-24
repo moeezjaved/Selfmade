@@ -37,25 +37,43 @@ function parseProduct(url: string, html: string): StoreProduct {
   return { title, image: image || null, price, url }
 }
 
-/** Hard signals for market detection — currency, payment, geography, language, contact. */
+/** Hard signals for GLOBAL market detection — currency, payment, geography, language, contact.
+ * Not region-specific: the LLM does the final geography, we just hand it the strongest cues + a raw
+ * contact/about snippet so it can pin ANY market (Pakistan, Bangladesh, India, USA, Gulf, UK, EU, …). */
 function extractSignals(pages: { url: string; html: string }[]): string[] {
   const blob = pages.map((p) => p.html).join(' ')
-  const text = strip(blob).slice(0, 20000)
+  const text = strip(blob).slice(0, 24000)
   const sig = new Set<string>()
-  const curSyms: [RegExp, string][] = [[/₨|\bPKR\b|\bRs\.?\s?\d/i, 'currency: PKR (Rs)'], [/\bAED\b|د\.إ/i, 'currency: AED'], [/₹|\bINR\b/i, 'currency: INR'], [/£|\bGBP\b/i, 'currency: GBP'], [/€|\bEUR\b/i, 'currency: EUR'], [/\$|\bUSD\b/i, 'currency: USD'], [/\bCAD\b/i, 'currency: CAD'], [/\bAUD\b/i, 'currency: AUD']]
-  for (const [re, label] of curSyms) if (re.test(text)) sig.add(label)
-  if (/cash[\s-]?on[\s-]?delivery|\bCOD\b/i.test(text)) sig.add('payment: cash on delivery')
-  if (/easypaisa|jazzcash/i.test(text)) sig.add('payment: Easypaisa/JazzCash (Pakistan)')
-  if (/\bcod available|bank transfer\b/i.test(text)) sig.add('payment: bank transfer / COD')
-  const cities = ['Karachi', 'Lahore', 'Islamabad', 'Rawalpindi', 'Dubai', 'Abu Dhabi', 'Mumbai', 'Delhi', 'London', 'Toronto', 'Sydney', 'New York', 'Los Angeles']
-  const foundCities = cities.filter((c) => new RegExp(`\\b${c}\\b`, 'i').test(text))
-  if (foundCities.length) sig.add('cities mentioned: ' + foundCities.slice(0, 4).join(', '))
-  const countries = ['Pakistan', 'United Arab Emirates', 'UAE', 'India', 'United Kingdom', 'Canada', 'Australia', 'United States', 'USA']
-  const foundCountries = countries.filter((c) => new RegExp(`\\b${c}\\b`, 'i').test(text))
-  if (foundCountries.length) sig.add('country mentioned: ' + foundCountries.slice(0, 3).join(', '))
+  // Currency — the strongest single market cue. Symbols + ISO codes, worldwide.
+  const curSyms: [RegExp, string][] = [
+    [/৳|\bBDT\b|\bTk\.?\s?\d/i, 'currency: BDT (Bangladeshi Taka)'], [/₨|\bPKR\b|\bRs\.?\s?\d/i, 'currency: Rs/PKR'], [/₹|\bINR\b/i, 'currency: INR (India)'],
+    [/\bAED\b|د\.إ/i, 'currency: AED (UAE)'], [/\bSAR\b|ر\.س|﷼/i, 'currency: SAR (Saudi)'], [/\bQAR\b/i, 'currency: QAR (Qatar)'],
+    [/₦|\bNGN\b/i, 'currency: NGN (Nigeria)'], [/\bKES\b|KSh/i, 'currency: KES (Kenya)'], [/\bZAR\b|\bR\s?\d/i, 'currency: ZAR (South Africa)'],
+    [/₱|\bPHP\b/i, 'currency: PHP (Philippines)'], [/Rp\s?\d|\bIDR\b/i, 'currency: IDR (Indonesia)'], [/\bMYR\b|RM\s?\d/i, 'currency: MYR (Malaysia)'], [/฿|\bTHB\b/i, 'currency: THB (Thailand)'], [/\bVND\b|₫/i, 'currency: VND (Vietnam)'],
+    [/Rs\.?\s?\d|\bLKR\b/i, 'currency: LKR (Sri Lanka)'], [/\bNPR\b/i, 'currency: NPR (Nepal)'],
+    [/£|\bGBP\b/i, 'currency: GBP (UK)'], [/€|\bEUR\b/i, 'currency: EUR (Eurozone)'], [/\bCAD\b|C\$/i, 'currency: CAD (Canada)'], [/\bAUD\b|A\$/i, 'currency: AUD (Australia)'], [/\bNZD\b/i, 'currency: NZD'],
+    [/₺|\bTRY\b/i, 'currency: TRY (Turkey)'], [/R\$|\bBRL\b/i, 'currency: BRL (Brazil)'], [/\bMXN\b/i, 'currency: MXN (Mexico)'], [/¥|\bJPY\b/i, 'currency: JPY'], [/\bCNY\b|\bRMB\b/i, 'currency: CNY'],
+    [/\bUSD\b|(?<![A-Za-z])\$\s?\d/i, 'currency: USD'],
+  ]
+  const curs = curSyms.filter(([re]) => re.test(text)).map(([, l]) => l)
+  if (curs.length) sig.add(curs.slice(0, 3).join(' / '))
+  // Payment rails are strong country tells.
+  const pay: [RegExp, string][] = [
+    [/bkash|nagad|\brocket\b/i, 'payment: bKash/Nagad (Bangladesh)'], [/easypaisa|jazzcash/i, 'payment: Easypaisa/JazzCash (Pakistan)'],
+    [/\bUPI\b|paytm|phonepe|razorpay|\bGPay\b/i, 'payment: UPI/Paytm (India)'], [/\bmada\b|tabby|tamara/i, 'payment: Mada/Tabby (Gulf)'], [/m-?pesa/i, 'payment: M-Pesa (East Africa)'],
+    [/shop pay|stripe|afterpay|klarna/i, 'payment: Shop Pay/Stripe (US/global)'], [/cash[\s-]?on[\s-]?delivery|\bCOD\b/i, 'payment: cash on delivery'],
+  ]
+  for (const [re, l] of pay) if (re.test(text)) sig.add(l)
   const phone = text.match(/\+(\d{1,3})[\s-]?\d/); if (phone) sig.add('phone country code: +' + phone[1])
-  const lang = tag(pages[0]?.html || '', /<html[^>]+lang=["']([a-z-]+)["']/i); if (lang) sig.add('site language: ' + lang)
-  const ship = text.match(/ships? (?:to|within|across)\s+([A-Za-z ,]{3,40})/i); if (ship) sig.add('shipping: ' + ship[1].trim())
+  const lang = tag(pages[0]?.html || '', /<html[^>]+lang=["']([a-z-]+)["']/i); if (lang && lang !== 'en') sig.add('site language: ' + lang)
+  const ship = text.match(/ships?\s+(?:to|within|across|nationwide in)\s+([A-Za-z ,]{3,50})/i); if (ship) sig.add('shipping: ' + ship[1].trim())
+  // Raw contact/about snippet — lets the LLM read the actual address/city/country for ANY market.
+  const contactPage = pages.find((p) => /contact|about|shipping|policies/i.test(p.url)) || pages[0]
+  const cText = strip(contactPage?.html || '')
+  const addr = cText.match(/([A-Za-z0-9#,.\- ]{6,60}(?:street|st\.|road|rd\.|ave|block|sector|nagar|colony|floor|suite)[A-Za-z0-9#,.\- ]{0,50})/i)
+  const near = cText.match(/(?:address|located|based|office|store)[:\s][A-Za-z0-9#,.\- ]{6,90}/i)
+  const snip = (addr?.[1] || near?.[0] || '').trim()
+  if (snip) sig.add('address text on site: “' + snip.slice(0, 90) + '”')
   return Array.from(sig)
 }
 
@@ -83,7 +101,8 @@ DESCRIPTION: ${ctx.description || '(none)'}
 PRODUCTS: ${productList}
 HARD SIGNALS (read off the site — use these to pin the geography precisely): ${ctx.signals.join(' · ') || '(none detected)'}
 
-For each audience give a short name and EXACTLY 6 insight bullets covering: demographics (with specific geography/cities when signals support it), daily behavior, pain points, values, shopping habits (payment methods when known), and why THIS product fits them. Be concrete and grounded in the signals — do not invent a market the signals contradict.
+Rules for MARKET: infer it from the hard signals only (currency, payment rails, phone code, address text, language, domain TLD). Could be ANY country — Bangladesh, Pakistan, India, USA, UK, UAE, Nigeria, etc. Do NOT default to any region. If signals are ambiguous or point to USD/English/Stripe with no local cues, treat it as US / global.
+For each audience give a short name and EXACTLY 6 insight bullets covering: demographics (with specific geography/cities ONLY when signals support it), daily behavior, pain points, values, shopping habits (name the local payment methods you detected), and why THIS product fits them. Be concrete and grounded — never invent a market the signals contradict.
 Return ONLY JSON: {"market":"...","audiences":[{"name":"...","insights":["...","...","...","...","...","..."]}]}`
   try {
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 1600, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
