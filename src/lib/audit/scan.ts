@@ -17,7 +17,7 @@ export type Finding = { id: string; title: string; detail: string; severity: 'hi
 export type SerpLadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 export type AiEngineRead = { engine: string; mentioned: boolean; question: string; answer: string }
 export type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
-export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
+export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
   websiteScore: number; visibilityScore: number; sections: Section[]
@@ -221,7 +221,8 @@ async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section
   } else if (mine && mine.referringDomains < 25) {
     f.push({ id: 'bl-thin', title: `Only ${mine.referringDomains.toLocaleString()} domains link to you`, detail: 'Too few for competitive terms. We build high-quality backlinks every month to close the gap.', severity: 'medium', fixable: true })
   }
-  return { key: 'backlinks', name: 'Backlinks', sub: 'Who vouches for you across the web', score: f.length ? scoreFrom(f) : 100, findings: f }
+  const backlinks = mine ? { mineRef: mine.referringDomains, mineLinks: mine.backlinks, rivalRef: rival?.referringDomains ?? null, rivalDomain: rivalDomain ?? null } : undefined
+  return { key: 'backlinks', name: 'Backlinks', sub: 'Who vouches for you across the web', score: f.length ? scoreFrom(f) : 100, findings: f, backlinks }
 }
 
 /* ── Stream ────────────────────────────────────────────────────────────────────────────────────── */
