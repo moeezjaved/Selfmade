@@ -39,7 +39,7 @@ export async function serpGoogle(keyword: string, yourDomain: string): Promise<S
     const organic = items.filter((it: any) => it.type === 'organic' && it.domain).map((it: any) => ({ domain: String(it.domain).replace(/^www\./, ''), url: it.url || '', position: it.rank_absolute || it.rank_group || 0 }))
     const yd = rootDomain(yourDomain)
     const mine = organic.find((o: SerpRow) => o.domain === yd)
-    return { keyword, volume: null, top: organic.slice(0, 3), yourPosition: mine ? mine.position : null }
+    return { keyword, volume: null, top: organic.slice(0, 10), yourPosition: mine ? mine.position : null }
   } catch { return null }
 }
 
