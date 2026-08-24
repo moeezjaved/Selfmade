@@ -22,6 +22,7 @@ export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
   websiteScore: number; visibilityScore: number; sections: Section[]
   ai: { question: string; reads: AiEngineRead[] }; revenueLostPerYear: number; currency: string; problemCount: number
+  revenueModel: { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
 }
 export type ScanEvent =
   | { type: 'meta'; domain: string; siteName: string; category: string }
@@ -239,12 +240,21 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
 
   const prices = ctx.productPages.map((p) => p.price).filter((p): p is number => !!p).sort((a, b) => a - b)
   const aov = prices.length ? prices[Math.floor(prices.length / 2)] : 60
+  const CONV = 0.009
   const ladder = get('google').ladder || []
-  const lostVisits = ladder.filter((r) => r.yourPosition == null || r.yourPosition > 10).reduce((a, r) => a + (r.volume || 0) * 0.3, 0)
-  const missShare = ai.ai && ai.ai.reads.length ? ai.ai.reads.filter((r) => !r.mentioned).length / ai.ai.reads.length : 0
-  const revenueLostPerYear = Math.round((lostVisits * 0.009 * aov + missShare * 1000) * 12) || (problemCount * 800 + Math.round(missShare * 12000))
+  const lostRows = ladder.filter((r) => r.yourPosition == null || r.yourPosition > 10)
+  const keywordLeaks = lostRows.map((r) => ({ keyword: r.keyword, visits: Math.round((r.volume || 0) * 0.3), rival: r.top[0]?.domain ?? null }))
+  const lostVisits = Math.round(keywordLeaks.reduce((a, k) => a + k.visits, 0))
+  const catalogGapProducts = ctx.productPages.filter((p) => p.imgsNoAlt > 0 || p.words < 200 || !p.schema).length
+  const missReads = ai.ai ? ai.ai.reads.filter((r) => !r.mentioned).length : 0
+  const missTotal = ai.ai ? ai.ai.reads.length : 0
+  const fromSearch = Math.round(lostVisits * CONV * aov * 12)
+  const fromCatalog = Math.round(catalogGapProducts * aov * 0.017 * 12)
+  const fromAi = Math.round((missTotal ? missReads / missTotal : 0) * aov * 4.4 * 12)
+  const revenueLostPerYear = (fromSearch + fromCatalog + fromAi) || (problemCount * 800)
+  const revenueModel = { lostVisits, conversion: CONV, aov, fromSearch, fromCatalog, fromAi, catalogGapProducts, missReads, missTotal, keywordLeaks }
 
-  const result: ScanResult = { domain, siteName: ctx.siteName, category: ctx.category, score, grade, websiteScore, visibilityScore, sections, ai: ai.ai!, revenueLostPerYear, currency: '$', problemCount }
+  const result: ScanResult = { domain, siteName: ctx.siteName, category: ctx.category, score, grade, websiteScore, visibilityScore, sections, ai: ai.ai!, revenueLostPerYear, currency: '$', problemCount, revenueModel }
   yield { type: 'done', result }
 }
 

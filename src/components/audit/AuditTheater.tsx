@@ -19,7 +19,8 @@ type LadderRow = { keyword: string; volume: number | null; yourPosition: number 
 type AiRead = { engine: string; mentioned: boolean; question: string; answer: string }
 type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
 type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
-type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number }
+type RevenueModel = { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
+type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
 
 const STEPS = [
   { key: 'health', label: 'Website health' }, { key: 'speed', label: 'Website speed' }, { key: 'spam', label: 'Spam-update check' },
@@ -272,7 +273,7 @@ export default function AuditTheater() {
       <Sidebar />
       <main style={{ padding: isMobile ? '22px 18px 60px' : '40px 48px 80px', minWidth: 0, background: PAPER }}>
         {phase === 'running' ? <RunningStage step={step} live={live} isMobile={isMobile} domain={domain.trim()} />
-          : result ? <Report result={result} open={open} setOpen={setOpen} isMobile={isMobile} /> : null}
+          : result ? <Report result={result} open={open} setOpen={setOpen} isMobile={isMobile} onFix={() => setPhase('offer')} /> : null}
       </main>
     </div>
   )
@@ -655,7 +656,7 @@ function RevenueTally({ sec, live, isMobile }: { sec?: (Section & { _lost?: numb
 }
 
 /* ── Report ───────────────────────────────────────────────────────────────────────────────────── */
-function Report({ result, open, setOpen, isMobile }: { result: Result; open: Record<string, boolean>; setOpen: (f: (o: Record<string, boolean>) => Record<string, boolean>) => void; isMobile: boolean }) {
+function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; open: Record<string, boolean>; setOpen: (f: (o: Record<string, boolean>) => Record<string, boolean>) => void; isMobile: boolean; onFix: () => void }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
   return (
     <>
@@ -687,7 +688,7 @@ function Report({ result, open, setOpen, isMobile }: { result: Result; open: Rec
               <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>“{r.keyword}”{r.volume ? <span style={{ color: SUB, fontWeight: 500, fontSize: 13 }}> · {r.volume.toLocaleString()} searches/mo</span> : ''}</div>
               <div style={{ marginTop: 10 }}>
                 {r.top.slice(0, 3).map((t, i) => <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, color: '#3a453c', borderTop: i ? `1px solid ${LINE}` : 'none', padding: '7px 0' }}><span>{i + 1}. {t.domain}</span><span style={{ color: SUB }}>#{t.position}</span></div>)}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}`, paddingTop: 8 }}><span style={{ fontSize: 13.5, fontWeight: 700 }}>{result.domain}</span><span style={{ fontSize: 12, fontWeight: 700, color: RED, background: '#fdecea', borderRadius: 100, padding: '3px 10px' }}>{r.yourPosition == null ? 'not in top 50' : `#${r.yourPosition}`}</span></div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: `1px solid ${LINE}`, paddingTop: 8 }}><span style={{ fontSize: 13.5, fontWeight: 700 }}>{result.domain}</span><span style={{ fontSize: 12, fontWeight: 700, color: ENTRY_BG, background: '#ffe7df', borderRadius: 100, padding: '3px 10px' }}>{r.yourPosition == null ? 'not in top 50' : `#${r.yourPosition}`}</span></div>
               </div>
             </div>
           ))}
@@ -706,13 +707,51 @@ function Report({ result, open, setOpen, isMobile }: { result: Result; open: Rec
         </section>
       ))}
 
-      <section style={{ marginBottom: 20 }}>
+      <section style={{ marginBottom: 24 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', borderBottom: `1px solid ${LINE}`, paddingBottom: 10, marginBottom: 14 }}>
           <div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: SUB, fontWeight: 600, marginRight: 8 }}>{result.sections.length + 1}.</span>What it’s costing you</div>
-          <div style={{ fontSize: 18, fontWeight: 800, color: RED }}>−{money(result.revenueLostPerYear)}/yr</div>
+          <div style={{ fontSize: 18, fontWeight: 800, color: LIME }}>−{money(result.revenueLostPerYear)}/yr</div>
         </div>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 16, fontSize: 14, color: SUB, lineHeight: 1.6 }}>A conservative estimate from the {result.problemCount} fixable problems above, the buyer searches where rivals take the click, and the AI assistants that skip you. Every one is something our agent fixes for you.</div>
+        {(() => {
+          const m = result.revenueModel
+          if (!m) return <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 16, fontSize: 14, color: SUB, lineHeight: 1.6 }}>A conservative estimate from the {result.problemCount} fixable problems above. Every one is something our agent fixes for you.</div>
+          const lines = [
+            m.fromSearch > 0 && { icon: '🔍', title: 'Searches where rivals take the click', sub: `${m.keywordLeaks.length} buyer ${m.keywordLeaks.length === 1 ? 'search' : 'searches'} where you’re not #1`, amt: m.fromSearch },
+            m.fromCatalog > 0 && { icon: '📦', title: 'Product pages under-optimised', sub: `${m.catalogGapProducts} products with catalog gaps`, amt: m.fromCatalog },
+            m.fromAi > 0 && { icon: '🤖', title: 'AI assistants recommending rivals', sub: `${m.missReads} of ${m.missTotal} AI answers skip you`, amt: m.fromAi },
+          ].filter(Boolean) as { icon: string; title: string; sub: string; amt: number }[]
+          return (
+            <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden' }}>
+              {lines.map((l, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: isMobile ? '13px 15px' : '15px 20px', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+                  <span style={{ width: 32, height: 32, borderRadius: 9, background: '#fff2ee', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, flex: 'none' }}>{l.icon}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: isMobile ? 14 : 15.5, fontWeight: 800, color: INK }}>{l.title}</div><div style={{ fontSize: 12.5, color: SUB, marginTop: 1 }}>{l.sub}</div></div>
+                  <span style={{ fontSize: isMobile ? 13.5 : 15, fontWeight: 800, color: LIME, flex: 'none' }}>−{money(l.amt)}/yr</span>
+                </div>
+              ))}
+              {m.keywordLeaks.slice(0, 5).map((k, i) => (
+                <div key={`k${i}`} style={{ display: 'flex', alignItems: 'center', gap: 13, padding: isMobile ? '10px 15px' : '11px 20px', borderTop: `1px solid ${LINE}`, background: PAPER }}>
+                  <span style={{ width: 26, flex: 'none', textAlign: 'center', fontSize: 12, color: SUB }}>{k.rival ? k.rival[0].toUpperCase() : '·'}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}><div style={{ fontSize: 13.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>“{k.keyword}”</div><div style={{ fontSize: 12, color: SUB }}>~{k.visits} visits/mo{k.rival ? ` · ${k.rival.replace(/^www\./, '')} ranks #1` : ''}</div></div>
+                </div>
+              ))}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: isMobile ? '14px 15px' : '16px 20px', borderTop: `2px solid ${LINE}` }}>
+                <div style={{ fontSize: isMobile ? 12.5 : 13.5, color: SUB }}>Total — ≈{m.lostVisits.toLocaleString()} lost visits/mo × {(m.conversion * 100).toFixed(1)}% conversion × {result.currency}{m.aov.toLocaleString()} avg order</div>
+                <span style={{ fontSize: isMobile ? 15 : 17, fontWeight: 800, color: LIME, flex: 'none' }}>−{money(result.revenueLostPerYear)}/yr</span>
+              </div>
+            </div>
+          )
+        })()}
       </section>
+
+      {/* Bottom CTA — dark card, our agent fixes it */}
+      <div style={{ background: DARK, borderRadius: 18, padding: isMobile ? '24px 20px' : '32px 36px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 27, fontWeight: 700, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.1 }}>Every problem here — our agent fixes automatically.</div>
+          <div style={{ fontSize: 14.5, color: 'rgba(255,255,255,.62)', marginTop: 8, lineHeight: 1.5, maxWidth: 520 }}>Hire your AI team and watch the fixes go live in the next 30 minutes. Nothing ships without your approval.</div>
+        </div>
+        <button onClick={onFix} style={{ flex: 'none', background: LIME, color: '#fff', border: 'none', borderRadius: 100, padding: isMobile ? '14px 26px' : '16px 32px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Fix in 30 minutes →</button>
+      </div>
     </>
   )
 }
