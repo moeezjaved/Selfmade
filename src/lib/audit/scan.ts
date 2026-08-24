@@ -16,7 +16,8 @@ import { llm } from '@/lib/llm'
 export type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
 export type SerpLadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 export type AiEngineRead = { engine: string; mentioned: boolean; question: string; answer: string }
-export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] } }
+export type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
+export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
 export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
   websiteScore: number; visibilityScore: number; sections: Section[]
@@ -32,10 +33,15 @@ export function normalizeDomain(input: string): string {
   return String(input || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/\s+/g, '').replace(/^www\./, '')
 }
 
-const strip = (h: string) => h.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
-const tag = (html: string, re: RegExp): string => { const m = html.match(re); return m ? m[1].trim() : '' }
+const NAMED: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ', rsquo: '’', lsquo: '‘', ldquo: '“', rdquo: '”', mdash: '—', ndash: '–', hellip: '…', trade: '™', reg: '®', copy: '©' }
+const decodeEntities = (s: string) => s
+  .replace(/&#x([0-9a-f]+);/gi, (_, h) => { try { return String.fromCodePoint(parseInt(h, 16)) } catch { return _ } })
+  .replace(/&#(\d+);/g, (_, d) => { try { return String.fromCodePoint(parseInt(d, 10)) } catch { return _ } })
+  .replace(/&([a-z]+);/gi, (_, n) => NAMED[n.toLowerCase()] ?? _)
+const strip = (h: string) => decodeEntities(h.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim()
+const tag = (html: string, re: RegExp): string => { const m = html.match(re); return m ? decodeEntities(m[1]).trim() : '' }
 
-type Page = { url: string; title: string; metaDesc: string; h1: number; imgs: number; imgsNoAlt: number; words: number; schema: boolean; price: number | null }
+type Page = { url: string; title: string; metaDesc: string; h1: number; imgs: number; imgsNoAlt: number; words: number; schema: boolean; price: number | null; image: string | null }
 function analyze(url: string, html: string): Page {
   const title = tag(html, /<title[^>]*>([^<]{0,300})/i)
   const metaDesc = tag(html, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i)
@@ -46,7 +52,9 @@ function analyze(url: string, html: string): Page {
   const words = strip(html.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '')).split(' ').length
   const priceRaw = tag(html, /"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)/i) || tag(html, /property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([0-9.]+)/i)
   const price = priceRaw ? Number(priceRaw) : null
-  return { url, title, metaDesc, h1, imgs: imgTags.length, imgsNoAlt, words, schema, price: price && price > 0 ? price : null }
+  let image = tag(html, /property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || tag(html, /name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
+  if (image && image.startsWith('//')) image = 'https:' + image
+  return { url, title, metaDesc, h1, imgs: imgTags.length, imgsNoAlt, words, schema, price: price && price > 0 ? price : null, image: image || null }
 }
 
 async function sitemap(domain: string): Promise<{ urls: string[]; byDay: Map<string, number> }> {
@@ -115,7 +123,9 @@ function stepHealth(ctx: Ctx): Section {
   if (noAlt) f.push({ id: 'alt', title: `${noAlt} images missing alt text on sampled pages`, detail: 'Invisible in Google image search.', severity: noAlt > 20 ? 'high' : 'medium', fixable: true })
   const badH1 = ctx.pages.filter((p) => p.h1 !== 1)
   if (badH1.length) f.push({ id: 'h1', title: `${badH1.length} pages with a missing or duplicate H1`, detail: 'The H1 tells Google the page’s main topic.', severity: 'medium', sample: badH1.map((p) => new URL(p.url).pathname), fixable: true })
-  return { key: 'health', name: 'Website health', sub: 'Meta, headings and images across your pages', score: scoreFrom(f), findings: f }
+  const urls = ctx.pages.map((p) => { try { return new URL(p.url).pathname } catch { return p.url } })
+  const total = Math.max(ctx.pages.length, ctx.sm.urls.length || ctx.pages.length)
+  return { key: 'health', name: 'Website health', sub: 'Meta, headings and images across your pages', score: scoreFrom(f), findings: f, read: { urls, total, metaMissing: noMeta.length, h1Missing: badH1.length, altMissing: noAlt } }
 }
 function stepSpam(ctx: Ctx): Section {
   const f: Finding[] = []
@@ -136,7 +146,8 @@ function stepCatalog(ctx: Ctx): Section {
     const noMeta = P.filter((p) => !p.metaDesc)
     if (noMeta.length) f.push({ id: 'prodmeta', title: `${noMeta.length} products missing a meta description`, detail: 'Google writes its own snippet — usually worse than yours.', severity: 'medium', sample: noMeta.map((p) => strip(p.title).slice(0, 60)), fixable: true })
   }
-  return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : 100, findings: f }
+  const products: CatalogProduct[] = P.map((p) => ({ title: strip(p.title).replace(/\s*[|–-]\s*[^|–-]*$/, '').slice(0, 60) || strip(p.title).slice(0, 60), price: p.price, image: p.image, missingAlt: p.imgsNoAlt, thin: p.words < 200, noSchema: !p.schema }))
+  return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : 100, findings: f, products }
 }
 async function stepAi(ctx: Ctx): Promise<Section> {
   const engines = availableEngines().slice(0, 4)
@@ -181,7 +192,7 @@ async function stepSpeed(ctx: Ctx): Promise<Section | null> {
     f.push({ id: 'perf', title: `Performance score ${ps.perf}/100`, detail: 'Room to speed up your pages.', severity: ps.perf < 50 ? 'high' : 'medium', fixable: true })
   }
   const score = ps.lcpMs != null ? (ps.lcpMs <= 2500 ? 100 : ps.lcpMs < 4000 ? 60 : 30) : (ps.perf ?? 100)
-  return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Lab performance (not enough real-visitor data yet)', score, findings: f }
+  return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Lab performance (not enough real-visitor data yet)', score, findings: f, speed: { lcpS: ps.lcpMs != null ? +(ps.lcpMs / 1000).toFixed(1) : null, cls: ps.clsScore != null ? +ps.clsScore.toFixed(2) : null } }
 }
 
 async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {

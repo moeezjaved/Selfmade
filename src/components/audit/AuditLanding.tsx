@@ -28,7 +28,6 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
   const isMobile = useIsMobile()
   const cta = () => { onScan?.(); const el = document.getElementById('audit-top'); el?.scrollIntoView({ behavior: 'smooth' }) }
 
-  const TINT = '#fbe9e3'
   const included = [
     { head: 'Site fixes', items: ['Title tags', 'Meta descriptions', 'Image alt text', 'Schema markup', 'Internal links', 'Broken links'] },
     { head: 'Content', items: ['Blogs written for you', 'Programmatic SEO pages', 'Buyer-intent articles', 'FAQ + answer pages', 'Published to your store'] },
@@ -69,7 +68,7 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
       </section>
 
       {/* What's included */}
-      <section style={{ padding: isMobile ? '54px 0' : '84px 0' }}>
+      <section style={{ background: '#fff', padding: isMobile ? '54px 0' : '84px 0' }}>
         <div style={wrap}>
           <Reveal><h2 style={H2}>What&rsquo;s included.</h2></Reveal>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4,1fr)', gap: isMobile ? 30 : 26, marginTop: isMobile ? 30 : 44 }}>
@@ -79,7 +78,7 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
                   {col.items.map((it) => (
                     <div key={it} style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                      <span style={{ width: 30, height: 30, borderRadius: 8, background: TINT, color: LIME, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon d="M20 6 9 17l-5-5" /></span>
+                      <span style={{ width: 30, height: 30, borderRadius: 8, background: LIME, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Icon d="M20 6 9 17l-5-5" /></span>
                       <span style={{ fontSize: 14.5, color: '#3a352c' }}>{it}</span>
                     </div>
                   ))}
