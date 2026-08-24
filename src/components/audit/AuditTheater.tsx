@@ -8,7 +8,10 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
-const INK = '#141d15', SUB = '#6f7a70', LINE = '#ececec', GOOD = '#1f8f4e', RED = '#e5484d', LIME = '#ff5a2c', PAPER = '#faf9f5', DARK = '#161311'
+// Matches the ads audit: orange accent, cream paper, dark sidebar, Fraunces serif headings, /hero.mp4 entry.
+const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', GOOD = '#1f8f4e', RED = '#e5484d', LIME = '#ef4a1e', PAPER = '#fbf4e2', DARK = '#1c1611'
+const ENTRY_BG = '#e02f06'
+const SERIF = 'Fraunces, Georgia, serif'
 
 type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
@@ -61,18 +64,20 @@ export default function AuditTheater() {
   useEffect(() => { if (phase === 'running' && step >= STEPS.length - 1 && doneRef.current) { setResult(doneRef.current); setTimeout(() => setPhase('report'), 500) } }, [step, phase])
 
   if (phase === 'idle') return (
-    <div style={{ minHeight: '100dvh', background: DARK, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: 'Inter, system-ui, sans-serif' }}>
-      <div style={{ width: '100%', maxWidth: 560, textAlign: 'center', color: '#fff' }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: LIME, marginBottom: 16 }}>Free SEO X-ray</div>
-        <h1 style={{ fontSize: isMobile ? 30 : 42, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 0 14px' }}>Is your store invisible on Google &amp; AI?</h1>
-        <p style={{ fontSize: 16, color: 'rgba(255,255,255,.65)', lineHeight: 1.5, margin: '0 0 28px' }}>Enter your website. In ~30 seconds we check your search health, your catalog, and whether ChatGPT even mentions you — no login.</p>
-        <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row', maxWidth: 460, margin: '0 auto' }}>
+    <div style={{ position: 'relative', minHeight: '100vh', background: ENTRY_BG, display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: 'clamp(32px,6vw,80px)', color: '#fff', overflow: 'hidden', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
+      <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.96) 0%, rgba(224,47,6,.9) 42%, rgba(224,47,6,.5) 100%)' }} />
+      <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
+        <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 30 seconds · no login</div>
+        <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(38px,6.2vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your SEO.</h1>
+        <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 470 }}>See exactly where your store stands on Google &amp; AI — your search health, your catalog, and whether ChatGPT even mentions you.</p>
+        <div style={{ display: 'flex', gap: 10, flexDirection: isMobile ? 'column' : 'row', maxWidth: 480 }}>
           <input value={domain} onChange={(e) => setDomain(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="yourstore.com" autoFocus
-            style={{ flex: 1, padding: '15px 18px', fontSize: 16, borderRadius: 12, border: '1px solid rgba(255,255,255,.15)', background: 'rgba(255,255,255,.06)', color: '#fff', fontFamily: 'inherit', outline: 'none' }} />
-          <button onClick={run} style={{ background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px 24px', fontSize: 16, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
+            style={{ flex: 1, padding: '16px 18px', fontSize: 16, borderRadius: 100, border: 'none', background: '#fff', color: INK, fontFamily: 'inherit', outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
+          <button onClick={run} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
         </div>
-        {error && <div style={{ color: '#ffb3b3', fontSize: 14, marginTop: 12 }}>{error}</div>}
-        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.4)', marginTop: 16 }}>Reads only what’s public. No account, no card.</div>
+        {error && <div style={{ color: '#ffe0d6', fontSize: 14, marginTop: 12 }}>{error}</div>}
+        <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 16 }}>Reads only what’s public. No account, no card.</div>
       </div>
     </div>
   )
@@ -92,7 +97,7 @@ export default function AuditTheater() {
         </>
       ) : (
         <>
-          <div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800 }}>Scanning your website</div>
+          <div style={{ fontFamily: SERIF, fontSize: isMobile ? 19 : 23, fontWeight: 700 }}>Scanning your website</div>
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,.55)', marginTop: 8, lineHeight: 1.5 }}>Checks across search, speed, catalog and competitors. No setup needed.</div>
           <div style={{ marginTop: 22, display: 'flex', flexDirection: 'column', gap: 13 }}>
             {STEPS.map((s, i) => {
@@ -150,7 +155,7 @@ function RunningStage({ step, live, isMobile }: { step: number; live: Record<str
       <div style={{ minHeight: isMobile ? 'auto' : '72vh', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
         <div style={{ maxWidth: 640, marginBottom: isMobile ? 22 : 30, animation: 'aFade .4s ease' }} key={s.key}>
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: LIME, marginBottom: 10 }}>Step {step + 1} of {STEPS.length}</div>
-          <h1 style={{ fontSize: isMobile ? 26 : 40, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.05, margin: '0 0 12px', color: INK }}>{titles[s.key]}</h1>
+          <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 28 : 42, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 12px', color: INK }}>{titles[s.key]}</h1>
           <p style={{ fontSize: isMobile ? 15 : 16.5, color: SUB, lineHeight: 1.5, margin: 0 }}>{blurbs[s.key]}</p>
         </div>
         <div style={{ animation: 'aFade .5s ease', display: 'flex', justifyContent: 'center' }} key={s.key + '-v'}>
@@ -241,7 +246,7 @@ function Report({ result, open, setOpen, isMobile }: { result: Result; open: Rec
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
   return (
     <>
-      <h1 style={{ fontSize: isMobile ? 24 : 30, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px', color: INK }}>Your full report — {result.problemCount} problems found</h1>
+      <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 26 : 34, fontWeight: 700, letterSpacing: '-.02em', margin: '0 0 6px', color: INK }}>Your full report — {result.problemCount} problems found</h1>
       <p style={{ fontSize: 15.5, color: SUB, margin: '0 0 30px', lineHeight: 1.5, maxWidth: 640 }}>Everything we found across Google, your catalog, AI assistants and your site — and what fixing it is worth.</p>
 
       {result.sections.map((sec, si) => (
@@ -308,7 +313,7 @@ function Gauge({ score, grade }: { score: number; grade: string }) {
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}><div style={{ fontSize: 34, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{score}</div><div style={{ fontSize: 11, color: 'rgba(255,255,255,.5)' }}>of 100</div></div>
       </div>
       <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 10 }}>Search health grade</div>
-      <div style={{ fontSize: 24, fontWeight: 800, color: col, marginTop: 2 }}>{grade}</div>
+      <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 700, color: col, marginTop: 2 }}>{grade}</div>
     </div>
   )
 }
@@ -319,13 +324,13 @@ function SubScore({ label, value }: { label: string; value: number }) {
 function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => void; isMobile: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
   // Stash the scanned domain, then hand off to signup (Gmail OK) — the app claims the scan on login.
-  const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; window.location.href = '/signup?ref=seo-scan' }
+  const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; window.location.href = `/signup?ref=seo-scan&next=${encodeURIComponent('/mission/seo')}` }
   return (
     <div style={{ minHeight: '100dvh', background: PAPER, fontFamily: 'Inter, system-ui, sans-serif', padding: isMobile ? '20px 16px 60px' : '40px 48px' }}>
       <button onClick={onBack} style={{ background: DARK, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', marginBottom: 24 }}>← Back to report</button>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,1fr) 380px', gap: 28, maxWidth: 1080 }}>
         <div>
-          <h1 style={{ fontSize: isMobile ? 30 : 44, fontWeight: 800, letterSpacing: '-.03em', lineHeight: 1.02, margin: '0 0 14px', color: INK }}>Fix all {result.problemCount} problems on {result.domain}</h1>
+          <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 32 : 46, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.0, margin: '0 0 14px', color: INK }}>Fix all {result.problemCount} problems on {result.domain}</h1>
           <p style={{ fontSize: 16.5, color: SUB, lineHeight: 1.5, margin: '0 0 26px' }}>These problems cost {result.domain} ≈{money(result.revenueLostPerYear)}/yr. Your AI marketing team starts fixing them in the next 30 minutes — you approve every change.</p>
           <div style={{ fontSize: 13, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>What you get — priced like hiring it out</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(4,1fr)', gap: 12 }}>
