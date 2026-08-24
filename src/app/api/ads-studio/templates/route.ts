@@ -43,7 +43,7 @@ const CATALOG: { title: string; concept: string; style: string }[] = [
 ]
 
 // Applied to every template so common image-model quirks don't slip through.
-const GUARDRAILS = 'CRITICAL RULES — follow exactly.\nTEXT: the HEADLINE appears EXACTLY ONCE as one clean phrase — do NOT repeat, echo, mirror, stutter, or restart any word of it (never "Hear from / Hear from Satisfied Users"; it reads once as "Hear from Satisfied Users"). Every text element (headline, subtext, CTA label, badges) appears ONCE. Exactly ONE call-to-action button. Render the LOGO once. All text correctly spelled, cleanly laid out, legible.\nPRODUCT SIZE: keep the product SMALL-to-MEDIUM — it must occupy at most ~25-30% of the frame, shown at realistic scale relative to the hand/scene. It must NEVER fill or dominate the frame. When unsure, make it SMALLER. Leave generous room for the headline, copy and CTA.'
+const GUARDRAILS = 'CRITICAL RULES — follow exactly.\nTEXT: the HEADLINE appears EXACTLY ONCE as one clean phrase — do NOT repeat, echo, mirror, stutter, or restart any word of it (never "Hear from / Hear from Satisfied Users"; it reads once as "Hear from Satisfied Users"). Every text element (headline, subtext, CTA label, badges) appears ONCE. Exactly ONE call-to-action button. Render the LOGO once. All text correctly spelled, cleanly laid out, legible.\nPRODUCT: show the product at a natural, realistic scale for what it actually is and the scene — well-composed and balanced, not artificially enlarged to dominate the frame. Keep clear room for the headline, copy and CTA.'
 
 async function briefs(siteName: string, facts: string[], voice: any): Promise<Tpl[]> {
   const fixed = (contents: Record<string, { headline: string; content: string }>): Tpl[] =>
