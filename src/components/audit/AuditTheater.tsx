@@ -140,25 +140,28 @@ export default function AuditTheater() {
     // Director: walk each step at a deliberate, Ryze-slow pace. Every step dwells DWELL ms so its
     // visual is actually seen; a step that yields data waits (up to MAXWAIT) for it before advancing.
     // Data arrival never fast-forwards the theater — only fills each slide in as the director lands on it.
-    const DWELL = 8000, MAXWAIT = 11000
+    const MAXWAIT = 13000
     const OPTIONAL = new Set(['speed', 'backlinks'])   // may yield nothing (no API key) — don't stall waiting
+    // health lingers longest (many live screenshots load); others get a steady beat.
+    const dwellFor = (key: string) => (key === 'health' ? 13000 : 8000)
     let i = 0, stopped = false
     const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('ready') } }
     const walk = () => {
       if (stopped) return
       setStep(i)
       const key = STEPS[i].key
+      const D = dwellFor(key)
       const started = Date.now()
       const check = () => {
         if (stopped) return
         const elapsed = Date.now() - started
         if (i >= STEPS.length - 1) {                      // last slide: hold until the final result lands
-          if (doneRef.current && elapsed >= DWELL) { finish(); return }
+          if (doneRef.current && elapsed >= D) { finish(); return }
           timer.current = setTimeout(check, 200); return
         }
         const hasData = !!liveRef.current[key]
-        const ceil = OPTIONAL.has(key) ? DWELL : MAXWAIT
-        if (elapsed >= DWELL && (hasData || elapsed >= ceil)) { i++; walk() }
+        const ceil = OPTIONAL.has(key) ? D : MAXWAIT
+        if (elapsed >= D && (hasData || elapsed >= ceil)) { i++; walk() }
         else timer.current = setTimeout(check, 200)
       }
       timer.current = setTimeout(check, 200)
@@ -308,7 +311,7 @@ function RunningStage({ step, live, isMobile, domain }: { step: number; live: Re
               <p style={{ fontSize: isMobile ? 15 : 18, color: SUB, lineHeight: 1.45, margin: 0, maxWidth: 720 }}>{blurbs[s.key]}</p>
             </div>
             <div style={{ flex: 1, minHeight: isMobile ? 260 : 0, animation: 'aFade .5s ease', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: isMobile ? '22px 0' : '18px 0' }} key={s.key + '-v'}>
-              {s.key === 'health' ? <HealthGrid sec={live.health} isMobile={isMobile} />
+              {s.key === 'health' ? <HealthGrid sec={live.health} domain={domain} isMobile={isMobile} />
                 : s.key === 'speed' ? <Speedometer sec={live.speed} isMobile={isMobile} />
                 : s.key === 'spam' ? <SpamGauge sec={live.spam} isMobile={isMobile} />
                 : s.key === 'catalog' ? <CatalogCards sec={live.catalog} isMobile={isMobile} />
@@ -467,8 +470,24 @@ function ScanPulse({ isMobile }: { isMobile: boolean }) {
   return <div style={{ position: 'relative', width: size, height: size }}>{[0.5, 0.38, 0.26].map((f, i) => <div key={i} style={{ position: 'absolute', inset: `${(0.5 - f) * size}px`, border: '1.5px dashed #e2e6ea', borderRadius: '50%' }} />)}<div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}><div style={{ width: size * 0.3, height: size * 0.3, borderRadius: '50%', border: `3px solid ${LINE}`, borderTopColor: LIME, animation: 'aOrbit 1s linear infinite' }} /></div></div>
 }
 
+/** Live screenshot of a page via a free render service, falling back to og:image then a skeleton. */
+const shotUrl = (full: string) => `https://image.thum.io/get/width/640/crop/480/noanimate/${full}`
+function PageThumb({ full, og, i }: { full: string; og: string | null; i: number }) {
+  const [stage, setStage] = useState(0)   // 0 = live screenshot, 1 = og:image, 2 = skeleton
+  const src = stage === 0 ? shotUrl(full) : stage === 1 && og ? og : null
+  if (!src) return (
+    <>
+      <div style={{ position: 'absolute', left: '12%', right: '14%', top: '20%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.08)' }} />
+      <div style={{ position: 'absolute', left: '12%', right: '34%', top: '38%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.06)' }} />
+      <div style={{ position: 'absolute', left: '12%', right: '48%', top: '56%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.05)' }} />
+    </>
+  )
+  // eslint-disable-next-line @next/next/no-img-element
+  return <img key={stage} src={src} alt="" loading={i < 8 ? undefined : 'lazy'} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} onError={() => setStage((s) => (s === 0 && og ? 1 : 2))} />
+}
+
 /** Health — a big live grid of your key pages being opened and rendered, with a huge counter (Ryze-style). */
-function HealthGrid({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
+function HealthGrid({ sec, domain, isMobile }: { sec?: Section; domain: string; isMobile: boolean }) {
   const urls = sec?.read?.urls || []
   const thumbs = sec?.read?.thumbs || []
   const total = sec?.read?.total || urls.length || 0
@@ -497,11 +516,9 @@ function HealthGrid({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
           return (
             <div key={i} style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 8px 18px -12px rgba(0,0,0,.3)', animation: real ? `aPop .4s ease ${Math.min(i, 20) * 0.06}s both` : 'none', opacity: real ? 1 : 0.4 }}>
               <div style={{ aspectRatio: '4 / 3', background: `linear-gradient(135deg, ${tints[i % tints.length]}, #ffffff)`, position: 'relative', overflow: 'hidden' }}>
-                {c.thumb
-                  // eslint-disable-next-line @next/next/no-img-element
-                  ? <img src={c.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
+                {real ? <PageThumb full={`https://${domain}${c.url}`} og={c.thumb} i={i} />
                   : <><div style={{ position: 'absolute', left: '12%', right: '14%', top: '20%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.08)' }} /><div style={{ position: 'absolute', left: '12%', right: '34%', top: '38%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.06)' }} /><div style={{ position: 'absolute', left: '12%', right: '48%', top: '56%', height: 5, borderRadius: 4, background: 'rgba(0,0,0,.05)' }} /></>}
-                <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 8, fontWeight: 800, letterSpacing: '.08em', color: '#fff', background: LIME, borderRadius: 4, padding: '1px 5px' }}>SM</span>
+                <span style={{ position: 'absolute', top: 6, left: 6, fontSize: 8, fontWeight: 800, letterSpacing: '.08em', color: '#fff', background: LIME, borderRadius: 4, padding: '1px 5px', zIndex: 1 }}>SM</span>
               </div>
               <div style={{ fontSize: 10, color: SUB, padding: '5px 7px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{real ? shorten(c.url, isMobile ? 11 : 15) : '…'}</div>
             </div>
