@@ -12,10 +12,14 @@ const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#
 const SERIF = 'Fraunces, Georgia, serif'
 const SANS = 'Inter, system-ui, sans-serif'
 
-type PlanId = 'starter' | 'business'
-const PLANS: { id: PlanId; role: string; price: number; brands: string; blurb: string; recommended?: boolean }[] = [
-  { id: 'starter', role: 'Full-time', price: 49, brands: '1 brand', blurb: 'The whole team, working every day on one store.', recommended: true },
-  { id: 'business', role: 'Agency', price: 149, brands: 'up to 10 brands', blurb: 'Pooled across clients, with seats and white-label reports.' },
+// The one paid plan: Creator $49/mo (internal id 'starter'). Prices provisional — tuned with real users.
+const PLAN = { id: 'starter' as const, price: 49 }
+const INCLUDES = [
+  '6,000 credits / month · $0.15 an image · $6 a video',
+  '15 brands · 15 competitors to spy on',
+  'Connect Meta & run ads',
+  'Invite your team — 3 seats',
+  'Customer inbox + fresh creatives every morning',
 ]
 
 const ROLES = [
@@ -26,7 +30,6 @@ const ROLES = [
 ]
 
 export default function HireAgreement() {
-  const [plan, setPlan] = useState<PlanId>('starter')
   const [busy, setBusy] = useState(false)
   const [signer, setSigner] = useState('')
   useEffect(() => {
@@ -38,14 +41,11 @@ export default function HireAgreement() {
     setBusy(true)
     try {
       const { startPaypalCheckout } = await import('@/lib/paypal/start')
-      const res = await startPaypalCheckout({ kind: 'subscription', plan, cycle: 'monthly' })
+      const res = await startPaypalCheckout({ kind: 'subscription', plan: PLAN.id, cycle: 'monthly' })
       if ((res as any)?.error) { alert((res as any).message || 'Could not start checkout.'); setBusy(false) }
       // otherwise redirecting to PayPal
     } catch { setBusy(false) }
   }
-
-  const chosen = PLANS.find((p) => p.id === plan)!
-  const HUMAN = 12400
 
   return (
     <div style={{ minHeight: '100dvh', background: PAPER, fontFamily: SANS, color: INK, padding: '48px 22px', boxSizing: 'border-box' }}>
@@ -89,28 +89,29 @@ export default function HireAgreement() {
             ))}
           </div>
 
-          {/* compensation / plan pick */}
+          {/* compensation — the one Creator plan */}
           <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>Compensation</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12, marginBottom: 18 }}>
-            {PLANS.map((p) => {
-              const on = plan === p.id
-              return (
-                <button key={p.id} onClick={() => setPlan(p.id)} style={{ textAlign: 'left', border: `1.5px solid ${on ? ORANGE : LINE}`, borderRadius: 14, background: on ? '#fff7f4' : CREAM, padding: 16, cursor: 'pointer', fontFamily: SANS, position: 'relative' }}>
-                  {p.recommended && <span style={{ position: 'absolute', top: -10, right: 14, fontSize: 10.5, fontWeight: 800, color: '#fff', background: ORANGE, borderRadius: 100, padding: '3px 10px' }}>RECOMMENDED</span>}
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                    <span style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 800 }}>${p.price}</span><span style={{ fontSize: 13, color: SUB }}>/mo</span>
-                  </div>
-                  <div style={{ fontSize: 14, fontWeight: 800, marginTop: 4 }}>{p.role} · {p.brands}</div>
-                  <div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.4 }}>{p.blurb}</div>
-                </button>
-              )
-            })}
+          <div style={{ border: `1.5px solid ${ORANGE}`, borderRadius: 16, background: '#fff7f4', padding: 18, marginBottom: 16 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Creator</span>
+              <span style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 800, marginLeft: 'auto' }}>$49</span><span style={{ fontSize: 13, color: SUB }}>/ month</span>
+            </div>
+            <div style={{ fontSize: 13.5, color: '#43403a', marginTop: 2, marginBottom: 12 }}>The whole team, full-time — everything, every morning.</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+              {INCLUDES.map((f) => (
+                <div key={f} style={{ display: 'flex', gap: 9, alignItems: 'flex-start', fontSize: 13.5, color: INK }}>
+                  <span style={{ color: '#1f8f4e', fontWeight: 900, flex: 'none' }}>✓</span>{f}
+                </div>
+              ))}
+            </div>
           </div>
-          <div style={{ fontSize: 13, color: SUB, marginBottom: 22 }}>A human team doing this costs about <b style={{ color: INK }}>${HUMAN.toLocaleString()}/mo</b>. You pay <b style={{ color: INK }}>${chosen.price}</b>.</div>
+          <div style={{ background: PAPER, borderRadius: 12, padding: '13px 16px', fontSize: 13.5, color: '#43403a', lineHeight: 1.5, marginBottom: 20 }}>
+            Media is metered honestly — <b style={{ color: INK }}>$0.15 an image, $6 a video</b>. A UGC video from a freelancer is <b style={{ color: INK }}>$200–300 and a week</b>; here it’s <b style={{ color: INK }}>$6 and 2 minutes</b>.
+          </div>
 
           {/* sign */}
           <button onClick={hire} disabled={busy} style={{ width: '100%', background: busy ? '#e7a897' : ORANGE, color: '#fff', border: 'none', borderRadius: 14, padding: '16px 22px', fontSize: 16.5, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: SANS }}>
-            {busy ? 'Opening secure checkout…' : `Sign & hire the team — $${chosen.price}/mo`}
+            {busy ? 'Opening secure checkout…' : 'Sign & hire the team — $49/mo'}
           </button>
           <div style={{ textAlign: 'center', fontSize: 12.5, color: SUB, marginTop: 12 }}>Cancel anytime · Secure checkout · You approve every spend</div>
         </div>
