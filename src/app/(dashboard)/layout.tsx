@@ -4,7 +4,10 @@
  * (survives a broken hydration from browser extensions), matching the app's "never gate first paint on
  * the client" rule. The shell itself lives in @/components/app/AppShell.
  */
+import { cookies } from 'next/headers'
 import AppShell from '@/components/app/AppShell'
+import CompanyShell from '@/components/app/CompanyShell'
+import ShellFlag from '@/components/app/ShellFlag'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { readBrandCookie } from '@/lib/brand/active'
 import { brandPoolUserIds } from '@/lib/org'
@@ -25,5 +28,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
       activeBrand = await readBrandCookie()
     }
   } catch { /* rail still renders; switcher falls back to its own client fetch */ }
-  return <AppShell brands={brands} activeBrand={activeBrand}>{children}</AppShell>
+
+  // Unified Shell v2 behind the `sf_shell` flag (default = current AppShell; flip with ?shell=v2).
+  const shellV2 = (await cookies()).get('sf_shell')?.value === 'v2'
+  const Shell = shellV2 ? CompanyShell : AppShell
+  return <><ShellFlag /><Shell brands={brands} activeBrand={activeBrand}>{children}</Shell></>
 }
