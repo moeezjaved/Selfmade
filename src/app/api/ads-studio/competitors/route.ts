@@ -73,11 +73,10 @@ export async function GET(req: NextRequest) {
     let discovered: any[] = []
     let seed: any = null
     let configured = true
-    let dbg: any = null
     if (domain && domain.includes('.')) {
       const res = await discoverCompetitors(domain).catch(() => null)
       if (res) {
-        seed = res.seed; configured = res.configured; dbg = res.debug ?? null
+        seed = res.seed; configured = res.configured
         discovered = await Promise.all(res.competitors.map(async (c) => {
           // Richest source first: our ad-DNA corpus (hooks/personas), matched by the rival's DOMAIN. Else live ads.
           const dna = await adDnaFor(admin, c.name, c.domain)
@@ -130,7 +129,7 @@ export async function GET(req: NextRequest) {
     // Brands with real ad-DNA rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || (b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0))
 
-    return NextResponse.json({ seed, configured, competitors: merged, _debug: dbg })
+    return NextResponse.json({ seed, configured, competitors: merged })
   } catch (e: any) {
     return NextResponse.json({ competitors: [], error: String(e?.message || e).slice(0, 160) })
   }
