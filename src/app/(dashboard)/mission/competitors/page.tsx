@@ -5,6 +5,7 @@
  * keyword API is connected.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { useEmbedded } from '@/lib/ui/embedded'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -12,6 +13,7 @@ type Comp = { id: string; name: string; domain: string; page_count: number; blog
 type Data = { competitors: Comp[]; gaps: string[] }
 
 export default function CompetitorsPage() {
+  const embedded = useEmbedded()
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -52,11 +54,13 @@ export default function CompetitorsPage() {
 
   return (
     <Shell>
-      <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>Competitor intelligence</div>
-      <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>What rivals rank for — and your gaps</h1>
-      <p style={{ color: SUB, fontSize: 15, margin: '0 0 20px', lineHeight: 1.5 }}>
-        We read each rival’s public content to see what they publish, then find the buyer-intent pages they cover and you don’t. Build those pages to take their traffic.
-      </p>
+      {!embedded && <>
+        <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>Competitor intelligence</div>
+        <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>What rivals rank for — and your gaps</h1>
+        <p style={{ color: SUB, fontSize: 15, margin: '0 0 20px', lineHeight: 1.5 }}>
+          We read each rival’s public content to see what they publish, then find the buyer-intent pages they cover and you don’t. Build those pages to take their traffic.
+        </p>
+      </>}
 
       {note && <div style={{ borderRadius: 12, padding: '11px 15px', marginBottom: 18, fontSize: 14, fontWeight: 600, background: '#eef4fb', color: '#28527a', border: '1px solid #cddcf0' }}>{note}</div>}
 
@@ -134,5 +138,6 @@ const primaryBtn: React.CSSProperties = { background: LIME, color: '#fff', borde
 const ghostBtn: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '8px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
+  const embedded = useEmbedded()
+  return <div style={{ maxWidth: embedded ? '100%' : 780, margin: '0 auto', padding: embedded ? '8px 0 30px' : '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
 }

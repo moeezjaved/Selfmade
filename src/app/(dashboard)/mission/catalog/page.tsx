@@ -5,6 +5,7 @@
  * changes on Shopify until you click Approve. Before/after on every draft.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { useEmbedded } from '@/lib/ui/embedded'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -25,6 +26,7 @@ const AGENTS = [
 ] as const
 
 export default function CatalogPage() {
+  const embedded = useEmbedded()
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState<string | null>(null)
@@ -81,11 +83,13 @@ export default function CatalogPage() {
   const h = data.health
   return (
     <Shell>
-      <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>{data.store?.shop_name || data.store?.shop_domain} · Catalog cluster</div>
-      <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>Fix your catalog</h1>
-      <p style={{ color: SUB, fontSize: 15, margin: '0 0 22px', lineHeight: 1.5 }}>
-        {h ? `${h.products} products · ${h.missingSeoTitle} missing SEO title · ${h.imagesMissingAlt} images without alt.` : 'Your synced catalog.'} The agents draft the fix; nothing changes on Shopify until you approve.
-      </p>
+      {!embedded && <>
+        <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>{data.store?.shop_name || data.store?.shop_domain} · Catalog cluster</div>
+        <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>Fix your catalog</h1>
+        <p style={{ color: SUB, fontSize: 15, margin: '0 0 22px', lineHeight: 1.5 }}>
+          {h ? `${h.products} products · ${h.missingSeoTitle} missing SEO title · ${h.imagesMissingAlt} images without alt.` : 'Your synced catalog.'} The agents draft the fix; nothing changes on Shopify until you approve.
+        </p>
+      </>}
 
       {note && <div style={{ borderRadius: 12, padding: '11px 15px', marginBottom: 18, fontSize: 14, fontWeight: 600, background: '#eef4fb', color: '#28527a', border: '1px solid #cddcf0' }}>{note}</div>}
 
@@ -178,5 +182,6 @@ const primaryBtn: React.CSSProperties = { background: LIME, color: '#fff', borde
 const ghostBtn: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
+  const embedded = useEmbedded()
+  return <div style={{ maxWidth: embedded ? '100%' : 780, margin: '0 auto', padding: embedded ? '8px 0 30px' : '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
 }

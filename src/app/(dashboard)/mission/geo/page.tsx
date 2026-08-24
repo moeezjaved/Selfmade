@@ -5,6 +5,7 @@
  * the real engines (metered). Everything shown is really checked and stored — never asserted.
  */
 import { useCallback, useEffect, useState } from 'react'
+import { useEmbedded } from '@/lib/ui/embedded'
 
 type EngineCell = { engine: string; label: string; cited: boolean; grounded: boolean; competitorsCited: string[]; excerpt: string }
 type PromptResult = { prompt: string; engines: EngineCell[]; youCited: boolean; rivalsCited: number }
@@ -21,6 +22,7 @@ type Asset = { id: string | null; kind?: string; title: string; target_prompt: s
 const CRAWL_KINDS = ['llms_txt', 'schema', 'fact_sheet']
 
 export default function GeoPage() {
+  const embedded = useEmbedded()
   const [status, setStatus] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
@@ -123,8 +125,9 @@ export default function GeoPage() {
   const sov = status ? Math.round(status.shareOfVoice * 100) : 0
 
   return (
-    <div className="geo">
+    <div className={`geo${embedded ? ' embedded' : ''}`}>
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style>{`.geo.embedded .back{display:none}.geo.embedded .top>div:first-child{display:none}.geo.embedded .wrap{padding:6px 0 30px;max-width:100%}`}</style>
       <div className="wrap">
         <a href="/mission" className="back">← Back to your desk</a>
 

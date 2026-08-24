@@ -6,6 +6,7 @@
  * connection, its own screen asks for it right here — like the mission page. Full white, visual-first.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { EmbeddedContext } from '@/lib/ui/embedded'
 import CatalogPage from '../mission/catalog/page'
 import BlogPage from '../mission/blog/page'
 import ProgrammaticPage from '../mission/programmatic/page'
@@ -127,8 +128,8 @@ export default function GrowPage() {
                 ))}
               </div>
             ) : (
-              <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
-                {Dept && <Dept />}
+              <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 6 }}>
+                <EmbeddedContext.Provider value={true}>{Dept && <Dept />}</EmbeddedContext.Provider>
               </div>
             )}
           </>

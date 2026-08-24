@@ -5,6 +5,7 @@
  * FAQ, generates a hero image, and — on approval — publishes to your Shopify blog. Draft-first.
  */
 import { useEffect, useState, useCallback } from 'react'
+import { useEmbedded } from '@/lib/ui/embedded'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -12,6 +13,7 @@ type Draft = { id: string; title: string; target_prompt: string; body_markdown: 
 type Data = { connected: boolean; store?: { shop_name?: string; shop_domain?: string }; drafts?: Draft[]; topics?: string[] }
 
 export default function BlogPage() {
+  const embedded = useEmbedded()
   const [data, setData] = useState<Data | null>(null)
   const [loading, setLoading] = useState(true)
   const [topic, setTopic] = useState('')
@@ -70,11 +72,13 @@ export default function BlogPage() {
   const drafts = data.drafts || []
   return (
     <Shell>
-      <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>{data.store?.shop_name || data.store?.shop_domain} · Content agent</div>
-      <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>Write a blog that ranks</h1>
-      <p style={{ color: SUB, fontSize: 15, margin: '0 0 20px', lineHeight: 1.5 }}>
-        It reads your real products + brand, writes a buyer-intent article with Buy/Consider/Skip picks and a deep FAQ, and generates a hero image. Nothing publishes until you approve.
-      </p>
+      {!embedded && <>
+        <div style={{ marginBottom: 6, fontSize: 12.5, color: SUB, fontWeight: 700, letterSpacing: '.02em', textTransform: 'uppercase' }}>{data.store?.shop_name || data.store?.shop_domain} · Content agent</div>
+        <h1 style={{ fontSize: 27, fontWeight: 800, letterSpacing: '-.02em', margin: '0 0 6px' }}>Write a blog that ranks</h1>
+        <p style={{ color: SUB, fontSize: 15, margin: '0 0 20px', lineHeight: 1.5 }}>
+          It reads your real products + brand, writes a buyer-intent article with Buy/Consider/Skip picks and a deep FAQ, and generates a hero image. Nothing publishes until you approve.
+        </p>
+      </>}
 
       {note && <div style={{ borderRadius: 12, padding: '11px 15px', marginBottom: 18, fontSize: 14, fontWeight: 600, background: note.startsWith('Published') ? '#eaf6e6' : '#eef4fb', color: note.startsWith('Published') ? GOOD : '#28527a', border: `1px solid ${note.startsWith('Published') ? '#bfe3b6' : '#cddcf0'}`, wordBreak: 'break-word' }}>{note}</div>}
 
@@ -145,5 +149,6 @@ const primaryBtn: React.CSSProperties = { background: LIME, color: '#fff', borde
 const ghostBtn: React.CSSProperties = { background: '#fff', color: INK, border: `1.5px solid ${LINE}`, borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }
 
 function Shell({ children }: { children: React.ReactNode }) {
-  return <div style={{ maxWidth: 780, margin: '0 auto', padding: '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
+  const embedded = useEmbedded()
+  return <div style={{ maxWidth: embedded ? '100%' : 780, margin: '0 auto', padding: embedded ? '8px 0 30px' : '40px 20px 90px', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>{children}</div>
 }
