@@ -132,6 +132,7 @@ export default function AuditTheater() {
   const isMobile = useIsMobile()
   const [phase, setPhase] = useState<'idle' | 'running' | 'ready' | 'report' | 'offer'>('idle')
   const [domain, setDomain] = useState('')
+  const [rival, setRival] = useState('')
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(0)
@@ -177,7 +178,8 @@ export default function AuditTheater() {
     const stop = () => { stopped = true; clearTimeout(timer.current) }
     walk()
     try {
-      const res = await fetch(`/api/audit/stream?domain=${encodeURIComponent(d)}`)
+      const rv = rival.trim()
+      const res = await fetch(`/api/audit/stream?domain=${encodeURIComponent(d)}${rv ? `&rival=${encodeURIComponent(rv)}` : ''}`)
       const reader = res.body!.getReader(); const dec = new TextDecoder(); let buf = ''
       for (;;) {
         const { value, done } = await reader.read(); if (done) break
@@ -200,7 +202,7 @@ export default function AuditTheater() {
       }
       if (!doneRef.current) { stop(); setError('Scan didn’t finish — try again.'); setPhase('idle') }
     } catch { stop(); setError('Network error — try again.'); setPhase('idle') }
-  }, [domain])
+  }, [domain, rival])
   useEffect(() => () => clearTimeout(timer.current), [])
 
   if (phase === 'idle') return (
@@ -217,8 +219,10 @@ export default function AuditTheater() {
               style={{ flex: 1, padding: '16px 18px', fontSize: 16, borderRadius: 100, border: 'none', background: '#fff', color: INK, fontFamily: 'inherit', outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
             <button onClick={run} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
           </div>
+          <input value={rival} onChange={(e) => setRival(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="your #1 competitor (optional) — e.g. rival.com"
+            style={{ width: '100%', maxWidth: 480, marginTop: 10, padding: '13px 18px', fontSize: 14.5, borderRadius: 100, border: '1px solid rgba(255,255,255,.35)', background: 'rgba(255,255,255,.12)', color: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
           {error && <div style={{ color: '#ffe0d6', fontSize: 14, marginTop: 12 }}>{error}</div>}
-          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 16 }}>Reads only what’s public. No account, no card.</div>
+          <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 14 }}>Add your competitor for a head-to-head, or we’ll pick a real one. Reads only what’s public — no account, no card.</div>
         </div>
       </section>
       <AuditLanding onScan={() => document.getElementById('audit-domain')?.focus()} />

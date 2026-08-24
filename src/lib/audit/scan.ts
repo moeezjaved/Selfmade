@@ -213,12 +213,14 @@ function stepSpeed(ctx: Ctx, ps: Awaited<ReturnType<typeof pageSpeed>>): Section
 }
 
 const MARKETPLACES = /(amazon|walmart|etsy|ebay|target|aliexpress|temu|wayfair|bestbuy|costco|homedepot|shein|alibaba|reddit|pinterest|youtube|facebook|instagram|tiktok|wikipedia|nytimes|forbes|healthline|webmd)\./i
-async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {
+async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[], userRival?: string): Promise<Section | null> {
   if (!dfsConfigured()) return null
-  // Pick a real, comparable rival — a store, not a marketplace/publisher (comparing to amazon is useless).
+  // Prefer the competitor the user named; else pick a real, comparable store from the SERP —
+  // never a marketplace/publisher (comparing a DTC brand to amazon is useless).
   const me = ctx.domain.replace(/^www\./, '')
-  const rivalDomain = ladder.flatMap((r) => r.top.map((t) => t.domain))
-    .find((d) => d && d.replace(/^www\./, '') !== me && !MARKETPLACES.test(d))
+  const rivalDomain = (userRival && userRival.replace(/^www\./, '') !== me ? userRival : undefined)
+    || ladder.flatMap((r) => r.top.map((t) => t.domain))
+      .find((d) => d && d.replace(/^www\./, '') !== me && !MARKETPLACES.test(d))
   const [mine, rival] = await Promise.all([backlinksSummary(ctx.domain), rivalDomain ? backlinksSummary(rivalDomain) : Promise.resolve(null)])
   const f: Finding[] = []
   if (mine && rival && rival.referringDomains > mine.referringDomains * 1.5) {
@@ -231,8 +233,9 @@ async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section
 }
 
 /* ── Stream ────────────────────────────────────────────────────────────────────────────────────── */
-export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
+export async function* scanStream(domain0: string, rival0?: string): AsyncGenerator<ScanEvent> {
   const domain = normalizeDomain(domain0)
+  const rival = rival0 ? normalizeDomain(rival0) : ''
   if (!domain || !domain.includes('.')) { yield { type: 'error', error: 'Enter a real website, like yourstore.com' }; return }
   const home = await fetchHtml(`https://${domain}/`)
   if (!home) { yield { type: 'error', error: `Couldn’t reach ${domain} — it may be down or blocking bots.` }; return }
@@ -251,7 +254,7 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   yield emit(stepSpam(ctx))
   yield emit(stepCatalog(ctx))
   const google = await stepGoogle(ctx); yield emit(google)
-  const bl = await stepBacklinks(ctx, google.ladder || []); if (bl) yield emit(bl)
+  const bl = await stepBacklinks(ctx, google.ladder || [], rival); if (bl) yield emit(bl)
   const ai = await stepAi(ctx); yield emit(ai)
 
   // Scores + revenue

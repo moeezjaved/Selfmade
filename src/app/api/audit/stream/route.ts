@@ -13,12 +13,13 @@ export const runtime = 'nodejs'
 
 export async function GET(req: NextRequest) {
   const domain = normalizeDomain(req.nextUrl.searchParams.get('domain') || '')
+  const rival = normalizeDomain(req.nextUrl.searchParams.get('rival') || '') || undefined
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
       const send = (obj: any) => controller.enqueue(encoder.encode(`data: ${JSON.stringify(obj)}\n\n`))
       try {
-        for await (const ev of scanStream(domain)) {
+        for await (const ev of scanStream(domain, rival)) {
           send(ev)
           // Persist the finished scan so it carries into the logged-in product (theater → dashboard).
           if (ev.type === 'done') { try { await saveScan(createAdminClient() as any, ev.result) } catch { /* best-effort */ } }
