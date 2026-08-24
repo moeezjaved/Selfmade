@@ -148,10 +148,10 @@ export default function AuditTheater() {
     // Director: walk each step at a deliberate, Ryze-slow pace. Every step dwells DWELL ms so its
     // visual is actually seen; a step that yields data waits (up to MAXWAIT) for it before advancing.
     // Data arrival never fast-forwards the theater — only fills each slide in as the director lands on it.
-    const MAXWAIT = 13000
-    const OPTIONAL = new Set(['speed', 'backlinks'])   // may yield nothing (no API key) — don't stall waiting
-    // health lingers longest (many live screenshots load); others get a steady beat.
-    const dwellFor = (key: string) => (key === 'health' ? 13000 : key === 'google' ? 12000 : 8000)
+    const MAXWAIT = 16000                               // speed depends on a ~25s API — give it room to land
+    const OPTIONAL = new Set(['backlinks'])             // may yield nothing (no rival) — don't stall waiting
+    // health lingers longest (many live screenshots load); speed waits on PageSpeed; others steady.
+    const dwellFor = (key: string) => (key === 'health' ? 13000 : key === 'google' ? 12000 : key === 'speed' ? 11000 : 8000)
     let i = 0, stopped = false
     const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('ready') } }
     const walk = () => {
