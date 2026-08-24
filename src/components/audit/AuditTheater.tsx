@@ -18,7 +18,7 @@ type Finding = { id: string; title: string; detail: string; severity: 'high' | '
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 type AiRead = { engine: string; mentioned: boolean; question: string; answer: string }
 type CatalogProduct = { title: string; price: number | null; image: string | null; missingAlt: number; thin: boolean; noSchema: boolean }
-type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[] }
+type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 type RevenueModel = { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
 type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
 
@@ -93,10 +93,18 @@ function remark(key: string, sec?: Section & { _lost?: number; _cur?: string }):
         ? { title: 'Some pages look mass-published', sub: 'At risk from Google’s spam update — fixable', ok: false }
         : { title: 'Your pages don’t match the scaled-content pattern', sub: 'Google’s spam update is unlikely to target your site', ok: true }
     }
-    case 'catalog':
+    case 'catalog': {
+      const P = sec.products || []
+      if (P.length) {
+        const need = P.filter((p) => p.missingAlt > 0 || p.thin || p.noSchema).length
+        return need
+          ? { title: `${need} of ${P.length} products need work`, sub: 'Missing alt text, schema or descriptions — all fixable', ok: false }
+          : { title: 'Your product pages are complete', sub: 'Schema, alt text and descriptions all present', ok: true }
+      }
       return sec.findings.length
         ? { title: sec.findings[0].title, sub: 'Fixable across your product pages — with your approval', ok: false }
         : { title: 'Your product pages are complete', sub: 'Schema, alt text and descriptions all present', ok: true }
+    }
     case 'google': {
       const r = sec.ladder?.[0]; if (!r) return null
       return r.yourPosition == null
@@ -143,7 +151,7 @@ export default function AuditTheater() {
     const MAXWAIT = 13000
     const OPTIONAL = new Set(['speed', 'backlinks'])   // may yield nothing (no API key) — don't stall waiting
     // health lingers longest (many live screenshots load); others get a steady beat.
-    const dwellFor = (key: string) => (key === 'health' ? 13000 : 8000)
+    const dwellFor = (key: string) => (key === 'health' ? 13000 : key === 'google' ? 12000 : 8000)
     let i = 0, stopped = false
     const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('ready') } }
     const walk = () => {
@@ -312,7 +320,7 @@ function RunningStage({ step, live, isMobile, domain }: { step: number; live: Re
   }
   return (
     <>
-      <style>{`@keyframes aSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}@keyframes aOrbit{to{transform:rotate(360deg)}}@keyframes aFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes aScan{0%{top:6%}100%{top:92%}}@keyframes aPulseDot{0%,100%{opacity:.3}50%{opacity:1}}@keyframes aBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes aPop{0%{opacity:0;transform:translateY(8px) scale(.96)}100%{opacity:1;transform:none}}@keyframes aScrollUp{0%,12%{transform:translateY(0)}88%,100%{transform:translateY(-44%)}}`}</style>
+      <style>{`@keyframes aSweep{from{stroke-dashoffset:var(--c)}to{stroke-dashoffset:var(--off)}}@keyframes aOrbit{to{transform:rotate(360deg)}}@keyframes aFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}@keyframes aFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes aScan{0%{top:6%}100%{top:92%}}@keyframes aPulseDot{0%,100%{opacity:.3}50%{opacity:1}}@keyframes aBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}@keyframes aPop{0%{opacity:0;transform:translateY(8px) scale(.96)}100%{opacity:1;transform:none}}@keyframes aSerp{0%,14%{transform:translateY(0)}86%,100%{transform:translateY(-46%)}}`}</style>
       <div style={{ minHeight: isMobile ? 'auto' : 'calc(100dvh - 120px)', display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, position: 'relative', overflow: 'hidden', background: '#fff', border: `1px solid ${LINE}`, borderRadius: isMobile ? 18 : 26, boxShadow: '0 40px 100px -60px rgba(0,0,0,.45)', display: 'flex', flexDirection: 'column', padding: isMobile ? '26px 20px 24px' : 'clamp(32px,3.5vw,52px)' }}>
           {/* faint blueprint grid, like Ryze */}
@@ -334,9 +342,9 @@ function RunningStage({ step, live, isMobile, domain }: { step: number; live: Re
                 : s.key === 'revenue' ? <RevenueTally sec={live.revenue as any} live={live} domain={domain} isMobile={isMobile} />
                 : <ScanPulse isMobile={isMobile} />}
             </div>
-            {/* Remark — orange stripe, white text: the verdict, revealed only after the step has worked */}
-            {(() => { const rk = remark(s.key, live[s.key] as any); return showRemark && rk ? (
-              <div style={{ width: '100%', background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 26px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)', animation: 'aPop .5s ease both' }}>
+            {/* Remark — the verdict, revealed only after the step has worked. Green when good, orange when a real problem. */}
+            {(() => { const rk = remark(s.key, live[s.key] as any); const bg = rk?.ok ? GOOD : ENTRY_BG; return showRemark && rk ? (
+              <div style={{ width: '100%', background: bg, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 26px', display: 'flex', alignItems: 'center', gap: 14, boxShadow: `0 18px 40px -24px ${bg}`, animation: 'aPop .5s ease both' }}>
                 <span style={{ width: 32, height: 32, borderRadius: 100, flex: 'none', background: 'rgba(255,255,255,.22)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 17 }}>{rk.ok ? '✓' : '!'}</span>
                 <div style={{ minWidth: 0 }}>
                   <div style={{ fontSize: isMobile ? 15.5 : 18, fontWeight: 800, color: '#fff', lineHeight: 1.2 }}>{rk.title}</div>
@@ -420,22 +428,31 @@ function CatalogCards({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
     </div>
   )
 }
-/** Google — a fake Google SERP browser that cycles buyer keywords and highlights where you rank. */
+/** Google — a fake Google SERP that scrolls the full first page for each buyer keyword, landing on your rank. */
 function SerpBrowser({ rows, domain, isMobile }: { rows: LadderRow[]; domain: string; isMobile: boolean }) {
+  const CYCLE = 4000
   const [idx, setIdx] = useState(0)
   useEffect(() => {
     if (rows.length < 2) return
     const reduce = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
     if (reduce) return
-    const t = setInterval(() => setIdx((n) => (n + 1) % rows.length), 3200)
+    const t = setInterval(() => setIdx((n) => (n + 1) % rows.length), CYCLE)
     return () => clearInterval(t)
   }, [rows.length])
   const r = rows.length ? rows[idx % rows.length] : null
   const kw = r?.keyword || 'your buyer keywords'
-  const you = domain || 'your store'
-  const results = r?.top?.slice(0, 5) || []
+  const you = (domain || 'your store').replace(/^www\./, '')
+  const rivals = (r?.top || []).filter((t) => t.domain.replace(/^www\./, '') !== you).slice(0, 8)
+  const scroll = rows.length > 0 && rivals.length >= 4   // only scroll when there's a full page to scroll through
   const chrome = '#e9ebee'
   const titleCase = (d: string) => d.replace(/^www\./, '').split('.')[0].replace(/\b\w/g, (c) => c.toUpperCase())
+  const Row = ({ dom, pos, i }: { dom: string; pos: number; i: number }) => (
+    <div style={{ marginBottom: 16 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}><span style={{ width: 22, height: 22, borderRadius: 100, background: '#f0f1f3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: SUB }}>{dom[0]?.toUpperCase()}</span><span style={{ fontSize: 12.5, color: '#3a3a3a' }}>{dom.replace(/^www\./, '')}</span><span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: SUB }}>#{pos}</span></div>
+      <div style={{ fontSize: isMobile ? 15 : 17, color: '#1a0dab', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(dom)} — {kw}</div>
+      <div style={{ fontSize: 12.5, color: SUB, marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>The {titleCase(dom)} guide to {kw} — shop the range and compare.</div>
+    </div>
+  )
   return (
     <div style={{ width: '100%', maxWidth: 720, borderRadius: 16, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 24px 60px -30px rgba(0,0,0,.45)' }}>
       <div style={{ background: chrome, padding: '9px 14px', display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -446,8 +463,8 @@ function SerpBrowser({ rows, domain, isMobile }: { rows: LadderRow[]; domain: st
         <span style={{ fontSize: 12, color: SUB }}>🔒</span>
         <span style={{ fontSize: 12.5, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>google.com/search?q={kw.replace(/ /g, '+')}</span>
       </div>
-      <div style={{ padding: isMobile ? '16px 16px 18px' : '22px 26px 24px' }}>
-        <div key={idx} style={{ animation: 'aFade .5s ease both' }}>
+      <div style={{ height: isMobile ? 250 : 340, overflow: 'hidden', padding: isMobile ? '16px 16px 0' : '22px 26px 0' }}>
+        <div key={idx} style={{ animation: scroll ? `aSerp ${CYCLE}ms ease-in-out both` : 'aFade .5s ease both' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 14 }}>
             <span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#4285F4' }}>Google</span>
             <span style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 100, padding: '8px 16px', fontSize: 13.5, color: INK, boxShadow: '0 1px 4px rgba(0,0,0,.06)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kw}</span>
@@ -457,17 +474,12 @@ function SerpBrowser({ rows, domain, isMobile }: { rows: LadderRow[]; domain: st
             {['Images', 'Shopping', 'Videos', 'News'].map((t) => <span key={t} style={{ color: SUB }}>{t}</span>)}
           </div>
           {!rows.length ? (
-            [0, 1, 2].map((i) => <div key={i} style={{ marginBottom: 18 }}><div style={{ height: 10, width: '30%', borderRadius: 4, background: '#eef0f2', marginBottom: 8 }} /><div style={{ height: 14, width: '60%', borderRadius: 4, background: '#e6ecf6', marginBottom: 6 }} /><div style={{ height: 9, width: '90%', borderRadius: 4, background: '#f0f1f3' }} /></div>)
+            [0, 1, 2, 3].map((i) => <div key={i} style={{ marginBottom: 18 }}><div style={{ height: 10, width: '30%', borderRadius: 4, background: '#eef0f2', marginBottom: 8 }} /><div style={{ height: 14, width: '60%', borderRadius: 4, background: '#e6ecf6', marginBottom: 6 }} /><div style={{ height: 9, width: '90%', borderRadius: 4, background: '#f0f1f3' }} /></div>)
           ) : (
             <>
-              {results.slice(0, 3).map((t, i) => (
-                <div key={i} style={{ marginBottom: 15, animation: `aPop .4s ease ${i * 0.12}s both` }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}><span style={{ width: 22, height: 22, borderRadius: 100, background: '#f0f1f3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, color: SUB }}>{t.domain[0]?.toUpperCase()}</span><span style={{ fontSize: 12.5, color: '#3a3a3a' }}>{t.domain.replace(/^www\./, '')}</span><span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 700, color: GOOD }}>#{t.position}</span></div>
-                  <div style={{ fontSize: isMobile ? 15 : 17, color: '#1a0dab', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleCase(t.domain)} — {kw}</div>
-                </div>
-              ))}
-              {/* the reveal: your row lands last, with the rank badge */}
-              <div style={{ borderLeft: `3px solid ${ENTRY_BG}`, background: '#fff2ee', borderRadius: '0 10px 10px 0', padding: '11px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 8, animation: 'aPop .5s ease .5s both' }}>
+              {rivals.map((t, i) => <Row key={i} dom={t.domain} pos={t.position} i={i} />)}
+              {/* the reveal at the bottom of the page: where YOU actually land */}
+              <div style={{ borderLeft: `3px solid ${ENTRY_BG}`, background: '#fff2ee', borderRadius: '0 10px 10px 0', padding: '12px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginBottom: 20 }}>
                 <div style={{ minWidth: 0 }}><div style={{ fontSize: 12.5, color: '#3a3a3a' }}>you</div><div style={{ fontSize: isMobile ? 15 : 17, color: ENTRY_BG, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{you}</div></div>
                 <span style={{ flex: 'none', fontSize: 12, fontWeight: 800, color: '#fff', background: ENTRY_BG, borderRadius: 100, padding: '5px 13px' }}>{r?.yourPosition == null ? 'NOT IN TOP 50' : `#${r?.yourPosition}`}</span>
               </div>
@@ -631,20 +643,29 @@ function AiGrid({ sec, domain, isMobile }: { sec?: Section; domain: string; isMo
   )
 }
 
-/** Backlinks — you vs rivals authority bars. */
+/** Backlinks — real referring-domain counts: you vs the rival who outranks you. */
 function BacklinkGap({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
-  const gap = sec?.findings[0]?.title
-  const bars = [['Top rival', 0.92, '#3a453c'], ['Rival #2', 0.7, '#5a655c'], ['You', 0.22, RED]] as const
+  const bl = sec?.backlinks
+  if (!bl) return <ScanPulse isMobile={isMobile} />
+  const rivalName = bl.rivalDomain?.replace(/^www\./, '') || null
+  const bars = [
+    rivalName && bl.rivalRef != null ? { label: rivalName, val: bl.rivalRef, col: '#3a453c', you: false } : null,
+    { label: `${sec?.name && ''}you`, val: bl.mineRef, col: ENTRY_BG, you: true },
+  ].filter(Boolean) as { label: string; val: number; col: string; you: boolean }[]
+  const max = Math.max(1, ...bars.map((b) => b.val))
   return (
-    <div style={{ width: '100%', maxWidth: 520, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: isMobile ? 18 : 26, boxShadow: '0 10px 30px rgba(0,0,0,.05)' }}>
-      <div style={{ fontSize: 13, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 16 }}>Referring domains</div>
-      {bars.map(([label, w, col], i) => (
-        <div key={label} style={{ marginBottom: 14 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13.5, marginBottom: 5 }}><span style={{ fontWeight: label === 'You' ? 800 : 600, color: label === 'You' ? RED : INK }}>{label}</span></div>
-          <div style={{ height: 12, borderRadius: 8, background: '#eef0f2', overflow: 'hidden' }}><div style={{ height: '100%', width: `${w * 100}%`, background: col, borderRadius: 8, transformOrigin: 'left', animation: `aBar .9s cubic-bezier(.2,.8,.2,1) ${i * 0.15}s both` }} /></div>
+    <div style={{ width: '100%', maxWidth: 560, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: isMobile ? 20 : 28, boxShadow: '0 10px 30px rgba(0,0,0,.06)' }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.08em', marginBottom: 18 }}>Referring domains</div>
+      {bars.map((b, i) => (
+        <div key={i} style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', fontSize: 13.5, marginBottom: 6 }}>
+            <span style={{ fontWeight: b.you ? 800 : 600, color: b.you ? ENTRY_BG : INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{b.you ? 'You' : b.label}</span>
+            <span style={{ fontWeight: 800, color: b.you ? ENTRY_BG : INK, flex: 'none', fontVariantNumeric: 'tabular-nums' }}>{b.val.toLocaleString()}</span>
+          </div>
+          <div style={{ height: 14, borderRadius: 8, background: '#eef0f2', overflow: 'hidden' }}><div style={{ height: '100%', width: `${Math.max(4, (b.val / max) * 100)}%`, background: b.col, borderRadius: 8, transformOrigin: 'left', animation: `aBar 1s cubic-bezier(.2,.8,.2,1) ${i * 0.18}s both` }} /></div>
         </div>
       ))}
-      <div style={{ fontSize: 13, color: sec ? RED : SUB, fontWeight: 700, marginTop: 8 }}>{gap || (sec ? 'You’re behind on authority' : 'Comparing backlink profiles…')}</div>
+      <div style={{ fontSize: 13.5, color: SUB, marginTop: 4, lineHeight: 1.5 }}>{bl.mineLinks.toLocaleString()} total backlinks from {bl.mineRef.toLocaleString()} domains{rivalName && bl.rivalRef != null ? ` · ${rivalName} has ${bl.rivalRef.toLocaleString()}` : ''}.</div>
     </div>
   )
 }
