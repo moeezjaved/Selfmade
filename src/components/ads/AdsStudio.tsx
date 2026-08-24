@@ -66,7 +66,7 @@ export default function AdsStudio() {
 
   return (
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}`}</style>
       {Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -420,11 +420,24 @@ function EmptyState({ title, body, cta }: { title: string; body: string; cta: st
 }
 
 /* ── Brand Kit (derived from the website — no Shopify needed) ────────────── */
-type BrandKitData = { siteName: string; logo: string | null; colors: { hex: string; primary: boolean }[]; fonts: string[]; facts: string[]; voice: { tone: string; energy: string; audience: string } | null; visualPages: string[]; empty?: boolean }
+type BrandKitData = { siteName: string; logo: string | null; colors: { hex: string; primary: boolean }[]; fonts: string[]; facts: string[]; voice: { tone: string; energy: string; audience: string } | null; visualPages: string[]; empty?: boolean; saved?: boolean; editable?: boolean }
 function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [tab, setTab] = useState<'visual' | 'knowledge'>('visual')
   const [data, setData] = useState<BrandKitData | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [busy, setBusy] = useState(false)
+  const post = async (payload: any) => {
+    if (busy) return
+    setBusy(true)
+    try {
+      const d = await fetch('/api/ads-studio/brand-kit', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, ...payload }) }).then((r) => r.json()).catch(() => null)
+      if (d && Array.isArray(d.facts)) setData(d)
+      else if (d?.error) alert(d.error)
+    } finally { setBusy(false) }
+  }
+  const addFact = () => { const t = window.prompt('Add something we should know about your brand:'); if (t && t.trim()) post({ action: 'addFact', text: t.trim() }) }
+  const editFact = (i: number, cur: string) => { const t = window.prompt('Edit this fact:', cur); if (t != null && t.trim()) post({ action: 'editFact', index: i, text: t.trim() }) }
+  const delFact = (i: number) => { if (window.confirm('Delete this fact?')) post({ action: 'deleteFact', index: i }) }
   useEffect(() => {
     if (!domain) { setData({ empty: true } as any); return }
     let on = true; setData(null)
@@ -476,13 +489,25 @@ function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: isMobile ? 20 : 26 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div><div style={{ fontSize: 16, fontWeight: 800 }}>What we know about you</div><div style={{ fontSize: 13, color: SUB, marginTop: 2 }}>{facts.length} things we’ve learned — edit or add more</div></div>
-                  <button style={{ ...primaryBtn, padding: '8px 16px', fontSize: 13, borderRadius: 8 }}>Add</button>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+                  <div>
+                    <div style={{ fontSize: 16, fontWeight: 800, display: 'flex', alignItems: 'center', gap: 8 }}>What we know about you{data.saved && <span style={{ fontSize: 10.5, fontWeight: 800, color: '#1f8f4e', background: '#e8f6ee', borderRadius: 100, padding: '2px 9px' }}>SAVED</span>}</div>
+                    <div style={{ fontSize: 13, color: SUB, marginTop: 2 }}>{facts.length} things we’ve learned{data.saved ? ' — saved & feeding your Company Brain' : ' — sign in from your audit to save & edit'}</div>
+                  </div>
+                  {data.editable && <button onClick={addFact} disabled={busy} style={{ ...primaryBtn, padding: '8px 16px', fontSize: 13, borderRadius: 8, opacity: busy ? .6 : 1 }}>Add</button>}
                 </div>
                 <div style={{ marginTop: 18 }}>
                   {(showAll ? facts : facts.slice(0, 8)).map((f, i) => (
-                    <div key={i} style={{ display: 'flex', gap: 12, padding: '14px 0', borderTop: i ? `1px solid ${LINE}` : 'none', fontSize: 14.5, color: '#37332c', lineHeight: 1.55 }}><span style={{ width: 6, height: 6, borderRadius: 100, background: ORANGE, marginTop: 8, flex: 'none' }} />{f}</div>
+                    <div key={i} className="sf-fact" style={{ display: 'flex', gap: 12, padding: '14px 0', borderTop: i ? `1px solid ${LINE}` : 'none', fontSize: 14.5, color: '#37332c', lineHeight: 1.55, alignItems: 'flex-start' }}>
+                      <span style={{ width: 6, height: 6, borderRadius: 100, background: ORANGE, marginTop: 8, flex: 'none' }} />
+                      <span style={{ flex: 1 }}>{f}</span>
+                      {data.editable && (
+                        <span className="sf-fact-actions" style={{ display: 'flex', gap: 10, flex: 'none', opacity: 0, transition: 'opacity .15s' }}>
+                          <button onClick={() => editFact(i, f)} disabled={busy} title="Edit" style={{ border: 'none', background: 'none', cursor: 'pointer', color: SUB, fontSize: 15, padding: 0, lineHeight: 1 }}>✎</button>
+                          <button onClick={() => delFact(i)} disabled={busy} title="Delete" style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#c0392b', fontSize: 15, padding: 0, lineHeight: 1 }}>🗑</button>
+                        </span>
+                      )}
+                    </div>
                   ))}
                   {facts.length > 8 && <button onClick={() => setShowAll((s) => !s)} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '8px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer' }}>{showAll ? 'Show less' : `Show all ${facts.length}`}</button>}
                 </div>
