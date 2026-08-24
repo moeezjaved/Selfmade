@@ -141,9 +141,9 @@ export default function AuditLanding({ onScan }: { onScan?: () => void }) {
       {/* Final CTA — orange */}
       <section style={{ background: ORANGE, color: '#fff', padding: isMobile ? '54px 22px' : '88px 40px', textAlign: 'center' }}>
         <Reveal>
-          <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 30 : 48, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 14px' }}>See what&rsquo;s broken — free.</h2>
-          <p style={{ fontSize: 17, opacity: .9, margin: '0 0 26px', maxWidth: 520, marginInline: 'auto' }}>Your search health, catalog, and whether AI even mentions you — in ~30 seconds. No login.</p>
-          <button onClick={cta} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 34px', fontSize: 17, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>Audit my SEO — free →</button>
+          <h2 style={{ fontFamily: SERIF, color: '#fff', fontSize: isMobile ? 32 : 52, fontWeight: 700, letterSpacing: '-.02em', lineHeight: 1.02, margin: '0 0 14px' }}>Let AI run your company.</h2>
+          <p style={{ fontSize: 17, color: 'rgba(255,255,255,.92)', margin: '0 0 26px', maxWidth: 560, marginInline: 'auto', lineHeight: 1.5 }}>SEO, ads, content, and your store — one AI team that finds what&rsquo;s broken and fixes it, with your sign-off. Start with a free scan.</p>
+          <button onClick={cta} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 34px', fontSize: 17, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit' }}>Scan my store — free →</button>
         </Reveal>
       </section>
     </div>
