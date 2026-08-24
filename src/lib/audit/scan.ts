@@ -196,9 +196,8 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
   return { key: 'google', name: 'Google visibility', sub, score: rows.length ? scoreFrom(f) : 100, findings: f, ladder: rows }
 }
 
-async function stepSpeed(ctx: Ctx): Promise<Section | null> {
+function stepSpeed(ctx: Ctx, ps: Awaited<ReturnType<typeof pageSpeed>>): Section | null {
   if (!pagespeedConfigured()) return null
-  const ps = await pageSpeed(`https://${ctx.domain}/`)
   if (!ps) return null
   const f: Finding[] = []
   if (ps.lcpMs != null) {
@@ -213,9 +212,13 @@ async function stepSpeed(ctx: Ctx): Promise<Section | null> {
   return { key: 'speed', name: 'Website speed', sub: ps.hasField ? 'Real-visitor load times from Chrome UX data' : 'Estimated from lab performance', score, findings: f, speed: { lcpS, cls: ps.clsScore != null ? +ps.clsScore.toFixed(2) : null } }
 }
 
+const MARKETPLACES = /(amazon|walmart|etsy|ebay|target|aliexpress|temu|wayfair|bestbuy|costco|homedepot|shein|alibaba|reddit|pinterest|youtube|facebook|instagram|tiktok|wikipedia|nytimes|forbes|healthline|webmd)\./i
 async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[]): Promise<Section | null> {
   if (!dfsConfigured()) return null
-  const rivalDomain = ladder.find((r) => r.top[0]?.domain && r.top[0].domain !== ctx.domain)?.top[0]?.domain
+  // Pick a real, comparable rival — a store, not a marketplace/publisher (comparing to amazon is useless).
+  const me = ctx.domain.replace(/^www\./, '')
+  const rivalDomain = ladder.flatMap((r) => r.top.map((t) => t.domain))
+    .find((d) => d && d.replace(/^www\./, '') !== me && !MARKETPLACES.test(d))
   const [mine, rival] = await Promise.all([backlinksSummary(ctx.domain), rivalDomain ? backlinksSummary(rivalDomain) : Promise.resolve(null)])
   const f: Finding[] = []
   if (mine && rival && rival.referringDomains > mine.referringDomains * 1.5) {
@@ -234,13 +237,17 @@ export async function* scanStream(domain0: string): AsyncGenerator<ScanEvent> {
   const home = await fetchHtml(`https://${domain}/`)
   if (!home) { yield { type: 'error', error: `Couldn’t reach ${domain} — it may be down or blocking bots.` }; return }
 
+  // Fire the slow PageSpeed call immediately, in parallel with the crawl, so its result is ready
+  // by the time the theater reaches the speed step (~25-30s API latency would otherwise miss the screen).
+  const speedPromise = pagespeedConfigured() ? pageSpeed(`https://${domain}/`).catch(() => null) : Promise.resolve(null)
+
   const ctx = await buildContext(domain, home)
   yield { type: 'meta', domain, siteName: ctx.siteName, category: ctx.category }
 
   const sections: Section[] = []
   const emit = (s: Section) => { sections.push(s); return { type: 'section', section: s } as ScanEvent }
   yield emit(stepHealth(ctx))
-  const speed = await stepSpeed(ctx); if (speed) yield emit(speed)
+  const speed = stepSpeed(ctx, await speedPromise); if (speed) yield emit(speed)
   yield emit(stepSpam(ctx))
   yield emit(stepCatalog(ctx))
   const google = await stepGoogle(ctx); yield emit(google)
