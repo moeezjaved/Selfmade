@@ -333,7 +333,9 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
               </div>
               <div style={{ padding: 11 }}>
                 {m.caption && <div style={{ fontSize: 12, color: '#43403a', lineHeight: 1.4, marginBottom: 9, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.caption}</div>}
-                {m.image && <a href={m.image} download style={{ ...primaryBtn, display: 'inline-block', padding: '6px 13px', fontSize: 12, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
+                {/* Route R2 URLs through /api/download (forces an attachment header) so it saves the file
+                    in place instead of opening the image in a new tab; data: URLs download directly. */}
+                {m.image && <a href={m.image.startsWith('http') ? `/api/download?url=${encodeURIComponent(m.image)}&name=selfmade-ad.png` : m.image} download="selfmade-ad.png" style={{ ...primaryBtn, display: 'inline-block', padding: '6px 13px', fontSize: 12, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
               </div>
             </div>
           ))}
