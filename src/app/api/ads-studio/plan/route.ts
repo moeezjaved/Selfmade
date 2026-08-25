@@ -39,7 +39,7 @@ FOUNDER'S REQUEST: "${message}"
 
 Return ONLY JSON:
 {
- "headline": "the punchy on-image headline (<= 8 words), in ${language}, matching the format's vibe",
+ "headlines": ["3 DISTINCT punchy on-image headline options (each <= 8 words), in ${language}, matching the format's vibe — vary the angle across them (e.g. benefit-led, curiosity/hook, offer/urgency) so the founder can pick the direction they like"],
  "angle": "one sentence of creative direction for the image — composition, mood, and the platform vibe (${format}); this steers the visual, not the copy",
  "caption": "a short social caption to post with the ad, in ${language}",
  "productIndex": <the 0-based index of the product to feature, or -1 if none applies>
@@ -49,8 +49,10 @@ Return ONLY JSON:
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
     const idx = Number.isInteger(j?.productIndex) ? j.productIndex : -1
+    const headlines = (Array.isArray(j?.headlines) ? j.headlines : [j?.headline]).map((h: any) => String(h || '').slice(0, 120)).filter(Boolean).slice(0, 3)
     return NextResponse.json({
-      headline: String(j?.headline || '').slice(0, 120),
+      headline: headlines[0] || String(j?.headline || '').slice(0, 120),
+      headlines,
       angle: `${String(j?.angle || '').slice(0, 240)} Style: ${vibe}`,
       caption: String(j?.caption || '').slice(0, 400),
       productIndex: idx >= 0 && idx < productTitles.length ? idx : -1,
