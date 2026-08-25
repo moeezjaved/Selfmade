@@ -269,7 +269,9 @@ export default function InterviewPage() {
       if (c) { fromSiteFunnel.current = true; seedCompetitor.current = decodeURIComponent(c[1]).trim() }
     } catch { /* ignore */ }
   }, [])
-  const doneDest = () => (fromSiteFunnel.current ? '/studio-building' : '/brief?welcome=1')
+  // Funnel users go build their studio; everyone else lands on the chat-first Home (/hq) — which IS in
+  // the sidebar. (Was /brief, which has no nav item, so users got stranded there.)
+  const doneDest = () => (fromSiteFunnel.current ? '/studio-building' : '/hq')
 
   // Resume, don't restart — persist progress so a browser back/refresh returns to the same step with the
   // same answers, instead of throwing the founder back to the welcome screen. (#5)
