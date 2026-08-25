@@ -166,9 +166,19 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         const refAd = refAdRaw.startsWith('/') ? window.location.origin + refAdRaw : refAdRaw   // server fetch needs absolute
         const brandId = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
         const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
+        // If the user typed their OWN instruction (beyond the auto-filled "Create an ad like this…"),
+        // run it through the plan layer to IMPROVE it into a punchy headline, and bake it into the remake
+        // — so typing something (e.g. "make it for Eid, 30% off") is honored, not ignored. No custom text
+        // → pure clone (let the reference's own copy adapt to the product).
+        const defaultMsg = `create an ad like this for ${(kit?.siteName || 'my product').toLowerCase()}`
+        let newHeadline: string | undefined
+        if (message && message.toLowerCase().trim() !== defaultMsg) {
+          const plan = await fetch('/api/ads-studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, format: fmt, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json()).catch(() => null)
+          newHeadline = plan?.headline || undefined
+        }
         const enq = await fetch('/api/discovery/clone-image', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K' }),
+          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K', newHeadline }),
         }).then((r) => r.json())
         if (!enq?.jobId) throw new Error(enq?.error === 'insufficient_credits' ? 'credits' : 'no-job')
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
