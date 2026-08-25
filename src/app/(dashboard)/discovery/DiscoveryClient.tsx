@@ -1925,9 +1925,9 @@ export default function DiscoveryPage() {
       })()}
 
       {/* ── Header ── */}
-      <div style={{ borderBottom: '1px solid #e0eecb', position: 'sticky', top: 0, zIndex: 40,
-        // Motion-style pastel gradient band behind the page title + search.
-        background: 'radial-gradient(90% 160% at 100% 0%, #fdf3cf 0%, transparent 50%), radial-gradient(80% 140% at 0% 20%, #e3f9d6 0%, transparent 55%), linear-gradient(120deg, #f6fceb, #f0fae2 45%, #edf8ee)',
+      <div style={{ borderBottom: '1px solid #efece2', position: 'sticky', top: 0, zIndex: 40,
+        // White header band (matches the app's light workspace theme).
+        background: '#fff',
         padding: '14px 24px' }}>
 
         {/* Row 1: title + nav + search + refresh */}

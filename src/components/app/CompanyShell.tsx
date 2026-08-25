@@ -28,13 +28,12 @@ const NAV: Group[] = [
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
     { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
-    { href: '/ads-workspace/discover', label: 'Discover', icon: Radar },
+    { href: '/discovery', label: 'Discover', icon: Radar },
     { href: '/ads-workspace/products', label: 'Products', icon: Store },
     { href: '/ads-workspace/brand', label: 'Brand Kit', icon: Wand2 },
     { href: '/ads-workspace/audiences', label: 'Audiences', icon: Users },
     { href: '/reports', label: 'Reports', icon: BarChart2 },
     { href: '/m4', label: 'Launch Ads', icon: Rocket },
-    { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
   ] },
   { label: 'SEO', stage: true, items: [
     { href: '/grow', label: 'Overview', icon: BarChart2 },
@@ -46,7 +45,6 @@ const NAV: Group[] = [
     { href: '/mission/competitors', label: 'SEO Competitors', icon: Eye },
   ] },
   { label: 'Intel', stage: true, items: [
-    { href: '/discovery', label: 'All ads', icon: Radar },
     { href: '/discovery/brand-spy', label: 'Brand Spy', icon: Eye },
     { href: '/discovery/saved', label: 'Boards', icon: Bookmark },
     { href: '/brands', label: 'My Brands', icon: Store },
