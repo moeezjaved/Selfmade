@@ -257,6 +257,7 @@ export default function InterviewPage() {
   // interview and remember to land them in the ads workspace (templates already built) when done.
   const fromSiteFunnel = useRef(false)
   const ownPageId = useRef('')   // Meta page id from the funnel's Facebook Ad Library link → brand's own-ads audit
+  const seedCompetitor = useRef('')   // competitor (ad-library link/website) from the get-started screen → spy after create
   useEffect(() => {
     try {
       const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/)
@@ -264,6 +265,8 @@ export default function InterviewPage() {
       if (d) { fromSiteFunnel.current = true; setUrl((u) => u || d) }
       const p = document.cookie.match(/(?:^|; )sf_scan_pageid=(\d{5,})/)
       if (p) { fromSiteFunnel.current = true; ownPageId.current = p[1] }
+      const c = document.cookie.match(/(?:^|; )sf_scan_competitor=([^;]+)/)
+      if (c) { fromSiteFunnel.current = true; seedCompetitor.current = decodeURIComponent(c[1]).trim() }
     } catch { /* ignore */ }
   }, [])
   const doneDest = () => (fromSiteFunnel.current ? '/studio-building' : '/brief?welcome=1')
@@ -452,6 +455,14 @@ export default function InterviewPage() {
         // Make the just-created brand the ACTIVE project so the brief + every surface scope to it. Essential
         // when onboarding an Nth brand (?new=1) — otherwise the app stays on the previous brand.
         try { document.cookie = `sf_brand=${r.brand.id}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax` } catch { /* ignore */ }
+        // Funnel: spy the competitor named on the get-started screen so the audit compares against a rival
+        // the founder actually cares about (best-effort — needs a Meta Ad Library link to resolve a page id).
+        if (seedCompetitor.current) {
+          try {
+            const sp = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: seedCompetitor.current, brand: r.brand.id }) }).then((x) => x.json()).catch(() => null)
+            if (sp?.pageId) await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: String(sp.pageId), action: 'follow', brandId: r.brand.id, spied: true }) }).catch(() => {})
+          } catch { /* best-effort */ }
+        }
       } else if (resp && !resp.ok) {
         // The brand create FAILED (e.g. 402 brand_limit_reached). This used to be swallowed silently —
         // onboarding finished and the user landed on /brief with NO brand created. Surface it instead so
