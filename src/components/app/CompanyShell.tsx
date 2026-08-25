@@ -99,13 +99,15 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const isActive = (href: string) => href === bestMatch || (href === '/mission' && pathname === '/' && !bestMatch)
 
   const Sidebar = (
-    <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, height: '100dvh', boxSizing: 'border-box', overflowY: 'auto', position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'flex-start' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 6px 12px' }}>
+    <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, height: '100dvh', boxSizing: 'border-box', overflow: 'hidden', position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'flex-start' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 6px 12px', flex: 'none' }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, background: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: SERIF, fontWeight: 800, fontSize: 17, flex: 'none' }}>S</div>
         <div style={{ minWidth: 0, flex: 1 }}><ProjectSwitcher initialBrands={brands} initialActive={activeBrand} /></div>
         {isMobile && <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: SUB, padding: 4 }}><X size={20} /></button>}
       </div>
 
+      {/* Only the nav scrolls; account + credits stay pinned at the bottom. */}
+      <div style={{ flex: 1, minHeight: 0, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2, margin: '0 -4px', padding: '0 4px' }}>
       {NAV.map((g, gi) => (
         <div key={gi} style={{ marginTop: g.label ? 12 : 0 }}>
           {g.stage && gi === NAV.findIndex((x) => x.stage) && (
@@ -125,8 +127,9 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
           })}
         </div>
       ))}
+      </div>
 
-      <div style={{ marginTop: 'auto', paddingTop: 14, position: 'relative' }}>
+      <div style={{ paddingTop: 12, marginTop: 4, borderTop: `1px solid ${LINE}`, flex: 'none', position: 'relative' }}>
         {/* Credits — always visible in the rail (tap to top up / manage plan). */}
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
           <CreditCounter />
