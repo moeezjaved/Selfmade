@@ -9,7 +9,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap } from 'lucide-react'
+import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { openCredits } from '@/components/credits/CreditModal'
@@ -32,6 +32,7 @@ const NAV: Group[] = [
   { items: [{ href: '/hq', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
+    { href: '/creative-studio', label: 'My Creatives', icon: Sparkles },
     { href: '/ads-workspace/your-ads', label: 'Your Ads', icon: ImageIcon },
     { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
     { href: '/discovery', label: 'Discover', icon: Radar },

@@ -267,6 +267,9 @@ export default function InterviewPage() {
       if (p) { fromSiteFunnel.current = true; ownPageId.current = p[1] }
       const c = document.cookie.match(/(?:^|; )sf_scan_competitor=([^;]+)/)
       if (c) { fromSiteFunnel.current = true; seedCompetitor.current = decodeURIComponent(c[1]).trim() }
+      // Funnel users already gave their website — skip the "enter your site" beat and auto-run the crawl
+      // straight away (unless they're resuming a saved interview). startHomework guards against double-fire.
+      if (d && !sessionStorage.getItem('sm_onb_state_v1')) { setPhase('homework'); startHomework(d) }
     } catch { /* ignore */ }
   }, [])
   // Funnel users go build their studio; everyone else lands on the chat-first Home (/hq) — which IS in
@@ -306,8 +309,8 @@ export default function InterviewPage() {
   }
 
   // ── Beat 2: the homework — real crawl + real analysis, log lines tied to real completions ──
-  const startHomework = async () => {
-    const u = url.trim(); if (!u || homeworkFired.current) return
+  const startHomework = async (override?: string) => {
+    const u = (override ?? url).trim(); if (!u || homeworkFired.current) return
     homeworkFired.current = true
     addLog(`opening ${u.replace(/^https?:\/\//, '')} …`)
     const detP = fetch('/api/discovery/detect-product', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: u }) }).then(r => r.json()).catch(() => null)
@@ -678,8 +681,10 @@ export default function InterviewPage() {
                 </div>
               )}
               <div style={{ textAlign: 'center', marginTop: 18 }}>
-                <button style={{ ...btnMain, opacity: picks.length ? 1 : 0.5 }} disabled={!picks.length} onClick={confirmCompetitors}>
-                  Watch {picks.length ? `these ${picks.length}` : 'them'} for me →
+                {/* Funnel users already named a competitor (spied on brand create) — don't force a re-pick. */}
+                {fromSiteFunnel.current && !picks.length && seedCompetitor.current && <p style={{ ...sub, marginBottom: 10 }}>Already tracking the competitor you added — pick more, or continue.</p>}
+                <button style={{ ...btnMain, opacity: (picks.length || fromSiteFunnel.current) ? 1 : 0.5 }} disabled={!picks.length && !fromSiteFunnel.current} onClick={confirmCompetitors}>
+                  {picks.length ? `Watch these ${picks.length} for me →` : fromSiteFunnel.current ? 'Continue →' : 'Watch them for me →'}
                 </button>
               </div>
             </div>
