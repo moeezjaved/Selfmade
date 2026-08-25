@@ -2082,33 +2082,6 @@ export default function DiscoveryPage() {
           </button>
         </div>
 
-        {/* Preset chips (GetHookd-style quick filter combos) */}
-        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
-          {[
-            { label: '🔥 Winning ads', tip: 'Ads in the top percentile of our library. Scored by longevity (how long it runs), creative reuse (how often the brand re-runs it), and brand scale — must run ≥14 days to qualify. Meta hides impressions, so we rank by public signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setSort('performance') }, sig: () => tiers.includes('winning') && sort === 'performance' },
-          ].map((p: { label: string; tip?: string; apply: () => void; sig: () => boolean }) => {
-            // A chip is "selected" when the user clicked it AND its underlying filter is still applied
-            // (so changing a dropdown that removes the filter clears the highlight; the clicked-tracking
-            // disambiguates 'Winning ads' from the superset 'Best of the Month').
-            const on = activeChip === p.label && p.sig()
-            return (
-            <button key={p.label} onClick={() => { p.apply(); setActiveChip(p.label) }}
-              onMouseEnter={p.tip ? (e) => { const r = e.currentTarget.getBoundingClientRect(); setChipTip({ label: p.label, top: r.bottom + 5, left: Math.min(r.left, window.innerWidth - 280) }) } : undefined}
-              onMouseLeave={p.tip ? () => setChipTip(null) : undefined}
-              style={{ position: 'relative', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: on ? 700 : 600, background: on ? '#ef4a1e' : '#fff', color: on ? '#fff' : '#333d35', border: on ? '1px solid #141d15' : '1px solid #dcebc4', cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0 }}>
-              {p.label}
-              {p.tip && chipTip?.label === p.label && (
-                <span style={{ position: 'fixed', top: chipTip.top, left: chipTip.left, width: 270, zIndex: 9999,
-                  background: '#fff', border: '1px solid #e2e8f0', borderRadius: 10, boxShadow: '0 10px 30px rgba(0,0,0,0.18)', padding: '11px 12px',
-                  fontSize: 11.5, lineHeight: 1.5, color: '#475569', fontWeight: 400, textAlign: 'left', pointerEvents: 'none' }}>
-                  <span style={{ display: 'block', fontWeight: 800, fontSize: 12, color: '#0f172a', marginBottom: 5 }}>How “Winning” is calculated</span>
-                  {p.tip}
-                </span>
-              )}
-            </button>
-          )})}
-        </div>
-
         {/* Filter tray — Motion-style: icon pills with chevrons in one soft container, the
             coming-soon set on a quieter second row, numeric filters as compact pills, Sort right. */}
         <div data-tour="spy-filters" style={{ display: 'flex', gap: 8, rowGap: 10, flexWrap: 'wrap', alignItems: 'center',
@@ -2151,11 +2124,6 @@ export default function DiscoveryPage() {
           <FilterDropdown label="UGC / Studio" options={FORMATSTYLE_OPTS} selected={formatStyles} onToggle={toggle(setFormatStyles)} onClear={() => setFormatStyles([])} comingSoon />
           <FilterDropdown label="Visual" options={VISUALSTYLE_OPTS} selected={visualStyles} onToggle={toggle(setVisualStyles)} onClear={() => setVisualStyles([])} searchable comingSoon />
 
-          {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap', maxWidth: '100%', padding: '4px 8px', background: '#fff', border: '1px solid #efece2', borderRadius: 14, flexShrink: 1 }}>
-            <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
-            <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
-          </div>
 
           {/* Clear all */}
           {activeFilterCount > 0 && (
@@ -2275,59 +2243,9 @@ export default function DiscoveryPage() {
           </div>
         )}
 
-        {/* ── Top Brands Strip (like Atria) ── */}
-        {(topBrands.length > 0 || brandsLoading) && (
-          <div style={{ marginBottom: 20 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#9ca3af', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>{query ? 'Top Brands' : 'Top brands · most active'}</div>
-            <div style={{ display: 'flex', gap: 8, overflowX: 'auto', paddingBottom: 4 }}>
-              {brandsLoading && !topBrands.length && [1,2,3,4,5].map(i => (
-                <div key={i} style={{ flexShrink: 0, width: 140, height: 64, background: '#e2e8f0', borderRadius: 10 }} className="shimmer" />
-              ))}
-              {topBrands.map(brand => {
-                const hue = brand.name.charCodeAt(0) * 7 % 360
-                const hovered = hoverBrand === brand.pageId
-                const viewAds = () => { setSearchInput(brand.name); setQuery(brand.name); setSearchMode('brand'); setSelectedBrand(null) }
-                return (
-                  <div key={brand.pageId} style={{ flexShrink: 0 }}
-                    onMouseEnter={(e) => openHover(brand.pageId, e.currentTarget as HTMLElement)}
-                    onMouseLeave={closeHover}>
-                    <button onClick={viewAds}
-                      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', background: '#fff', borderRadius: 10, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left', minWidth: 140, maxWidth: 200, border: `1.5px solid ${hovered ? '#141d15' : '#e2e8f0'}`, boxShadow: hovered ? '0 2px 8px rgba(0,0,0,0.08)' : 'none' }}>
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: `linear-gradient(135deg, hsl(${hue},62%,52%), hsl(${(hue + 28) % 360},60%,44%))`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, fontWeight: 800, color: '#fff', flexShrink: 0, boxShadow: `0 2px 6px hsla(${hue},55%,40%,0.35)` }}>
-                        {brand.name.charAt(0).toUpperCase()}
-                      </div>
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 700, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{brand.name}</div>
-                        <div style={{ fontSize: 11, color: '#6b7280', marginTop: 1 }}>{brand.adCount.toLocaleString()} Ads</div>
-                      </div>
-                    </button>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Ad grid */}
         {filteredAds.length > 0 && (
           <>
-            <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
-              <span>
-                Showing <strong style={{ color: '#111' }}>{filteredAds.length.toLocaleString()}</strong> unique {filteredAds.length === 1 ? 'creative' : 'creatives'}
-                {searchSource === 'indexed' && dbTotal > filteredAds.length ? <span title="The same creative often runs across many countries/retailers as separate ads — we show each once."> · from {dbTotal.toLocaleString()} placements</span> : ''}
-                {hasMore ? ' · scroll for more' : ''}
-              </span>
-              {/* Search mode badge */}
-              <span style={{ background: searchMode === 'brand' ? '#eff6ff' : searchMode === 'category' ? '#fff7f3' : '#faf5ff', color: searchMode === 'brand' ? '#1d4ed8' : searchMode === 'category' ? '#9a3412' : '#7c3aed', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100, border: `1px solid ${searchMode === 'brand' ? '#bfdbfe' : searchMode === 'category' ? '#f6d8cc' : '#e9d5ff'}` }}>
-                {searchMode === 'brand' ? '🏷️ Brand' : searchMode === 'category' ? '📂 Category' : '📝 Ad copy'} · "{query}"
-              </span>
-              {/* Source badge */}
-              <span style={{ background: searchSource === 'indexed' ? '#fff7f3' : '#fffbeb', color: searchSource === 'indexed' ? '#9a3412' : '#92400e', fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 100 }}>
-                {searchSource === 'indexed' ? `⚡ ${totalInDB.toLocaleString()} ads indexed` : '🔴 Live from Meta'}
-              </span>
-              {activeFilterCount > 0 && <span style={{ background: '#fff7f3', color: '#9a3412', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 100 }}>{activeFilterCount} filter{activeFilterCount > 1 ? 's' : ''} active</span>}
-              {loading && <span style={{ opacity: 0.6 }}>• Loading…</span>}
-            </div>
             {/* Virtualized masonry (masonic) — balanced Pinterest columns where only
                 the visible cards are mounted (windowing). Deep scroll stays flat in
                 memory (no DOM accumulation / tab freeze). onRender drives infinite load.

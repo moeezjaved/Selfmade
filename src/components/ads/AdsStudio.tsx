@@ -539,6 +539,42 @@ function CompCard({ c, isMobile, onSpy }: { c: Comp; isMobile: boolean; onSpy?: 
 
 const SCAN_STEPS = ['Reading your store…', 'Pinpointing your exact niche…', 'Searching Google for rival brands…', 'Sweeping the Meta Ad Library (all countries)…', 'Pulling competitors’ live ads…', 'Decoding their ad strategy…']
 
+/* ── Brands you're spying (followed brands from Brand Spy) — shown atop My Competitors ── */
+type SpiedBrand = { pageId: string; name: string; active: number | null; inactive: number | null; adCount: number }
+function SpiedBrands() {
+  const [brands, setBrands] = useState<SpiedBrand[] | null>(null)
+  useEffect(() => {
+    let on = true
+    const c = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
+    const p = new URLSearchParams({ scope: 'mine' }); if (c) p.set('brand', decodeURIComponent(c))
+    fetch(`/api/discovery/brand-spy?${p}`).then((r) => r.json()).then((d) => { if (on) setBrands(Array.isArray(d.brands) ? d.brands : []) }).catch(() => on && setBrands([]))
+    return () => { on = false }
+  }, [])
+  const stop = async (pageId: string) => {
+    setBrands((prev) => (prev || []).filter((x) => x.pageId !== pageId))
+    await fetch(`/api/discovery/brand-spy?pageId=${encodeURIComponent(pageId)}`, { method: 'DELETE' }).catch(() => {})
+  }
+  if (!brands || brands.length === 0) return null
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
+        <span style={{ fontSize: 13, fontWeight: 800, color: INK }}>Brands you&rsquo;re spying</span>
+        <span style={{ fontSize: 12, color: SUB }}>{brands.length} tracked · live from the Meta Ad Library</span>
+      </div>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
+        {brands.map((b, i) => (
+          <div key={b.pageId} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px', borderTop: i ? `1px solid ${LINE}` : 'none' }}>
+            <div style={{ flex: 1, minWidth: 0, fontSize: 14, fontWeight: 700, color: INK, textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
+            <div style={{ fontSize: 12.5, color: SUB, flex: 'none' }}>{b.active != null ? <><b style={{ color: ORANGE }}>{b.active.toLocaleString()}</b> active · {(b.inactive ?? 0).toLocaleString()} inactive</> : `${(b.adCount || 0).toLocaleString()} ads`}</div>
+            <a href={`/discovery/brand-spy/${b.pageId}`} style={{ fontSize: 12, fontWeight: 800, color: ORANGE, background: '#fdeee9', padding: '5px 12px', borderRadius: 999, textDecoration: 'none', flex: 'none' }}>Open &rarr;</a>
+            <button onClick={() => stop(b.pageId)} title="Stop spying" style={{ fontSize: 12, fontWeight: 700, color: '#b91c1c', background: 'rgba(185,28,28,0.07)', border: 'none', padding: '5px 12px', borderRadius: 999, cursor: 'pointer', fontFamily: SANS, flex: 'none' }}>Stop</button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [comps, setComps] = useState<Comp[] | null>(null)
   const [seed, setSeed] = useState<CompSeed>(null)
@@ -564,7 +600,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   const shown = (comps || []).filter((c) => !q.trim() || c.name.toLowerCase().includes(q.trim().toLowerCase()) || (c.domain || '').includes(q.trim().toLowerCase()))
   return (
     <div>
-      <Header title="My Competitors" isMobile={isMobile} action="Add competitor" />
+      <Header title="My Competitors" isMobile={isMobile} action="+ Spy new brand" onAction={() => { window.location.href = '/discovery/brand-spy' }} />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>
         We found your real rivals{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''} across the web <b style={{ color: INK }}>and the Meta Ad Library</b>, then pulled their <b style={{ color: INK }}>live ads &amp; ad strategy</b>.
       </div>
@@ -572,6 +608,8 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search competitors…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
       </div>
+
+      <SpiedBrands />
 
       {comps === null ? (
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: '38px 28px', marginTop: 20, textAlign: 'center' }}>
