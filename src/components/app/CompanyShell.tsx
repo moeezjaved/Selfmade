@@ -98,7 +98,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const isActive = (href: string) => href === bestMatch || (href === '/mission' && pathname === '/' && !bestMatch)
 
   const Sidebar = (
-    <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, minHeight: '100dvh', boxSizing: 'border-box', overflowY: 'auto' }}>
+    <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, height: '100dvh', boxSizing: 'border-box', overflowY: 'auto', position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'flex-start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 6px 12px' }}>
         <div style={{ width: 32, height: 32, borderRadius: 8, background: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: SERIF, fontWeight: 800, fontSize: 17, flex: 'none' }}>S</div>
         <div style={{ minWidth: 0, flex: 1 }}><ProjectSwitcher initialBrands={brands} initialActive={activeBrand} /></div>
@@ -112,12 +112,12 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
               <span style={{ height: 1, flex: 1, background: LINE }} />Grows with your stage<span style={{ height: 1, flex: 1, background: LINE }} />
             </div>
           )}
-          {g.label && <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: SUB, opacity: .7, padding: '4px 10px 5px', fontFamily: NAV_FONT }}>{g.label}</div>}
+          {g.label && <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: SUB, padding: '4px 10px 5px', fontFamily: NAV_FONT }}>{g.label}</div>}
           {g.items.map((it) => {
             const on = isActive(it.href)
             const Icon = it.icon
             return (
-              <Link key={it.href} href={it.href} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', background: on ? ORANGE_WASH : 'transparent', color: on ? ORANGE : '#43403a', fontWeight: on ? 600 : 500, fontSize: 14.5, fontFamily: NAV_FONT, opacity: g.stage && !on ? 0.55 : 1, transition: 'background .12s' }}>
+              <Link key={it.href} href={it.href} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', background: on ? ORANGE_WASH : 'transparent', color: on ? ORANGE : '#2e2a24', fontWeight: on ? 700 : 600, fontSize: 14.5, fontFamily: NAV_FONT, transition: 'background .12s' }}>
                 {Icon && <Icon size={16} style={{ flex: 'none', color: on ? ORANGE : SUB }} />}{it.label}
               </Link>
             )
