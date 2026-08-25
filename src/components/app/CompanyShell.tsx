@@ -32,6 +32,7 @@ const NAV: Group[] = [
   { items: [{ href: '/hq', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
+    { href: '/ads-workspace/your-ads', label: 'Your Ads', icon: ImageIcon },
     { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
     { href: '/discovery', label: 'Discover', icon: Radar },
     { href: '/ads-workspace/brand', label: 'Brand Hub', icon: Wand2 },

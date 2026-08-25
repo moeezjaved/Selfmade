@@ -562,20 +562,60 @@ function TemplateCard({ label, variant }: { label: string; variant: 'showcase' |
 }
 
 /* ── Your Ads ───────────────────────────────────────────────────────────── */
+type OwnAd = { adId: string; title: string; body: string; isActive: boolean; image: string | null; link: string; isVideo: boolean }
 function YourAds({ isMobile }: { isMobile: boolean }) {
+  const { addToChat } = useContext(StudioCtx)
+  const [data, setData] = useState<{ ads: OwnAd[]; pageId: string | null } | null>(null)
+  const [link, setLink] = useState('')
+  const [saving, setSaving] = useState(false)
+  const load = () => fetch('/api/ads-studio/your-ads').then((r) => r.json()).then(setData).catch(() => setData({ ads: [], pageId: null }))
+  useEffect(() => { load() }, [])
+  const save = async () => {
+    if (!link.trim() || saving) return
+    setSaving(true)
+    try {
+      const d = await fetch('/api/ads-studio/your-ads', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ link: link.trim() }) }).then((r) => r.json())
+      if (d.pageId) { setData(null); await load() } else if (d.error) alert(d.error)
+    } finally { setSaving(false) }
+  }
+
   return (
     <div>
-      <Header title="Your Ads" isMobile={isMobile} action="Create New Ad" />
-      <SearchBar placeholder="Search your ads…" />
-      <div style={{ fontSize: 15, fontWeight: 800, margin: '26px 0 12px' }}>Recent</div>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16 }}>
-        {['Break free from vaping', 'Study smarter, stress less', 'Elevate your wellness ritual', 'Breathe better, feel better'].map((t, i) => (
-          <div key={i} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', boxShadow: '0 10px 26px -18px rgba(0,0,0,.3)' }}>
-            <div style={{ aspectRatio: '1', background: `linear-gradient(150deg, ${['#e7efe4', '#f1ece3', '#e9efe6', '#efe7ea'][i]}, #fff)`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, fontSize: 15, color: INK, textAlign: 'center', padding: 14 }}>{t}</div>
-            <div style={{ padding: 12 }}><div style={{ fontSize: 13, fontWeight: 700 }}>Product ad</div><div style={{ fontSize: 12, color: SUB, marginBottom: 10 }}>Aug 24, 2026</div><div style={{ display: 'flex', gap: 8 }}><button style={{ ...primaryBtn, padding: '7px 14px', fontSize: 12.5, borderRadius: 8 }}>Download</button><button style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, padding: '7px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Share</button></div></div>
+      <Header title="Your Ads" isMobile={isMobile} />
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The live ads running on your Facebook page — pulled straight from the Meta Ad Library.</div>
+
+      {data === null ? (
+        <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
+      ) : !data.pageId ? (
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? '28px 20px' : '40px 34px', textAlign: 'center', maxWidth: 560, margin: '10px auto 0' }}>
+          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Pull in your live ads</div>
+          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, marginBottom: 18 }}>Paste your <b style={{ color: INK }}>Facebook Ad Library</b> link and we&rsquo;ll show the ads you&rsquo;re running right now — then help you make better ones.</div>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <input value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} placeholder="facebook.com/ads/library/?…view_all_page_id=…" style={{ flex: 1, minWidth: 220, border: `1px solid ${LINE}`, borderRadius: 100, padding: '13px 18px', fontSize: 14.5, outline: 'none', fontFamily: SANS, color: INK }} />
+            <button onClick={save} disabled={saving || !link.trim()} style={{ ...primaryBtn, opacity: saving || !link.trim() ? 0.6 : 1 }}>{saving ? 'Reading…' : 'Show my ads →'}</button>
           </div>
-        ))}
-      </div>
+          <a href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 14, fontSize: 12.5, color: ORANGE, fontWeight: 700, textDecoration: 'none' }}>Where do I find this? →</a>
+        </div>
+      ) : data.ads.length === 0 ? (
+        <EmptyState title="No live ads found" body="We couldn’t find active ads on this page right now. Double-check the Facebook Ad Library link, or start creating with Ad Studio." cta="Change link" onCta={() => setData({ ads: [], pageId: null })} />
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16 }}>
+          {data.ads.map((a) => (
+            <div key={a.adId} className="sf-disc" style={{ position: 'relative', border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
+              <div style={{ aspectRatio: '4/5', background: PAPER, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {a.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                {a.isActive && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#16a34a', borderRadius: 6, padding: '3px 7px' }}>LIVE</span>}
+                <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
+                  <button onClick={() => addToChat({ label: 'Remake my ad', image: a.image, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Remake this</button>
+                </div>
+              </div>
+              <div style={{ padding: 11 }}>
+                <div style={{ fontSize: 12.5, color: '#43403a', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 34 }}>{a.body || a.title}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -887,12 +927,12 @@ function Audiences({ isMobile, domain, hideHeader }: { isMobile: boolean; domain
     </div>
   )
 }
-function EmptyState({ title, body, cta }: { title: string; body: string; cta: string }) {
+function EmptyState({ title, body, cta, onCta }: { title: string; body: string; cta: string; onCta?: () => void }) {
   return (
     <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
       <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>{title}</div>
       <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>{body}</div>
-      <button style={primaryBtn}>{cta}</button>
+      <button style={primaryBtn} onClick={onCta}>{cta}</button>
     </div>
   )
 }
