@@ -314,8 +314,24 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
     return () => { on = false }
   }, [domain])
 
-  const hero = products.find((p) => p.image)?.image
-  const genBody = (i: number, force = false) => ({ domain, index: i, force, productImages: hero ? [hero] : [], colors: (kit?.colors || []).map((c) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] })
+  const withImg = products.filter((p) => p.image)
+  const hero = withImg[0]?.image ?? undefined
+  // Pick the product each template's brief is actually about (its title/headline/concept name it), so a
+  // Product Showcase and a Sale Campaign can feature different products — not always the first one.
+  // Falls back to the store's main (first) product with an image.
+  const productFor = (i: number): string | undefined => {
+    const t = tpls?.[i]
+    if (!t || withImg.length <= 1) return hero
+    const text = `${t.title} ${t.headline || ''} ${t.angle || ''}`.toLowerCase()
+    let best: { image: string | null; score: number } | null = null
+    for (const p of withImg) {
+      const words = (p.title || '').toLowerCase().split(/\s+/).filter((w) => w.length >= 4)
+      const score = words.reduce((n, w) => n + (text.includes(w) ? 1 : 0), 0)
+      if (score > 0 && (!best || score > best.score)) best = { image: p.image, score }
+    }
+    return best?.image ?? hero
+  }
+  const genBody = (i: number, force = false) => { const prod = productFor(i); return { domain, index: i, force, productImages: prod ? [prod] : [], colors: (kit?.colors || []).map((c) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] } }
   const genOne = async (i: number, force = false) => {
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
     // Retry transient image-model overload (pro_model_busy) so cards fill in when capacity returns.
