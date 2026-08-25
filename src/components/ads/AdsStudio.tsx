@@ -19,7 +19,7 @@ type Key = 'home' | 'search' | 'ads' | 'competitors' | 'discover' | 'products' |
 const NAV: { group: string | null; items: { key: Key; label: string; icon: string; locked?: boolean }[] }[] = [
   { group: null, items: [{ key: 'home', label: 'Home', icon: 'M3 11l9-8 9 8M5 10v10h5v-6h4v6h5V10' }, { key: 'search', label: 'Search', icon: 'M11 4a7 7 0 105 12l4 4M11 4a7 7 0 015 12' }, { key: 'ads', label: 'Your Ads', icon: 'M3 5h18v14H3zM3 15l5-5 4 4 3-3 6 6' }] },
   { group: 'Insights', items: [{ key: 'competitors', label: 'My Competitors', icon: 'M9 11a3 3 0 100-6 3 3 0 000 6zM2 20c0-3 3-5 7-5m6-4a3 3 0 100-6M22 20c0-3-3-5-7-5' }, { key: 'discover', label: 'Discover', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM16 8l-2 6-6 2 2-6z' }, { key: 'products', label: 'Products', icon: 'M6 7h12l1 13H5zM9 7a3 3 0 016 0' }] },
-  { group: 'Tools', items: [{ key: 'calendar', label: 'Calendar', icon: 'M3 5h18v16H3zM3 9h18M8 3v4M16 3v4' }, { key: 'brand', label: 'Brand Kit', icon: 'M12 2a10 10 0 100 20c1 0 2-1 2-2 0-2-2-2-1-4 1-1 3 0 4-1a5 5 0 00-5-13z' }, { key: 'audiences', label: 'Audiences', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM12 8v8M8 12h8' }, { key: 'google', label: 'Google Ads', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM12 6v12' }, { key: 'google', label: 'ChatGPT Ads', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20', locked: true }] },
+  { group: 'Tools', items: [{ key: 'calendar', label: 'Calendar', icon: 'M3 5h18v16H3zM3 9h18M8 3v4M16 3v4' }, { key: 'brand', label: 'Brand Hub', icon: 'M12 2a10 10 0 100 20c1 0 2-1 2-2 0-2-2-2-1-4 1-1 3 0 4-1a5 5 0 00-5-13z' }, { key: 'audiences', label: 'Audiences', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM12 8v8M8 12h8' }, { key: 'google', label: 'Google Ads', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20zM12 6v12' }, { key: 'google', label: 'ChatGPT Ads', icon: 'M12 2a10 10 0 100 20 10 10 0 000-20', locked: true }] },
 ]
 
 const Icon = ({ d, size = 19 }: { d: string; size?: number }) => (
@@ -689,7 +689,7 @@ function Discover({ isMobile }: { isMobile: boolean }) {
 
 /* ── Products (real catalog from the store) ─────────────────────────────── */
 type StoreProduct = { title: string; image: string | null; price: string | null; url: string }
-function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+function Products({ isMobile, domain, hideHeader }: { isMobile: boolean; domain: string; hideHeader?: boolean }) {
   const { addToChat } = useContext(StudioCtx)
   const [data, setData] = useState<{ products: StoreProduct[]; siteName: string } | null>(null)
   const [sel, setSel] = useState<Record<string, boolean>>({})
@@ -705,7 +705,9 @@ function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const selCount = Object.values(sel).filter(Boolean).length
   return (
     <div>
-      <Header title="Products" isMobile={isMobile} action={selCount ? `Use in chat (${selCount})` : 'Import from Website'} onAction={selCount ? useSelected : undefined} />
+      {hideHeader
+        ? (selCount ? <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}><button style={{ ...primaryBtn, whiteSpace: 'nowrap' }} onClick={useSelected}>Use in chat ({selCount})</button></div> : null)
+        : <Header title="Products" isMobile={isMobile} action={selCount ? `Use in chat (${selCount})` : 'Import from Website'} onAction={selCount ? useSelected : undefined} />}
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>{domain ? `Detected from ${domain} — select products to generate ads for.` : 'Connect a store to detect your products.'}</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
@@ -735,7 +737,7 @@ function Products({ isMobile, domain }: { isMobile: boolean; domain: string }) {
 
 /* ── Audiences (AI, grounded on real store signals) ─────────────────────── */
 type Aud = { name: string; insights: string[] }
-function Audiences({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+function Audiences({ isMobile, domain, hideHeader }: { isMobile: boolean; domain: string; hideHeader?: boolean }) {
   const [data, setData] = useState<{ market: string; audiences: Aud[]; signals: string[] } | null>(null)
   useEffect(() => {
     if (!domain) { setData({ market: '', audiences: [], signals: [] }); return }
@@ -745,7 +747,7 @@ function Audiences({ isMobile, domain }: { isMobile: boolean; domain: string }) 
   }, [domain])
   return (
     <div>
-      <Header title="Audiences" isMobile={isMobile} action="Add Audience" />
+      {!hideHeader && <Header title="Audiences" isMobile={isMobile} action="Add Audience" />}
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 8 }}>We read your store’s real signals to identify who actually buys — each audience drives its own ads.</div>
       {data?.market && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ffe7df', color: ORANGE, borderRadius: 100, padding: '6px 14px', fontSize: 13, fontWeight: 800, marginBottom: 18 }}>📍 Detected market: {data.market}</div>}
       {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your store & building audiences…</div>
@@ -779,8 +781,9 @@ function EmptyState({ title, body, cta }: { title: string; body: string; cta: st
 
 /* ── Brand Kit (derived from the website — no Shopify needed) ────────────── */
 type BrandKitData = { siteName: string; logo: string | null; colors: { hex: string; primary: boolean }[]; fonts: string[]; facts: string[]; voice: { tone: string; energy: string; audience: string } | null; visualPages: string[]; empty?: boolean; saved?: boolean; editable?: boolean }
+const BRANDKIT_TABS = { visual: 'Visual Brand Kit', knowledge: 'Knowledge Base', products: 'Products', audiences: 'Audiences' } as const
 function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
-  const [tab, setTab] = useState<'visual' | 'knowledge'>('visual')
+  const [tab, setTab] = useState<'visual' | 'knowledge' | 'products' | 'audiences'>('visual')
   const [data, setData] = useState<BrandKitData | null>(null)
   const [showAll, setShowAll] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -807,13 +810,15 @@ function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
 
   return (
     <div>
-      <Header title="Brand Kit" isMobile={isMobile} />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The visual identity and knowledge we learned from {domain || 'your site'} — no setup, no Shopify needed.</div>
-      <div style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${LINE}`, marginBottom: 22 }}>
-        {(['visual', 'knowledge'] as const).map((t) => <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 2px', fontSize: 15, fontWeight: 700, color: tab === t ? INK : SUB, borderBottom: tab === t ? `2px solid ${ORANGE}` : '2px solid transparent', background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>{t === 'visual' ? 'Visual Brand Kit' : 'Knowledge Base'}</button>)}
+      <Header title="Brand Hub" isMobile={isMobile} />
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>Everything we know about your brand from {domain || 'your site'} — identity, knowledge, products &amp; audiences. No setup, no Shopify needed.</div>
+      <div style={{ display: 'flex', gap: 24, borderBottom: `1px solid ${LINE}`, marginBottom: 22, flexWrap: 'wrap' }}>
+        {(['visual', 'knowledge', 'products', 'audiences'] as const).map((t) => <button key={t} onClick={() => setTab(t)} style={{ padding: '10px 2px', fontSize: 15, fontWeight: 700, color: tab === t ? INK : SUB, borderBottom: tab === t ? `2px solid ${ORANGE}` : '2px solid transparent', background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS }}>{BRANDKIT_TABS[t]}</button>)}
       </div>
 
-      {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your brand from the site…</div>
+      {tab === 'products' ? <Products isMobile={isMobile} domain={domain} hideHeader />
+        : tab === 'audiences' ? <Audiences isMobile={isMobile} domain={domain} hideHeader />
+        : data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your brand from the site…</div>
         : data.empty ? <EmptyState title={domain ? 'Couldn’t read your brand yet' : 'No store connected'} body={domain ? 'We couldn’t read enough from this site — try again shortly.' : 'Open this workspace from your ads audit and we’ll learn your brand automatically.'} cta="Retry" />
           : tab === 'visual' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
