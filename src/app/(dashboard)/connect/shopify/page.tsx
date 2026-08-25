@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, useCallback, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
+import ConnectGuide from '@/components/shopify/ConnectGuide'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5'
 
@@ -35,10 +36,11 @@ function ConnectShopifyInner() {
   const [state, setState] = useState<Status | null>(null)
   const [loading, setLoading] = useState(true)
   const [shop, setShop] = useState('')
-  const [showToken, setShowToken] = useState(false)
   const [token, setToken] = useState('')
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<{ tone: 'ok' | 'err' | 'info'; text: string } | null>(null)
+  const [showGuide, setShowGuide] = useState(false)
+  const [showOAuth, setShowOAuth] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -125,41 +127,71 @@ function ConnectShopifyInner() {
         </div>
       ) : (
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: PAPER, padding: 22 }}>
+          {/* Primary flow (works today): connect with a custom-app Admin API token. */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
+            <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>Connect in 30 seconds</div>
+            <button onClick={() => setShowGuide(true)} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 7, background: '#fff', color: INK, border: `1.5px solid ${LINE}`,
+              borderRadius: 100, padding: '7px 14px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+            }}>
+              <span style={{ width: 18, height: 18, borderRadius: 100, background: LIME, color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9 }}>▶</span>
+              Watch how
+            </button>
+          </div>
+
+          {/* the 3-beat summary — the animation shows the full detail */}
+          <ol style={{ margin: '10px 0 18px', padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
+            {[
+              ['1', <>In your store: <b>Settings → Apps → Develop apps → Create an app</b> (name it “Selfmade”).</>],
+              ['2', <>Add these Admin API scopes, then <b>Save</b> &amp; <b>Install</b>: <code style={{ fontSize: 11.5 }}>read_products, write_products, read_orders, read_inventory, read_content, write_content</code>.</>],
+              ['3', <>Open <b>API credentials</b>, reveal the <b>Admin API access token</b> (<code>shpat_…</code>), and paste it below.</>],
+            ].map(([n, body]) => (
+              <li key={n as string} style={{ display: 'flex', gap: 10, fontSize: 13, color: INK, lineHeight: 1.5 }}>
+                <span style={{ flex: 'none', width: 20, height: 20, borderRadius: 100, background: LIME, color: '#fff', fontSize: 11.5, fontWeight: 800, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{n}</span>
+                <span>{body}</span>
+              </li>
+            ))}
+          </ol>
+
           <label style={{ fontSize: 13, fontWeight: 700, color: INK }}>Your store URL</label>
           <input
             value={shop} onChange={(e) => setShop(e.target.value)} placeholder="your-store.myshopify.com"
             style={{ width: '100%', marginTop: 8, padding: '12px 14px', fontSize: 15, borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }}
           />
-          <button onClick={connectOAuth} style={{
+          <label style={{ fontSize: 13, fontWeight: 700, color: INK, display: 'block', marginTop: 14 }}>Admin API access token</label>
+          <input
+            value={token} onChange={(e) => setToken(e.target.value)} placeholder="shpat_…" type="password"
+            style={{ width: '100%', marginTop: 8, padding: '12px 14px', fontSize: 15, borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }}
+          />
+          <button onClick={connectToken} disabled={busy} style={{
             marginTop: 14, width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 100,
-            padding: '13px 20px', fontSize: 15, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
-          }}>Connect Shopify →</button>
+            padding: '13px 20px', fontSize: 15, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1,
+          }}>{busy ? 'Connecting…' : 'Connect store →'}</button>
           <div style={{ fontSize: 12.5, color: SUB, marginTop: 10, textAlign: 'center' }}>
-            You’ll approve the permissions on Shopify’s own screen. We never see your password.
+            Your token is encrypted and stored securely. We never see your password.
           </div>
 
+          {/* Secondary: one-click OAuth (available once the public app clears Shopify review). */}
           <div style={{ borderTop: `1px solid ${LINE}`, margin: '20px 0 0', paddingTop: 16 }}>
-            <button onClick={() => setShowToken((v) => !v)} style={{ background: 'none', border: 'none', color: SUB, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
-              {showToken ? '− Hide' : '+ Advanced'}: paste an Admin API token instead
+            <button onClick={() => setShowOAuth((v) => !v)} style={{ background: 'none', border: 'none', color: SUB, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }}>
+              {showOAuth ? '− Hide' : '+'} Prefer one-click? Use OAuth instead
             </button>
-            {showToken && (
+            {showOAuth && (
               <div style={{ marginTop: 12 }}>
                 <div style={{ fontSize: 12.5, color: SUB, marginBottom: 8, lineHeight: 1.5 }}>
-                  For a custom app: in your store, Settings → Apps → Develop apps → your app → API credentials → reveal the Admin API access token (<code>shpat_…</code>).
+                  Enter your store URL and approve on Shopify’s own screen — no token needed. (Rolling out as our Shopify app finishes review.)
                 </div>
-                <input
-                  value={token} onChange={(e) => setToken(e.target.value)} placeholder="shpat_…" type="password"
-                  style={{ width: '100%', padding: '11px 14px', fontSize: 14, borderRadius: 10, border: `1.5px solid ${LINE}`, background: '#fff', fontFamily: 'inherit', boxSizing: 'border-box' }}
-                />
-                <button onClick={connectToken} disabled={busy} style={{
-                  marginTop: 10, background: INK, color: '#fff', border: 'none', borderRadius: 100,
-                  padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.6 : 1,
-                }}>{busy ? 'Connecting…' : 'Connect with token'}</button>
+                <button onClick={connectOAuth} style={{
+                  background: INK, color: '#fff', border: 'none', borderRadius: 100,
+                  padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit',
+                }}>Connect with OAuth →</button>
               </div>
             )}
           </div>
         </div>
       )}
+
+      {showGuide && <ConnectGuide onClose={() => setShowGuide(false)} />}
     </div>
   )
 }
