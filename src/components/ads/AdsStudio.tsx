@@ -116,7 +116,8 @@ const ASPECTS = ['Auto', '1:1', '4:5', '9:16', '16:9']
 const LANGS = ['English', 'Urdu', 'Hindi', 'Bengali', 'Arabic', 'Spanish', 'French', 'German', 'Portuguese', 'Indonesian']
 const CHANNELS: AdFormat[] = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
 type AdFormat = 'Banner Ad' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'LinkedIn'
-type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat }
+type PlanPick = { angle: string; caption: string; aspect: string; productImages: string[]; useCompose: boolean; refTags: string[]; baseProduct: string[]; colors: string[]; fonts?: { heading?: string | null; body?: string | null } }
+type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat; headlines?: string[]; pick?: PlanPick }
 type HomeTag = StudioTag
 type BrandKitLite = { siteName?: string; logo?: string | null; colors?: { hex: string }[]; fonts?: string[]; facts?: string[]; voice?: any }
 
@@ -213,31 +214,52 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
       const fonts = kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined
       const aspectRatio = aspect !== 'Auto' ? aspect : plan.aspect
-      // Element tagged (a person) → dedicated /compose path (preserves their identity + the product,
-      // no fake inspiration people). Otherwise the product-centric /generate-ad studio engine.
+      // Element tagged (a person) → /compose path (preserves identity + product). Else the studio engine.
       const useCompose = refTags.length > 0
-      const endpoint = useCompose ? '/api/ads-studio/compose' : '/api/discovery/generate-ad'
-      const reqBody = useCompose
-        ? JSON.stringify({ personImages: refTags, productImages: baseProduct, headline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, brandName: kit?.siteName })
-        : JSON.stringify({ productImages, newHeadline: plan.headline, angle: plan.angle, aspectRatio, colors, fonts, logo: kit?.logo || undefined, imageSize: '2K' })
-      // Retry the transient image-model overload (pro_model_busy); both endpoints refund on failure.
-      let res: Response, d: any
-      for (let attempt = 0; ; attempt++) {
-        res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
-        d = await res.json()
-        if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
-        await new Promise((r) => setTimeout(r, 5000))
+      const pick: PlanPick = { angle: plan.angle, caption: plan.caption, aspect: aspectRatio, productImages, useCompose, refTags, baseProduct, colors, fonts }
+      const headlines: string[] = Array.isArray(plan.headlines) && plan.headlines.length ? plan.headlines : (plan.headline ? [plan.headline] : [])
+      // Higgsfield-style: offer the improved headline DIRECTIONS to pick from before spending a
+      // generation. Multiple options → show the chooser; one (or none) → just generate.
+      if (headlines.length > 1) {
+        setMsgs((m) => replaceLast(m, { role: 'assistant', headlines, pick, format: fmt }))
+        setTags([]); setBusy(false)
+        return
       }
-      if (!res.ok) {
-        const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : d.error === 'pro_model_busy' ? 'The image model is busy right now — please try again in a moment.' : (d.error || 'Generation failed. Try again.')
-        setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
-      } else {
-        setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: plan.caption, format: fmt }))
-      }
+      await runGeneration(headlines[0] || plan.headline || message, pick, fmt)
       setTags([])
     } catch {
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Couldn’t generate — make sure your store has product images.', format: fmt }))
     } finally { setBusy(false) }
+  }
+
+  // The actual image generation for a chosen headline (used by both the direct path and the chooser).
+  // The last chat message must already be a loading placeholder; this replaces it with the result.
+  const runGeneration = async (headline: string, pick: PlanPick, fmt: AdFormat) => {
+    const endpoint = pick.useCompose ? '/api/ads-studio/compose' : '/api/discovery/generate-ad'
+    const reqBody = pick.useCompose
+      ? JSON.stringify({ personImages: pick.refTags, productImages: pick.baseProduct, headline, angle: pick.angle, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, brandName: kit?.siteName })
+      : JSON.stringify({ productImages: pick.productImages, newHeadline: headline, angle: pick.angle, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, imageSize: '2K' })
+    let res: Response, d: any
+    for (let attempt = 0; ; attempt++) {
+      res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
+      d = await res.json()
+      if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
+      await new Promise((r) => setTimeout(r, 5000))
+    }
+    if (!res.ok) {
+      const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : d.error === 'pro_model_busy' ? 'The image model is busy right now — please try again in a moment.' : (d.error || 'Generation failed. Try again.')
+      setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
+    } else {
+      setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: pick.caption, format: fmt }))
+    }
+  }
+
+  // User picked one of the suggested headline directions → generate with it.
+  const chooseHeadline = async (headline: string, pick: PlanPick, fmt: AdFormat) => {
+    if (busy) return
+    setBusy(true)
+    setMsgs((m) => replaceLast(m, { role: 'assistant', loading: true, format: fmt }))
+    try { await runGeneration(headline, pick, fmt) } catch { setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Couldn’t generate — try again.', format: fmt })) } finally { setBusy(false) }
   }
   const replaceLast = (m: ChatMsg[], next: ChatMsg) => { const c = [...m]; c[c.length - 1] = next; return c }
 
@@ -342,6 +364,19 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
           {msgs.map((m, i) => m.role === 'user' ? (
             <div key={i} style={{ flexBasis: '100%', display: 'flex', justifyContent: 'flex-end' }}>
               <div style={{ maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
+            </div>
+          ) : m.headlines && m.pick ? (
+            <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', padding: 16, maxWidth: 560 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 800, color: INK, marginBottom: 4 }}>Pick a headline direction ✨</div>
+              <div style={{ fontSize: 12.5, color: SUB, marginBottom: 12 }}>I improved your idea into 3 directions — tap one and I’ll build the ad.</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {m.headlines.map((h, hi) => (
+                  <button key={hi} onClick={() => chooseHeadline(h, m.pick!, m.format || format)} disabled={busy} style={{ display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 12, padding: '11px 14px', fontSize: 14, fontWeight: 600, color: INK, cursor: busy ? 'default' : 'pointer', fontFamily: SANS }}>
+                    <span style={{ flex: 'none', width: 22, height: 22, borderRadius: '50%', background: '#fdeee9', color: ORANGE, fontSize: 11.5, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{hi + 1}</span>
+                    “{h}”
+                  </button>
+                ))}
+              </div>
             </div>
           ) : m.loading ? (
             <div key={i} style={{ flexBasis: '100%', padding: '4px 0' }}><GeneratingCard format={m.format || 'ad'} /></div>
