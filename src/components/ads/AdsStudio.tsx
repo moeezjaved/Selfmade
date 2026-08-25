@@ -77,7 +77,7 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
   return (
     <StudioCtx.Provider value={{ addToChat }}>
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: embedded ? 'auto' : '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}`}</style>
       {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -283,6 +283,9 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       )}
 
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
+      {!started && <HomeDiscoverRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
+      {!started && <HomeProductsRow products={products} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
+      {!started && <HomeCompetitorsRow domain={domain} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
     </div>
   )
@@ -335,9 +338,9 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
     <div style={{ marginTop: 48 }}>
       <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
       <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
+      <div className="sf-hrow" style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
+          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 244, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
             <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
               {t?.image ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -396,13 +399,13 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
       <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>Elements</h2>
       <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>People &amp; props to drop into your creative. Add a face or scene, then tag it in the chat.</p>
       <input ref={fileRef} type="file" accept="image/*" onChange={add} style={{ display: 'none' }} />
-      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3,1fr)' : 'repeat(6,1fr)', gap: 12 }}>
-        <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ aspectRatio: '1', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+      <div className="sf-hrow" style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+        <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
           {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
           <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
         </button>
         {els.map((e) => (
-          <div key={e.id} className="sf-disc" style={{ position: 'relative', aspectRatio: '1', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, cursor: 'pointer' }} onClick={() => onUse(e)}>
+          <div key={e.id} className="sf-disc" style={{ position: 'relative', width: 124, height: 124, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, cursor: 'pointer' }} onClick={() => onUse(e)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={e.url} alt={e.label} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
             <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 55%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 7, opacity: 0, transition: 'opacity .15s' }}>
@@ -413,6 +416,82 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
         ))}
       </div>
     </div>
+  )
+}
+
+/* ── Home carousels (single-line, Lapis-style): Discover · Products · Competitor ads ── */
+function HomeCarousel({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 44 }}>
+      <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, margin: '0 0 4px' }}>{title}</h2>
+      <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>{sub}</p>
+      <div className="sf-hrow" style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8 }}>{children}</div>
+    </div>
+  )
+}
+
+const overlayBtn = { position: 'absolute' as const, inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: 9, opacity: 0, transition: 'opacity .15s' }
+
+function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
+  const [ads, setAds] = useState<DiscoverAd[] | null>(null)
+  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=30').then((r) => r.json()).then((d) => on && setAds(Array.isArray(d.ads) ? d.ads : [])).catch(() => on && setAds([])); return () => { on = false } }, [])
+  if (ads && ads.length === 0) return null
+  return (
+    <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
+      {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
+        <div key={a.id} className="sf-disc" style={{ position: 'relative', width: 180, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+          <div className="sf-disc-over" style={overlayBtn}>
+            <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
+            <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
+          </div>
+        </div>
+      ) : <div key={i} style={{ width: 180, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
+    </HomeCarousel>
+  )
+}
+
+function HomeProductsRow({ products, onTag }: { products: { title: string; image: string | null }[]; onTag: (t: StudioTag) => void }) {
+  if (!products.length) return null
+  return (
+    <HomeCarousel title="Products" sub="Straight from your store — tap one to build an ad around it.">
+      {products.slice(0, 24).map((p, i) => (
+        <button key={i} onClick={() => onTag({ label: p.title.slice(0, 24), image: p.image, kind: 'product' })} style={{ width: 150, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: SANS, padding: 0 }}>
+          <div style={{ aspectRatio: '1', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
+          <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>
+        </button>
+      ))}
+    </HomeCarousel>
+  )
+}
+
+function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
+  const [ads, setAds] = useState<{ thumb: string; brand: string }[] | null>(null)
+  useEffect(() => {
+    if (!domain) { setAds([]); return }
+    let on = true
+    fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => {
+      if (!on) return
+      const comps = Array.isArray(d.competitors) ? d.competitors : []
+      const flat = comps.flatMap((c: any) => (Array.isArray(c.ads) ? c.ads : []).map((a: any) => ({ thumb: a.thumb, brand: c.name }))).filter((x: any) => x.thumb).slice(0, 24)
+      setAds(flat)
+    }).catch(() => on && setAds([]))
+    return () => { on = false }
+  }, [domain])
+  if (ads !== null && ads.length === 0) return null
+  return (
+    <HomeCarousel title="Competitor ads" sub="Live creatives your rivals are running right now — tap Create Similar to make your own.">
+      {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
+        <div key={i} className="sf-disc" style={{ position: 'relative', width: 180, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <div className="sf-disc-over" style={overlayBtn}>
+            <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
+            <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
+          </div>
+        </div>
+      ) : <div key={i} style={{ width: 180, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
+    </HomeCarousel>
   )
 }
 
