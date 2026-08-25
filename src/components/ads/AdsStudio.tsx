@@ -475,9 +475,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   const grad = ['#f4ede2', '#e9efe6', '#eef2f8', '#f7f0e0', '#efe7ea', '#eef3ee']
   return (
     <div style={{ marginTop: 48 }}>
-      <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
-      <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
-      <HScroll gap={16}>
+      <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Personalized templates" sub="Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.">
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
           <div key={i} className="sf-disc" onClick={() => t && !t.generating && !t.failed && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating && !t.failed ? 'pointer' : 'default', fontFamily: SANS }}>
             {/* Title on top, like the reference — no description below. */}
@@ -537,10 +535,8 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
   if (els === null) return null
   return (
     <div style={{ marginTop: 40 }}>
-      <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>Elements</h2>
-      <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>People &amp; props to drop into your creative. Add a face or scene, then tag it in the chat.</p>
       <input ref={fileRef} type="file" accept="image/*" onChange={add} style={{ display: 'none' }} />
-      <HScroll gap={12}>
+      <HScroll gap={12} titleSize={isMobile ? 22 : 26} title="Elements" sub="People & props to drop into your creative. Add a face or scene, then tag it in the chat.">
         <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
           {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
           <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
@@ -561,18 +557,34 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
 }
 
 /* ── Horizontal scroll row with side arrow buttons (appear on hover), Lapis-style ── */
-function HScroll({ children, gap = 14 }: { children: React.ReactNode; gap?: number }) {
+function HScroll({ children, gap = 14, title, sub, titleSize = 24 }: { children: React.ReactNode; gap?: number; title?: string; sub?: React.ReactNode; titleSize?: number }) {
   const ref = useRef<HTMLDivElement>(null)
   const [edge, setEdge] = useState({ start: true, end: false })
   const update = () => { const el = ref.current; if (!el) return; setEdge({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 }) }
   useEffect(() => { update(); const el = ref.current; if (!el) return; const ro = new ResizeObserver(update); ro.observe(el); return () => ro.disconnect() }, [])
   const go = (dir: number) => ref.current?.scrollBy({ left: dir * (ref.current.clientWidth * 0.85), behavior: 'smooth' })
   const arrow = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: '50%', [side]: -8, transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 6px 20px rgba(0,0,0,.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, lineHeight: 1, color: INK, zIndex: 4, opacity: 0, transition: 'opacity .15s', fontFamily: SANS })
+  // Lapis-style header arrows (‹ ›) at the top-right of the section — always visible, greyed at the edges.
+  const hdrArrow = (disabled: boolean): React.CSSProperties => ({ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE}`, background: '#fff', cursor: disabled ? 'default' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, color: disabled ? '#cfcabf' : INK, opacity: disabled ? 0.55 : 1, fontFamily: SANS, flex: 'none', padding: 0 })
   return (
-    <div className="sf-scroll-wrap" style={{ position: 'relative' }}>
-      <div ref={ref} className="sf-hrow" onScroll={update} style={{ display: 'flex', gap, overflowX: 'auto', paddingBottom: 8 }}>{children}</div>
-      {!edge.start && <button className="sf-scroll-btn" onClick={() => go(-1)} style={arrow('left')} aria-label="Scroll left">‹</button>}
-      {!edge.end && <button className="sf-scroll-btn" onClick={() => go(1)} style={arrow('right')} aria-label="Scroll right">›</button>}
+    <div>
+      {title && (
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 16 }}>
+          <div style={{ minWidth: 0 }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: titleSize, fontWeight: 700, margin: '0 0 4px' }}>{title}</h2>
+            {sub && <p style={{ color: SUB, fontSize: 14, margin: 0 }}>{sub}</p>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, flex: 'none' }}>
+            <button onClick={() => go(-1)} disabled={edge.start} style={hdrArrow(edge.start)} aria-label="Scroll left">‹</button>
+            <button onClick={() => go(1)} disabled={edge.end} style={hdrArrow(edge.end)} aria-label="Scroll right">›</button>
+          </div>
+        </div>
+      )}
+      <div className="sf-scroll-wrap" style={{ position: 'relative' }}>
+        <div ref={ref} className="sf-hrow" onScroll={update} style={{ display: 'flex', gap, overflowX: 'auto', paddingBottom: 8 }}>{children}</div>
+        {!edge.start && <button className="sf-scroll-btn" onClick={() => go(-1)} style={arrow('left')} aria-label="Scroll left">‹</button>}
+        {!edge.end && <button className="sf-scroll-btn" onClick={() => go(1)} style={arrow('right')} aria-label="Scroll right">›</button>}
+      </div>
     </div>
   )
 }
@@ -581,9 +593,7 @@ function HScroll({ children, gap = 14 }: { children: React.ReactNode; gap?: numb
 function HomeCarousel({ title, sub, children }: { title: string; sub: string; children: React.ReactNode }) {
   return (
     <div style={{ marginTop: 44 }}>
-      <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, margin: '0 0 4px' }}>{title}</h2>
-      <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>{sub}</p>
-      <HScroll>{children}</HScroll>
+      <HScroll title={title} sub={sub}>{children}</HScroll>
     </div>
   )
 }
