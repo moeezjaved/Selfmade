@@ -20,6 +20,8 @@ const PROTECTED = [
   '/insights',
   '/m4',
   '/discovery',
+  '/hq',              // chat-first Home (Unified Shell v2) — logged-in only
+  '/ads-workspace',   // embedded Ad Studio — logged-in only (standalone /ads-studio stays public)
 ]
 
 // Pages that need an active subscription (billing itself is always accessible). Pricing v2: Free is a
