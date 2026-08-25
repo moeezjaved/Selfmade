@@ -10,7 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateImage, geminiEnabled, geminiImageMime } from '@/lib/gemini/image'
+import { generateImage, geminiEnabled, geminiImageMime, verifyClonedAd } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 
 export const dynamic = 'force-dynamic'
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const prompt = [
       `Create ONE polished, photorealistic advertisement image${aspectRatio ? ` (aspect ratio ${aspectRatio})` : ''}.`,
       `SUBJECT — reference image 1 is a specific real PERSON. Use THAT exact person as the human subject: preserve their face, likeness, skin tone, hair, and clothing faithfully. Do NOT replace them with a different person, do NOT add other people, do NOT beautify or change their identity.`,
-      hasProduct ? `PRODUCT — reference image 2 is the ${brandName} product. Render it accurately (correct shape, materials, colours and proportions) held naturally in the subject's hand or clearly in use. Do not invent a different product.` : '',
+      hasProduct ? `PRODUCT — reference image 2 is the ${brandName} product. Render it EXACTLY as in the photo: same shape, materials, colours, proportions and on-label text — never a different product. Size it at a natural, believable real-world scale (a small handheld device stays small). It does NOT have to be held or in use: place it wherever looks most natural — the subject MAY hold it, OR it can rest on a surface, sit beside them, or appear as a clean product inset. Never force it awkwardly into their hand or mouth.` : '',
       logo ? `Include the brand logo once, small and tasteful (from the last reference image).` : '',
       colors.length ? `Brand colours to use: ${colors.join(', ')}.` : '',
       fonts?.heading ? `Prefer the "${fonts.heading}" typeface for the headline.` : '',
@@ -80,12 +80,30 @@ export async function POST(req: NextRequest) {
       `Natural light, on-brand, uncluttered, leave room for the headline and CTA. No duplicated text, logos or people. Correctly spelled text.`,
     ].filter(Boolean).join('\n')
 
-    const gen = await generateImage(prompt, images, 'pro', { aspectRatio, imageSize: '2K' })
-    if (!gen.ok) { await refund(); return NextResponse.json({ error: gen.error || 'generation-failed' }, { status: 502 }) }
+    // Generate → VISION-VERIFY the product/text/size against the real product photo → regenerate once
+    // with a correction if it's wrong. Fixes "the product didn't come right" on element ads.
+    const MAX_GENS = hasProduct ? 2 : 1
+    let best: Img | null = null
+    let fix = ''
+    for (let i = 0; i < MAX_GENS; i++) {
+      const attemptPrompt = i === 0 ? prompt : `${prompt}\nIMPORTANT CORRECTION: ${fix}`
+      const gen = await generateImage(attemptPrompt, images, 'pro', { aspectRatio, imageSize: '2K' })
+      if (!gen.ok) { if (best) break; await refund(); return NextResponse.json({ error: gen.error || 'generation-failed' }, { status: 502 }) }
+      best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+      if (!hasProduct) break
+      const v = await verifyClonedAd(best, product[0], brandName)
+      if (v.pass) break
+      fix = v.fix || [
+        !v.productMatches && 'Render the product EXACTLY as its photo — same shape, container type, label and colours.',
+        !v.textClean && 'Fix all text: correct spelling, no repeated words.',
+        !v.productProportional && 'Size the product at a natural real-world scale — smaller, not larger-than-life.',
+      ].filter(Boolean).join(' ')
+    }
+    if (!best) { await refund(); return NextResponse.json({ error: 'generation-failed' }, { status: 502 }) }
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
-    const saved = await saveGeneration({ userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'inspired', tier: 'pro', brandId: body.brandId || null, prompt: headline || null }).catch(() => null)
-    return NextResponse.json({ image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null })
+    const saved = await saveGeneration({ userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', brandId: body.brandId || null, prompt: headline || null }).catch(() => null)
+    return NextResponse.json({ image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: String(e?.message || e).slice(0, 200) }, { status: 500 })
