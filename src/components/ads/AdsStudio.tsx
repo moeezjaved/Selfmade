@@ -301,7 +301,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
 }
 
 /** A CSS-rendered ad template card (our generic templates, brand-fillable). */
-type Template = { title: string; concept: string; image?: string | null; headline?: string; angle?: string; generating?: boolean }
+type Template = { title: string; concept: string; image?: string | null; headline?: string; angle?: string; generating?: boolean; failed?: boolean }
 function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isMobile: boolean; domain: string; kit: BrandKitLite | null; products: { title: string; image: string | null }[]; onUse: (t: { title: string; image?: string | null }) => void }) {
   const [tpls, setTpls] = useState<Template[] | null>(null)
   const [canGen, setCanGen] = useState(false)
@@ -333,16 +333,17 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   }
   const genBody = (i: number, force = false) => { const prod = productFor(i); return { domain, index: i, force, productImages: prod ? [prod] : [], colors: (kit?.colors || []).map((c) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] } }
   const genOne = async (i: number, force = false) => {
-    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
-    // Retry transient image-model overload (pro_model_busy) so cards fill in when capacity returns.
-    for (let attempt = 0; attempt < 4; attempt++) {
+    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true, failed: false } : x))
+    // The server now rotates across the Gemini key pool, so one POST usually succeeds; we still retry a
+    // couple of times to ride out a busy stretch, then surface a tap-to-retry state (never spin forever).
+    for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(genBody(i, force)) }).then((r) => r.json())
-        if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false } : x)); return }
+        if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false, failed: false } : x)); return }
       } catch { /* retry */ }
-      await new Promise((r) => setTimeout(r, 5000))   // model busy → wait, then retry
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 4000))   // busy → wait, then retry
     }
-    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false } : x))
+    setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: true } : x))
   }
 
   // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
@@ -367,7 +368,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
       <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
       <HScroll gap={16}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
+          <div key={i} className="sf-disc" onClick={() => t && !t.generating && !t.failed && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating && !t.failed ? 'pointer' : 'default', fontFamily: SANS }}>
             {/* Title on top, like the reference — no description below. */}
             <div style={{ padding: '11px 14px 9px', fontSize: 14, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t?.title || '…'}</div>
             <div style={{ aspectRatio: '4/5', background: t?.image ? PAPER : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
@@ -379,6 +380,12 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
                   <span style={{ width: 26, height: 26, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>Generating…</span>
                 </>
+              ) : t?.failed ? (
+                <button onClick={(e) => { e.stopPropagation(); genOne(i) }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS, padding: 16 }}>
+                  <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#fdeee9', color: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>↻</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>Tap to retry</span>
+                  <span style={{ fontSize: 11, color: SUB }}>Image engine was busy</span>
+                </button>
               ) : null}
               {t?.image && !t.generating && (
                 <button className="sf-disc-over" onClick={(e) => { e.stopPropagation(); genOne(i, true) }} title="Regenerate" style={{ position: 'absolute', top: 8, right: 8, opacity: 0, transition: 'opacity .15s', border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>↻ Regenerate</button>

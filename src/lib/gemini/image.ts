@@ -9,7 +9,14 @@
  *   GEMINI_IMAGE_MODEL      (default) — e.g. 'gemini-2.5-flash-image'
  *   GEMINI_IMAGE_MODEL_PRO  (premium) — the Nano Banana Pro id
  */
-const KEY = process.env.GEMINI_API_KEY
+// KEY POOL — spread image generation across multiple Gemini API keys (separate Google Cloud projects)
+// so the per-project RPM limit no longer caps the whole platform. Set GEMINI_API_KEYS to a comma-
+// separated list; falls back to the single GEMINI_API_KEY. On a 429/quota error we rotate to the next
+// key immediately (before backing off), which is what turns "pro_model_busy" spam into a success.
+const KEYS = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '')
+  .split(',').map((s) => s.trim()).filter(Boolean)
+const KEY = KEYS[0]   // the text-only helpers (verify/describe) are low-volume → single key is fine
+let rrCursor = 0      // round-robin start offset, so consecutive gens begin on different keys
 const MODEL_DEFAULT = process.env.GEMINI_IMAGE_MODEL || 'gemini-2.5-flash-image'
 // Pro MUST default to the real Nano Banana Pro model — NOT flash. Defaulting to flash meant that when
 // GEMINI_IMAGE_MODEL_PRO was unset, every "Pro" render (clone/remake — billed at Pro) silently ran on
@@ -21,7 +28,7 @@ const _rawPro = process.env.GEMINI_IMAGE_MODEL_PRO || PRO_FALLBACK
 const MODEL_PRO = /flash/i.test(_rawPro) ? PRO_FALLBACK : _rawPro
 const BASE = 'https://generativelanguage.googleapis.com/v1beta/models'
 
-export const geminiEnabled = !!KEY
+export const geminiEnabled = KEYS.length > 0
 export function modelFor(tier: 'default' | 'pro') { return tier === 'pro' ? MODEL_PRO : MODEL_DEFAULT }
 
 export type ImageInput = { mimeType: string; dataB64: string }
@@ -49,7 +56,7 @@ export function geminiImageMime(raw?: string | null, head?: Buffer): string | nu
  * Returns the first image part (base64). The caller uploads it to R2.
  */
 export async function generateImage(prompt: string, images: ImageInput[], tier: 'default' | 'pro' = 'default', opts?: { aspectRatio?: string; imageSize?: string }): Promise<GenResult> {
-  if (!KEY) return { ok: false, error: 'GEMINI_API_KEY not set' }
+  if (!KEYS.length) return { ok: false, error: 'GEMINI_API_KEY not set' }
   // Safety net: strip any image whose MIME Gemini can't ingest (e.g. an SVG logo) so one bad
   // input never 400s the whole request. Callers should filter earlier to keep prompt indices aligned.
   const safeImages = images.filter((i) => geminiImageMime(i.mimeType) !== null)
@@ -66,8 +73,11 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
   // (all our reference results were made on Pro). imageSize (1K/2K/4K) is Pro-only.
   const candidates = [tier === 'pro' ? MODEL_PRO : modelFor(tier)]
   const RETRYABLE = new Set([429, 500, 502, 503, 504])
-  const MAX_TRIES = tier === 'pro' ? 6 : 4   // ride out transient Pro-model 503s before giving up
+  // Give every key at least ~2 shots at the Pro model before giving up (busy is transient + per-key).
+  const MAX_TRIES = Math.max(tier === 'pro' ? 6 : 4, KEYS.length * 2)
   const sleep = (ms: number) => new Promise((res) => setTimeout(res, ms))
+  const start = rrCursor++                         // this call's starting key (spreads load across keys)
+  const keyAt = (attempt: number) => KEYS[(start + attempt - 1) % KEYS.length]
   let lastErr = 'gemini failed'
 
   for (const model of candidates) {
@@ -81,14 +91,19 @@ export async function generateImage(prompt: string, images: ImageInput[], tier: 
 
     for (let attempt = 1; attempt <= MAX_TRIES; attempt++) {
       try {
-        const r = await fetch(`${BASE}/${model}:generateContent?key=${KEY}`, {
+        const r = await fetch(`${BASE}/${model}:generateContent?key=${keyAt(attempt)}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ contents: [{ parts }], generationConfig: cfg }),
         })
         if (!r.ok) {
           lastErr = `gemini ${r.status} [${model}]: ${(await r.text().catch(() => '')).slice(0, 240)}`
-          if (RETRYABLE.has(r.status) && attempt < MAX_TRIES) { await sleep(700 * 2 ** (attempt - 1)); continue }
+          if (RETRYABLE.has(r.status) && attempt < MAX_TRIES) {
+            // Rotate to the NEXT key first (it may have quota); only back off once we've cycled every key.
+            const cycled = attempt % KEYS.length === 0
+            await sleep(cycled ? 700 * 2 ** Math.floor(attempt / KEYS.length) : 150)
+            continue
+          }
           break   // exhausted this model → fall through to the next candidate (standard)
         }
         const j = await r.json()
