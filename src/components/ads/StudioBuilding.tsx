@@ -22,6 +22,7 @@ export default function StudioBuilding({ domain }: { domain: string }) {
   const [brand, setBrand] = useState<Step>('run')
   const [prod, setProd] = useState<Step>('run')
   const [comp, setComp] = useState<Step>('run')
+  const [ownAds, setOwnAds] = useState<Step>('run')
   const [tpl, setTpl] = useState({ done: 0, total: 10 })
   const [target, setTarget] = useState(4)          // how many templates must be ready before reveal
   const [showEnter, setShowEnter] = useState(false)
@@ -36,6 +37,8 @@ export default function StudioBuilding({ domain }: { domain: string }) {
     let on = true
     // competitors — slow, best-effort, in parallel (doesn't block the others)
     fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(cleanDomain)}`).then((r) => r.json()).catch(() => null).finally(() => { if (on) setComp('done') })
+    // your own live ads (the ads audit) — from the Meta page linked in the funnel, best-effort in parallel
+    fetch(`/api/ads-studio/your-ads`).then((r) => r.json()).catch(() => null).finally(() => { if (on) setOwnAds('done') })
 
     ;(async () => {
       let kit: any = null
@@ -93,13 +96,14 @@ export default function StudioBuilding({ domain }: { domain: string }) {
   }, [brand, prod, comp, tpl, target]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pct = Math.min(100, Math.round(
-    (brand === 'done' ? 25 : 0) + (prod === 'done' ? 22 : 0) + (comp === 'done' ? 15 : 0) +
-    (tpl.total ? 38 * (tpl.done / tpl.total) : 0)
+    (brand === 'done' ? 22 : 0) + (prod === 'done' ? 20 : 0) + (comp === 'done' ? 13 : 0) + (ownAds === 'done' ? 12 : 0) +
+    (tpl.total ? 33 * (tpl.done / tpl.total) : 0)
   ))
 
   const rows: { label: string; state: Step; note?: string }[] = [
     { label: 'Reading your brand', state: brand },
     { label: 'Finding your products', state: prod },
+    { label: 'Reading your live ads', state: ownAds },
     { label: 'Scouting your competitors', state: comp },
     { label: 'Designing your ad concepts', state: tpl.done >= (target || 1) ? 'done' : 'run', note: `${tpl.done}/${tpl.total}` },
   ]

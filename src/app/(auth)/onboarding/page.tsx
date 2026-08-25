@@ -256,11 +256,14 @@ export default function InterviewPage() {
   // Website-capture funnel (landing "See your ads" form drops sf_scan_domain): seed the site into the
   // interview and remember to land them in the ads workspace (templates already built) when done.
   const fromSiteFunnel = useRef(false)
+  const ownPageId = useRef('')   // Meta page id from the funnel's Facebook Ad Library link → brand's own-ads audit
   useEffect(() => {
     try {
       const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/)
       const d = m ? decodeURIComponent(m[1]).trim() : ''
       if (d) { fromSiteFunnel.current = true; setUrl((u) => u || d) }
+      const p = document.cookie.match(/(?:^|; )sf_scan_pageid=(\d{5,})/)
+      if (p) { fromSiteFunnel.current = true; ownPageId.current = p[1] }
     } catch { /* ignore */ }
   }, [])
   const doneDest = () => (fromSiteFunnel.current ? '/studio-building' : '/brief?welcome=1')
@@ -439,7 +442,7 @@ export default function InterviewPage() {
         tone: gVoice || undefined, target_audience: gBuyer || undefined,
         usps: gDiff ? [gDiff] : undefined, avoid_words: redline ? [redline] : undefined,
         product_images: (detect?.productImages?.length ? detect.productImages : detect?.images || []).slice(0, 4),
-        brand_kit: { ...(detect?.brandKit || {}), category: gType },
+        brand_kit: { ...(detect?.brandKit || {}), category: gType, ...(ownPageId.current ? { ownMetaPageId: ownPageId.current } : {}) },
         brand_type: gType,
       }
       const resp = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }).catch(() => null)
