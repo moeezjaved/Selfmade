@@ -285,7 +285,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
       {!started && <HomeDiscoverRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
       {!started && <HomeProductsRow products={products} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
-      {!started && <HomeCompetitorsRow domain={domain} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
+      {!started && <HomeCompetitorsRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
     </div>
   )
@@ -465,22 +465,35 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
   )
 }
 
-function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
+function HomeCompetitorsRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<{ thumb: string; brand: string }[] | null>(null)
   useEffect(() => {
-    if (!domain) { setAds([]); return }
     let on = true
-    fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => {
-      if (!on) return
-      const comps = Array.isArray(d.competitors) ? d.competitors : []
-      const flat = comps.flatMap((c: any) => (Array.isArray(c.ads) ? c.ads : []).map((a: any) => ({ thumb: a.thumb, brand: c.name }))).filter((x: any) => x.thumb).slice(0, 24)
-      setAds(flat)
-    }).catch(() => on && setAds([]))
+    ;(async () => {
+      try {
+        // SAVED competitors only (the brands you've spied) — no fresh discovery scan. Same source as
+        // the Brand-Spy "Feed": /api/follows (spied) → /api/discovery/db-search recent per brand.
+        const c = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
+        const qs = new URLSearchParams({ spied: '1' }); if (c) qs.set('brand', decodeURIComponent(c))
+        const f = await fetch(`/api/follows?${qs}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
+        const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
+        if (!pageIds.length) { if (on) setAds([]); return }
+        const perBrand = await Promise.all(pageIds.slice(0, 8).map((pid) =>
+          fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
+        ))
+        const seen = new Set<string>()
+        const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
+          .map((a: any) => { const cr = a.creatives?.[0]; const thumb = cr ? (cr.asset_type === 'video' ? (cr.poster_url || '') : cr.r2_url) : ''; return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string } })
+          .filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+          .slice(0, 24)
+        if (on) setAds(flat)
+      } catch { if (on) setAds([]) }
+    })()
     return () => { on = false }
-  }, [domain])
+  }, [])
   if (ads !== null && ads.length === 0) return null
   return (
-    <HomeCarousel title="Competitor ads" sub="Live creatives your rivals are running right now — tap Create Similar to make your own.">
+    <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
         <div key={i} className="sf-disc" style={{ position: 'relative', width: 180, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
