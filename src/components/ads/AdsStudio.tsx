@@ -153,6 +153,42 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     setBusy(true); setInput('')
     const fmt = format
     setMsgs((m) => [...m, { role: 'user', text: message, format: fmt }, { role: 'assistant', loading: true, format: fmt }])
+
+    // REMAKE / "Create Similar": a Discover/Competitor ad is attached → use the OLD STUDIO's proven clone
+    // engine (reproduces the reference's exact winning layout with the user's product, then vision-verifies
+    // and auto-regenerates). Same async path as the Discovery "Remake", so results are consistently good.
+    const refAdRaw = tags.find((t) => t.kind === 'discover')?.image
+    const hasElement = tags.some((t) => t.kind === 'element')
+    if (refAdRaw && !hasElement) {
+      try {
+        const productImg = tags.find((t) => t.kind === 'product' || t.kind === 'upload')?.image || products.find((p) => p.image)?.image
+        if (!productImg) throw new Error('no-product')
+        const refAd = refAdRaw.startsWith('/') ? window.location.origin + refAdRaw : refAdRaw   // server fetch needs absolute
+        const brandId = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
+        const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
+        const enq = await fetch('/api/discovery/clone-image', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K' }),
+        }).then((r) => r.json())
+        if (!enq?.jobId) throw new Error(enq?.error === 'insufficient_credits' ? 'credits' : 'no-job')
+        const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
+        const deadline = Date.now() + 6 * 60_000
+        let settled = false
+        while (Date.now() < deadline) {
+          await sleep(2500)
+          const s = await fetch(`/api/discovery/clone-image/status?id=${enq.jobId}`).then((r) => r.json()).catch(() => ({}))
+          if (s.done && s.url) { setMsgs((m) => replaceLast(m, { role: 'assistant', image: s.url, caption: 'Remade from your reference — your product in their winning layout.', format: fmt })); settled = true; break }
+          if (s.failed) { setMsgs((m) => replaceLast(m, { role: 'assistant', error: s.error || 'The remake failed — your credits were refunded. Try again.', format: fmt })); settled = true; break }
+        }
+        if (!settled) setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Still rendering — it’ll land in My Creatives shortly.', format: fmt }))
+      } catch (e: any) {
+        const msg = e?.message === 'no-product' ? 'Add a product first — tap + and pick one of your products.' : e?.message === 'credits' ? 'You’re out of credits — top up to remake ads.' : 'Couldn’t start the remake — try again.'
+        setMsgs((m) => replaceLast(m, { role: 'assistant', error: msg, format: fmt }))
+      }
+      setTags([]); setBusy(false)
+      return
+    }
+
     try {
       const plan = await fetch('/api/ads-studio/plan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, format: fmt, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json())
       // References: a product tag/upload IS the product; an element/discover/template is a person/style
