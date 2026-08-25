@@ -29,8 +29,9 @@ export default async function DashboardLayout({ children }: { children: React.Re
     }
   } catch { /* rail still renders; switcher falls back to its own client fetch */ }
 
-  // Unified Shell v2 behind the `sf_shell` flag (default = current AppShell; flip with ?shell=v2).
-  const shellV2 = (await cookies()).get('sf_shell')?.value === 'v2'
-  const Shell = shellV2 ? CompanyShell : AppShell
+  // Unified Shell v2 is now the DEFAULT (Phase 5 flip). The old rail stays one step away at ?shell=v1
+  // for anyone who wants it, and AppShell is kept in the codebase for rollback (flag not retired yet).
+  const shellV1 = (await cookies()).get('sf_shell')?.value === 'v1'
+  const Shell = shellV1 ? AppShell : CompanyShell
   return <><ShellFlag /><Shell brands={brands} activeBrand={activeBrand}>{children}</Shell></>
 }
