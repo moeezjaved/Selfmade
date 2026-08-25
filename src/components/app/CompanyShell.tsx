@@ -9,9 +9,9 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Inbox, Map, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown } from 'lucide-react'
+import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { useCredits } from '@/components/credits/CreditCounter'
+import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
@@ -25,12 +25,6 @@ type Group = { label?: string; stage?: boolean; items: Item[] }
 
 const NAV: Group[] = [
   { items: [{ href: '/hq', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
-  { label: 'Company', items: [
-    { href: '/mission/journey', label: 'Journey', icon: Map },
-    { href: '/company', label: 'Your Team', icon: Users },
-    { href: '/brain', label: 'Company Brain', icon: Brain },
-    { href: '/documents', label: 'Documents', icon: FileText },
-  ] },
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
     { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
@@ -133,6 +127,10 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
       ))}
 
       <div style={{ marginTop: 'auto', paddingTop: 14, position: 'relative' }}>
+        {/* Credits — always visible in the rail (tap to top up / manage plan). */}
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 8 }}>
+          <CreditCounter />
+        </div>
         {!isPaid && <a href="/hire" style={{ display: 'block', background: ORANGE, color: '#fff', borderRadius: 11, padding: '9px 12px', fontSize: 12.5, fontWeight: 800, textAlign: 'center', textDecoration: 'none', marginBottom: 8 }}>Hire the team →</a>}
 
         {/* Account row — click to open the settings/billing/connectors menu above it. */}
