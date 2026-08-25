@@ -263,7 +263,7 @@ export default function InterviewPage() {
       if (d) { fromSiteFunnel.current = true; setUrl((u) => u || d) }
     } catch { /* ignore */ }
   }, [])
-  const doneDest = () => (fromSiteFunnel.current ? '/ads-workspace' : '/brief?welcome=1')
+  const doneDest = () => (fromSiteFunnel.current ? '/studio-building' : '/brief?welcome=1')
 
   // Resume, don't restart — persist progress so a browser back/refresh returns to the same step with the
   // same answers, instead of throwing the founder back to the welcome screen. (#5)
