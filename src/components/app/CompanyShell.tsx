@@ -16,6 +16,7 @@ import { openCredits } from '@/components/credits/CreditModal'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
+import Celebration from '@/components/motion/Celebration'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', ORANGE = '#e02f06', ORANGE_WASH = '#fdeee9', MUTED = '#b9b1a3'
 const SERIF = 'Fraunces, Georgia, serif'
@@ -169,6 +170,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
 
   return (
     <div style={{ display: 'flex', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
+      <Celebration />
       {!isMobile && Sidebar}
       {isMobile && open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>

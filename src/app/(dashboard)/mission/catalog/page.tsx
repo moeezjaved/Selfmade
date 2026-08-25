@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
+import { celebrate, shopifyApplied } from '@/lib/celebrate'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -57,7 +58,7 @@ export default function CatalogPage() {
     try {
       const r = await fetch('/api/shopify/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', draftIds: ids }) })
       const j = await r.json()
-      if (r.ok) { setNote(`Applied ${j.applied} to Shopify${j.failed ? `, ${j.failed} failed` : ''}.`); setSelected({}); await load() }
+      if (r.ok) { if (j.applied > 0) celebrate(shopifyApplied(j.applied)); setNote(j.failed ? `${j.failed} couldn’t apply — we’ll retry those.` : null); setSelected({}); await load() }
       else setNote(j.error || 'Could not apply.')
     } catch { setNote('Network error.') }
     setBusy(null)
