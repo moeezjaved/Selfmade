@@ -605,7 +605,7 @@ export default function InterviewPage() {
                   <p style={sub}>Give me your website — I’d rather do my homework than ask you things I can read.</p>
                   <div style={{ display: 'flex', gap: 8, maxWidth: 420, margin: '22px auto 0' }}>
                     <input value={url} onChange={e => setUrl(e.target.value)} onKeyDown={e => e.key === 'Enter' && startHomework()} placeholder="yourcompany.com" style={{ ...inputCss, borderRadius: 100, padding: '13px 20px' }} autoFocus />
-                    <button style={btnMain} onClick={startHomework}>→</button>
+                    <button style={btnMain} onClick={() => startHomework()}>→</button>
                   </div>
                 </>
               )}
