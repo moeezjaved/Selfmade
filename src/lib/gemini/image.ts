@@ -364,10 +364,11 @@ const MODEL_VERIFY = process.env.GEMINI_VERIFY_MODEL || 'gemini-2.5-flash'
 
 export type CloneVerdict = {
   pass: boolean
-  productMatches: boolean      // generated ad shows the user's product (shape/label from its photo)
-  brandingClean: boolean       // no branding other than the user's brand
-  textClean: boolean           // no misspelled/duplicated/gibberish text
-  fix?: string                 // ONE short corrective sentence for the retry prompt
+  productMatches: boolean       // generated ad shows the user's product (shape/label from its photo)
+  brandingClean: boolean        // no branding other than the user's brand
+  textClean: boolean            // no misspelled/duplicated/gibberish text
+  productProportional: boolean  // product is a NATURAL real-world size for the scene (not giant/dominating)
+  fix?: string                  // ONE short corrective sentence for the retry prompt
 }
 
 /**
@@ -375,13 +376,14 @@ export type CloneVerdict = {
  * Fails OPEN (pass:true) on any API error — QA must never block a paying user's result.
  */
 export async function verifyClonedAd(generated: ImageInput, product: ImageInput, brandName?: string): Promise<CloneVerdict> {
-  const OPEN: CloneVerdict = { pass: true, productMatches: true, brandingClean: true, textClean: true }
+  const OPEN: CloneVerdict = { pass: true, productMatches: true, brandingClean: true, textClean: true, productProportional: true }
   if (!KEY) return OPEN
   const prompt = [
     `Image 1 is an AI-generated ad. Image 2 is the real product it must feature${brandName ? ` (brand "${brandName}")` : ''}. Inspect image 1 strictly and answer with ONLY this JSON:`,
     `{"productMatches":bool,  // image 1's product has the same shape, packaging type, label and colors as image 2 (not a different product or the wrong container type)`,
     ` "brandingClean":bool,   // every logo/brand name/label in image 1 belongs to ${brandName ? `"${brandName}"` : "the product's own brand as seen in image 2"} — no other company's branding anywhere`,
     ` "textClean":bool,       // all visible text is correctly spelled real English with no duplicated words or repeated text blocks`,
+    ` "productProportional":bool, // the product is rendered at a NATURAL, believable real-world size for the scene — NOT unnaturally huge, not larger-than-life, not dominating the frame. If a hand holds it, it must look right in the hand (a small handheld device stays small). false if it's blown up too big.`,
     ` "fix":string}           // if anything is false: ONE short imperative sentence telling an image model what to correct; else ""`,
   ].join('\n')
   try {
@@ -404,9 +406,10 @@ export async function verifyClonedAd(generated: ImageInput, product: ImageInput,
     const productMatches = v.productMatches !== false
     const brandingClean = v.brandingClean !== false
     const textClean = v.textClean !== false
+    const productProportional = v.productProportional !== false
     return {
-      pass: productMatches && brandingClean && textClean,
-      productMatches, brandingClean, textClean,
+      pass: productMatches && brandingClean && textClean && productProportional,
+      productMatches, brandingClean, textClean, productProportional,
       fix: typeof v.fix === 'string' && v.fix.trim() ? v.fix.trim().slice(0, 200) : undefined,
     }
   } catch { return OPEN }
