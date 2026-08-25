@@ -139,11 +139,29 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // Dedupe spied brands already surfaced by discovery (by lowercased name), discovered first.
-    const seenNames = new Set(discovered.map((d) => d.name.toLowerCase()))
-    const merged = [...discovered, ...spied.filter((s) => !seenNames.has(String(s.name).toLowerCase()))]
-    // Brands with real ad-DNA rise to the top.
-    merged.sort((a, b) => (b.ads.length - a.ads.length) || (b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0))
+    // Collapse duplicate brands into ONE card. The same rival can surface under several Meta page IDs
+    // (or via both Google and the Ad Library), which showed a brand like "MuscleMax" as many separate
+    // cards. Merge by normalized brand name, combining their live ads (unique by id) and keeping the
+    // richest metadata. Discovered entries come first so their card wins the base fields.
+    const normName = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+    const byBrand = new Map<string, any>()
+    for (const c of [...discovered, ...spied]) {
+      const key = normName(c.name)
+      if (!key) continue
+      const cur = byBrand.get(key)
+      if (!cur) { byBrand.set(key, { ...c, ads: [...(c.ads || [])] }); continue }
+      const seenAds = new Set(cur.ads.map((a: any) => a.id))
+      for (const a of (c.ads || [])) { if (a?.id && !seenAds.has(a.id)) { cur.ads.push(a); seenAds.add(a.id) } }
+      cur.ads = cur.ads.slice(0, 8)
+      cur.adCount = Math.max(cur.adCount || 0, c.adCount || 0, cur.ads.length)
+      if (!cur.hasAdDna && c.hasAdDna) { cur.hasAdDna = true; cur.dna = c.dna; cur.adsSource = c.adsSource }
+      cur.spyable = !!cur.spyable && !!c.spyable
+      if (!cur.pageId && c.pageId) cur.pageId = c.pageId
+      if (!cur.domain && c.domain) cur.domain = c.domain
+    }
+    const merged = Array.from(byBrand.values())
+    // Brands with real ad-DNA / live ads rise to the top.
+    merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
     return NextResponse.json({ seed, configured, competitors: merged })
   } catch (e: any) {
