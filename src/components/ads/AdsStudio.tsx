@@ -247,7 +247,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
 
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      {!started && <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}><h1 style={{ margin: 0, fontFamily: "'Playfair Display', 'Times New Roman', serif", fontWeight: 500, fontStyle: 'normal', fontSize: isMobile ? 42 : 58, lineHeight: 1.02, letterSpacing: '-0.03em', backgroundImage: 'linear-gradient(100deg, #1a1410 32%, #d3ad7f 50%, #1a1410 68%)', backgroundSize: '220% auto', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', animation: 'sfShimmer 2.4s ease-out .12s 1 both' }}>Start with an idea</h1></div>}
+      {!started && <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}><h1 style={{ margin: 0, fontFamily: "'Playfair Display', 'Times New Roman', serif", fontWeight: 500, fontStyle: 'normal', fontSize: isMobile ? 42 : 58, lineHeight: 1.02, letterSpacing: '-0.03em', backgroundImage: 'linear-gradient(100deg, #1a1410 44%, #d8b088 50%, #1a1410 56%)', backgroundSize: '320% auto', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', animation: 'sfShimmer 2.2s ease-out .15s 1 both' }}>Start with an idea</h1></div>}
 
       {/* format selector */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', margin: started ? '0 0 16px' : '28px 0 18px' }}>
