@@ -19,6 +19,10 @@ import ProjectSwitcher from '@/components/app/ProjectSwitcher'
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', ORANGE = '#e02f06', ORANGE_WASH = '#fdeee9', MUTED = '#b9b1a3'
 const SERIF = 'Fraunces, Georgia, serif'
 const SANS = 'Inter, system-ui, sans-serif'
+// Sidebar nav font — match Lapis, which uses "Die Grotesk" (a licensed grotesque; their own fallback is
+// Arial). We can't ship Die Grotesk, but it's Helvetica-adjacent, so a neutral Helvetica/Arial grotesque
+// at medium weight reads the same. Kept to the rail only.
+const NAV_FONT = "'Helvetica Neue', Helvetica, Arial, system-ui, sans-serif"
 
 type Item = { href: string; label: string; icon?: React.ElementType }
 type Group = { label?: string; stage?: boolean; items: Item[] }
@@ -44,10 +48,6 @@ const NAV: Group[] = [
     { href: '/mission/geo', label: 'AI Search', icon: Brain },
     { href: '/mission/competitors', label: 'SEO Competitors', icon: Eye },
   ] },
-  { label: 'Intel', stage: true, items: [
-    { href: '/discovery/saved', label: 'Boards', icon: Bookmark },
-    { href: '/brands', label: 'My Brands', icon: Store },
-  ] },
 ]
 
 // The account/settings menu that opens from the bottom of the sidebar. Same destinations the old
@@ -55,6 +55,7 @@ const NAV: Group[] = [
 const ACCT: { href: string; label: string; icon: React.ElementType; external?: boolean }[] = [
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/billing', label: 'Billing & plan', icon: CreditCard },
+  { href: '/brands', label: 'My Brands', icon: Bookmark },
   { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
   { href: '/connect/shopify', label: 'Connect Shopify', icon: Store },
   { href: '/team', label: 'Team & members', icon: Users },
@@ -110,12 +111,12 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
               <span style={{ height: 1, flex: 1, background: LINE }} />Grows with your stage<span style={{ height: 1, flex: 1, background: LINE }} />
             </div>
           )}
-          {g.label && <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: SUB, opacity: .7, padding: '4px 10px 5px' }}>{g.label}</div>}
+          {g.label && <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.09em', textTransform: 'uppercase', color: SUB, opacity: .7, padding: '4px 10px 5px', fontFamily: NAV_FONT }}>{g.label}</div>}
           {g.items.map((it) => {
             const on = isActive(it.href)
             const Icon = it.icon
             return (
-              <Link key={it.href} href={it.href} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', background: on ? ORANGE_WASH : 'transparent', color: on ? ORANGE : '#43403a', fontWeight: on ? 800 : 600, fontSize: 13.5, fontFamily: SANS, opacity: g.stage && !on ? 0.55 : 1, transition: 'background .12s' }}>
+              <Link key={it.href} href={it.href} onClick={() => setOpen(false)} style={{ display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', background: on ? ORANGE_WASH : 'transparent', color: on ? ORANGE : '#43403a', fontWeight: on ? 600 : 500, fontSize: 14.5, fontFamily: NAV_FONT, opacity: g.stage && !on ? 0.55 : 1, transition: 'background .12s' }}>
                 {Icon && <Icon size={16} style={{ flex: 'none', color: on ? ORANGE : SUB }} />}{it.label}
               </Link>
             )
