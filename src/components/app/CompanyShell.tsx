@@ -9,9 +9,10 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown } from 'lucide-react'
+import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
+import { openCredits } from '@/components/credits/CreditModal'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
@@ -50,15 +51,16 @@ const NAV: Group[] = [
 
 // The account/settings menu that opens from the bottom of the sidebar. Same destinations the old
 // AppShell avatar carried (Settings · Billing · Connectors · Team · Activity · Support · Log out).
-const ACCT: { href: string; label: string; icon: React.ElementType; external?: boolean }[] = [
+const ACCT: { href?: string; label: string; icon: React.ElementType; external?: boolean; action?: () => void }[] = [
   { href: '/settings', label: 'Settings', icon: Settings },
   { href: '/billing', label: 'Billing & plan', icon: CreditCard },
+  { label: 'Buy credits', icon: Zap, action: () => openCredits('buy') },
   { href: '/brands', label: 'My Brands', icon: Bookmark },
   { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
   { href: '/connect/shopify', label: 'Connect Shopify', icon: Store },
   { href: '/team', label: 'Team & members', icon: Users },
   { href: '/activity', label: 'Activity log', icon: ClipboardList },
-  { href: '/contact', label: 'Support & feedback', icon: LifeBuoy },
+  { href: '/contact', label: 'Contact support', icon: LifeBuoy },
 ]
 
 export default function CompanyShell({ brands, activeBrand, children }: { brands: { id: string; name: string }[]; activeBrand: string; children: React.ReactNode }) {
@@ -146,9 +148,10 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
               {ACCT.map((it) => {
                 const Icon = it.icon
                 const row = { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', color: '#43403a', fontWeight: 600, fontSize: 13, fontFamily: SANS } as const
+                if (it.action) return <button key={it.label} onClick={() => { setAcctOpen(false); it.action!() }} style={{ ...row, width: '100%', border: 'none', background: 'none', cursor: 'pointer', textAlign: 'left' }}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</button>
                 return it.external
-                  ? <a key={it.href} href={it.href} target="_blank" rel="noreferrer" onClick={() => setAcctOpen(false)} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</a>
-                  : <Link key={it.href} href={it.href} onClick={() => { setAcctOpen(false); setOpen(false) }} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</Link>
+                  ? <a key={it.label} href={it.href} target="_blank" rel="noreferrer" onClick={() => setAcctOpen(false)} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</a>
+                  : <Link key={it.label} href={it.href!} onClick={() => { setAcctOpen(false); setOpen(false) }} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</Link>
               })}
               <div style={{ height: 1, background: LINE, margin: '5px 6px' }} />
               <button onClick={signOut} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, border: 'none', background: 'none', cursor: 'pointer', color: '#c23b1c', fontWeight: 700, fontSize: 13, fontFamily: SANS, textAlign: 'left' }}><LogOut size={16} style={{ flex: 'none' }} />Log out</button>
