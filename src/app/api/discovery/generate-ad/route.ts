@@ -150,8 +150,13 @@ async function handle(req: NextRequest) {
     const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: resolvedAspect, imageSize })
     if (!gen.ok) {
       await refund()
-      const { sendAdminAlert } = await import('@/lib/email')
-      await sendAdminAlert(`⚠️ studio ad generation failed`, `<p>User <b>${user.id}</b>'s fresh-ad generation failed and was refunded.</p><p><b>Error:</b> ${String(gen.error).slice(0, 300)}</p>`)
+      // pro_model_busy is transient Gemini-Pro congestion — the client already retries and the user is
+      // refunded, so don't founder-alert on it (it was spamming 1 email per retry). Alert only on real
+      // failures; busy episodes stay visible via /api/admin/gen-health.
+      if (gen.error !== 'pro_model_busy') {
+        const { sendAdminAlert } = await import('@/lib/email')
+        await sendAdminAlert(`⚠️ studio ad generation failed`, `<p>User <b>${user.id}</b>'s fresh-ad generation failed and was refunded.</p><p><b>Error:</b> ${String(gen.error).slice(0, 300)}</p>`)
+      }
       return NextResponse.json({ error: gen.error }, { status: 502 })
     }
 
