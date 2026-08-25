@@ -131,6 +131,8 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
+  const focusComposer = () => setTimeout(() => composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
 
   useEffect(() => {
     if (!domain) return
@@ -203,13 +205,13 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       return next
     })
     setInput(`Create an ad like this for ${kit?.siteName || 'my product'}`)
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+    focusComposer()
   }
   // Products row: attach the product + pre-fill, ready to generate in one click.
   const primeFromProduct = (t: StudioTag) => {
     setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))
     setInput(`Make a scroll-stopping ${format} ad featuring ${t.label}`)
-    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+    focusComposer()
   }
 
   const chips = ['Create an Instagram ad campaign', 'Generate ad creatives for my product', 'Design a product launch campaign', 'Make a WhatsApp promotional banner', 'Design a seasonal sale campaign', 'Create a LinkedIn thought-leadership post']
@@ -226,7 +228,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   )
 
   const composer = (
-    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 16, boxShadow: started ? 'none' : '0 20px 50px -34px rgba(0,0,0,.4)' }}>
+    <div ref={composerRef} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 16, boxShadow: started ? 'none' : '0 20px 50px -34px rgba(0,0,0,.4)' }}>
       {tags.length > 0 && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 10 }}>
           {tags.map((t, i) => (
