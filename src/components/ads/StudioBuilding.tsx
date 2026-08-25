@@ -21,6 +21,7 @@ export default function StudioBuilding({ domain }: { domain: string }) {
   const router = useRouter()
   const [brand, setBrand] = useState<Step>('run')
   const [prod, setProd] = useState<Step>('run')
+  const [aud, setAud] = useState<Step>('run')
   const [comp, setComp] = useState<Step>('run')
   const [ownAds, setOwnAds] = useState<Step>('run')
   const [tpl, setTpl] = useState({ done: 0, total: 10 })
@@ -30,7 +31,12 @@ export default function StudioBuilding({ domain }: { domain: string }) {
   const startedAt = useRef(Date.now())
   const cleanDomain = domain.replace(/^https?:\/\//i, '').replace(/\/.*$/, '')
 
-  const go = () => { if (navigated.current) return; navigated.current = true; router.push('/ads-workspace') }
+  const go = () => {
+    if (navigated.current) return
+    navigated.current = true
+    fetch('/api/ads-studio/warm', { method: 'POST' }).catch(() => {})   // mark built so future visits skip this screen
+    router.push('/ads-workspace?built=1')   // built=1 renders the workspace directly (loop-proof)
+  }
 
   // ── run the build once ──
   useEffect(() => {
@@ -39,6 +45,8 @@ export default function StudioBuilding({ domain }: { domain: string }) {
     fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(cleanDomain)}`).then((r) => r.json()).catch(() => null).finally(() => { if (on) setComp('done') })
     // your own live ads (the ads audit) — from the Meta page linked in the funnel, best-effort in parallel
     fetch(`/api/ads-studio/your-ads`).then((r) => r.json()).catch(() => null).finally(() => { if (on) setOwnAds('done') })
+    // audiences — warms + caches the market/audience read, best-effort in parallel
+    fetch(`/api/ads-studio/audiences?domain=${encodeURIComponent(cleanDomain)}`).then((r) => r.json()).catch(() => null).finally(() => { if (on) setAud('done') })
 
     ;(async () => {
       let kit: any = null
@@ -96,13 +104,14 @@ export default function StudioBuilding({ domain }: { domain: string }) {
   }, [brand, prod, comp, tpl, target]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const pct = Math.min(100, Math.round(
-    (brand === 'done' ? 22 : 0) + (prod === 'done' ? 20 : 0) + (comp === 'done' ? 13 : 0) + (ownAds === 'done' ? 12 : 0) +
-    (tpl.total ? 33 * (tpl.done / tpl.total) : 0)
+    (brand === 'done' ? 20 : 0) + (prod === 'done' ? 18 : 0) + (aud === 'done' ? 12 : 0) + (comp === 'done' ? 12 : 0) + (ownAds === 'done' ? 10 : 0) +
+    (tpl.total ? 28 * (tpl.done / tpl.total) : 0)
   ))
 
   const rows: { label: string; state: Step; note?: string }[] = [
     { label: 'Reading your brand', state: brand },
     { label: 'Finding your products', state: prod },
+    { label: 'Understanding your audience', state: aud },
     { label: 'Reading your live ads', state: ownAds },
     { label: 'Scouting your competitors', state: comp },
     { label: 'Designing your ad concepts', state: tpl.done >= (target || 1) ? 'done' : 'run', note: `${tpl.done}/${tpl.total}` },

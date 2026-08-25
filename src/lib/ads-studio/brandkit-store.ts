@@ -27,8 +27,11 @@ export async function saveKit(admin: any, brandId: string, domain: string, kit: 
   try {
     const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
     const existing = (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {}
+    const existingAds = (existing.adsStudio && typeof existing.adsStudio === 'object') ? existing.adsStudio : {}
     const saved: SavedKit = { ...kit, domain: domain.replace(/^www\./, ''), savedAt: new Date().toISOString() }
-    await admin.from('brands').update({ brand_kit: { ...existing, adsStudio: saved } }).eq('id', brandId)
+    // Merge the kit fields into adsStudio — preserve sibling caches (templates, products, audiences,
+    // competitors) written by their own routes; overwriting the whole bucket would wipe them.
+    await admin.from('brands').update({ brand_kit: { ...existing, adsStudio: { ...existingAds, ...saved } } }).eq('id', brandId)
     return saved
   } catch { return null }
 }
