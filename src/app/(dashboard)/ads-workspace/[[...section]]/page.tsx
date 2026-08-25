@@ -4,6 +4,7 @@
  * `embedded` mode (no internal sidebar), driven by the section, with the domain taken from the active
  * brand's website. The standalone /ads-studio?domain=… (audit-funnel landing) is unchanged.
  */
+import { redirect } from 'next/navigation'
 import AdsStudio from '@/components/ads/AdsStudio'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
@@ -17,12 +18,14 @@ const SEG_TO_SECTION: Record<string, Key> = {
   calendar: 'calendar', search: 'search', google: 'google',
 }
 
-export default async function AdsWorkspacePage({ params }: { params: Promise<{ section?: string[] }> }) {
+export default async function AdsWorkspacePage({ params, searchParams }: { params: Promise<{ section?: string[] }>; searchParams: Promise<{ built?: string }> }) {
   const { section: segs } = await params
+  const sp = await searchParams
   const seg = (segs?.[0] || '').toLowerCase()
   const section: Key = SEG_TO_SECTION[seg] || 'home'
 
   let website = ''
+  let warmed = false
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -30,11 +33,17 @@ export default async function AdsWorkspacePage({ params }: { params: Promise<{ s
       const admin = createAdminClient() as any
       const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
       if (brandId) {
-        const { data } = await admin.from('brands').select('website').eq('id', brandId).maybeSingle()
+        const { data } = await admin.from('brands').select('website, brand_kit').eq('id', brandId).maybeSingle()
         website = (data?.website || '').trim()
+        warmed = !!(data?.brand_kit as any)?.adsStudio?.warmedAt
       }
     }
   } catch { /* AdsStudio falls back to the sf_scan_domain cookie */ }
+
+  // First arrival with a known store but nothing built yet → run the "Building your studio" screen so the
+  // whole workspace (brand kit, products, audiences, competitors, templates) is ready on reveal. `built=1`
+  // (set when that screen finishes) renders straight through, so there's no redirect loop.
+  if (website && !warmed && sp?.built !== '1') redirect('/studio-building')
 
   return <AdsStudio embedded section={section} domainOverride={website || undefined} />
 }

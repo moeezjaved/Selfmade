@@ -10,6 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 import { discoverCompetitors } from '@/lib/ads-studio/competitors'
+import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -68,14 +69,29 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 export async function GET(req: NextRequest) {
   const domain = (req.nextUrl.searchParams.get('domain') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+  const force = req.nextUrl.searchParams.get('force') === '1'
   try {
     const admin = createAdminClient() as any
 
-    // ── 1. Discover rivals from the open web, then enrich each with our ad-DNA ──
+    // Resolve the active brand up front — it scopes both the cache and the spied merge below.
+    const supa = await createClient()
+    const { data: { user } } = await supa.auth.getUser()
+    const brandId = user ? await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand') || undefined).catch(() => null) : null
+
+    // ── 1. DISCOVERED rivals (the expensive open-web pass) — cached per brand/domain so the workspace is
+    // instant after the first build. Only the discovered part is cached; spied brands stay live below. ──
     let discovered: any[] = []
     let seed: any = null
     let configured = true
-    if (domain && domain.includes('.')) {
+    let discoveryDone = false
+    if (brandId && domain && !force) {
+      const ads = await readAdsStudio(admin, brandId)
+      const cached = readSection<{ discovered: any[]; seed: any; configured: boolean }>(ads, 'competitors', domain)
+      if (cached) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
+      else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true }   // another run in-flight → serve spied-only for now
+    }
+    if (!discoveryDone && domain && domain.includes('.')) {
+      if (brandId) await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
       const res = await discoverCompetitors(domain).catch(() => null)
       if (res) {
         seed = res.seed; configured = res.configured
@@ -94,14 +110,12 @@ export async function GET(req: NextRequest) {
           }
         }))
       }
+      if (brandId) await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, { discovered, seed, configured }), competitorsBuilding: null }).catch(() => {})
     }
 
-    // ── 2. Merge in the logged-in user's manually-spied brands (existing behavior) ──
+    // ── 2. Merge in the logged-in user's manually-spied brands (always live — user can spy/unspy) ──
     let spied: any[] = []
-    const supa = await createClient()
-    const { data: { user } } = await supa.auth.getUser()
     if (user) {
-      const brandId = await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand') || undefined).catch(() => null)
       let q = admin.from('followed_brands').select('page_id, brand_name, brand_id').eq('user_id', user.id).eq('spied', true)
       if (brandId) q = q.or(`brand_id.eq.${brandId},brand_id.is.null`)
       const { data: follows } = await q.limit(30)
