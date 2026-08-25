@@ -158,7 +158,13 @@ export async function GET(_req: NextRequest) {
     if (t?.title) threat = { title: t.title }
   } catch { /* optional */ }
 
+  // Brand name + current stage for the chat-first Home standing strip.
+  let brandName = store?.shop_name || ''
+  if (brandId) { try { const { data: b } = await admin.from('brands').select('name').eq('id', brandId).maybeSingle(); if ((b as any)?.name) brandName = (b as any).name } catch { /* fallback to store name */ } }
+  const stageLabel = (stages.find((s) => s.status === 'active') || stages.find((s) => s.status !== 'done'))?.name || ''
+
   return NextResponse.json({
+    brandName, stageLabel,
     store: store ? { name: store.shop_name || store.shop_domain } : null,
     momentum, wins, banked, activeDays, nextAction, revenue,
     milestones, nextMilestone, threat,
