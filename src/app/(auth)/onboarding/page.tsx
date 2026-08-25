@@ -253,6 +253,17 @@ export default function InterviewPage() {
   const brandIdRef = useRef<string | null>(null)
   const homeworkFired = useRef(false)
   const nightFired = useRef(false)
+  // Website-capture funnel (landing "See your ads" form drops sf_scan_domain): seed the site into the
+  // interview and remember to land them in the ads workspace (templates already built) when done.
+  const fromSiteFunnel = useRef(false)
+  useEffect(() => {
+    try {
+      const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/)
+      const d = m ? decodeURIComponent(m[1]).trim() : ''
+      if (d) { fromSiteFunnel.current = true; setUrl((u) => u || d) }
+    } catch { /* ignore */ }
+  }, [])
+  const doneDest = () => (fromSiteFunnel.current ? '/ads-workspace' : '/brief?welcome=1')
 
   // Resume, don't restart — persist progress so a browser back/refresh returns to the same step with the
   // same answers, instead of throwing the founder back to the welcome screen. (#5)
@@ -801,7 +812,7 @@ export default function InterviewPage() {
                   <p style={{ ...sub, color: '#7d8a7c', marginTop: 24 }}>The team studies your market all night — competitors, angles, everything that wins. But I already have a first read for you.</p>
                   {/* Section 4 (show, then sell): the promised payoff must BE the payoff. This opens the real
                       first brief; the plan ask is sequenced after value, as a card inside ?welcome=1. */}
-                  <button style={{ ...btnMain, background: '#ef4a1e', color: '#fff', marginTop: 18 }} onClick={() => router.push('/brief?welcome=1')}>Read my first briefing →</button>
+                  <button style={{ ...btnMain, background: '#ef4a1e', color: '#fff', marginTop: 18 }} onClick={() => router.push(doneDest())}>{fromSiteFunnel.current ? 'See your ads →' : 'Read my first briefing →'}</button>
                 </>
               )}
             </div>
@@ -819,7 +830,7 @@ export default function InterviewPage() {
                   <div style={planName}>Free</div>
                   <div style={planPrice}>$0<span style={planPer}>/mo</span></div>
                   <div style={planFeat}>75 free credits (~5 image ads)<br />Spy on 1 competitor<br />Daily brief from Mello</div>
-                  <button style={{ ...btnGhost, width: '100%', marginTop: 14 }} onClick={() => router.push('/brief')}>Start on Free →</button>
+                  <button style={{ ...btnGhost, width: '100%', marginTop: 14 }} onClick={() => router.push(doneDest())}>Start on Free →</button>
                 </div>
                 {/* Full-time — the ONE paid plan ($49/mo). Tiers collapsed to Polsia-simple. */}
                 <div style={{ ...planCard, border: `2px solid ${SELBORDER}`, background: SELBG }}>
@@ -831,7 +842,7 @@ export default function InterviewPage() {
                 </div>
               </div>
               <p style={{ ...sub, marginTop: 16 }}>Prefer to pay as you go? You can buy credits anytime — no subscription.</p>
-              <button style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontFamily: 'inherit' }} onClick={() => router.push('/brief')}>Skip for now — I’ll start free →</button>
+              <button style={{ background: 'none', border: 'none', color: MUTED, fontSize: 13, fontWeight: 700, cursor: 'pointer', marginTop: 14, fontFamily: 'inherit' }} onClick={() => router.push(doneDest())}>Skip for now — I’ll start free →</button>
             </div>
           )}
         </div>
