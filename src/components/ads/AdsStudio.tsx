@@ -642,7 +642,7 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
 type CompAd = { id: string; thumb: string | null; copy: string; format: string | null; active: boolean }
 type CompDna = { hooks: string[]; angles: string[]; personas: string[] }
 type Comp = { source: 'discovered' | 'spied'; pageId?: string | null; domain?: string | null; name: string; reason?: string; hasAdDna: boolean; adsSource?: 'corpus' | 'live' | null; spyable: boolean; adCount: number; ads: CompAd[]; dna: CompDna | null; checked?: boolean }
-type CompSeed = { name: string; category: string; market: string; queries: string[] } | null
+type CompSeed = { name: string; category: string; market: string; productForms?: string[]; queries: string[] } | null
 function DnaRow({ label, items }: { label: string; items: string[] }) {
   if (!items?.length) return null
   return (
@@ -756,6 +756,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   const [seed, setSeed] = useState<CompSeed>(null)
   const [q, setQ] = useState('')
   const [step, setStep] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
   useEffect(() => {
     let on = true
     setComps(null); setStep(0)
@@ -763,6 +764,18 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
     fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => { if (!on) return; setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null) }).catch(() => on && setComps([]))
     return () => { on = false; clearInterval(tick) }
   }, [domain])
+
+  // Force a fresh discovery pass (bypasses the per-brand cache) — used after a brand adds products, so
+  // the search re-runs across ALL current product lines instead of the cached single-line result.
+  const refresh = async () => {
+    if (!domain || refreshing) return
+    setRefreshing(true); setComps(null); setStep(0)
+    try {
+      const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}&force=1`).then((r) => r.json())
+      setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null)
+    } catch { setComps([]) }
+    setRefreshing(false)
+  }
 
   const spy = async (c: Comp) => {
     const p = new URLSearchParams()
@@ -777,8 +790,20 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   return (
     <div>
       <Header title="My Competitors" isMobile={isMobile} action="+ Spy new brand" onAction={() => { window.location.href = '/discovery/brand-spy' }} />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>
-        We found your real rivals{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''} across the web <b style={{ color: INK }}>and the Meta Ad Library</b>, then pulled their <b style={{ color: INK }}>live ads &amp; ad strategy</b>.
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, marginTop: -8, marginBottom: 14 }}>
+        <div style={{ color: SUB, fontSize: 14, flex: 1 }}>
+          We found your real rivals{seed?.category ? <> in <b style={{ color: INK }}>{seed.category}</b></> : ''}{seed?.market ? <> — {seed.market}</> : ''} across the web <b style={{ color: INK }}>and the Meta Ad Library</b>, then pulled their <b style={{ color: INK }}>live ads &amp; ad strategy</b>.
+          {seed?.productForms && seed.productForms.length > 1 && (
+            <span> Searched across <b style={{ color: INK }}>{seed.productForms.length} product lines</b>: {seed.productForms.join(', ')}.</span>
+          )}
+        </div>
+        <button
+          onClick={refresh} disabled={refreshing || !domain} title="Re-run discovery across all your current products"
+          style={{ flex: 'none', display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: refreshing || !domain ? 'default' : 'pointer', fontFamily: SANS, opacity: refreshing || !domain ? 0.6 : 1 }}
+        >
+          <span style={{ display: 'inline-block', animation: refreshing ? 'sfspin .8s linear infinite' : undefined }}>↻</span>
+          {refreshing ? 'Refreshing…' : 'Refresh'}
+        </button>
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
