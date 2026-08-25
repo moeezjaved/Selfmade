@@ -9,7 +9,7 @@
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
-import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film } from 'lucide-react'
+import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film, Search } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
 import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
@@ -84,6 +84,8 @@ function Generations() {
   const [gens, setGens] = useState<Gen[] | null>(null)
   const [filter, setFilter] = useState<'all' | 'clone' | 'edit' | 'inspired'>('all')
   const [open, setOpen] = useState<Gen | null>(null)
+  const [q, setQ] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
   const router = useRouter()
   // A draft has no output yet — clicking it should take the user back to the source ad to finish the
   // remake (drafts can't be generated from here). Falls back to Discovery if we don't have the source id.
@@ -121,10 +123,50 @@ function Generations() {
     return () => clearInterval(t)
   }, [gens, load])
 
-  const shown = (gens || []).filter((g) => filter === 'all' || g.type === filter)
+  const titleOf = (g: Gen) => (g.brand_name || g.prompt || 'Untitled')
+  const matchesQ = (g: Gen) => !q.trim() || titleOf(g).toLowerCase().includes(q.trim().toLowerCase())
+  const shown = (gens || []).filter((g) => (filter === 'all' || g.type === filter) && matchesQ(g))
+  const searchHits = q.trim() ? (gens || []).filter((g) => g.image_url && matchesQ(g)).slice(0, 8) : []
+  const dl = (g: Gen) => { if (g.image_url) window.location.href = `/api/download?url=${encodeURIComponent(g.image_url)}&name=selfmade-ad.png` }
 
   return (
     <div>
+      {/* Search — Lapis-style bar + live results popup */}
+      <div style={{ position: 'relative', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid #e3e6e3', background: '#fff', borderRadius: 14, padding: '12px 16px' }}>
+          <Search size={18} color="#9ca3af" />
+          <input
+            value={q} onChange={(e) => { setQ(e.target.value); setSearchOpen(true) }}
+            onFocus={() => setSearchOpen(true)} onBlur={() => setTimeout(() => setSearchOpen(false), 150)}
+            placeholder="Search your ads…"
+            style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: DARK, fontFamily: 'inherit' }}
+          />
+          {q && <button onClick={() => setQ('')} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex' }}><X size={16} /></button>}
+        </div>
+        {searchOpen && q.trim() && (
+          <div style={{ position: 'absolute', top: 'calc(100% + 8px)', left: 0, right: 0, background: '#fff', border: '1px solid #e3e6e3', borderRadius: 16, boxShadow: '0 24px 60px -20px rgba(0,0,0,.28)', padding: 8, zIndex: 30, maxHeight: 380, overflowY: 'auto' }}>
+            {searchHits.length === 0 ? (
+              <div style={{ padding: '18px 12px', textAlign: 'center', color: '#9ca3af', fontSize: 13.5 }}>No ads match “{q}”.</div>
+            ) : searchHits.map((g) => (
+              <div key={g.id} onMouseDown={(e) => e.preventDefault()} onClick={() => { openGen(g); setSearchOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: 8, borderRadius: 12, cursor: 'pointer' }} onMouseEnter={(e) => (e.currentTarget.style.background = '#f6f6f4')} onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                <div style={{ width: 48, height: 48, borderRadius: 8, overflow: 'hidden', background: '#0d120e', flex: 'none' }}>
+                  {g.media_type === 'video'
+                    ? <video src={g.image_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    : <img src={g.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                </div>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 700, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleOf(g)}</div>
+                  <div style={{ fontSize: 11.5, color: '#9ca3af', textTransform: 'capitalize' }}>{g.type === 'clone' ? 'Remake' : g.type} · {g.media_type === 'video' ? 'Video' : 'Image'}</div>
+                </div>
+                <button onClick={(e) => { e.stopPropagation(); dl(g) }} title="Download" style={{ width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#141d15', color: '#fff', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Download size={15} /></button>
+              </div>
+            ))}
+            <div style={{ textAlign: 'center', fontSize: 12, color: '#9ca3af', padding: '8px 0 4px' }}>{searchHits.length} result{searchHits.length === 1 ? '' : 's'} found</div>
+          </div>
+        )}
+      </div>
+
       <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
         {(['all', 'clone', 'edit', 'inspired'] as const).map((f) => (
           <button key={f} onClick={() => setFilter(f)} style={{ padding: '5px 12px', borderRadius: 20, border: `1px solid ${filter === f ? '#ef4a1e' : '#cbd5cb'}`, background: filter === f ? '#ef4a1e' : '#fff', color: filter === f ? '#fff' : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>{f === 'clone' ? 'remake' : f}</button>
