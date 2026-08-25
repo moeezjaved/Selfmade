@@ -18,7 +18,7 @@ import { llm } from '@/lib/llm'
 
 export type DiscoveredCompetitor = { domain: string; name: string; reason: string; foundVia: string; positions: number; pageId: string | null; liveAds: LiveAd[] }
 export type DiscoveryResult = {
-  seed: { name: string; category: string; market: string; queries: string[] }
+  seed: { name: string; category: string; market: string; productForms?: string[]; queries: string[] }
   competitors: DiscoveredCompetitor[]
   configured: boolean
 }
@@ -41,10 +41,10 @@ function domainRoot(d: string) { return d.replace(/^www\./, '').toLowerCase() }
  * and the exact brand-discovery queries a shopper types to find true alternatives. Grounding in the Brand-Kit
  * facts is what makes discovery accurate: it pins the specific product FORM (e.g. "non-electronic flavored-air
  * aromatherapy device"), not a loose category ("nicotine-free vape"). */
-async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; queries: string[]; adKeywords: string[] }> {
+async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; productForms: string[]; queries: string[]; adKeywords: string[] }> {
   const products = ctx.products.slice(0, 12).map((p) => p.title).join(' | ') || ctx.description
   const knowledge = facts.length ? facts.slice(0, 18).map((f) => `- ${f}`).join('\n') : '(none)'
-  const prompt = `You are a DTC market analyst finding a store's TRUE competitors. Accuracy depends on pinning the PRECISE product form, not a loose category. Use the brand knowledge below — it describes what the product actually is.
+  const prompt = `You are a DTC market analyst finding a store's TRUE competitors. A brand often sells SEVERAL distinct product lines (e.g. testosterone GUMMIES and testosterone TABLETS, or a supplement brand with 10 products) — you must cover EVERY line, not just the one that appears most. Accuracy depends on pinning each PRECISE product form, not one loose category.
 
 STORE: ${ctx.siteName} (${ctx.domain})
 DESCRIPTION: ${ctx.description || '(none)'}
@@ -53,26 +53,29 @@ SIGNALS (currency / payment / geography read off the site): ${ctx.signals.join('
 BRAND KNOWLEDGE (distilled from their real site):
 ${knowledge}
 
-First, identify the SPECIFIC product form and mechanism (e.g. "non-electronic flavored-air aromatherapy inhaler with replaceable cores", NOT just "nicotine-free vape"). Competitors must make the SAME KIND of product, not merely serve the same goal.
+Step 1 — list the DISTINCT product lines/forms this store sells (look at PRODUCTS above): e.g. ["testosterone support gummies","testosterone support tablets"]. Group near-identical variants (flavors/sizes) into ONE line. Return 1-5 lines — the real breadth of the catalog, not just the hero product.
+Step 2 — competitors must make the SAME KIND of product as one of these lines (same form, not merely the same goal).
 
 Return ONLY JSON:
 {
- "category":"the precise 4-8 word product niche (the specific FORM, not the broad goal)",
+ "category":"the brand's overall niche at BRAND level — broad enough to span ALL the lines below (e.g. 'natural testosterone support supplements', NOT just 'gummies')",
  "market":"the primary country the store sells to (infer from signals; US/global if none)",
- "queries":["6-8 Google queries that surface COMPETING BRANDS making this exact kind of product. Mix: exact-form queries ('<precise form> brands', 'buy <precise form>'), close synonyms shoppers use for this form, and 'alternatives to <product/category>'. Prefer the specific form wording over the generic goal so you find same-kind makers, not loosely-related products."],
- "adKeywords":["3-4 SHORT keyword phrases (1-3 words EACH) naming the product FORM the way it appears in ad copy — e.g. 'flavored air', 'aromatherapy inhaler', 'nicotine free inhaler'. These are for a Meta Ad Library keyword search, so they must be short and broad — NOT full sentences, NOT 'brands'/'buy'/'best' queries. Just the core product noun phrase and its close synonyms."]
+ "productForms":["each distinct product line/form from Step 1 — 1-5 short phrases"],
+ "queries":["8 Google queries that surface COMPETING BRANDS. COVER EVERY product line above — include at least one exact-form query per line ('<line> brands', 'buy <line>') plus a couple brand-level 'alternatives to <brand/category>' queries. Do NOT over-index on a single line."],
+ "adKeywords":["one SHORT keyword phrase (1-3 words EACH) PER product line above, naming the core product noun as it appears in ad copy — e.g. 'testosterone gummies', 'testosterone tablets', 'shilajit supplement'. Short and broad for a Meta Ad Library search — NOT 'brands'/'buy'/'best' queries. Max 5."]
 }`
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 800, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 900, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
     return {
       category: String(j?.category || '').slice(0, 80),
       market: String(j?.market || '').slice(0, 40),
-      queries: (Array.isArray(j?.queries) ? j.queries : []).map((q: any) => String(q).slice(0, 90)).filter(Boolean).slice(0, 8),
-      adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 4),
+      productForms: (Array.isArray(j?.productForms) ? j.productForms : []).map((q: any) => String(q).slice(0, 50)).filter(Boolean).slice(0, 5),
+      queries: (Array.isArray(j?.queries) ? j.queries : []).map((q: any) => String(q).slice(0, 90)).filter(Boolean).slice(0, 10),
+      adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 5),
     }
-  } catch { return { category: '', market: '', queries: [], adKeywords: [] } }
+  } catch { return { category: '', market: '', productForms: [], queries: [], adKeywords: [] } }
 }
 
 /** Step 5 — LLM keeps only the real product competitors (same product FORM) and says why each competes. */
@@ -107,14 +110,15 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   // exact product niche (Lapis-level accuracy), instead of a loose category guess off the thin crawl.
   const [ctx, kit] = await Promise.all([crawlStore(domain), buildBrandKit(domain).catch(() => null)])
   const facts = kit?.facts ?? []
-  const { category, market, queries, adKeywords } = await seedQueries(ctx, facts)
-  if (!configured || !queries.length) return { seed: { name: ctx.siteName, category, market, queries }, competitors: [], configured }
+  const { category, market, productForms, queries, adKeywords } = await seedQueries(ctx, facts)
+  if (!configured || !queries.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured }
 
   const loc = MARKET_LOCATION[market.trim().toLowerCase()] ?? 2840
   const self = domainRoot(domain)
 
-  // Step 3–4: search every query in the store's market, pool candidate brand domains.
-  const serps = await Promise.all(queries.slice(0, 6).map((q) => serpDiscover(q, loc)))
+  // Step 3–4: search every query in the store's market, pool candidate brand domains. Queries span ALL
+  // the brand's product lines (gummies AND tablets, etc.) so a multi-product brand isn't reduced to one.
+  const serps = await Promise.all(queries.slice(0, 8).map((q) => serpDiscover(q, loc)))
   const pool = new Map<string, { domain: string; title: string; snippet: string; positions: number; hits: number }>()
   serps.forEach((rows) => rows.forEach((r) => {
     const d = domainRoot(r.domain)
@@ -137,7 +141,8 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   // ── Meta Ad Library: keyword-search the niche → advertiser pool (live ads + BREADTH Google organic misses).
   // Short keywords + country=ALL (the Ad Library search wants broad phrases, not full Google queries). ──
   const country = 'ALL'
-  const adQueries = (adKeywords.length ? adKeywords : [category]).filter(Boolean).slice(0, 2)
+  // One keyword per product line (up to 4) so each line's advertisers are found — not just the hero line.
+  const adQueries = (adKeywords.length ? adKeywords : [category]).filter(Boolean).slice(0, 4)
   const advByPage = new Map<string, Advertiser>()
   try {
     const found = (await Promise.all(adQueries.map((q) => searchAdLibrary(q, country).catch(() => [] as Advertiser[])))).flat()
@@ -181,7 +186,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   }
 
   return {
-    seed: { name: ctx.siteName, category, market, queries },
+    seed: { name: ctx.siteName, category, market, productForms, queries },
     competitors: [...competitors, ...extra],
     configured,
   }
