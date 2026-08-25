@@ -261,9 +261,9 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
             <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
           ) : (
             <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '92%', display: 'flex', gap: 11 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 100, background: ORANGE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, fontSize: 15, flex: 'none', marginTop: 2 }}>S</div>
+              <div style={{ width: 30, height: 30, borderRadius: 100, background: ORANGE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, fontSize: 15, flex: 'none', marginTop: 2 }}>M</div>
               <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>Ad Studio</div>
+                <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>Mello</div>
                 {m.loading ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14, padding: '4px 0' }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Designing your {m.format} ad… this takes ~30–60s.</div>
                 ) : m.error ? (
@@ -345,7 +345,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   return (
     <div style={{ marginTop: 48 }}>
       <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
-      <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and the Studio builds it right here.</p>
+      <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 16 }}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
           <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
@@ -625,7 +625,7 @@ function Discover({ isMobile }: { isMobile: boolean }) {
   return (
     <div>
       <Header title="Discover" isMobile={isMobile} />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>Trending creative from across the community — hit <b style={{ color: INK }}>Create Similar</b> and the Studio builds your version right here.</div>
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 14 }}>Trending creative from across the community — hit <b style={{ color: INK }}>Create Similar</b> and Mello builds your version in the chat.</div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '14px 18px' }}>
         <Icon d="M11 4a7 7 0 105 12l4 4" size={18} />
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search ads by brand, product, style…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
