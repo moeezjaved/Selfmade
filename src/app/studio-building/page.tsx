@@ -1,12 +1,12 @@
 /**
- * /studio-building — the "wow" build-and-reveal screen shown right after the website funnel + onboarding.
- * It pre-generates the whole studio (brand kit, products, competitors, and the free ad templates) against
- * the new brand's website and only reveals /ads-workspace once the visible set is ready — the rest keep
- * generating in the background (each POST caches into brands.brand_kit.adsStudio.templates, so when the
- * workspace opens its own genAll finds them already done and shows them instantly).
+ * /studio-building — the "wow" full-screen build-and-reveal shown right after the website funnel +
+ * onboarding. Deliberately TOP-LEVEL (not in the (dashboard) group) so it renders full-bleed with no
+ * sidebar chrome — the app chrome only appears at the reveal. Pre-generates the whole studio against the
+ * new brand's website and reveals /ads-workspace once the visible set is ready (see StudioBuilding).
  *
- * Domain is resolved from the active brand's website (same as the ads-workspace page); if we can't resolve
- * one, there's nothing to build, so we send the user straight to the workspace.
+ * Auth is handled here (this path isn't in the middleware PROTECTED list): no session → /login; no
+ * resolvable brand website → straight to /ads-workspace (nothing to pre-build). Redirects run OUTSIDE
+ * the try/catch — next/navigation redirect() throws a control-flow signal that a catch would swallow.
  */
 import { redirect } from 'next/navigation'
 import StudioBuilding from '@/components/ads/StudioBuilding'
@@ -16,11 +16,13 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 export const dynamic = 'force-dynamic'
 
 export default async function StudioBuildingPage() {
+  let authed = false
   let website = ''
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
+      authed = true
       const admin = createAdminClient() as any
       const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
       if (brandId) {
@@ -28,8 +30,9 @@ export default async function StudioBuildingPage() {
         website = (data?.website || '').trim()
       }
     }
-  } catch { /* fall through to workspace */ }
+  } catch { /* handled by the redirects below */ }
 
+  if (!authed) redirect('/login')
   if (!website) redirect('/ads-workspace')
   return <StudioBuilding domain={website} />
 }
