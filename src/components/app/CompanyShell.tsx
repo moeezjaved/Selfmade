@@ -6,12 +6,14 @@
  * groups; SEO + Intel sit dimmed under a "Grows with your stage" divider (stage logic lands later).
  * The old AppShell is untouched (rollback at ?shell=v1). See docs/…/unified-shell-v2-design.md.
  */
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
-import { Home, Inbox, Map, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X } from 'lucide-react'
+import { usePathname, useRouter } from 'next/navigation'
+import { Home, Inbox, Map, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits } from '@/components/credits/CreditCounter'
+import { createClient } from '@/lib/supabase/client'
+import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', ORANGE = '#e02f06', ORANGE_WASH = '#fdeee9', MUTED = '#b9b1a3'
@@ -57,12 +59,44 @@ const NAV: Group[] = [
   ] },
 ]
 
+// The account/settings menu that opens from the bottom of the sidebar. Same destinations the old
+// AppShell avatar carried (Settings · Billing · Connectors · Team · Activity · Support · Log out).
+const ACCT: { href: string; label: string; icon: React.ElementType; external?: boolean }[] = [
+  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/billing', label: 'Billing & plan', icon: CreditCard },
+  { href: '/connect/meta', label: 'Connect Meta', icon: Plug },
+  { href: '/connect/shopify', label: 'Connect Shopify', icon: Store },
+  { href: '/team', label: 'Team & members', icon: Users },
+  { href: '/activity', label: 'Activity log', icon: ClipboardList },
+  { href: '/contact', label: 'Support & feedback', icon: LifeBuoy },
+]
+
 export default function CompanyShell({ brands, activeBrand, children }: { brands: { id: string; name: string }[]; activeBrand: string; children: React.ReactNode }) {
   const pathname = usePathname() || ''
+  const router = useRouter()
   const isMobile = useIsMobile()
   const [open, setOpen] = useState(false)
+  const [acctOpen, setAcctOpen] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const { plan } = useCredits()
   const isPaid = !!plan && plan !== 'free'
+
+  const supabase = createClient()
+  useEffect(() => {
+    let on = true
+    supabase.auth.getSession().then(({ data: { session } }) => { if (on) setUser(session?.user ?? null) })
+    return () => { on = false }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const signOut = async () => {
+    try { document.cookie = 'sm_onb=; path=/; max-age=0; samesite=lax' } catch { /* ignore */ }
+    await supabase.auth.signOut(); router.push('/login')
+  }
+
+  const initials = (user?.user_metadata?.full_name as string)?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
+    || user?.email?.[0]?.toUpperCase() || 'A'
+  const displayName = (user?.user_metadata?.full_name as string) || user?.email || 'Your account'
+  const planLabel = isPaid ? `${(plan || '').replace(/^\w/, (c) => c.toUpperCase())} plan` : 'Free plan'
 
   // Most-specific match wins, so /ads-workspace/competitors lights "My Competitors", not "Ad Studio".
   const bestMatch = NAV.flatMap((g) => g.items.map((i) => i.href))
@@ -98,9 +132,35 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
         </div>
       ))}
 
-      <div style={{ marginTop: 'auto', paddingTop: 14 }}>
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 11, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, color: SUB, textAlign: 'center', marginBottom: 8 }}>⚡ {isPaid ? `${(plan || '').replace(/^\w/, (c) => c.toUpperCase())} plan` : 'Free plan'}</div>
-        {!isPaid && <a href="/hire" style={{ display: 'block', background: ORANGE, color: '#fff', borderRadius: 11, padding: '9px 12px', fontSize: 12.5, fontWeight: 800, textAlign: 'center', textDecoration: 'none' }}>Hire the team →</a>}
+      <div style={{ marginTop: 'auto', paddingTop: 14, position: 'relative' }}>
+        {!isPaid && <a href="/hire" style={{ display: 'block', background: ORANGE, color: '#fff', borderRadius: 11, padding: '9px 12px', fontSize: 12.5, fontWeight: 800, textAlign: 'center', textDecoration: 'none', marginBottom: 8 }}>Hire the team →</a>}
+
+        {/* Account row — click to open the settings/billing/connectors menu above it. */}
+        <button onClick={() => setAcctOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', borderRadius: 11, border: `1px solid ${LINE}`, background: acctOpen ? ORANGE_WASH : '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: SANS }}>
+          <div style={{ width: 30, height: 30, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 12.5, flex: 'none' }}>{initials}</div>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{displayName}</div>
+            <div style={{ fontSize: 10.5, color: SUB, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{planLabel}</div>
+          </div>
+          <ChevronsUpDown size={15} style={{ flex: 'none', color: SUB }} />
+        </button>
+
+        {acctOpen && (
+          <>
+            <div onClick={() => setAcctOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 59 }} />
+            <div style={{ position: 'absolute', left: 0, right: 0, bottom: 'calc(100% - 6px)', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, boxShadow: '0 14px 44px rgba(20,20,16,.16)', zIndex: 60, overflow: 'hidden', padding: '6px' }}>
+              {ACCT.map((it) => {
+                const Icon = it.icon
+                const row = { display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, textDecoration: 'none', color: '#43403a', fontWeight: 600, fontSize: 13, fontFamily: SANS } as const
+                return it.external
+                  ? <a key={it.href} href={it.href} target="_blank" rel="noreferrer" onClick={() => setAcctOpen(false)} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</a>
+                  : <Link key={it.href} href={it.href} onClick={() => { setAcctOpen(false); setOpen(false) }} style={row}><Icon size={16} style={{ flex: 'none', color: SUB }} />{it.label}</Link>
+              })}
+              <div style={{ height: 1, background: LINE, margin: '5px 6px' }} />
+              <button onClick={signOut} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 11, padding: '9px 10px', borderRadius: 9, border: 'none', background: 'none', cursor: 'pointer', color: '#c23b1c', fontWeight: 700, fontSize: 13, fontFamily: SANS, textAlign: 'left' }}><LogOut size={16} style={{ flex: 'none' }} />Log out</button>
+            </div>
+          </>
+        )}
       </div>
     </aside>
   )
