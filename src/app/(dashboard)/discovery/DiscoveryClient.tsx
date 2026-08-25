@@ -2085,9 +2085,7 @@ export default function DiscoveryPage() {
         {/* Preset chips (GetHookd-style quick filter combos) */}
         <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center', marginBottom: 2 }}>
           {[
-            { label: '🏆 Best of the Month', tip: 'The top-percentile ads of the last 30 days. "Winning" = ranked across our whole library by how long an ad runs (advertisers kill losers fast), how often the brand re-runs the same creative, and brand scale — must run ≥14 days. Meta doesn’t publish impressions, so we rank by signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setNiches([]); setTimeDays(0); setSort('performance') }, sig: () => tiers.includes('winning') && sort === 'performance' },
             { label: '🔥 Winning ads', tip: 'Ads in the top percentile of our library. Scored by longevity (how long it runs), creative reuse (how often the brand re-runs it), and brand scale — must run ≥14 days to qualify. Meta hides impressions, so we rank by public signals advertisers can’t fake.', apply: () => { setTiers(['winning']); setSort('performance') }, sig: () => tiers.includes('winning') && sort === 'performance' },
-            { label: '📊 Brands · 100+ active ads', apply: () => { setMinBrandAdsStr('100') }, sig: () => minBrandAdsStr === '100' },
           ].map((p: { label: string; tip?: string; apply: () => void; sig: () => boolean }) => {
             // A chip is "selected" when the user clicked it AND its underlying filter is still applied
             // (so changing a dropdown that removes the filter clears the highlight; the clicked-tracking
@@ -2155,8 +2153,6 @@ export default function DiscoveryPage() {
 
           {/* Numeric thresholds — grouped in a subtle container so they read as one set, not scattered */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, rowGap: 6, flexWrap: 'wrap', maxWidth: '100%', padding: '4px 8px', background: '#fff', border: '1px solid #efece2', borderRadius: 14, flexShrink: 1 }}>
-            <NumberInput label="Run ≥ days" value={minDaysStr} onChange={setMinDaysStr} placeholder="0" />
-            <NumberInput label="Brand ads ≥" value={minBrandAdsStr} onChange={setMinBrandAdsStr} placeholder="0" />
             <NumberInput label="Reuse ≥" value={minReuseStr} onChange={setMinReuseStr} placeholder="0" />
             <NumberInput label="Ads/brand" value={adsPerBrandStr} onChange={setAdsPerBrandStr} placeholder="3" />
           </div>
