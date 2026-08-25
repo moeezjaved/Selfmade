@@ -92,12 +92,6 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
                           : active === 'google' ? <Gated title="Google Ads" blurb="Generate high-performing Google Ads campaigns — keywords, ad copy and bid strategy, powered by AI." items={['AI keyword research tailored to your brand', 'Campaign generation with ad groups & keywords', 'Ad copy: headlines & descriptions optimized for Google']} />
                             : <Search isMobile={isMobile} />}
         </div>
-        {active === 'home' && !isMobile && (
-          <aside style={{ width: 300, flex: 'none', borderLeft: `1px solid ${LINE}`, background: '#fff', padding: '40px 24px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}><span style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700 }}>History</span><span style={{ color: SUB, cursor: 'pointer' }}>✕</span></div>
-            <div style={{ textAlign: 'center', color: SUB, marginTop: 60 }}><div style={{ fontSize: 30, marginBottom: 12 }}>💬</div><div style={{ fontSize: 14 }}>No conversations yet</div><div style={{ fontSize: 14, color: ORANGE, fontWeight: 700, marginTop: 8, cursor: 'pointer' }}>Start a new chat</div></div>
-          </aside>
-        )}
       </main>
     </div>
     </StudioCtx.Provider>
@@ -254,31 +248,26 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         })}
       </div>
 
-      {/* conversation */}
+      {/* conversation — prompts + status are full-width; generated ads render as a row of uniform,
+          same-size result cards (like the reference), wrapping onto the next line as more are made. */}
       {started && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 18, marginBottom: 18 }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', flexDirection: 'row', gap: 16, marginBottom: 18, alignItems: 'flex-start' }}>
           {msgs.map((m, i) => m.role === 'user' ? (
-            <div key={i} style={{ alignSelf: 'flex-end', maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
+            <div key={i} style={{ flexBasis: '100%', display: 'flex', justifyContent: 'flex-end' }}>
+              <div style={{ maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
+            </div>
+          ) : m.loading ? (
+            <div key={i} style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14, padding: '4px 0' }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Mello is designing your {m.format} ad… this takes ~30–60s.</div>
+          ) : m.error ? (
+            <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
           ) : (
-            <div key={i} style={{ alignSelf: 'flex-start', maxWidth: '92%', display: 'flex', gap: 11 }}>
-              <div style={{ width: 30, height: 30, borderRadius: 100, background: ORANGE, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: SERIF, fontWeight: 800, fontSize: 15, flex: 'none', marginTop: 2 }}>M</div>
-              <div style={{ minWidth: 0, flex: 1 }}>
-                <div style={{ fontSize: 12.5, fontWeight: 800, color: INK, marginBottom: 6 }}>Mello</div>
-                {m.loading ? (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14, padding: '4px 0' }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Designing your {m.format} ad… this takes ~30–60s.</div>
-                ) : m.error ? (
-                  <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
-                ) : (
-                  <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff', maxWidth: 360 }}>
-                    {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', display: 'block' }} />}
-                    <div style={{ padding: 12 }}>
-                      {m.caption && <div style={{ fontSize: 13, color: '#43403a', lineHeight: 1.45, marginBottom: 10 }}>{m.caption}</div>}
-                      <div style={{ display: 'flex', gap: 8 }}>
-                        {m.image && <a href={m.image} download style={{ ...primaryBtn, padding: '7px 14px', fontSize: 12.5, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
-                      </div>
-                    </div>
-                  </div>
-                )}
+            <div key={i} style={{ width: 236, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+              <div style={{ aspectRatio: '4 / 5', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />}
+              </div>
+              <div style={{ padding: 11 }}>
+                {m.caption && <div style={{ fontSize: 12, color: '#43403a', lineHeight: 1.4, marginBottom: 9, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.caption}</div>}
+                {m.image && <a href={m.image} download style={{ ...primaryBtn, display: 'inline-block', padding: '6px 13px', fontSize: 12, borderRadius: 8, textDecoration: 'none' }}>Download</a>}
               </div>
             </div>
           ))}
