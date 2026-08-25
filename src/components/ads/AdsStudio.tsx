@@ -6,6 +6,7 @@
  * (personalized templates) + section screens in our design language. Data wiring lands incrementally.
  */
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
+import { Monitor, Instagram as IgIcon, Facebook as FbIcon, Linkedin as LiIcon } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 
 type StudioTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
@@ -77,7 +78,7 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
   return (
     <StudioCtx.Provider value={{ addToChat }}>
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: embedded ? 'auto' : '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}@keyframes sfShimmer{0%{background-position:150% center}100%{background-position:-150% center}}.sf-scroll-wrap:hover .sf-scroll-btn{opacity:1}`}</style>
       {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -99,6 +100,15 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
 }
 
 const H1 = (isMobile: boolean): React.CSSProperties => ({ fontFamily: SERIF, fontSize: isMobile ? 30 : 40, fontWeight: 700, letterSpacing: '-.02em', margin: 0, color: INK })
+
+/* Format-selector brand icons (Banner / WhatsApp / Instagram / Facebook / LinkedIn), like the reference. */
+function FmtIcon({ fmt }: { fmt: AdFormat }) {
+  if (fmt === 'WhatsApp') return (
+    <svg width={17} height={17} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.45 1.32 4.95L2 22l5.25-1.38a9.9 9.9 0 004.79 1.22h.01c5.46 0 9.9-4.45 9.9-9.91C21.95 6.45 17.5 2 12.04 2zm5.8 14.18c-.25.7-1.44 1.33-1.99 1.36-.53.04-1.02.23-3.44-.72-2.9-1.14-4.75-4.1-4.9-4.29-.14-.19-1.17-1.56-1.17-2.98 0-1.42.75-2.12 1.01-2.41.26-.29.57-.36.76-.36.19 0 .38 0 .55.01.18.01.42-.07.65.5.25.6.85 2.07.92 2.22.07.15.12.32.02.51-.09.19-.14.31-.28.48-.14.17-.29.37-.42.5-.14.14-.28.29-.12.57.16.28.72 1.18 1.54 1.91 1.06.94 1.95 1.24 2.23 1.38.28.14.44.12.6-.07.16-.19.69-.8.87-1.08.18-.28.36-.23.6-.14.25.09 1.58.75 1.85.89.28.14.46.21.53.32.07.12.07.68-.18 1.38z"/></svg>
+  )
+  const I = fmt === 'Banner Ad' ? Monitor : fmt === 'Instagram' ? IgIcon : fmt === 'Facebook' ? FbIcon : fmt === 'LinkedIn' ? LiIcon : null
+  return I ? <I size={17} strokeWidth={2} /> : null
+}
 const primaryBtn: React.CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 12, padding: '12px 20px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer', fontFamily: SANS }
 
 /* ── Home ───────────────────────────────────────────────────────────────── */
@@ -237,14 +247,13 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
 
   return (
     <div style={{ maxWidth: 1040, margin: '0 auto' }}>
-      {!started && <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}><h1 style={{ ...H1(isMobile), fontSize: isMobile ? 40 : 58 }}>Start with an idea</h1></div>}
+      {!started && <div style={{ textAlign: 'center', paddingTop: isMobile ? 8 : 24 }}><h1 style={{ margin: 0, fontFamily: "'Playfair Display', 'Times New Roman', serif", fontWeight: 500, fontStyle: 'normal', fontSize: isMobile ? 42 : 58, lineHeight: 1.02, letterSpacing: '-0.03em', backgroundImage: 'linear-gradient(100deg, #1a1410 32%, #d3ad7f 50%, #1a1410 68%)', backgroundSize: '220% auto', WebkitBackgroundClip: 'text', backgroundClip: 'text', color: 'transparent', WebkitTextFillColor: 'transparent', animation: 'sfShimmer 2.4s ease-out .12s 1 both' }}>Start with an idea</h1></div>}
 
       {/* format selector */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center', margin: started ? '0 0 16px' : '28px 0 18px' }}>
         {CHANNELS.map((c) => {
           const on = format === c
-          const ic: Record<AdFormat, string> = { 'Banner Ad': '🖥', WhatsApp: '💬', Instagram: '📷', Facebook: 'f', LinkedIn: 'in' }
-          return <button key={c} onClick={() => setFormat(c)} style={{ border: `1px solid ${on ? ORANGE : LINE}`, background: on ? '#fdeee9' : '#fff', color: on ? ORANGE : INK, borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: on ? 800 : 600, cursor: 'pointer', fontFamily: SANS, display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 13 }}>{ic[c]}</span>{c}</button>
+          return <button key={c} onClick={() => setFormat(c)} style={{ border: `1px solid ${on ? ORANGE : LINE}`, background: on ? '#fdeee9' : '#fff', color: on ? ORANGE : INK, borderRadius: 12, padding: '10px 16px', fontSize: 14, fontWeight: on ? 800 : 600, cursor: 'pointer', fontFamily: SANS, display: 'flex', alignItems: 'center', gap: 8 }}><FmtIcon fmt={c} />{c}</button>
         })}
       </div>
 
@@ -285,7 +294,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
       {!started && <HomeDiscoverRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
       {!started && <HomeProductsRow products={products} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
-      {!started && <HomeCompetitorsRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
+      {!started && <HomeCompetitorsRow domain={domain} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
     </div>
   )
@@ -338,10 +347,12 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
     <div style={{ marginTop: 48 }}>
       <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 24 : 30, fontWeight: 700, margin: '0 0 4px' }}>Personalized templates</h2>
       <p style={{ color: SUB, fontSize: 14.5, margin: '0 0 20px' }}>Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.</p>
-      <div className="sf-hrow" style={{ display: 'flex', gap: 16, overflowX: 'auto', paddingBottom: 8 }}>
+      <HScroll gap={16}>
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 244, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
-            <div style={{ aspectRatio: '4/5', background: t?.image ? '#fff' : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
+          <div key={i} className="sf-disc" onClick={() => t && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
+            {/* Title on top, like the reference — no description below. */}
+            <div style={{ padding: '11px 14px 9px', fontSize: 14, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t?.title || '…'}</div>
+            <div style={{ aspectRatio: '4/5', background: t?.image ? PAPER : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
               {t?.image ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
                 <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
@@ -350,20 +361,14 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
                   <span style={{ width: 26, height: 26, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>Generating…</span>
                 </>
-              ) : (
-                <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700, color: INK, padding: 20, textAlign: 'center' }}>{t?.title || ''}</span>
-              )}
+              ) : null}
               {t?.image && !t.generating && (
                 <button className="sf-disc-over" onClick={(e) => { e.stopPropagation(); genOne(i, true) }} title="Regenerate" style={{ position: 'absolute', top: 8, right: 8, opacity: 0, transition: 'opacity .15s', border: 'none', background: 'rgba(0,0,0,.55)', color: '#fff', borderRadius: 100, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 5 }}>↻ Regenerate</button>
               )}
             </div>
-            <div style={{ padding: 14 }}>
-              <div style={{ fontSize: 14.5, fontWeight: 800, color: INK }}>{t?.title || '…'}</div>
-              {t?.concept && <div style={{ fontSize: 12.5, color: SUB, marginTop: 3, lineHeight: 1.45, maxHeight: 54, overflow: 'hidden' }}>{t.concept}</div>}
-            </div>
           </div>
         ))}
-      </div>
+      </HScroll>
     </div>
   )
 }
@@ -399,7 +404,7 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
       <h2 style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 26, fontWeight: 700, margin: '0 0 4px' }}>Elements</h2>
       <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>People &amp; props to drop into your creative. Add a face or scene, then tag it in the chat.</p>
       <input ref={fileRef} type="file" accept="image/*" onChange={add} style={{ display: 'none' }} />
-      <div className="sf-hrow" style={{ display: 'flex', gap: 12, overflowX: 'auto', paddingBottom: 8 }}>
+      <HScroll gap={12}>
         <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
           {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
           <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
@@ -414,7 +419,24 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
             </div>
           </div>
         ))}
-      </div>
+      </HScroll>
+    </div>
+  )
+}
+
+/* ── Horizontal scroll row with side arrow buttons (appear on hover), Lapis-style ── */
+function HScroll({ children, gap = 14 }: { children: React.ReactNode; gap?: number }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [edge, setEdge] = useState({ start: true, end: false })
+  const update = () => { const el = ref.current; if (!el) return; setEdge({ start: el.scrollLeft <= 4, end: el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 }) }
+  useEffect(() => { update(); const el = ref.current; if (!el) return; const ro = new ResizeObserver(update); ro.observe(el); return () => ro.disconnect() }, [])
+  const go = (dir: number) => ref.current?.scrollBy({ left: dir * (ref.current.clientWidth * 0.85), behavior: 'smooth' })
+  const arrow = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: '50%', [side]: -8, transform: 'translateY(-50%)', width: 42, height: 42, borderRadius: '50%', border: `1px solid ${LINE}`, background: '#fff', boxShadow: '0 6px 20px rgba(0,0,0,.16)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 22, lineHeight: 1, color: INK, zIndex: 4, opacity: 0, transition: 'opacity .15s', fontFamily: SANS })
+  return (
+    <div className="sf-scroll-wrap" style={{ position: 'relative' }}>
+      <div ref={ref} className="sf-hrow" onScroll={update} style={{ display: 'flex', gap, overflowX: 'auto', paddingBottom: 8 }}>{children}</div>
+      {!edge.start && <button className="sf-scroll-btn" onClick={() => go(-1)} style={arrow('left')} aria-label="Scroll left">‹</button>}
+      {!edge.end && <button className="sf-scroll-btn" onClick={() => go(1)} style={arrow('right')} aria-label="Scroll right">›</button>}
     </div>
   )
 }
@@ -425,7 +447,7 @@ function HomeCarousel({ title, sub, children }: { title: string; sub: string; ch
     <div style={{ marginTop: 44 }}>
       <h2 style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, margin: '0 0 4px' }}>{title}</h2>
       <p style={{ color: SUB, fontSize: 14, margin: '0 0 16px' }}>{sub}</p>
-      <div className="sf-hrow" style={{ display: 'flex', gap: 14, overflowX: 'auto', paddingBottom: 8 }}>{children}</div>
+      <HScroll>{children}</HScroll>
     </div>
   )
 }
@@ -434,19 +456,20 @@ const overlayBtn = { position: 'absolute' as const, inset: 0, background: 'linea
 
 function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<DiscoverAd[] | null>(null)
-  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=30').then((r) => r.json()).then((d) => on && setAds(Array.isArray(d.ads) ? d.ads : [])).catch(() => on && setAds([])); return () => { on = false } }, [])
+  // Image ads only for now (video comes later) — drop any video-format creatives.
+  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=40').then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
   if (ads && ads.length === 0) return null
   return (
     <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={a.id} className="sf-disc" style={{ position: 'relative', width: 180, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
-          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+        <div key={a.id} className="sf-disc" style={{ position: 'relative', width: 212, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
           </div>
         </div>
-      ) : <div key={i} style={{ width: 180, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
+      ) : <div key={i} style={{ width: 212, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
     </HomeCarousel>
   )
 }
@@ -465,7 +488,7 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
   )
 }
 
-function HomeCompetitorsRow({ onTag }: { onTag: (t: StudioTag) => void }) {
+function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<{ thumb: string; brand: string }[] | null>(null)
   useEffect(() => {
     let on = true
@@ -477,16 +500,30 @@ function HomeCompetitorsRow({ onTag }: { onTag: (t: StudioTag) => void }) {
         const qs = new URLSearchParams({ spied: '1' }); if (c) qs.set('brand', decodeURIComponent(c))
         const f = await fetch(`/api/follows?${qs}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
         const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
-        if (!pageIds.length) { if (on) setAds([]); return }
-        const perBrand = await Promise.all(pageIds.slice(0, 8).map((pid) =>
-          fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
-        ))
         const seen = new Set<string>()
-        const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
-          .map((a: any) => { const cr = a.creatives?.[0]; const thumb = cr ? (cr.asset_type === 'video' ? (cr.poster_url || '') : cr.r2_url) : ''; return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string } })
-          .filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
-          .slice(0, 24)
-        if (on) setAds(flat)
+        if (pageIds.length) {
+          const perBrand = await Promise.all(pageIds.slice(0, 8).map((pid) =>
+            fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
+          ))
+          // Image ads only for now (video later): keep creatives whose asset_type isn't video.
+          const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
+            .map((a: any) => { const cr = a.creatives?.[0]; const thumb = cr && cr.asset_type !== 'video' ? cr.r2_url : ''; return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string } })
+            .filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+            .slice(0, 24)
+          if (flat.length) { if (on) setAds(flat); return }
+        }
+        // Not spying anyone (or they had no image ads) → discover rivals from the user's website and
+        // show THEIR live ads, so the section is never empty once we know the store.
+        if (domain) {
+          const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => null)
+          const comps = Array.isArray(d?.competitors) ? d.competitors : []
+          const flat2 = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : []).map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
+            .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+            .slice(0, 24)
+          if (on) setAds(flat2)
+          return
+        }
+        if (on) setAds([])
       } catch { if (on) setAds([]) }
     })()
     return () => { on = false }
@@ -495,15 +532,15 @@ function HomeCompetitorsRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   return (
     <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={i} className="sf-disc" style={{ position: 'relative', width: 180, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+        <div key={i} className="sf-disc" style={{ position: 'relative', width: 212, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
           </div>
         </div>
-      ) : <div key={i} style={{ width: 180, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
+      ) : <div key={i} style={{ width: 212, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
     </HomeCarousel>
   )
 }
