@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import {
-  normalizeShopDomain, isValidShopDomain, validateShopToken, encryptShopifyToken,
+  normalizeShopDomain, isValidShopDomain, validateShopToken, encryptShopifyToken, seedBrandWebsite,
 } from '@/lib/shopify/client'
 import { verifyHmac, exchangeCodeForToken, appBaseUrl } from '@/lib/shopify/oauth'
 import { syncShopifyProducts } from '@/lib/shopify/sync'
@@ -62,6 +62,9 @@ export async function GET(req: NextRequest) {
     status: 'active',
     updated_at: new Date().toISOString(),
   }, { onConflict: 'user_id,shop_domain' }).select('*').single()
+
+  // Seed the brand's website from the store domain so the ads studio can learn the brand from the site.
+  if (saved) await seedBrandWebsite(admin, cookieBrand || saved.brand_id || null, shop)
 
   // First sync (best-effort; the store is already saved).
   if (saved) { try { await syncShopifyProducts(admin, saved, 20) } catch { /* retryable */ } }

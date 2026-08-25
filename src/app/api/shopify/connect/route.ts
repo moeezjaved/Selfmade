@@ -16,7 +16,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import {
   normalizeShopDomain, isValidShopDomain, validateShopToken, encryptShopifyToken,
-  resolveStore, SHOPIFY_REQUIRED_SCOPES, ShopifyError,
+  resolveStore, seedBrandWebsite, SHOPIFY_REQUIRED_SCOPES, ShopifyError,
 } from '@/lib/shopify/client'
 import { syncShopifyProducts, catalogHealth } from '@/lib/shopify/sync'
 
@@ -102,6 +102,9 @@ export async function POST(req: NextRequest) {
   if (error || !saved) {
     return NextResponse.json({ error: 'Connected, but couldn’t save the store. Try again.' }, { status: 500 })
   }
+
+  // Seed the brand's website from the store domain so the ads studio can learn the brand from the site.
+  await seedBrandWebsite(admin, brandId, shop)
 
   // ── First sync so the founder sees real catalog numbers immediately ──
   let health: any = null, sync: any = null

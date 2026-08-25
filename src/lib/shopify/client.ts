@@ -140,3 +140,20 @@ export async function resolveStore(admin: any, userId: string, explicitBrand?: s
     .order('connected_at', { ascending: false }).limit(1)
   return (data && data[0]) || null
 }
+
+/**
+ * Seed a brand's `website` from its Shopify store domain when it has none. Brands created via the
+ * Shopify door (not the website funnel) otherwise have an empty website, which strands the whole ads
+ * studio — Brand Hub, Products, Audiences, Competitors all key off brands.website. The myshopify
+ * domain is crawlable (Shopify serves the storefront there and redirects to any custom domain), and
+ * the founder can override it later from the studio. Never overwrites an existing website.
+ */
+export async function seedBrandWebsite(admin: any, brandId: string | null, shopDomain: string): Promise<void> {
+  if (!brandId || !shopDomain) return
+  try {
+    const { data: b } = await admin.from('brands').select('website').eq('id', brandId).maybeSingle()
+    if (!String(b?.website || '').trim()) {
+      await admin.from('brands').update({ website: shopDomain }).eq('id', brandId)
+    }
+  } catch { /* best-effort; connect still succeeds if this fails */ }
+}
