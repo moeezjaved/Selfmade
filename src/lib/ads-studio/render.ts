@@ -5,7 +5,7 @@
  * rich fact-grounded angle, a real product photo, plus niche inspirations) so the output matches the
  * quality of a paid generation.
  */
-import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime } from '@/lib/gemini/image'
+import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime, verifyClonedAd } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 import { pickInspirations } from '@/lib/studio/inspiration'
 import { getNicheInsights, resolveBrandNiche } from '@/lib/studio/insights'
@@ -62,9 +62,29 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
     angle: opts.angle,
   })
   const genImages = [...fetched, ...products, ...(logoImg ? [logoImg] : [])]
-  const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: aspect, imageSize: '2K' })
-  if (!gen.ok) return null
 
-  const saved = await saveGeneration({ userId, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'inspired', tier: 'pro', brandId, prompt: opts.headline || null }).catch(() => null)
-  return { url: saved?.url || null, image: `data:${gen.mimeType};base64,${gen.dataB64}` }
+  // Generate → VISION-VERIFY → regenerate once with a correction if the product/branding/text came out
+  // wrong. Free templates weren't QA'd before, so garbled text or a wrong product slipped through; now
+  // they self-heal like the paid clone path. verifyClonedAd fails OPEN on any API error (never blocks).
+  const MAX_GENS = 2
+  let best: { mimeType: string; dataB64: string } | null = null
+  let fix = ''
+  for (let i = 0; i < MAX_GENS; i++) {
+    const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${fix}`
+    const gen = await generateImage(attemptPrompt, genImages, 'pro', { aspectRatio: aspect, imageSize: '2K' })
+    if (!gen.ok) break                                   // busy → keep best-so-far (or null on 1st attempt)
+    best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+    if (!products[0]) break                              // no product to verify against → accept
+    const v = await verifyClonedAd(best, products[0], opts.brandName)
+    if (v.pass) break
+    fix = v.fix || [
+      !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
+      !v.brandingClean && `Every logo and brand name shown must belong to ${opts.brandName ? `"${opts.brandName}"` : "the brand"} only.`,
+      !v.textClean && 'Fix all text: correct spelling, no repeated words or duplicated text blocks.',
+    ].filter(Boolean).join(' ')
+  }
+  if (!best) return null
+
+  const saved = await saveGeneration({ userId, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', brandId, prompt: opts.headline || null }).catch(() => null)
+  return { url: saved?.url || null, image: `data:${best.mimeType};base64,${best.dataB64}` }
 }
