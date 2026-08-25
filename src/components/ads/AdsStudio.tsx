@@ -779,11 +779,13 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
           </div>
         </div>
       ) : shown.length === 0 ? (
-        <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
-          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No competitors found yet</div>
-          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>{domain ? 'We couldn’t auto-discover rivals for this store. Add one and we’ll pull their live ads.' : 'Run an ads audit first so we know your store — then we auto-find your rivals and their ads.'}</div>
-          <button style={primaryBtn}>Add a competitor</button>
-        </div>
+        domain ? (
+          <div style={{ border: `1px dashed ${LINE}`, borderRadius: 18, background: '#fff', padding: 40, textAlign: 'center', marginTop: 22 }}>
+            <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No competitors found yet</div>
+            <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, maxWidth: 460, margin: '0 auto 18px' }}>We couldn’t auto-discover rivals for this store. Add one and we’ll pull their live ads.</div>
+            <button style={primaryBtn}>Add a competitor</button>
+          </div>
+        ) : <AddWebsite label="Add your site and we’ll auto-find your real rivals and their live ads." />
       ) : (() => {
         const withAds = shown.filter((c) => c.ads.length > 0)
         const withoutAds = shown.filter((c) => c.ads.length === 0)
@@ -872,7 +874,7 @@ function Products({ isMobile, domain, hideHeader }: { isMobile: boolean; domain:
         <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search products…" style={{ flex: 1, border: 'none', outline: 'none', fontSize: 15, background: 'transparent', color: INK, fontFamily: SANS }} />
       </div>
       {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your catalog…</div>
-        : products.length === 0 ? <EmptyState title={domain ? 'No products found' : 'No store connected'} body={domain ? 'We couldn’t read products from this store — import manually or check the URL.' : 'Open this workspace from your ads audit and we’ll auto-detect your catalog.'} cta="Import from Website" />
+        : products.length === 0 ? (domain ? <EmptyState title="No products found" body="We couldn’t read products from this site — check the URL or try again." cta="Retry" /> : <AddWebsite label="Add your site and we’ll pull your products automatically." />)
           : (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(5,1fr)', gap: 14, marginTop: 20 }}>
               {products.map((p, i) => {
@@ -909,7 +911,7 @@ function Audiences({ isMobile, domain, hideHeader }: { isMobile: boolean; domain
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 8 }}>We read your store’s real signals to identify who actually buys — each audience drives its own ads.</div>
       {data?.market && <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ffe7df', color: ORANGE, borderRadius: 100, padding: '6px 14px', fontSize: 13, fontWeight: 800, marginBottom: 18 }}>📍 Detected market: {data.market}</div>}
       {data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your store & building audiences…</div>
-        : data.audiences.length === 0 ? <EmptyState title={domain ? 'Couldn’t build audiences yet' : 'No store connected'} body={domain ? 'We couldn’t read enough from this store — try again in a moment.' : 'Open this workspace from your ads audit and we’ll auto-detect your audiences.'} cta="Add Audience" />
+        : data.audiences.length === 0 ? (domain ? <EmptyState title="Couldn’t build audiences yet" body="We couldn’t read enough from this site — try again in a moment." cta="Retry" /> : <AddWebsite label="Add your site and we’ll work out who actually buys from you." />)
           : (
             <>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(2,1fr)', gap: 16 }}>
@@ -939,6 +941,32 @@ function EmptyState({ title, body, cta, onCta }: { title: string; body: string; 
 
 /* ── Brand Kit (derived from the website — no Shopify needed) ────────────── */
 type BrandKitData = { siteName: string; logo: string | null; colors: { hex: string; primary: boolean }[]; fonts: string[]; facts: string[]; voice: { tone: string; energy: string; audience: string } | null; visualPages: string[]; empty?: boolean; saved?: boolean; editable?: boolean }
+/** Website capture — shown when the active brand has no site yet (e.g. created via Shopify connect), so
+ * the studio can learn brand/products/audiences/rivals from the site. Saving reloads with the domain set. */
+function AddWebsite({ label }: { label?: string }) {
+  const [v, setV] = useState('')
+  const [busy, setBusy] = useState(false)
+  const save = async () => {
+    const d = v.trim(); if (!d || busy) return
+    setBusy(true)
+    try {
+      const r = await fetch('/api/ads-studio/brand-website', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ website: d }) }).then((x) => x.json())
+      if (r.website) window.location.reload()
+      else { alert(r.error || 'Could not save that website'); setBusy(false) }
+    } catch { setBusy(false) }
+  }
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: '38px 28px', margin: '22px auto 0', textAlign: 'center', maxWidth: 540 }}>
+      <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>What&rsquo;s your website?</div>
+      <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, marginBottom: 18 }}>{label || 'Add your site and we’ll learn your brand, products, audiences and competitors from it — automatically. No Shopify needed.'}</div>
+      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+        <input value={v} onChange={(e) => setV(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} placeholder="yourstore.com" autoComplete="off" spellCheck={false} style={{ flex: 1, minWidth: 200, border: `1px solid ${LINE}`, borderRadius: 100, padding: '13px 18px', fontSize: 15, outline: 'none', fontFamily: SANS, color: INK }} />
+        <button onClick={save} disabled={busy || !v.trim()} style={{ ...primaryBtn, opacity: busy || !v.trim() ? 0.6 : 1 }}>{busy ? 'Learning…' : 'Learn my brand →'}</button>
+      </div>
+    </div>
+  )
+}
+
 const BRANDKIT_TABS = { visual: 'Visual Brand Kit', knowledge: 'Knowledge Base', products: 'Products', audiences: 'Audiences' } as const
 function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const [tab, setTab] = useState<'visual' | 'knowledge' | 'products' | 'audiences'>('visual')
@@ -977,7 +1005,7 @@ function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
       {tab === 'products' ? <Products isMobile={isMobile} domain={domain} hideHeader />
         : tab === 'audiences' ? <Audiences isMobile={isMobile} domain={domain} hideHeader />
         : data === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Reading your brand from the site…</div>
-        : data.empty ? <EmptyState title={domain ? 'Couldn’t read your brand yet' : 'No store connected'} body={domain ? 'We couldn’t read enough from this site — try again shortly.' : 'Open this workspace from your ads audit and we’ll learn your brand automatically.'} cta="Retry" />
+        : data.empty ? (domain ? <EmptyState title="Couldn’t read your brand yet" body="We couldn’t read enough from this site — try again shortly." cta="Retry" /> : <AddWebsite />)
           : tab === 'visual' ? (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <Card title="Your logo" sub="We use this across your creatives." action="Change">
