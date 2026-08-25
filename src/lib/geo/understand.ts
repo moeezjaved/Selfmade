@@ -31,13 +31,16 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
   // ── brand row + brand_kit ──
   let brandName = '', kitCategory = '', kitWebsite = ''
   try {
-    let q = (admin as any).from('brands').select('name, brand_type, brand_kit')
+    let q = (admin as any).from('brands').select('name, brand_type, brand_kit, website')
     q = brandId ? q.eq('id', brandId) : q.eq('user_id', userId).order('created_at', { ascending: false })
     const { data } = await q.limit(1).maybeSingle()
     if (!data?.name) return null
     brandName = String(data.name)
     kitCategory = data.brand_kit?.category ? String(data.brand_kit.category) : ''
-    kitWebsite = data.brand_kit?.website || data.brand_kit?.url || ''
+    // The website lives on the top-level brands.website column (set by the funnel/onboarding + Shopify
+    // connect + the studio's "add your site"); brand_kit.website is a legacy fallback. Read both so the
+    // GEO/SEO/mission surfaces see the same site the ads studio already does.
+    kitWebsite = data.brand_kit?.website || data.brand_kit?.url || data.website || ''
   } catch { return null }
 
   // competitors are cheap + can change → always fetched fresh (a strong category anchor)

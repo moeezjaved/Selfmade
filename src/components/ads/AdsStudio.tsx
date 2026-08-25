@@ -317,7 +317,6 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   const hero = products.find((p) => p.image)?.image
   const genBody = (i: number, force = false) => ({ domain, index: i, force, productImages: hero ? [hero] : [], colors: (kit?.colors || []).map((c) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] })
   const genOne = async (i: number, force = false) => {
-    if (!hero) return
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true } : x))
     // Retry transient image-model overload (pro_model_busy) so cards fill in when capacity returns.
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -331,8 +330,11 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   }
 
   // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
+  // We generate WITHOUT requiring a product hero image: many templates are graphic/brand-led, and
+  // renderAdFree works from brand colours/logo alone — gating on a product photo left stores with no
+  // scraped product images stuck on blank cards forever.
   useEffect(() => {
-    if (started.current || !tpls || !canGen || !kit || !hero) return
+    if (started.current || !tpls || !canGen || !kit) return
     const todo = tpls.map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
     if (!todo.length) return
     started.current = true
