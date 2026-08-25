@@ -249,6 +249,17 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     setInput(`Make a scroll-stopping ${format} ad featuring ${t.label}`)
     focusComposer()
   }
+  // Elements row (a person/scene reference): attach the element AND the user's product, pre-fill, ready.
+  const primeFromElement = (e: { label: string; url: string }) => {
+    setTags((x) => {
+      const next = x.some((y) => y.image === e.url) ? [...x] : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' as const }]
+      const prod = products.find((p) => p.image)
+      if (prod && !next.some((y) => y.kind === 'product' || y.kind === 'upload')) next.push({ label: prod.title.slice(0, 24), image: prod.image, kind: 'product' })
+      return next
+    })
+    setInput(`Create an ad with my product and this — for ${kit?.siteName || 'my brand'}`)
+    focusComposer()
+  }
 
   const chips = ['Create an Instagram ad campaign', 'Generate ad creatives for my product', 'Design a product launch campaign', 'Make a WhatsApp promotional banner', 'Design a seasonal sale campaign', 'Create a LinkedIn thought-leadership post']
   const started = msgs.length > 0
@@ -354,7 +365,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       {!started && <HomeDiscoverRow onTag={primeFromReference} />}
       {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
       {!started && <HomeCompetitorsRow domain={domain} onTag={primeFromReference} />}
-      {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
+      {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={primeFromElement} />}
     </div>
   )
 }
