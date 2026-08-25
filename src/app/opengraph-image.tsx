@@ -18,17 +18,17 @@ export default function Image() {
         {/* lime rule — the one accent, top edge */}
         <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 8, background: '#ff5a2c' }} />
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
           <div style={{ display: 'flex', fontSize: 30, fontWeight: 800, letterSpacing: -1, color: '#171d18' }}>Selfmade</div>
           <div style={{ display: 'flex', fontSize: 17, fontWeight: 700, letterSpacing: 4, textTransform: 'uppercase', color: '#8a927f' }}>Introducing Mello</div>
         </div>
 
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           <div style={{ display: 'flex', fontSize: 96, fontWeight: 500, lineHeight: 0.98, letterSpacing: -3, maxWidth: 1000 }}>The Marketing Co&#8209;founder.</div>
-          <div style={{ display: 'flex', fontSize: 29, lineHeight: 1.4, color: '#4c5347', marginTop: 30, maxWidth: 920, fontFamily: 'sans-serif', fontWeight: 500 }}>Mello studies your market all night — then walks in every morning with the work, already done.</div>
+          <div style={{ display: 'flex', fontSize: 29, lineHeight: 1.4, color: '#4c5347', marginTop: 30, maxWidth: 920, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 500 }}>Mello studies your market all night — then walks in every morning with the work, already done.</div>
         </div>
 
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'sans-serif' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
           <div style={{ display: 'flex', background: '#ef4a1e', color: '#fff', fontSize: 24, fontWeight: 800, padding: '14px 30px', borderRadius: 100 }}>tryselfmade.ai</div>
           <div style={{ display: 'flex', fontSize: 20, fontWeight: 600, color: '#8a927f' }}>$49/mo · starts tonight</div>
         </div>

@@ -121,7 +121,7 @@ export default function StoryTeamPreview() {
           <>
             <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><MelloFace size={54} state="awake" /></div>
             <div style={{ ...say, color: '#fff' }}>The team is starting work now.</div>
-            <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: '600 13px/2.3 ui-monospace, Menlo, monospace', color: '#7d8a7c' }}>
+            <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: "600 13px/2.3 'Helvetica Neue', Helvetica, Arial, sans-serif", color: '#7d8a7c' }}>
               {['Research is reading your market', 'Creative is drafting your first ads', 'Media Buying is scanning for winners', 'Customer is sorting your inbox'].map((l, i) => (
                 <div key={i}><span style={{ color: '#a9d96a' }}>✓</span> {l}</div>
               ))}

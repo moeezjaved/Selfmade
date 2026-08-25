@@ -197,7 +197,7 @@ export default function ConnectMetaByo() {
                     <div style={{ fontSize: 15, fontWeight: 800 }}>Add Selfmade as a partner <span style={{ color: MUTED, fontWeight: 600 }}>· ~60 seconds</span></div>
                     <ol style={{ fontSize: 13.5, color: '#2c342d', lineHeight: 1.8, margin: '8px 0 0', paddingLeft: 18 }}>
                       <li>Copy our Business ID:&nbsp;
-                        <button onClick={copyBiz} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f4f7f2', border: `1px solid ${LINE}`, borderRadius: 8, padding: '4px 10px', fontSize: 12.5, fontWeight: 800, fontFamily: 'ui-monospace, Menlo, monospace', cursor: 'pointer', color: INK }}>
+                        <button onClick={copyBiz} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#f4f7f2', border: `1px solid ${LINE}`, borderRadius: 8, padding: '4px 10px', fontSize: 12.5, fontWeight: 800, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", cursor: 'pointer', color: INK }}>
                           {bizId} {copied ? <Check size={13} color={GREEN} /> : <Copy size={13} />}
                         </button>
                       </li>
@@ -258,7 +258,7 @@ export default function ConnectMetaByo() {
                     <div style={{ fontSize: 15, fontWeight: 800 }}>Paste the token</div>
                     <textarea value={token} onChange={(e) => { setToken(e.target.value); setAccounts(null); setErr(null) }} rows={3}
                       placeholder="EAAG… (the token stays encrypted on our servers — it’s never shown again or sent to your browser)"
-                      style={{ width: '100%', marginTop: 8, fontSize: 12.5, fontFamily: 'ui-monospace, Menlo, monospace', border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 12px', resize: 'vertical', boxSizing: 'border-box' }} />
+                      style={{ width: '100%', marginTop: 8, fontSize: 12.5, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", border: `1.5px solid ${LINE}`, borderRadius: 10, padding: '10px 12px', resize: 'vertical', boxSizing: 'border-box' }} />
                     {!accounts && (
                       <button onClick={validate} disabled={busy || token.trim().length < 30} style={{ ...btnS, marginTop: 10, opacity: token.trim().length < 30 ? 0.5 : 1 }}>
                         {busy ? <><Loader2 size={15} className="spin" /> Checking with Meta…</> : 'Validate token'}

@@ -151,7 +151,7 @@ export default function InviteCodesPage() {
                   <tr key={c.id} style={{ borderBottom: '1px solid #f5f5f5' }}>
                     <td style={{ padding: '12px 16px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <code style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 14, color: status === 'active' ? '#111' : '#aaa', letterSpacing: '.05em' }}>{c.code}</code>
+                        <code style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 700, fontSize: 14, color: status === 'active' ? '#111' : '#aaa', letterSpacing: '.05em' }}>{c.code}</code>
                         <button
                           onClick={() => copy(c.code)}
                           style={{ background: 'none', border: '1px solid #e5e7eb', borderRadius: 6, padding: '2px 8px', fontSize: 11, cursor: 'pointer', color: copied === c.code ? '#16a34a' : '#666', fontFamily: 'inherit' }}

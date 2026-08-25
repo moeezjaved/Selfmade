@@ -73,7 +73,7 @@ function UgcRecording({ script }: { script: string }) {
           <span className="ugc-rec" style={{ width: 9, height: 9, borderRadius: '50%', background: '#ff4d4d', display: 'inline-block', boxShadow: '0 0 10px 1px rgba(255,77,77,.7)', animation: 'ugcrec 1.2s ease-in-out infinite' }} />
           <span style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.14em', color: '#fff' }}>REC</span>
         </div>
-        <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.85)', fontVariantNumeric: 'tabular-nums', zIndex: 3, fontFamily: 'ui-monospace, Menlo, monospace' }}>{mm}:{ss}</div>
+        <div style={{ position: 'absolute', top: 12, right: 12, fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,.85)', fontVariantNumeric: 'tabular-nums', zIndex: 3, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{mm}:{ss}</div>
         {/* the creator — a soft on-camera silhouette (identity is what's rendering; this is the viewfinder) */}
         <div style={{ position: 'absolute', left: '50%', top: '30%', transform: 'translateX(-50%)', width: 84, height: 84, borderRadius: '50%', background: 'linear-gradient(#e9efe2,#c3d0b6)', opacity: .5 }} />
         <div style={{ position: 'absolute', left: '50%', top: '52%', transform: 'translateX(-50%)', width: 150, height: 120, borderRadius: '50% 50% 0 0', background: 'linear-gradient(#e9efe2,#c3d0b6)', opacity: .45 }} />
@@ -409,7 +409,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
                     const cut = removedShots.has(i)
                     return (
                       <div key={i} style={{ display: 'flex', gap: 10, padding: '10px 13px', borderTop: i ? `1px solid ${LINE}` : 'none', alignItems: 'baseline', opacity: cut ? 0.4 : 1 }}>
-                        <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11.5, fontWeight: 700, color: GREEN, whiteSpace: 'nowrap', minWidth: 62, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
+                        <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11.5, fontWeight: 700, color: GREEN, whiteSpace: 'nowrap', minWidth: 62, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
                         <span style={{ flex: 1, fontSize: 13, color: '#33372f', lineHeight: 1.5, textDecoration: cut ? 'line-through' : 'none' }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: GREEN, fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
                         <button onClick={() => setRemovedShots(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })}
                           style={{ background: 'none', border: 'none', color: cut ? GREEN : '#c0392b', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}>{cut ? 'Undo' : 'Remove'}</button>
@@ -451,7 +451,7 @@ export default function InlineVideoRemake({ sourceAdId, sourceVideoUrl, sourcePo
                 <span style={{ color: '#aab0a6', fontWeight: 600 }}>· the exact prompt + {productImages.length + 1} reference image{productImages.length ? 's' : ''} — updates as you edit the script</span>
               </summary>
               <div style={{ padding: '0 14px 14px' }}>
-                <div style={{ fontSize: 12.5, lineHeight: 1.65, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Menlo, monospace', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 13px' }}>
+                <div style={{ fontSize: 12.5, lineHeight: 1.65, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 13px' }}>
                   {buildOneShotPreview({ secs: resolvedBucket, isService, productCount: productImages.length, script, langLabel: (LANGS.find(l => l.code === language)?.label || 'English').split(' ')[0] })}
                 </div>
                 <div style={{ fontSize: 11.5, color: MUTED, marginTop: 8 }}>

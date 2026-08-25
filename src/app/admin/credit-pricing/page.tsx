@@ -95,7 +95,7 @@ export default function CreditPricingPage() {
                 const margin = cost != null && cost > 0 ? `${Math.round(((price - cost) / price) * 100)}%` : '—'
                 return (
                   <tr key={row.action_type}>
-                    <td style={{ ...td, fontFamily: 'monospace', fontSize: 12, color: '#374151' }}>{row.action_type}</td>
+                    <td style={{ ...td, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, color: '#374151' }}>{row.action_type}</td>
                     <td style={td}><input value={row.label ?? ''} onChange={e => patch(row.action_type, 'label', e.target.value)} style={{ ...inputStyle, width: 180 }} /></td>
                     <td style={td}><input type="number" min={0} value={row.credits} onChange={e => patch(row.action_type, 'credits', Number(e.target.value))} style={inputStyle} /></td>
                     <td style={{ ...td, fontWeight: 700, color: '#141d15' }}>${price.toFixed(2)}</td>
@@ -116,7 +116,7 @@ export default function CreditPricingPage() {
               })}
               {/* Add new */}
               <tr style={{ background: '#f9fafb' }}>
-                <td style={td}><input value={adding.action_type} onChange={e => setAdding(a => ({ ...a, action_type: e.target.value }))} placeholder="new_action_type" style={{ ...inputStyle, width: 150, fontFamily: 'monospace' }} /></td>
+                <td style={td}><input value={adding.action_type} onChange={e => setAdding(a => ({ ...a, action_type: e.target.value }))} placeholder="new_action_type" style={{ ...inputStyle, width: 150, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }} /></td>
                 <td style={td}><input value={adding.label} onChange={e => setAdding(a => ({ ...a, label: e.target.value }))} placeholder="Label" style={{ ...inputStyle, width: 180 }} /></td>
                 <td style={td}><input type="number" min={0} value={adding.credits} onChange={e => setAdding(a => ({ ...a, credits: Number(e.target.value) }))} style={inputStyle} /></td>
                 <td style={{ ...td, fontWeight: 700, color: '#141d15' }}>${dollars(adding.credits).toFixed(2)}</td>

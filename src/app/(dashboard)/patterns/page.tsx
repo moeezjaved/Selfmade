@@ -75,7 +75,7 @@ function PatternsInner() {
   ].filter(Boolean).join(' · ') : ''
 
   return (
-    <div style={{ padding: 28, maxWidth: 1100, margin: '0 auto', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ padding: 28, maxWidth: 1100, margin: '0 auto', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: '#111', marginBottom: 4 }}>Pattern Detection</h1>
       <p style={{ color: '#6b7280', fontSize: 14, marginBottom: 18 }}>What repeats among <strong>winning</strong> ads — creative intelligence, not ad spying.</p>
 

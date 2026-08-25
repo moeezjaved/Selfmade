@@ -158,7 +158,7 @@ export default function TokenPoolPage() {
             <div>
               <label style={{ fontSize: 12, color: '#666', fontWeight: 600, display: 'block', marginBottom: 4 }}>Raw token (starts with EAA)</label>
               <textarea value={newToken} onChange={e => setNewToken(e.target.value)} placeholder="EAAB..." rows={3}
-                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d4d4d4', borderRadius: 7, fontSize: 12, fontFamily: 'monospace', resize: 'vertical' }} />
+                style={{ width: '100%', padding: '9px 12px', border: '1px solid #d4d4d4', borderRadius: 7, fontSize: 12, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", resize: 'vertical' }} />
             </div>
             {addError && (
               <div style={{ background: '#fee2e2', border: '1px solid #fecaca', borderRadius: 7, padding: '8px 12px', fontSize: 12, color: '#b91c1c' }}>

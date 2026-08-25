@@ -136,7 +136,7 @@ export default function BrainPage() {
                 {answer ? (
                   <div style={{ marginTop: 14, padding: '14px 16px', background: '#f9f5ec', border: '1px solid #e6efdc', borderRadius: 12 }}>
                     <div style={{ fontSize: 14, color: '#141d15', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{answer.reply}</div>
-                    {answer.sources?.length > 0 && <div style={{ marginTop: 10, fontSize: 11, color: '#7a9a7a', fontFamily: 'ui-monospace,monospace' }}>Source · {answer.sources.join(' · ')}</div>}
+                    {answer.sources?.length > 0 && <div style={{ marginTop: 10, fontSize: 11, color: '#7a9a7a', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>Source · {answer.sources.join(' · ')}</div>}
                   </div>
                 ) : (
                   <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -164,7 +164,7 @@ export default function BrainPage() {
                 <div style={{ fontSize: 15, fontWeight: 700, color: '#141d15', marginBottom: 10 }}>Company timeline</div>
                 {tl?.timeline?.length ? tl.timeline.map((e: any, i: number) => (
                   <div key={i} style={{ display: 'flex', gap: 10, padding: '8px 0', borderTop: i ? '1px solid #f1f5f9' : 'none' }}>
-                    <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: 'ui-monospace,monospace', flex: 'none', width: 58, paddingTop: 2 }}>{new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                    <span style={{ fontSize: 11, color: '#9ca3af', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", flex: 'none', width: 58, paddingTop: 2 }}>{new Date(e.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                     <span style={{ fontSize: 13.5, color: '#3a5a3a', lineHeight: 1.5 }}><b style={{ color: '#141d15', textTransform: 'capitalize' }}>{e.actor}</b>{e.department ? ` · ${DEPT_LABEL[e.department] || e.department}` : ''} — {e.event}</span>
                   </div>
                 )) : <p style={{ color: '#9ca3af', fontSize: 13 }}>No history yet. As Mello works and you teach it, the company's decisions and learnings show up here.</p>}
@@ -199,7 +199,7 @@ export default function BrainPage() {
                   {proposedFacts.map((f: any) => (
                     <div key={f.id} style={{ padding: '11px 0', borderTop: '1px solid #f1f5f9' }}>
                       <div style={{ fontSize: 14, color: '#141d15' }}>{f.content}</div>
-                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: 'ui-monospace,monospace' }}>observed · {f.source_kind || 'conversation'}{f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>observed · {f.source_kind || 'conversation'}{f.created_at ? ` · ${new Date(f.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}` : ''}</div>
                       <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
                         <button onClick={() => confirmFact(f.id, 'confirm')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Yes, that’s true</button>
                         <button onClick={() => confirmFact(f.id, 'reject')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>No, forget it</button>
@@ -216,7 +216,7 @@ export default function BrainPage() {
                   <div key={p.id} style={{ padding: '11px 0', borderTop: '1px solid #f1f5f9' }}>
                     <div style={{ fontSize: 14, color: '#141d15' }}>{p.rule}{p.department && pill(DEPT_LABEL[p.department] || p.department)}</div>
                     {p.evidence?.basedOn && <div style={{ fontSize: 12.5, color: '#5a705a', marginTop: 4 }}>Why — {p.evidence.basedOn}</div>}
-                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: 'ui-monospace,monospace' }}>{SOURCE_LABEL(p.source)}</div>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{SOURCE_LABEL(p.source)}</div>
                     <div style={{ display: 'flex', gap: 8, marginTop: 9 }}>
                       <button onClick={() => proposal(p.id, 'approve')} style={{ background: '#ff5a2c', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>Make it a rule</button>
                       <button onClick={() => proposal(p.id, 'dismiss')} style={{ background: '#fff', color: '#b91c1c', border: '1.5px solid #e2e8f0', padding: '6px 14px', borderRadius: 100, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Dismiss</button>
@@ -326,7 +326,7 @@ export default function BrainPage() {
                 {briefs[d.department] && !briefs[d.department].loading && (
                   <div style={{ marginBottom: 10, padding: '12px 14px', background: '#f7faf4', border: '1px solid #eef3ea', borderRadius: 12, fontSize: 13, color: '#3a5a3a', lineHeight: 1.6, whiteSpace: 'pre-line' }}>{briefs[d.department].brief}</div>
                 )}
-                {d.notebook?.length > 0 && <div style={{ marginBottom: 8 }}>{d.notebook.map((m: any, i: number) => <div key={i} style={{ fontSize: 13.5, color: '#3a5a3a', padding: '3px 0' }}>• {m.content}{m.source_kind && m.source_kind !== 'chat' ? <span style={{ fontSize: 10.5, color: '#9ca3af', marginLeft: 6, fontFamily: 'ui-monospace,monospace' }}>from {m.source_kind}</span> : null}</div>)}</div>}
+                {d.notebook?.length > 0 && <div style={{ marginBottom: 8 }}>{d.notebook.map((m: any, i: number) => <div key={i} style={{ fontSize: 13.5, color: '#3a5a3a', padding: '3px 0' }}>• {m.content}{m.source_kind && m.source_kind !== 'chat' ? <span style={{ fontSize: 10.5, color: '#9ca3af', marginLeft: 6, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>from {m.source_kind}</span> : null}</div>)}</div>}
                 {d.learnings?.length > 0 && <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: 8 }}>{d.learnings.map((l: any, i: number) => <div key={i} style={{ fontSize: 13, color: '#7a9a7a', padding: '2px 0' }}>✓ {l.event}{l.result ? ` → ${l.result}` : ''}</div>)}</div>}
               </div>
             )) : <div style={card}><p style={{ color: '#9ca3af', fontSize: 13, margin: 0 }}>Departments haven't written anything yet — they fill in as Mello works and you approve actions.</p></div>

@@ -750,7 +750,7 @@ function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; op
                 <span style={{ flex: 1, minWidth: 0 }}><span style={{ display: 'block', fontSize: 15, fontWeight: 800, color: INK }}>{f.title}</span><span style={{ display: 'block', fontSize: 13.5, color: SUB, marginTop: 2 }}>{f.detail}</span></span>
                 {f.fixable && <span style={{ flex: 'none', fontSize: 12.5, fontWeight: 800, color: GOOD, background: '#eaf6ec', borderRadius: 100, padding: '4px 11px' }}>Agent can fix</span>}
               </button>
-              {open[f.id] && f.sample?.length ? <div style={{ borderTop: `1px solid ${LINE}`, padding: '10px 16px', background: PAPER }}>{f.sample.slice(0, 6).map((s, i) => <div key={i} style={{ fontSize: 12.5, color: '#4a544c', fontFamily: 'monospace', padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>{s}</div>)}</div> : null}
+              {open[f.id] && f.sample?.length ? <div style={{ borderTop: `1px solid ${LINE}`, padding: '10px 16px', background: PAPER }}>{f.sample.slice(0, 6).map((s, i) => <div key={i} style={{ fontSize: 12.5, color: '#4a544c', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", padding: '5px 0', borderTop: i ? `1px solid ${LINE}` : 'none' }}>{s}</div>)}</div> : null}
             </div>
           ))}
 
@@ -875,14 +875,14 @@ function Ready({ result, onSee, isMobile }: { result: Result; onSee: () => void;
     </div>
   )
 }
-const MONO_G = 'ui-monospace, "Space Mono", Menlo, monospace'
+const MONO_G = "'Helvetica Neue', Helvetica, Arial, sans-serif"
 
 function Offer({ result, onBack, isMobile }: { result: Result; onBack: () => void; isMobile: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
   const [name, setName] = useState('')
   // Stash the scanned domain, then hand off to signup (Gmail OK) — the app claims the scan on login.
   const start = () => { document.cookie = `sf_scan_domain=${encodeURIComponent(result.domain)}; path=/; max-age=2592000`; if (name.trim()) document.cookie = `sf_scan_signer=${encodeURIComponent(name.trim())}; path=/; max-age=2592000`; window.location.href = `/signup?ref=seo-scan&next=${encodeURIComponent('/mission/seo')}` }
-  const MONO = 'ui-monospace, "Space Mono", Menlo, monospace'
+  const MONO = "'Helvetica Neue', Helvetica, Arial, sans-serif"
   const Row = ({ k, v }: { k: string; v: string }) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 16, padding: '14px 0', borderTop: `1px solid ${LINE}` }}>
       <span style={{ fontSize: 15, color: SUB }}>{k}</span><span style={{ fontSize: 15.5, fontWeight: 800, color: INK, textAlign: 'right' }}>{v}</span>

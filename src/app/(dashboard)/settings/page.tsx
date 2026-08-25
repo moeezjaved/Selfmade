@@ -595,7 +595,7 @@ function ChannelsSection() {
         {code?.provider === provider && (
           <div style={{ marginTop: 10, padding: '12px 14px', borderRadius: 12, background: '#f9f5ec', border: '1px dashed #cfe6b8' }}>
             <div style={{ fontSize: 12.5, color: '#7a9a7a' }}>Your code (expires in 15 min):</div>
-            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 1, color: '#141d15', margin: '4px 0', fontFamily: 'ui-monospace, monospace' }}>{code.code}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, letterSpacing: 1, color: '#141d15', margin: '4px 0', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{code.code}</div>
             <div style={{ fontSize: 12.5, color: '#141d15' }}>{code.instructions}</div>
           </div>
         )}

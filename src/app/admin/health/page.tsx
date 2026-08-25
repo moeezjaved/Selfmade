@@ -147,7 +147,7 @@ export default function HealthDashboard() {
   }, [autoRefresh, load])
 
   return (
-    <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto', fontFamily: 'ui-sans-serif, system-ui, sans-serif' }}>
+    <div style={{ padding: 24, maxWidth: 1280, margin: '0 auto', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>System Health</h1>
@@ -449,7 +449,7 @@ export default function HealthDashboard() {
                   <tr key={b.page_id} style={tableRow}>
                     <td style={td}>
                       <div style={{ fontWeight: 600 }}>{b.term}</div>
-                      <div style={{ fontSize: 10, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{b.page_id}</div>
+                      <div style={{ fontSize: 10, color: '#888', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{b.page_id}</div>
                     </td>
                     <td style={tdRight}>{b.thumbed.toLocaleString()}</td>
                     <td style={{ ...tdRight, color: b.fastReady > 0 ? '#15803d' : '#888' }}>{b.fastReady.toLocaleString()}</td>
@@ -617,7 +617,7 @@ function CountdownCard({ title, emptyText, isCountdown, running, next }: {
           {brandText}
         </div>
       )}
-      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: 'ui-monospace, monospace', color, lineHeight: 1.1 }}>{bigText}</div>
+      <div style={{ fontSize: 24, fontWeight: 700, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", color, lineHeight: 1.1 }}>{bigText}</div>
       {subText && <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>{subText}</div>}
     </div>
   )
@@ -661,7 +661,7 @@ const tableRow: React.CSSProperties = { borderBottom: '1px solid #f3f4f6' }
 const th: React.CSSProperties = { padding: '8px 12px', textAlign: 'left', fontSize: 11, color: '#666', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }
 const thRight: React.CSSProperties = { ...th, textAlign: 'right' }
 const td: React.CSSProperties = { padding: '8px 12px', fontSize: 13, color: '#111' }
-const tdRight: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: 'ui-monospace, monospace' }
+const tdRight: React.CSSProperties = { ...td, textAlign: 'right', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }
 
 function humanAgo(iso: string): string {
   const ms = Date.now() - new Date(iso).getTime()

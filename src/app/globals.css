@@ -1,4 +1,19 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+/* ── One grotesque, everywhere ───────────────────────────────────────────────
+   Match Lapis's look (they use "Die Grotesk", a licensed font we can't ship — its
+   own fallback is Arial). Rather than edit 40+ files, we remap every NAMED family
+   the app uses (Inter / Fraunces / Instrument Serif / Georgia / Hanken Grotesk) to
+   a Helvetica/Arial grotesque via @font-face local(). This catches inline styles
+   AND font constants automatically. Mono stacks use generic keywords that can't be
+   remapped this way, so those are swapped to the same grotesque in the components.
+   font-weight 100 900 so every weight resolves; italic covered for Instrument Serif. */
+@font-face { font-family: 'Inter'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Fraunces'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Instrument Serif'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-style: normal; font-display: swap; }
+@font-face { font-family: 'Instrument Serif'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-style: italic; font-display: swap; }
+@font-face { font-family: 'Georgia'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Hanken Grotesk'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'General Sans'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-display: swap; }
+@font-face { font-family: 'Space Mono'; src: local('Helvetica Neue'), local('Helvetica'), local('Arial'); font-weight: 100 900; font-display: swap; }
 
 @tailwind base;
 @tailwind components;

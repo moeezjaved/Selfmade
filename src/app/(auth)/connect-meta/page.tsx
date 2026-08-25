@@ -41,7 +41,7 @@ function ConnectMetaContent() {
   // Don't flash the connect screen to a Free user (or before the plan check resolves) — the effect
   // above redirects them to billing. Only the post-connect 'success' state bypasses the gate.
   if (gate !== 'ok' && state !== 'success') {
-    return <div style={{minHeight:'100vh',background:'#10211f',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)',fontSize:14,fontWeight:700,fontFamily:'-apple-system,Segoe UI,sans-serif'}}>{gate==='locked' ? 'Meta is a Creator feature — taking you to upgrade…' : 'Loading…'}</div>
+    return <div style={{minHeight:'100vh',background:'#10211f',display:'flex',alignItems:'center',justifyContent:'center',color:'rgba(255,255,255,0.6)',fontSize:14,fontWeight:700,fontFamily:"'Helvetica Neue', Helvetica, Arial, sans-serif"}}>{gate==='locked' ? 'Meta is a Creator feature — taking you to upgrade…' : 'Loading…'}</div>
   }
 
   return (

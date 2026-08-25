@@ -31,7 +31,7 @@ export default async function DocumentsPage() {
   return (
     <div style={{ maxWidth: 820, margin: '0 auto', padding: '32px 24px 96px' }}>
       <div style={{ borderTop: '3px solid #26331f', paddingTop: 14 }}>
-        <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Written by Mello</div>
+        <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Written by Mello</div>
       </div>
       <h1 style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 34, lineHeight: 1.12, color: '#1c2617', margin: '4px 0 6px', fontWeight: 400 }}>Documents</h1>
       <p style={{ fontSize: 14, color: '#66755d', margin: '0 0 26px', lineHeight: 1.6 }}>
@@ -53,7 +53,7 @@ export default async function DocumentsPage() {
             const adCount = (d.meta as any)?.adCount ?? null
             return (
               <Link key={d.id} href={`/documents/${d.id}`} style={{ display: 'block', textDecoration: 'none', color: 'inherit', borderBottom: '1px solid #eef2ec', padding: '16px 4px' }}>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8a9880', marginBottom: 4 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'baseline', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 10.5, letterSpacing: '0.06em', textTransform: 'uppercase', color: '#8a9880', marginBottom: 4 }}>
                   <span>{KIND_LABEL[d.kind] || d.kind}</span>
                   {when ? <><span style={{ opacity: 0.4 }}>·</span><span>{when}</span></> : null}
                   {adCount != null ? <><span style={{ opacity: 0.4 }}>·</span><span>{adCount} ads</span></> : null}

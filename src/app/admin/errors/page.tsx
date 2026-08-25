@@ -162,7 +162,7 @@ export default function ErrorsPage() {
               {expanded === err.id && (
                 <div style={{ padding: '0 16px 16px', borderTop: '1px solid #f5f5f5' }}>
                   <div style={{ fontSize: 11, fontWeight: 700, color: '#6b7280', margin: '12px 0 4px' }}>Raw error</div>
-                  <div style={{ fontSize: 12, color: '#374151', fontFamily: 'ui-monospace, monospace', wordBreak: 'break-word' }}>{err.error_message}</div>
+                  <div style={{ fontSize: 12, color: '#374151', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", wordBreak: 'break-word' }}>{err.error_message}</div>
                   {err.error_stack && (
                     <pre style={{ margin: '10px 0 0', padding: 12, background: '#1e1e1e', color: '#e5e7eb', borderRadius: 8, fontSize: 11, overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{err.error_stack}</pre>
                   )}

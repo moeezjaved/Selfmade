@@ -56,7 +56,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
 
       {/* Masthead — treats this like an internal strategy memo, not a chat message. */}
       <div style={{ borderTop: '3px solid #26331f', paddingTop: 14, marginBottom: 8 }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>
           <span>Competitor Intelligence</span>
           {doc.subject ? <><span style={{ opacity: 0.4 }}>·</span><span>{doc.subject}</span></> : null}
           {when ? <><span style={{ opacity: 0.4 }}>·</span><span>{when}</span></> : null}
@@ -134,7 +134,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
 
       {creators.length > 0 && (
         <div style={{ marginTop: 40, borderTop: '3px solid #26331f', paddingTop: 18 }}>
-          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Their creator payroll</div>
+          <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Their creator payroll</div>
           <h2 style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, lineHeight: 1.15, color: '#1c2617', margin: '4px 0 4px', fontWeight: 400 }}>The faces fronting their ads</h2>
           <p style={{ fontSize: 13.5, color: '#66755d', margin: '0 0 20px', lineHeight: 1.6 }}>
             {subject ? `${subject} runs` : 'They run'} these ads through partner/creator pages, not their own brand page — a paid whitelisting engine. This is who to recruit in the same style.
@@ -144,7 +144,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
               <div key={c.name}>
                 <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 10 }}>
                   <span style={{ fontSize: 15, fontWeight: 800, color: '#20321c' }}>{c.name}</span>
-                  <span style={{ fontSize: 12, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>{c.count} ad{c.count === 1 ? '' : 's'} fronted</span>
+                  <span style={{ fontSize: 12, color: '#8a9880', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{c.count} ad{c.count === 1 ? '' : 's'} fronted</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 12 }}>
                   {c.ads.map((s) => {
@@ -157,7 +157,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
                           {isVideo && <span style={{ position: 'absolute', top: 7, right: 7, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 9.5, fontWeight: 700, padding: '2px 6px', borderRadius: 100 }}>▶ VIDEO</span>}
                         </div>
                         <div style={{ padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-                          <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                          <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                             {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ') || 'their creative'}
                           </div>
                           <div style={{ fontSize: 11.5, color: '#ef4a1e', fontWeight: 800 }}>Make my version →</div>
@@ -174,7 +174,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
 
       {swipe.length > 0 && (
         <div style={{ marginTop: 40, borderTop: '3px solid #26331f', paddingTop: 18 }}>
-          <div style={{ fontFamily: 'ui-monospace, SFMono-Regular, Menlo, monospace', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Swipe file</div>
+          <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#6b7a62' }}>Swipe file</div>
           <h2 style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, lineHeight: 1.15, color: '#1c2617', margin: '4px 0 4px', fontWeight: 400 }}>Steal these — remade for you</h2>
           <p style={{ fontSize: 13.5, color: '#66755d', margin: '0 0 18px', lineHeight: 1.6 }}>
             {subject ? `${subject}'s` : 'Their'} proven winners. One click rebuilds any of them around your product, in your brand.
@@ -193,7 +193,7 @@ export default async function DocumentPage({ params }: { params: { id: string } 
                     <div style={{ fontSize: 12.5, color: '#2f3b2b', lineHeight: 1.4, flex: 1 }}>
                       {(cleanTpl(s.headline) || cleanTpl(s.copy) || 'Untitled ad').slice(0, 90)}
                     </div>
-                    <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: 'ui-monospace, Menlo, monospace' }}>
+                    <div style={{ fontSize: 10.5, color: '#8a9880', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                       {[s.days ? `${s.days}d live` : null, s.format].filter(Boolean).join(' · ')}
                     </div>
                     <Link href={href} style={{ display: 'block', textAlign: 'center', background: '#ef4a1e', color: '#fff', fontSize: 12.5, fontWeight: 800, padding: '9px 12px', borderRadius: 100, textDecoration: 'none' }}>

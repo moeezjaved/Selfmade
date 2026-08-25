@@ -580,7 +580,7 @@ export default function InterviewPage() {
                 </>
               )}
               {!!log.length && (
-                <div style={{ maxWidth: 420, margin: '24px auto 0', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 18px', font: '600 13px/2.1 ui-monospace, Menlo, monospace', color: MUTED }}>
+                <div style={{ maxWidth: 420, margin: '24px auto 0', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, padding: '14px 18px', font: "600 13px/2.1 'Helvetica Neue', Helvetica, Arial, sans-serif", color: MUTED }}>
                   {log.map((l, i) => <div key={i}>{l.done || i < log.length - 1 ? <span style={{ color: GREEN }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
                 </div>
               )}
@@ -793,7 +793,7 @@ export default function InterviewPage() {
             <div style={{ textAlign: 'center' }}>
               <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 20 }}><Mello state={nightDone ? 'delivered' : 'awake'} /></div>
               <div style={{ ...say, color: '#fff' }}>{nightDone ? 'Your first brief is ready.' : 'The team is starting work now.'}</div>
-              <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: '600 13px/2.3 ui-monospace, Menlo, monospace', color: '#7d8a7c' }}>
+              <div style={{ maxWidth: 380, margin: '22px auto 0', textAlign: 'left', font: "600 13px/2.3 'Helvetica Neue', Helvetica, Arial, sans-serif", color: '#7d8a7c' }}>
                 {nightLog.map((l, i) => <div key={i}>{l.done ? <span style={{ color: '#a9d96a' }}>✓</span> : <span className="spin-dot">›</span>} {l.t}</div>)}
               </div>
               {nightDone && (

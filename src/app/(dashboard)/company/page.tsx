@@ -17,7 +17,7 @@ export default function CompanyPage() {
 
   const node = (role: string, name: string, accent?: boolean): React.ReactNode => (
     <div style={{ background: accent ? '#eef8d6' : '#fff', border: `1px solid ${accent ? '#cbe88a' : 'rgba(0,0,0,0.08)'}`, borderRadius: 12, padding: '10px 22px', textAlign: 'center', minWidth: 190 }}>
-      <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: '#3e5c43' }}>{role}</div>
+      <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 10, letterSpacing: '.1em', textTransform: 'uppercase', color: '#3e5c43' }}>{role}</div>
       <div style={{ fontSize: 19, color: '#141d15', marginTop: 1, fontWeight: 600 }}>{name}</div>
     </div>
   )
@@ -28,7 +28,7 @@ export default function CompanyPage() {
       <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
         <span style={{ width: 9, height: 9, borderRadius: '50%', flex: 'none', background: DOT[d.status], border: d.status === 'hiring' ? '1.5px solid #c5cdc5' : 'none', boxShadow: d.status === 'waiting' ? '0 0 0 3px rgba(197,138,30,0.2)' : 'none' }} />
         <div style={{ fontSize: 15, fontWeight: 700, color: '#141d15', flex: 1 }}>{d.name}</div>
-        <div style={{ fontSize: 10.5, fontFamily: 'ui-monospace,monospace', letterSpacing: '.05em', textTransform: 'uppercase', color: d.status === 'waiting' ? '#c58a1e' : d.status === 'warning' ? '#b4530a' : '#8b958c' }}>{LABEL[d.status]}</div>
+        <div style={{ fontSize: 10.5, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", letterSpacing: '.05em', textTransform: 'uppercase', color: d.status === 'waiting' ? '#c58a1e' : d.status === 'warning' ? '#b4530a' : '#8b958c' }}>{LABEL[d.status]}</div>
       </div>
       <div style={{ fontSize: 12.5, color: '#7a9a7a', marginTop: 6, lineHeight: 1.5 }}>{d.status === 'hiring' ? d.detail : (d.detail || d.role)}</div>
       {/* leveling-up bar: how many of this department's responsibilities are built */}
@@ -64,7 +64,7 @@ export default function CompanyPage() {
 
           {(['Marketing', 'Operations'] as const).map(div => (
             <div key={div} style={{ marginBottom: 22 }}>
-              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#8b958c', margin: '10px 0 10px' }}>{div}</div>
+              <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, letterSpacing: '.12em', textTransform: 'uppercase', color: '#8b958c', margin: '10px 0 10px' }}>{div}</div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 12 }}>
                 {division(div).map((d: any) => <DeptCard key={d.key} d={d} />)}
               </div>

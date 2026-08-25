@@ -19,7 +19,7 @@ export default function AdminSeo() {
   const g = d.gsc
   const t = g?.totals
   return (
-    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ padding: 24, maxWidth: 1200, margin: '0 auto', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>SEO — Brand Pages</h1>
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 20 }}>
         Programmatic pages at <code>/brands/[slug]</code> for brands with ≥{d.min_ads} ads.

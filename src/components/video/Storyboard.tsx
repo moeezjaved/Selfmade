@@ -453,7 +453,7 @@ export default function Storyboard({ jobId, embedded, mode, maxScenes, resyncScr
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
               <div style={{ fontFamily: 'Instrument Serif, Georgia, serif', fontSize: 26, color: '#141d15', lineHeight: 1 }}>{i + 1}</div>
               <div style={{ fontSize: 10, textTransform: 'uppercase', letterSpacing: '.05em', color: '#7a8872' }}>{ROLE_LABEL[s.role] || 'Scene'}</div>
-              {s.time && <div style={{ fontSize: 10, color: '#a7b09e', fontFamily: 'ui-monospace, Menlo, monospace' }}>{s.time}</div>}
+              {s.time && <div style={{ fontSize: 10, color: '#a7b09e', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{s.time}</div>}
               {board.editable && (
                 <div style={{ display: 'flex', gap: 3, marginTop: 4 }}>
                   <button onClick={() => move(i, -1)} disabled={i === 0} aria-label="Move up" style={{ border: '1px solid #e6ece2', background: '#fff', borderRadius: 5, width: 20, height: 20, cursor: i === 0 ? 'default' : 'pointer', color: '#66755d', fontSize: 11, lineHeight: 1, padding: 0 }}>↑</button>

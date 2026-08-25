@@ -120,7 +120,7 @@ export default function ProxyPoolPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: 24, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
         <h1 style={{ margin: 0, fontSize: 24 }}>🔀 Proxy Pool</h1>
         <div style={{ display: 'flex', gap: 12 }}>
@@ -219,13 +219,13 @@ export default function ProxyPoolPage() {
                 <tr key={p.id} style={{ borderBottom: '1px solid #f3f4f6' }}>
                   <td style={{ ...td, color: STATUS_COLOR[p.status], fontWeight: 600 }}>{STATUS_LABEL[p.status]}</td>
                   <td style={td}><div style={{ fontWeight: 600 }}>{p.label}</div><div style={{ color: '#888', fontSize: 11 }}>{p.provider}</div></td>
-                  <td style={{ ...td, fontFamily: 'monospace', fontSize: 12 }}>{p.host}:{p.port}</td>
+                  <td style={{ ...td, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12 }}>{p.host}:{p.port}</td>
                   <td style={td}>{p.isp || '—'}{p.country ? ` / ${p.country}` : ''}</td>
                   <td style={{ ...td, textAlign: 'right' }}>{p.crawls_24h}</td>
                   <td style={{ ...td, textAlign: 'right', color: p.error_rate_1h > 5 ? '#ef4444' : 'inherit' }}>
                     {p.errors_1h}{p.error_rate_1h > 0 ? ` (${p.error_rate_1h}%)` : ''}
                   </td>
-                  <td style={{ ...td, textAlign: 'right', fontFamily: 'monospace' }}>
+                  <td style={{ ...td, textAlign: 'right', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
                     {p.p50_latency_ms}/{p.p95_latency_ms}<span style={{ color: '#888' }}>ms</span>
                   </td>
                   <td style={{ ...td, textAlign: 'right' }}>{(p.bytes_24h / 1_048_576).toFixed(1)} MB</td>
