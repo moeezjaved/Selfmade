@@ -299,7 +299,7 @@ export default function IndexerAdminPage() {
             {runLog.length > 0 && (
               <div style={{ background: '#0f172a', borderRadius: 8, padding: 12, maxHeight: 260, overflowY: 'auto' }}>
                 {runLog.map((l, i) => (
-                  <div key={i} style={{ fontSize: 12, color: l.startsWith('❌') ? '#f87171' : l.startsWith('✅') || l.startsWith('🎉') ? '#4ade80' : l.startsWith('⚠️') ? '#fbbf24' : '#94a3b8', fontFamily: 'monospace', marginBottom: 2, wordBreak: 'break-all' }}>{l}</div>
+                  <div key={i} style={{ fontSize: 12, color: l.startsWith('❌') ? '#f87171' : l.startsWith('✅') || l.startsWith('🎉') ? '#4ade80' : l.startsWith('⚠️') ? '#fbbf24' : '#94a3b8', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", marginBottom: 2, wordBreak: 'break-all' }}>{l}</div>
                 ))}
               </div>
             )}

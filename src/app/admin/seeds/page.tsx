@@ -201,7 +201,7 @@ export default function SeedsPage() {
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
                         <div>
                           <div style={{ fontWeight: 700 }}>{b.page_name || 'Unknown'}</div>
-                          <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{b.page_id}</div>
+                          <div style={{ fontSize: 11, color: '#888', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{b.page_id}</div>
                         </div>
                         <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 100, background: '#f1f5f9' }}>{b.ad_count} ads</span>
                       </div>

@@ -332,7 +332,7 @@ export default function ScanTheater() {
                         <button key={b.pageId} onClick={() => { if (b.pageId !== picked.pageId && !comps.some((c) => c.pageId === b.pageId)) setComps((s) => [...s, { pageId: b.pageId, name: b.name }]); setCq(''); setCresults([]) }}
                           style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 15px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
                           <span style={{ fontWeight: 700, fontSize: 14.5, color: INK }}>{b.name}</span>
-                          <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
+                          <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
                         </button>
                       ))}
                     </div>
@@ -367,7 +367,7 @@ export default function ScanTheater() {
                       <button key={b.pageId} onClick={() => { setPicked({ pageId: b.pageId, name: b.name }); setQ(''); setResults([]) }}
                         style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '12px 16px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
                         <span style={{ fontWeight: 700, fontSize: 15, color: INK }}>{b.name}</span>
-                        <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
+                        <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : ''}</span>
                       </button>
                     ))}
                   </div>
@@ -411,7 +411,7 @@ export default function ScanTheater() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                 <span style={{ width: 18, textAlign: 'center', color: s.status === 'done' ? ORANGE : s.status === 'active' ? '#fff' : MUT, fontWeight: 800 }}>{s.status === 'done' ? '✓' : s.status === 'active' ? '◐' : '○'}</span>
                 <span style={{ fontSize: 14.5, fontWeight: s.status === 'active' ? 800 : 600, color: s.status === 'pending' ? MUT : '#fff' }}>{s.label}</span>
-                {s.metric && <span style={{ marginLeft: 'auto', fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: ORANGE }}>{s.metric}</span>}
+                {s.metric && <span style={{ marginLeft: 'auto', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11.5, color: ORANGE }}>{s.metric}</span>}
               </div>
               {s.findings.length > 0 && (
                 <div style={{ margin: '7px 0 2px', paddingLeft: 28, display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -595,7 +595,7 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
                 <div style={{ marginBottom: items.length > 1 ? 11 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
                     <span style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(17px,2.1vw,23px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{top.label}</span>
-                    <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 13, fontWeight: 700, color: ORANGE, flex: 'none' }}>{top.pct}%</span>
+                    <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 13, fontWeight: 700, color: ORANGE, flex: 'none' }}>{top.pct}%</span>
                   </div>
                   <div style={{ height: 6, borderRadius: 100, background: '#eee6d7', marginTop: 7, overflow: 'hidden' }}>
                     <div style={{ height: '100%', width: `${Math.max(8, Math.round((top.count / max) * 100))}%`, background: ORANGE, borderRadius: 100 }} />
@@ -628,7 +628,7 @@ type Ex = FullDnaResult['winners']['examples'][number]
 function FeaturedAdCard({ ex, badge }: { ex: Ex; badge?: string }) {
   return (
     <div className="sf-rise" style={{ position: 'relative', borderRadius: 18, overflow: 'hidden', border: `1px solid ${LINE}`, aspectRatio: '4 / 5', maxHeight: '54vh', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7', boxShadow: '0 18px 50px -22px rgba(26,20,16,.5)' }}>
-      {badge && <div style={{ position: 'absolute', top: 11, left: 11, background: ORANGE, color: '#fff', fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 800, padding: '5px 11px', borderRadius: 100 }}>{badge}</div>}
+      {badge && <div style={{ position: 'absolute', top: 11, left: 11, background: ORANGE, color: '#fff', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 800, padding: '5px 11px', borderRadius: 100 }}>{badge}</div>}
       <div style={{ position: 'absolute', left: 0, right: 0, bottom: 0, padding: '30px 13px 11px', background: 'linear-gradient(transparent,rgba(20,14,8,.78))', color: '#fff' }}>
         <div style={{ fontWeight: 800, fontSize: 13.5 }}>{ex.brand}</div>
         {ex.hook && <div style={{ fontSize: 11.5, opacity: .82, lineHeight: 1.3, maxHeight: 30, overflow: 'hidden', marginTop: 2 }}>{ex.hook}</div>}
@@ -716,7 +716,7 @@ function slideFormula(winners: FullDnaResult['winners']) {
             <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.8vw,20px) clamp(14px,2vw,24px)', minWidth: 'clamp(120px,15vw,180px)', boxShadow: '0 10px 30px -18px rgba(26,20,16,.4)' }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 7 }}>{dim}</div>
               <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(18px,2.4vw,28px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{v!.label}</div>
-              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: SUB, marginTop: 6 }}>{v!.pct}% of winners</div>
+              <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 700, color: SUB, marginTop: 6 }}>{v!.pct}% of winners</div>
             </div>
           </div>
         ))}
@@ -832,7 +832,7 @@ function slideScore(res: ScanResult) {
             <div key={sc.key} className="sf-rise" style={{ ...rise(i) }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 5 }}>
                 <span style={{ fontSize: 'clamp(13px,1.5vw,15px)', fontWeight: 700, color: INK }}>{sc.label}</span>
-                <span style={{ fontFamily: 'ui-monospace,monospace', fontWeight: 700, fontSize: 13, color: c }}>{sc.value}/100</span>
+                <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 700, fontSize: 13, color: c }}>{sc.value}/100</span>
               </div>
               <div style={{ height: 9, borderRadius: 100, background: '#eee6d7', overflow: 'hidden' }}>
                 <div style={{ height: '100%', width: `${sc.value}%`, background: c, borderRadius: 100 }} />
@@ -866,7 +866,7 @@ function pullingSlide(brandName: string, elapsedS = 0, capS = 480) {
         <div style={{ height: 8, background: 'rgba(26,20,16,.1)', borderRadius: 100, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${barPct}%`, background: ORANGE, borderRadius: 100, transition: 'width .7s ease' }} />
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9, fontFamily: 'ui-monospace,monospace', fontSize: 12, color: SUB }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 9, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, color: SUB }}>
           <span>Crawling your library…</span>
           <span>{elapsedLabel}</span>
         </div>
@@ -950,7 +950,7 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
           <div key={ex.adId} className="sf-rise" style={{ ...rise(Math.min(i, 12)), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
             <div style={{ aspectRatio: '4 / 5', background: ex.thumb ? `#f1ece2 url(${ex.thumb}) center/cover` : '#eee6d7' }} />
             <div style={{ padding: '7px 9px 9px' }}>
-              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 10.5, fontWeight: 700, color: ORANGE }}>{ex.daysRunning}d running</div>
+              <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 10.5, fontWeight: 700, color: ORANGE }}>{ex.daysRunning}d running</div>
               <div style={{ fontSize: 11, color: INK, lineHeight: 1.3, marginTop: 3, maxHeight: 44, overflow: 'hidden' }}>{ex.hook || ex.brand}</div>
             </div>
           </div>
@@ -1065,7 +1065,7 @@ function ScoreAct({ res }: { res: ScanResult }) {
             <div key={ss.key} style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '9px 0' }}>
               <span style={{ width: 120, fontSize: 13, color: SUB }}>{ss.label}</span>
               <div style={{ flex: 1, height: 6, background: 'rgba(26,20,16,.08)', borderRadius: 100 }}>{ss.value != null && <div style={{ height: 6, width: drawn ? `${ss.value}%` : '0%', background: ORANGE, borderRadius: 100, transition: 'width 1s cubic-bezier(.4,0,.2,1)' }} />}</div>
-              <span style={{ width: 52, textAlign: 'right', fontFamily: 'ui-monospace,monospace', fontSize: 12, color: ss.value != null ? INK : MUT }}>{ss.value != null ? ss.value : 'n/a'}</span>
+              <span style={{ width: 52, textAlign: 'right', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, color: ss.value != null ? INK : MUT }}>{ss.value != null ? ss.value : 'n/a'}</span>
             </div>
           ))}
         </div>
@@ -1119,7 +1119,7 @@ function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief;
           <>
             <img src={st.imageUrl} alt={brief.headline} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
             <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ transform: 'rotate(-20deg)', fontFamily: 'ui-monospace,monospace', fontWeight: 800, letterSpacing: '.35em', fontSize: 'clamp(26px,7vw,44px)', color: 'rgba(255,255,255,.5)', textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>PREVIEW</span>
+              <span style={{ transform: 'rotate(-20deg)', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 800, letterSpacing: '.35em', fontSize: 'clamp(26px,7vw,44px)', color: 'rgba(255,255,255,.5)', textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>PREVIEW</span>
             </div>
           </>
         )}
@@ -1164,7 +1164,7 @@ function TheFix({ res }: { res: ScanResult }) {
             <video src={rv.videoUrl} poster={rv.posterUrl || undefined} controls muted playsInline loop preload="metadata"
               style={{ width: '100%', aspectRatio: '9 / 16', objectFit: 'cover', display: 'block', background: '#000' }} />
             <div style={{ padding: '10px 12px', background: DARK, color: CREAM }}>
-              <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>Their winner · {rv.daysRunning}d live</div>
+              <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, fontWeight: 700, color: ORANGE }}>Their winner · {rv.daysRunning}d live</div>
               <div style={{ fontSize: 12.5, marginTop: 3, lineHeight: 1.35, maxHeight: 52, overflow: 'hidden' }}>{rv.hook || rv.brand}</div>
             </div>
           </div>
@@ -1172,7 +1172,7 @@ function TheFix({ res }: { res: ScanResult }) {
         <div style={{ display: 'grid', gap: 8 }}>
           {script.beats.map((beat, i) => (
             <div key={i} className="sf-rise" style={{ ...rise(i), display: 'flex', gap: 14, alignItems: 'baseline', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px' }}>
-              <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 12, fontWeight: 700, color: ORANGE, flex: 'none', minWidth: 78 }}>{beat.t}</span>
+              <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 700, color: ORANGE, flex: 'none', minWidth: 78 }}>{beat.t}</span>
               <div style={{ minWidth: 0 }}>
                 <div style={{ fontSize: 14, color: INK, fontWeight: 700, lineHeight: 1.35 }}>{beat.onScreen}</div>
                 <div style={{ fontSize: 13, color: SUB, marginTop: 3, lineHeight: 1.45 }}>{beat.vo}</div>
@@ -1199,7 +1199,7 @@ function TheFix({ res }: { res: ScanResult }) {
             <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
               <div style={{ aspectRatio: '1 / 1', background: `#f1ece2 ${rival.thumb ? `url(${rival.thumb}) center/cover` : ''}` }} />
               <div style={{ padding: '11px 14px 13px' }}>
-                <div style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11, fontWeight: 700, color: ORANGE }}>Their ad · {rival.daysRunning}d</div>
+                <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, fontWeight: 700, color: ORANGE }}>Their ad · {rival.daysRunning}d</div>
                 <div style={{ fontSize: 13, color: INK, lineHeight: 1.35, marginTop: 3, maxHeight: 46, overflow: 'hidden' }}>{rival.hook || rival.brand}</div>
               </div>
             </div>
@@ -1298,7 +1298,7 @@ function CompetitorRefine({ pageId, onReaudit }: { pageId: string; onReaudit: (i
             {results.map((b) => (
               <button key={b.pageId} onClick={() => add(b)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 15px', background: 'none', border: 'none', borderBottom: `1px solid ${LINE}`, cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontWeight: 700, fontSize: 14.5, color: INK }}>{b.name}</span>
-                <span style={{ fontFamily: 'ui-monospace,monospace', fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
+                <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11.5, color: SUB }}>{b.adCount ? `${b.adCount.toLocaleString()} ads` : '+ add'}</span>
               </button>
             ))}
           </div>

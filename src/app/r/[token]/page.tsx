@@ -46,7 +46,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
 
   if (!snap) {
     return (
-      <div style={{ minHeight: '100vh', background: '#f3eee3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: '#f3eee3', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         <div style={{ textAlign: 'center', color: '#3a5a3a' }}>
           <div style={{ fontSize: 40, marginBottom: 10 }}>🔗</div>
           <div style={{ fontSize: 18, fontWeight: 800, color: '#141d15' }}>This shared report isn’t available</div>
@@ -63,7 +63,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
   const currency = snap.currency || 'USD'
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f3eee3', fontFamily: '-apple-system,Segoe UI,Roboto,sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f3eee3', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       {/* Top bar */}
       <div style={{ background: '#141d15', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://tryselfmade.ai" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>

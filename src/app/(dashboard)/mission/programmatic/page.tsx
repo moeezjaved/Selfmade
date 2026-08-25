@@ -121,7 +121,7 @@ export default function ProgrammaticPage() {
               <label key={d.id} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: '12px 14px', display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer' }}>
                 <input type="checkbox" checked={!!sel[d.id]} onChange={() => setSel((s) => ({ ...s, [d.id]: !s[d.id] }))} style={{ accentColor: LIME, width: 15, height: 15 }} />
                 <span style={{ fontSize: 13.5, fontWeight: 700, flex: 1, minWidth: 0 }}>{d.title}</span>
-                <span style={{ fontSize: 11, color: SUB, fontFamily: 'monospace' }}>{d.target_prompt.split(':')[0]}</span>
+                <span style={{ fontSize: 11, color: SUB, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{d.target_prompt.split(':')[0]}</span>
               </label>
             ))}
           </div>

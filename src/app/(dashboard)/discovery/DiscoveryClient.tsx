@@ -1874,7 +1874,7 @@ export default function DiscoveryPage() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <style>{`@keyframes spin { to { transform: rotate(360deg) } } @keyframes fadeUp { from { opacity: 0; transform: translateY(6px) } to { opacity: 1; transform: none } } .hide-scrollbar::-webkit-scrollbar { display: none } .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none }`}</style>
 
       {/* Brand Drawer */}

@@ -208,7 +208,7 @@ export default function WorkersPage() {
                         }} />
                         {w.is_live ? 'live' : 'offline'}
                       </td>
-                      <td style={{ padding: '10px 12px', fontFamily: 'ui-monospace, monospace', fontSize: 12 }}>{w.worker_id}</td>
+                      <td style={{ padding: '10px 12px', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12 }}>{w.worker_id}</td>
                       <td style={{ padding: '10px 12px', color: '#666' }}>{w.hostname || '—'}</td>
                       <td style={{ padding: '10px 12px', fontWeight: 600 }}>{w.ads_per_min ?? '—'}</td>
                       <td style={{ padding: '10px 12px', color: '#666' }}>{formatDuration(sessionSec)}</td>

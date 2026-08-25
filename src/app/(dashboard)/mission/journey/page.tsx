@@ -212,7 +212,7 @@ function Stage({ s, last, rev }: { s: Stage; last: boolean; rev?: { text: string
             <a key={t.key} href={t.locked ? undefined : t.href} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '12px 15px', borderTop: i ? `1px solid ${LINE}` : 'none', textDecoration: 'none', color: 'inherit', cursor: t.locked ? 'default' : 'pointer', pointerEvents: t.locked ? 'none' : 'auto' }}>
               <span style={{ width: 18, height: 18, borderRadius: 100, flex: 'none', border: `2px solid ${t.done ? GOOD : t.locked ? MUT : LINE}`, background: t.done ? GOOD : 'transparent', color: '#fff', fontSize: 11, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 }}>{t.done ? '✓' : ''}</span>
               <span style={{ flex: 1, minWidth: 0, fontSize: 14, color: t.done ? INK : t.locked ? SUB : INK, fontWeight: t.done ? 600 : 700, textDecoration: t.done ? 'none' : 'none' }}>{t.label}</span>
-              {t.value && <span style={{ fontSize: 11.5, fontFamily: 'monospace', color: t.done ? GOOD : SUB }}>{t.value}</span>}
+              {t.value && <span style={{ fontSize: 11.5, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", color: t.done ? GOOD : SUB }}>{t.value}</span>}
               {!t.locked && !t.done && <span style={{ color: LIME, fontSize: 15 }}>→</span>}
             </a>
           ))}

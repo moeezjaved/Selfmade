@@ -405,7 +405,7 @@ export default function BrandsPage() {
                       <div style={{ fontSize: 12, color: '#666' }}>
                         {urlLookupResult.follower_count?.toLocaleString() || '?'} followers · {urlLookupResult.category}
                       </div>
-                      <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace', marginTop: 2 }}>
+                      <div style={{ fontSize: 11, color: '#888', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", marginTop: 2 }}>
                         Page ID: {urlLookupResult.page_id}
                       </div>
                     </div>
@@ -465,7 +465,7 @@ export default function BrandsPage() {
             value={importCsv}
             onChange={e => setImportCsv(e.target.value)}
             placeholder={`brand_name,page_id,category,priority\ngymshark,129669023798560,gymwear,8\nlululemon,,athleisure,7\nnike,,sports,8`}
-            style={{ width: '100%', minHeight: 200, padding: 12, fontSize: 12, fontFamily: 'ui-monospace, monospace', border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
+            style={{ width: '100%', minHeight: 200, padding: 12, fontSize: 12, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", border: '1px solid #e2e8f0', borderRadius: 8, outline: 'none' }}
           />
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 10 }}>
             <button onClick={runBulkImport} disabled={importing || !importCsv.trim()}
@@ -633,7 +633,7 @@ export default function BrandsPage() {
                             }}>UNVERIFIED</span>
                           )}
                         </div>
-                        {t.page_id && <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{t.page_id}</div>}
+                        {t.page_id && <div style={{ fontSize: 11, color: '#888', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{t.page_id}</div>}
                         {t.follower_count != null && (
                           <div style={{ fontSize: 10, color: '#666' }}>{t.follower_count.toLocaleString()} followers</div>
                         )}
@@ -778,7 +778,7 @@ function PreviewDrawer({ brand, data, loading, removed, onRestore, onClose }: {
         <div style={{ padding: 18, borderBottom: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 800 }}>{brand.brand_name}</div>
-            <div style={{ fontSize: 11, color: '#888', fontFamily: 'ui-monospace, monospace' }}>{brand.page_id}</div>
+            <div style={{ fontSize: 11, color: '#888', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>{brand.page_id}</div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             {removed && onRestore && (
@@ -830,7 +830,7 @@ function PreviewDrawer({ brand, data, loading, removed, onRestore, onClose }: {
                         {ad.is_active ? 'Active' : 'Inactive'}
                         {ad.display_format && <span style={{ marginLeft: 8, color: '#94a3b8' }}>· {ad.display_format}</span>}
                       </span>
-                      <span style={{ fontFamily: 'ui-monospace, monospace', fontSize: 10 }}>{ad.ad_id}</span>
+                      <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 10 }}>{ad.ad_id}</span>
                     </div>
                     {heroImage && (
                       <img src={heroImage} alt="" loading="lazy" referrerPolicy="no-referrer"

@@ -114,7 +114,7 @@ export default function BillingPage() {
   const isLocked = isPastDue || isCanceled || (status === 'trialing' && trialEnded) || expired
 
   return (
-    <div style={{ padding: '32px 28px', maxWidth: 1120, fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ padding: '32px 28px', maxWidth: 1120, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <h1 style={{ fontSize: 22, fontWeight: 800, color: '#141d15', marginBottom: 4 }}>Billing & plans</h1>
       <p style={{ fontSize: 13, color: '#7a9a7a', marginBottom: 28 }}>Choose a plan, buy top-ups, or manage your subscription.</p>
 
@@ -201,7 +201,7 @@ export default function BillingPage() {
               onChange={e => setInviteCode(e.target.value.toUpperCase())}
               placeholder="SM-XXXXXXXX"
               onKeyDown={e => e.key === 'Enter' && redeemCode()}
-              style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, fontFamily: 'monospace', fontWeight: 700, letterSpacing: '.05em', outline: 'none' }}
+              style={{ flex: 1, padding: '10px 14px', border: '1.5px solid #e5e7eb', borderRadius: 10, fontSize: 14, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 700, letterSpacing: '.05em', outline: 'none' }}
             />
             <button
               onClick={redeemCode}

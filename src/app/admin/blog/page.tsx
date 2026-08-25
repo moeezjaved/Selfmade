@@ -141,7 +141,7 @@ export default function AdminBlog() {
               <label style={lbl}>Body (Markdown) · {readingTimeMin(editing.body_md)} min read</label>
               <textarea value={editing.body_md} onChange={(e) => set('body_md', e.target.value)} spellCheck
                 placeholder={'## A big subhead\n\nWrite in **markdown**. Use *italics*, [links](https://…), lists:\n\n- point one\n- point two\n\n> A pull quote.\n\n![alt text](https://…/image.jpg)'}
-                style={{ width: '100%', minHeight: 520, padding: 16, border: '1px solid #d1d5db', borderRadius: 10, fontSize: 14.5, lineHeight: 1.6, fontFamily: 'ui-monospace,SFMono-Regular,Menlo,monospace', boxSizing: 'border-box', resize: 'vertical' }} />
+                style={{ width: '100%', minHeight: 520, padding: 16, border: '1px solid #d1d5db', borderRadius: 10, fontSize: 14.5, lineHeight: 1.6, fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", boxSizing: 'border-box', resize: 'vertical' }} />
             </div>
             <div>
               <label style={lbl}>Live preview</label>

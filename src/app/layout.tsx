@@ -42,12 +42,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               `window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments)}gtag('js',new Date());gtag('config','${process.env.NEXT_PUBLIC_GA_ID}');` }} />
           </>
         )}
-        <link rel="preconnect" href="https://fonts.googleapis.com"/>
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous"/>
-        <link
-          href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&display=swap"
-          rel="stylesheet"
-        />
+        {/* Fonts are remapped to one Helvetica/Arial grotesque in globals.css (matches Lapis's
+            Die Grotesk look); no web fonts are loaded. */}
         <style>{`
       @keyframes sm-pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(.9); opacity: .78 } }
       .selfmade-loading {

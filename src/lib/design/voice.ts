@@ -46,7 +46,7 @@ export const mello = (size = 20): CSSProperties => ({
 export const ui: CSSProperties = { fontFamily: "'Inter', -apple-system, BlinkMacSystemFont, sans-serif" }
 
 /** THE MACHINE AT WORK — mono. Narration, timestamps, logs. Signals "the system is doing something." */
-export const machine: CSSProperties = { fontFamily: "ui-monospace, 'SF Mono', 'SFMono-Regular', Menlo, monospace" }
+export const machine: CSSProperties = { fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }
 
 /** An uppercase eyebrow label — the quiet section marker used across the brief/scan. */
 export const label: CSSProperties = {

@@ -892,7 +892,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                             const cut = removedShots.has(i)
                             return (
                               <div key={i} style={{ display: 'flex', gap: 10, padding: '9px 12px', borderTop: i ? `1px solid ${L_LINE}` : 'none', alignItems: 'baseline', opacity: cut ? 0.4 : 1 }}>
-                                <span style={{ fontFamily: 'ui-monospace, Menlo, monospace', fontSize: 11, fontWeight: 700, color: '#ef4a1e', whiteSpace: 'nowrap', minWidth: 58, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
+                                <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 11, fontWeight: 700, color: '#ef4a1e', whiteSpace: 'nowrap', minWidth: 58, textDecoration: cut ? 'line-through' : 'none' }}>{s.t}</span>
                                 <span style={{ flex: 1, fontSize: 12.5, color: '#33372f', lineHeight: 1.5, textDecoration: cut ? 'line-through' : 'none' }}>{s.action}{s.lens ? <span style={{ color: '#9aa79a' }}> · {s.lens}</span> : null}{s.shows ? <span style={{ color: '#ef4a1e', fontWeight: 700 }}> · shows {s.shows}</span> : null}</span>
                                 <button onClick={() => setRemovedShots(prev => { const n = new Set(prev); n.has(i) ? n.delete(i) : n.add(i); return n })} style={{ background: 'none', border: 'none', color: cut ? '#ef4a1e' : '#c0392b', fontSize: 12, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit', flexShrink: 0, padding: 0 }}>{cut ? 'Undo' : 'Remove'}</button>
                               </div>
@@ -923,7 +923,7 @@ export default function CloneVideoModal({ sourceAdId, sourceVideoUrl, sourcePost
                             ✦ What Seedance 2.5 receives <span style={{ color: L_MUTED, fontWeight: 600 }}>· exact prompt + {selected.length + 1} reference image{selected.length ? 's' : ''} — updates as you edit</span>
                           </summary>
                           <div style={{ padding: '0 13px 13px' }}>
-                            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: 'ui-monospace, Menlo, monospace', background: '#fff', border: `1px solid ${L_LINE}`, borderRadius: 10, padding: '10px 12px' }}>
+                            <div style={{ fontSize: 12.5, lineHeight: 1.6, color: '#33372f', whiteSpace: 'pre-wrap', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", background: '#fff', border: `1px solid ${L_LINE}`, borderRadius: 10, padding: '10px 12px' }}>
                               {buildOneShotPreview({ secs: targetSecs, isService, productCount: selected.length, script: draftScript, langLabel: (langCfg.label || 'English').split(' ')[0] })}
                             </div>
                             <div style={{ fontSize: 11, color: L_MUTED, marginTop: 7 }}><b>[Image1]</b> = approved opening frame · <b>[Image2…]</b> = your product photos.</div>

@@ -26,7 +26,7 @@ export default function AdminLogin() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', fontFamily: 'system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#0a0a0a', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
       <div style={{ background: '#141414', padding: '48px', borderRadius: '16px', width: '380px', border: '1px solid #222' }}>
         <div style={{ marginBottom: '32px' }}>
           <div style={{ fontSize: '13px', fontWeight: '700', letterSpacing: '0.15em', color: '#666', textTransform: 'uppercase', marginBottom: '8px' }}>Selfmade</div>

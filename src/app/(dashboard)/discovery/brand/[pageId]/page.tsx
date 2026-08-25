@@ -263,7 +263,7 @@ export default function BrandPage() {
   const isPermError = error.toLowerCase().includes('permission') || error.toLowerCase().includes('application does not')
 
   return (
-    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: 'system-ui, -apple-system, sans-serif' }}>
+    <div style={{ minHeight: '100vh', background: '#f8fafc', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
 
       {/* ── Header ── */}
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '16px 28px' }}>
