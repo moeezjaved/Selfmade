@@ -81,6 +81,7 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
       !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
       !v.brandingClean && `Every logo and brand name shown must belong to ${opts.brandName ? `"${opts.brandName}"` : "the brand"} only.`,
       !v.textClean && 'Fix all text: correct spelling, no repeated words or duplicated text blocks.',
+      !v.productProportional && 'Size the product at a natural, believable real-world scale — smaller, not larger-than-life; it must not dominate the frame.',
     ].filter(Boolean).join(' ')
   }
   if (!best) return null
