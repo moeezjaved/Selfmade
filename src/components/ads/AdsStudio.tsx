@@ -193,6 +193,25 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   }
   const replaceLast = (m: ChatMsg[], next: ChatMsg) => { const c = [...m]; c[c.length - 1] = next; return c }
 
+  // "Create Similar" (Discover/Competitor): attach the reference AND the user's main product AND pre-fill
+  // the prompt — so the user just hits Generate. A remake is one click, not "now type something".
+  const primeFromReference = (t: StudioTag) => {
+    setTags((x) => {
+      const next = x.some((y) => y.image === t.image) ? [...x] : [...x, t]
+      const prod = products.find((p) => p.image)
+      if (prod && !next.some((y) => y.kind === 'product' || y.kind === 'upload')) next.push({ label: prod.title.slice(0, 24), image: prod.image, kind: 'product' })
+      return next
+    })
+    setInput(`Create an ad like this for ${kit?.siteName || 'my product'}`)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+  // Products row: attach the product + pre-fill, ready to generate in one click.
+  const primeFromProduct = (t: StudioTag) => {
+    setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))
+    setInput(`Make a scroll-stopping ${format} ad featuring ${t.label}`)
+    if (typeof window !== 'undefined') window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   const chips = ['Create an Instagram ad campaign', 'Generate ad creatives for my product', 'Design a product launch campaign', 'Make a WhatsApp promotional banner', 'Design a seasonal sale campaign', 'Create a LinkedIn thought-leadership post']
   const started = msgs.length > 0
   const dd = (label: string, val: string, which: 'aspect' | 'lang', opts: string[]) => (
@@ -266,7 +285,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
               <div style={{ maxWidth: '78%', background: '#fdeee9', color: INK, borderRadius: '16px 16px 4px 16px', padding: '11px 15px', fontSize: 14.5 }}>{m.text}</div>
             </div>
           ) : m.loading ? (
-            <div key={i} style={{ flexBasis: '100%', display: 'flex', alignItems: 'center', gap: 10, color: SUB, fontSize: 14, padding: '4px 0' }}><span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />Mello is designing your {m.format} ad… this takes ~30–60s.</div>
+            <div key={i} style={{ flexBasis: '100%', padding: '4px 0' }}><GeneratingCard format={m.format || 'ad'} /></div>
           ) : m.error ? (
             <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
           ) : (
@@ -292,15 +311,46 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       )}
 
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
-      {!started && <HomeDiscoverRow onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
-      {!started && <HomeProductsRow products={products} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
-      {!started && <HomeCompetitorsRow domain={domain} onTag={(t) => setTags((x) => (x.some((y) => y.image === t.image) ? x : [...x, t]))} />}
+      {!started && <HomeDiscoverRow onTag={primeFromReference} />}
+      {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
+      {!started && <HomeCompetitorsRow domain={domain} onTag={primeFromReference} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={(e) => setTags((x) => (x.some((y) => y.image === e.url) ? x : [...x, { label: e.label.slice(0, 24), image: e.url, kind: 'element' }]))} />}
     </div>
   )
 }
 
 /** A CSS-rendered ad template card (our generic templates, brand-fillable). */
+/** ChatGPT-style staged progress while a single (long) generation runs — a shimmer result card + a
+ *  checklist that advances on a timer, so a 30-60s render feels alive instead of a frozen spinner. */
+function GeneratingCard({ format }: { format: string }) {
+  const stages = ['Reading your brand kit', 'Writing the concept & headline', 'Designing the layout', `Rendering your ${format} ad in high-res`, 'Polishing the details']
+  const [s, setS] = useState(0)
+  useEffect(() => { const t = setInterval(() => setS((x) => Math.min(x + 1, stages.length - 1)), 6500); return () => clearInterval(t) }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+  return (
+    <div style={{ display: 'flex', gap: 18, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+      <div style={{ width: 236, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
+        <div style={{ aspectRatio: '4 / 5', backgroundImage: 'linear-gradient(100deg, #f1ece4 30%, #fbf9f5 50%, #f1ece4 70%)', backgroundSize: '220% 100%', animation: 'sfShimmer 1.5s ease-in-out infinite' }} />
+      </div>
+      <div style={{ paddingTop: 6, minWidth: 210 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 14.5, fontWeight: 800, color: INK, marginBottom: 14 }}>
+          <span style={{ width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} />
+          Mello is designing your {format} ad
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {stages.map((st, i) => (
+            <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, fontWeight: i === s ? 700 : 500, color: i <= s ? INK : SUB, opacity: i <= s ? 1 : 0.5, transition: 'opacity .3s, color .3s' }}>
+              <span style={{ width: 16, height: 16, flex: 'none', borderRadius: '50%', border: `1.5px solid ${i <= s ? ORANGE : LINE}`, background: i < s ? ORANGE : '#fff', color: '#fff', fontSize: 9, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {i < s ? '✓' : i === s ? <span style={{ width: 6, height: 6, borderRadius: '50%', background: ORANGE }} /> : ''}
+              </span>
+              {st}{i === s ? '…' : ''}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 type Template = { title: string; concept: string; image?: string | null; headline?: string; angle?: string; generating?: boolean; failed?: boolean }
 function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isMobile: boolean; domain: string; kit: BrandKitLite | null; products: { title: string; image: string | null }[]; onUse: (t: { title: string; image?: string | null }) => void }) {
   const [tpls, setTpls] = useState<Template[] | null>(null)
