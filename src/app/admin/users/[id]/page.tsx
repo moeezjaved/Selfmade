@@ -1,5 +1,5 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface UserDetail {
@@ -13,11 +13,11 @@ interface UserDetail {
   brands_created?: { id: string; name: string; brand_type: string | null; created_at: string | null }[];
   errors: { id: string; error_message: string; page_url: string | null; created_at: string }[];
   follows: { page_id: string; brand_name: string | null; email_alerts: boolean; created_at: string }[];
-  creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
+  creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_id: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
   credit_balance?: number | null;
   logins?: { d7: number; d30: number; total: number; recent: string[] };
   revenue?: { total: number; organic: number; orders: number; currency: string };
-  reports?: { id: string; kind: string; title: string; subject: string | null; model: string | null; ad_count: number | null; created_at: string }[];
+  reports?: { id: string; kind: string; title: string; subject: string | null; model: string | null; ad_count: number | null; body_md?: string; created_at: string }[];
   brands_workspace?: BrandWorkspace[];
 }
 
@@ -162,6 +162,7 @@ export default function UserProfile({ params }: { params: { id: string } }) {
   const router = useRouter()
 
   const [extending, setExtending] = useState(false)
+  const [openReport, setOpenReport] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/admin/users/${params.id}`)
@@ -429,6 +430,30 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                     </div>
                   </SubBlock>
                 )}
+
+                {/* ── Generated ads for THIS brand (the actual creatives they made) ── */}
+                {(() => {
+                  const brandAds = user.creatives.filter((c) => c.brand_id === b.id)
+                  if (brandAds.length === 0) return null
+                  return (
+                    <SubBlock label={`Generated ads (${brandAds.length})`}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(110px, 1fr))', gap: 10 }}>
+                        {brandAds.slice(0, 24).map((c) => (
+                          <a key={c.id} href={c.image_url || '#'} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden', background: '#fafafa' }}>
+                            <div style={{ position: 'relative', aspectRatio: '1', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {c.media_type === 'video'
+                                ? <video src={c.image_url || ''} muted style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                // eslint-disable-next-line @next/next/no-img-element
+                                : c.image_url ? <img src={c.image_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                                : <span style={{ color: c.status === 'processing' ? '#ff5a2c' : '#666', fontSize: 10 }}>{c.status === 'processing' ? '⏳' : 'no image'}</span>}
+                              <span style={{ position: 'absolute', top: 4, left: 4, background: 'rgba(0,0,0,.65)', color: '#fff', borderRadius: 4, fontSize: 9, fontWeight: 700, padding: '1px 5px', textTransform: 'capitalize' }}>{c.type}</span>
+                            </div>
+                          </a>
+                        ))}
+                      </div>
+                    </SubBlock>
+                  )
+                })()}
               </div>
             ))}
           </div>
@@ -448,14 +473,26 @@ export default function UserProfile({ params }: { params: { id: string } }) {
             </thead>
             <tbody>
               {user.reports!.map(r => (
-                <tr key={r.id} style={{ borderBottom: '1px solid #f8f8f8' }}>
-                  <td style={{ padding: '9px 8px', color: '#111', fontWeight: 600 }}>{r.title}</td>
-                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.kind.replace(/_/g, ' ')}</td>
-                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.subject || '—'}</td>
-                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.ad_count ?? '—'}</td>
-                  <td style={{ padding: '9px 8px', color: '#888', fontSize: 11 }}>{r.model || '—'}</td>
-                  <td style={{ padding: '9px 8px', color: '#888' }}>{fmt(r.created_at)}</td>
-                </tr>
+                <React.Fragment key={r.id}>
+                  <tr onClick={() => setOpenReport(openReport === r.id ? null : r.id)}
+                    style={{ borderBottom: '1px solid #f8f8f8', cursor: r.body_md ? 'pointer' : 'default', background: openReport === r.id ? '#faf9f6' : 'transparent' }}>
+                    <td style={{ padding: '9px 8px', color: '#111', fontWeight: 600 }}>{r.body_md ? (openReport === r.id ? '▾ ' : '▸ ') : ''}{r.title}</td>
+                    <td style={{ padding: '9px 8px', color: '#555' }}>{r.kind.replace(/_/g, ' ')}</td>
+                    <td style={{ padding: '9px 8px', color: '#555' }}>{r.subject || '—'}</td>
+                    <td style={{ padding: '9px 8px', color: '#555' }}>{r.ad_count ?? '—'}</td>
+                    <td style={{ padding: '9px 8px', color: '#888', fontSize: 11 }}>{r.model || '—'}</td>
+                    <td style={{ padding: '9px 8px', color: '#888' }}>{fmt(r.created_at)}</td>
+                  </tr>
+                  {openReport === r.id && r.body_md && (
+                    <tr>
+                      <td colSpan={6} style={{ padding: '4px 8px 16px' }}>
+                        <div style={{ background: '#fff', border: '1px solid #eceeec', borderRadius: 8, padding: 16, maxHeight: 480, overflowY: 'auto', fontSize: 12.5, lineHeight: 1.6, color: '#222', whiteSpace: 'pre-wrap' }}>
+                          {r.body_md}
+                        </div>
+                      </td>
+                    </tr>
+                  )}
+                </React.Fragment>
               ))}
             </tbody>
           </table>
