@@ -29,6 +29,8 @@ const WITH_IMAGES = process.argv.includes('--with-images')
 // the ad-driven scan can't see them. This mode deletes by KEY instead — every videos/{adId}_*.mp4 whose
 // adId isn't in the keep set (spied brands' current ads + saved ads). Reclaims the orphaned TBs.
 const ORPHANS = process.argv.includes('--orphans')
+const MEASURE = process.argv.includes('--measure')   // just print the bucket size breakdown, then exit
+const SPIED = process.argv.includes('--spied')        // just list the spied brands, then exit
 const PAGE = 500
 // Cloudflare R2 standard storage: $0.015 per GB-month (egress is free). Dashboard is authoritative;
 // this is just to turn "GB reclaimed" into an at-a-glance $/month so you don't have to do the math.
@@ -51,6 +53,39 @@ async function loadIdSet(table: string, column: string, filter?: (q: any) => any
 }
 
 async function main() {
+  const gb = (n: number) => (n / 1073741824).toFixed(2)
+
+  // ── --measure: bucket size breakdown (videos / posters / images / other), then exit ──
+  if (MEASURE) {
+    console.log('\n📏 Measuring the selfmade-ads bucket…\n')
+    const prog = (label: string) => (c: number, b: number) => process.stdout.write(`\r   …${label}: ${c.toLocaleString()} (${gb(b)} GB)   `)
+    const sum = (m: Map<string, number>) => [...m.values()].reduce((s, n) => s + n, 0)
+    const vids = await listSizesByPrefix('videos/', prog('videos')); console.log('')
+    const post = await listSizesByPrefix('posters/', prog('posters')); console.log('')
+    const thumbnails = await listSizesByPrefix('thumbnails/', prog('thumbnails')); console.log('')
+    const thumbs = await listSizesByPrefix('thumbs/', prog('thumbs')); console.log('')
+    const vB = sum(vids), pB = sum(post), imgB = sum(thumbnails) + sum(thumbs), imgN = thumbnails.size + thumbs.size
+    console.log(`\n📁 Bucket breakdown`)
+    console.log(`   Videos:   ${vids.size.toLocaleString()} objects · ${gb(vB)} GB`)
+    console.log(`   Images:   ${imgN.toLocaleString()} objects · ${gb(imgB)} GB   (thumbnails/ + thumbs/)`)
+    console.log(`   Posters:  ${post.size.toLocaleString()} objects · ${gb(pB)} GB`)
+    console.log(`   ≈ Images cost: $${((imgB / 1073741824) * R2_USD_PER_GB_MONTH).toFixed(2)}/month\n`)
+    return
+  }
+
+  // ── --spied: list the spied brands, then exit ──
+  if (SPIED) {
+    const { data, error } = await (supabase as any).from('followed_brands').select('page_id, brand_name').eq('spied', true)
+    if (error) throw new Error(`spied: ${error.message}`)
+    const byPage = new Map<string, string>()
+    for (const r of (data as any[]) || []) if (r.page_id) byPage.set(String(r.page_id), r.brand_name || '(unnamed)')
+    const rows = [...byPage.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+    console.log(`\n🕵️  Spied brands: ${rows.length}\n`)
+    for (const [pid, name] of rows) console.log(`   ${name.padEnd(34)}  page_id ${pid}`)
+    console.log('')
+    return
+  }
+
   console.log(`\n🎬 Purge non-spied discovery videos ${DRY ? '(DRY RUN — nothing will be deleted)' : '(LIVE)'}\n`)
 
   // 1) Keep-sets
@@ -217,7 +252,6 @@ async function main() {
   const vBytes = safeVideo.reduce((s, k) => s + (videoSizes.get(k) ?? 0), 0)
   const pBytes = safePoster.reduce((s, k) => s + (posterSizes.get(k) ?? 0), 0)
   const freedBytes = vBytes + pBytes
-  const gb = (n: number) => (n / 1073741824).toFixed(2)
   const freedGB = freedBytes / 1073741824
   // "Known" bucket size from the prefixes we measured. If images weren't measured we still report the
   // reclaim + $ saved exactly; the % / after-total only show when --with-images gave us the full bucket.
