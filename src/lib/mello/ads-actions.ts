@@ -29,8 +29,8 @@ export type AdAction =
       cta: string
       linkUrl: string
       mode?: 'new' | 'refresh' | 'carousel'   // creative→FB bridge variants
-      targetCampaignId?: string           // for refresh/carousel/add-to-campaign
-      pauseAdId?: string                  // ad to pause when refreshing
+      adsetId?: string                    // refresh/carousel: existing ad set to add into (inherits budget/targeting)
+      pauseAdId?: string                  // ad to pause when refreshing/carousel-ing
       extraImageUrls?: string[]           // carousel: existing card images to keep
     }
 
@@ -175,6 +175,44 @@ async function launchCopy(description: string, brand?: string): Promise<{ headli
   } catch { return { headline: 'Shop now', primaryText: '', cta: CTA_DEFAULT } }
 }
 
+/**
+ * Plan a creative→Facebook attach: Refresh (swap an ad's creative) or Carousel (add a card). The founder
+ * picked which live ad to target; we inherit its ad set (budget + audience) and copy, and pause the old ad.
+ */
+export async function planAttach(
+  userId: string,
+  spec: { creativeUrl: string; brandName?: string; website?: string; variant: 'refresh' | 'carousel'; targetAdId: string },
+): Promise<PlanResult> {
+  const mc = await createMetaClientForUser(userId).catch(() => null)
+  if (!mc) return { error: 'Meta isn’t connected — reconnect and try again.' }
+  const { currency, pageId } = await accountCtx(userId)
+  if (!pageId) return { error: 'No Facebook Page linked to this ad account — reconnect Meta with a Page.' }
+  const ads = await mc.listAdsForPicker()
+  const target = ads.find((a) => a.adId === spec.targetAdId)
+  if (!target) return { error: 'That ad isn’t on your account anymore — pick another.' }
+
+  const linkUrl = target.linkUrl || (spec.website ? (spec.website.startsWith('http') ? spec.website : `https://${spec.website}`) : 'https://')
+  const headline = target.headline || 'Shop now'
+  const primaryText = target.primaryText || ''
+  const isRefresh = spec.variant === 'refresh'
+  return { ok: true, card: {
+    title: isRefresh ? `Refresh “${target.name}”` : `Add a carousel card to “${target.name}”`,
+    summary: isRefresh
+      ? `Your new creative replaces it — a fresh ad in the same campaign (“${target.campaignName}”), inheriting its budget & audience. The old ad pauses. Launches PAUSED.`
+      : `Builds a carousel from the existing image + your new one in “${target.campaignName}”. The old ad pauses. Launches PAUSED.`,
+    lines: [`Campaign: ${target.campaignName}`, `Copy inherited: ${headline}`],
+    confirmLabel: isRefresh ? 'Approve — refresh (paused)' : 'Approve — add carousel (paused)',
+    currency,
+    action: {
+      kind: 'launch', mode: spec.variant, creativeUrl: spec.creativeUrl,
+      adsetId: target.adsetId, pauseAdId: target.adId,
+      extraImageUrls: !isRefresh && target.image ? [target.image] : [],
+      campaignName: target.campaignName || (isRefresh ? 'Refreshed ad' : 'Carousel ad'),
+      dailyBudget: 0, description: '', headline, primaryText, cta: CTA_DEFAULT, linkUrl,
+    },
+  } }
+}
+
 /** The founder approved the card → perform the write. Returns a human result + logs a Win. */
 export async function executeAction(userId: string, action: AdAction): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const mc = await createMetaClientForUser(userId).catch(() => null)
@@ -195,10 +233,28 @@ export async function executeAction(userId: string, action: AdAction): Promise<{
     if (action.kind === 'launch') {
       const { pageId } = await accountCtx(userId)
       if (!pageId) return { ok: false, error: 'No Facebook Page linked — reconnect Meta with a Page.' }
-      const img = await mc.uploadAdImage(action.creativeUrl)
-      const imageHash = img?.images?.[Object.keys(img.images || {})[0]]?.hash || img?.hash
+      const uploadHash = async (url: string) => { const img = await mc.uploadAdImage(url); return img?.images?.[Object.keys(img.images || {})[0]]?.hash || img?.hash }
+      const imageHash = await uploadHash(action.creativeUrl)
       if (!imageHash) return { ok: false, error: 'Couldn’t upload the creative to Meta — try again.' }
-      // Targeting: clone a winner, else interests, else broad.
+
+      // ── Refresh / Carousel → add into the EXISTING ad set (inherits its budget + targeting), then pause
+      // the old ad. Meta can't swap a live ad's creative in place; this is the correct, safe equivalent. ──
+      if ((action.mode === 'refresh' || action.mode === 'carousel') && action.adsetId) {
+        const copy = { headline: action.headline, primaryText: action.primaryText, cta: action.cta, linkUrl: action.linkUrl }
+        if (action.mode === 'refresh') {
+          await mc.createImageAdInAdSet(action.adsetId, pageId, imageHash, copy, action.campaignName, 'PAUSED')
+        } else {
+          const cards: { imageHash: string; link: string }[] = []
+          for (const u of (action.extraImageUrls || [])) { const h = await uploadHash(u); if (h) cards.push({ imageHash: h, link: action.linkUrl }) }
+          cards.push({ imageHash, link: action.linkUrl })
+          await mc.createCarouselAdInAdSet(action.adsetId, pageId, cards, { primaryText: action.primaryText, cta: action.cta, linkUrl: action.linkUrl }, action.campaignName, 'PAUSED')
+        }
+        if (action.pauseAdId) { try { await mc.setAdStatus(action.pauseAdId, 'PAUSED') } catch { /* best-effort */ } }
+        await win(`${action.mode === 'refresh' ? 'Refreshed' : 'Carousel'} ad in “${action.campaignName}”`, 'New creative added; old ad paused; PAUSED for review', { adsetId: action.adsetId, mode: action.mode })
+        return { ok: true, message: `Done — your ${action.mode === 'refresh' ? 'refreshed' : 'carousel'} ad is created PAUSED in the same campaign, and the old ad is paused. Review it in Meta, then set it live.` }
+      }
+
+      // ── New campaign (default) ── Targeting: clone a winner, else interests, else broad.
       let targeting: Record<string, unknown> = { geo_locations: { countries: ['US'] } }
       if (action.copyWinnerId) { const t = await mc.firstAdSetTargeting(action.copyWinnerId); if (t) targeting = t }
       else if (action.interests?.length) targeting = { geo_locations: { countries: ['US'] }, flexible_spec: [{ interests: action.interests.map((i) => ({ id: i.id, name: i.name })) }] }
@@ -207,8 +263,6 @@ export async function executeAction(userId: string, action: AdAction): Promise<{
         startTime: new Date(Date.now() + 60_000).toISOString(), pageId,
         creative: { imageHash, headline: action.headline, primaryText: action.primaryText, cta: action.cta, linkUrl: action.linkUrl },
       })
-      // Refresh: pause the old ad so the new creative replaces it.
-      if (action.mode === 'refresh' && action.pauseAdId) { try { await mc.setAdStatus(action.pauseAdId, 'PAUSED') } catch { /* best-effort */ } }
       await win(`Launched “${action.campaignName}”`, `New ad · ${action.dailyBudget}/day · PAUSED for review`, { campaignId: launched?.campaign_id, mode: action.mode })
       return { ok: true, message: `“${action.campaignName}” is created and PAUSED — review it in Meta, then set it live when you're ready.` }
     }
