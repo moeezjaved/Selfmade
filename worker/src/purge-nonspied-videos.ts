@@ -90,30 +90,44 @@ async function main() {
   const adsToDelete: string[] = []
   const adsToStrip: string[] = []
 
-  let from = 0
+  // KEYSET pagination by the PK (ad_id) — NOT range/offset. Offset pagination re-scans + skips a growing
+  // prefix each page (with the leading-wildcard video_url filter), which times out past ~50k. Keyset stays
+  // an index-ordered fetch at any depth. We sweep ALL ads by ad_id and filter to R2 videos in JS, so every
+  // query is a plain `ad_id > last ORDER BY ad_id LIMIT n` that can't time out.
+  const SWEEP = 1000
+  let lastId = ''
+  let sweptRows = 0
   for (;;) {
     const { data, error } = await (supabase as any)
       .from('discovery_ads_index')
       .select('ad_id, page_id, video_url, thumbnail_url')
-      .ilike('video_url', '%r2%')
-      .range(from, from + PAGE - 1)
+      .gt('ad_id', lastId)
+      .order('ad_id', { ascending: true })
+      .limit(SWEEP)
     if (error) throw new Error(`scan: ${error.message}`)
     const rows = (data as any[]) || []
     if (!rows.length) break
+    lastId = rows[rows.length - 1].ad_id
+    sweptRows += rows.length
 
-    // Batch-load this page's creatives so we know image-vs-video per ad in one query.
-    const adIds = rows.map((a) => a.ad_id)
-    const { data: cre } = await (supabase as any)
-      .from('discovery_creatives').select('ad_id, asset_type, r2_url, poster_url').in('ad_id', adIds)
+    // Only the ads that actually carry an R2 video are in scope.
+    const vidRows = rows.filter((a) => typeof a.video_url === 'string' && /r2/i.test(a.video_url))
+
+    // Batch-load creatives for just those ads (chunked so the .in() querystring stays small).
     const byAd = new Map<string, { images: number; vids: { r2: string | null; poster: string | null }[] }>()
-    for (const c of (cre as any[]) || []) {
-      const e = byAd.get(c.ad_id) || { images: 0, vids: [] }
-      if (c.asset_type === 'image') e.images++
-      else if (c.asset_type === 'video') e.vids.push({ r2: c.r2_url, poster: c.poster_url })
-      byAd.set(c.ad_id, e)
+    for (let i = 0; i < vidRows.length; i += 300) {
+      const ids = vidRows.slice(i, i + 300).map((a) => a.ad_id)
+      const { data: cre } = await (supabase as any)
+        .from('discovery_creatives').select('ad_id, asset_type, r2_url, poster_url').in('ad_id', ids)
+      for (const c of (cre as any[]) || []) {
+        const e = byAd.get(c.ad_id) || { images: 0, vids: [] }
+        if (c.asset_type === 'image') e.images++
+        else if (c.asset_type === 'video') e.vids.push({ r2: c.r2_url, poster: c.poster_url })
+        byAd.set(c.ad_id, e)
+      }
     }
 
-    for (const a of rows) {
+    for (const a of vidRows) {
       scanned++
       if (keepPages.has(String(a.page_id))) { keptSpied++; continue }
       if (keepAds.has(String(a.ad_id))) { keptSaved++; continue }
@@ -136,9 +150,8 @@ async function main() {
       }
     }
 
-    from += rows.length
-    if (scanned % 10000 < PAGE) console.log(`   …scanned ${scanned}`)
-    if (rows.length < PAGE) break
+    if (sweptRows % 50000 < SWEEP) console.log(`   …swept ${sweptRows.toLocaleString()} ads · ${scanned.toLocaleString()} with an R2 video`)
+    if (rows.length < SWEEP) break
   }
 
   // Safety: only ever touch videos/ and posters/ keys.
