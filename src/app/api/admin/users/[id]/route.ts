@@ -22,7 +22,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     admin.from('error_logs').select('id, error_message, page_url, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
     // Brands this user follows (spy/alerts) + their AI creatives.
     admin.from('followed_brands').select('page_id, brand_name, email_alerts, created_at').eq('user_id', userId).order('created_at', { ascending: false }),
-    admin.from('creative_generations').select('id, type, tier, media_type, status, prompt, image_url, brand_id, source_ad_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
+    admin.from('creative_generations').select('id, type, tier, model, media_type, status, prompt, image_url, brand_id, source_ad_id, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(60),
     // website + brand_kit so the admin can see each workspace's site, knowledge base, templates + audiences.
     admin.from('brands').select('id, name, website, brand_kit, created_at, brand_type').eq('user_id', userId).order('created_at', { ascending: false }),
     // Did they engage the M4 launch flow at all (even a failed attempt)? Newly tracked as an activity.

@@ -13,7 +13,7 @@ interface UserDetail {
   brands_created?: { id: string; name: string; brand_type: string | null; created_at: string | null }[];
   errors: { id: string; error_message: string; page_url: string | null; created_at: string }[];
   follows: { page_id: string; brand_name: string | null; email_alerts: boolean; created_at: string }[];
-  creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_id: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
+  creatives: { id: string; type: string; tier: string; model: string | null; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_id: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
   credit_balance?: number | null;
   logins?: { d7: number; d30: number; total: number; recent: string[] };
   revenue?: { total: number; organic: number; orders: number; currency: string };
@@ -573,6 +573,10 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                 <div style={{ padding: '7px 8px' }}>
                   <div style={{ fontSize: 11.5, color: '#333', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{c.brand_name || c.prompt || 'Untitled'}</div>
                   <div style={{ fontSize: 10, color: '#aaa', marginTop: 2 }}>{fmt(c.created_at)}</div>
+                  {/* Real model that ran (provenance). Older rows predate model-logging → "model not recorded". */}
+                  <div style={{ fontSize: 9.5, marginTop: 3, fontWeight: 700, color: c.model ? (/pro/i.test(c.model) ? '#16a34a' : '#d97706') : '#c3c7c3' }} title="The actual image model that generated this">
+                    {c.model ? (/pro/i.test(c.model) ? `✓ ${c.model}` : `⚠ ${c.model}`) : 'model not recorded'}
+                  </div>
                   {/* Which ad this was cloned from — click opens it in Discovery (nested-anchor-safe via onClick). */}
                   {c.source_ad_id && (
                     <div onClick={(e) => { e.preventDefault(); e.stopPropagation(); window.open(`/discovery/${c.source_ad_id}`, '_blank') }}

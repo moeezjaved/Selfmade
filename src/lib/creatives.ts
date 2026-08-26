@@ -18,6 +18,7 @@ export type SaveGenerationInput = {
   sourceAdId?: string | null
   parentId?: string | null
   prompt?: string | null
+  model?: string | null   // the ACTUAL image model that ran (e.g. gemini-3-pro-image) — provenance, not the tier label
 }
 
 function keyFor(userId: string, ext: string) {
@@ -44,6 +45,7 @@ export async function saveGeneration(input: SaveGenerationInput): Promise<{ id: 
       parent_id: input.parentId || null,
       type: input.type,
       tier: input.tier || 'default',
+      model: input.model || null,
       prompt: input.prompt || null,
       image_url: url,
     }).select('id').single()
