@@ -10,9 +10,9 @@ import LandingV2 from './LandingV2'
 import AmbientAudio from './AmbientAudio'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
-const TITLE = 'Selfmade — The Company That Runs Itself'
-const DESC = 'You just hired a marketing company. No employees, no agency, no freelancers. Research, Creative, Media Buying and Customer care — a whole team run by Mello. They study your market every night across 3M+ ads and 611K brands and bring you the work every morning, already done. Nothing ships without your yes.'
-const OG_DESC = 'Hire a marketing company, not software. Your team works every night and brings you the work every morning — already done. You approve; it ships.'
+const TITLE = 'Selfmade — Ecommerce, version two'
+const DESC = 'The growth team your store could never afford — now AI. Ads, SEO, conversion, and website design, on autopilot. Selfmade learns your brand, does the marketing, and brings you the work already done. Nothing ships without your yes.'
+const OG_DESC = 'Ecommerce, version two. The growth team your store could never afford — now AI. Ads, SEO, conversion & website design on autopilot. You approve; it ships.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
