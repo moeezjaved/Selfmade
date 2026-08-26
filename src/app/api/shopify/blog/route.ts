@@ -13,6 +13,7 @@ import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, generateHero, renderArticleHtml, publishToShopifyBlog, suggestTopics, type Article } from '@/lib/shopify/blog'
 import { getPlanId, isGrandfathered } from '@/lib/entitlements'
 import { resolveBillingOwner } from '@/lib/org'
+import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -47,24 +48,35 @@ export async function POST(req: NextRequest) {
   const action = body.action
 
   if (action === 'draft') {
-    // Content agent is a paid feature — Free plan can't generate (draft or publish). Existing/grandfathered
-    // users are exempt. (No credits are charged either way; this is a plan gate, not a credit gate.)
-    const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
-    if (!isGrandfathered(userCreatedAt) && (await getPlanId(admin, owner)) === 'free') {
-      return NextResponse.json({ error: 'upgrade_required', reason: 'The Content agent is a paid feature — upgrade to write and publish blogs.' }, { status: 402 })
+    // Drafting calls paid LLM APIs (article) + optionally an image model (hero) → charge credits up
+    // front (everyone, free + paid). Out of credits → 402 so the client shows the upgrade/top-up modal.
+    // Refunded if the write fails, so a failed draft never costs the user.
+    let txId: string | null = null
+    try {
+      const tx = await reserveCredits(admin, userId, 'blog_draft')
+      txId = tx.id
+    } catch (e) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Writing a blog costs credits — top up or upgrade to continue.' }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
     }
-    const topic = body.topic ? String(body.topic) : undefined
-    const article = await writeArticle(admin, store, userId, topic)
-    if (!article) return NextResponse.json({ error: 'Could not write the article. Try a more specific topic.' }, { status: 500 })
-    let heroUrl: string | null = null
-    if (body.withImage !== false) heroUrl = await generateHero(article, store.shop_name || undefined).catch(() => null)
-    const html = renderArticleHtml(article, heroUrl)
-    const { data: saved } = await admin.from('geo_assets').insert({
-      brand_id: store.brand_id, user_id: userId, kind: 'blog',
-      title: article.title, target_prompt: topic || article.dek, body_markdown: html, status: 'draft',
-      published_url: heroUrl,   // stash hero url here until published (published_url is overwritten on publish)
-    }).select('id, created_at').maybeSingle()
-    return NextResponse.json({ ok: true, id: saved?.id || null, article, heroUrl, html })
+    try {
+      const topic = body.topic ? String(body.topic) : undefined
+      const article = await writeArticle(admin, store, userId, topic)
+      if (!article) { await refundCredits(admin, txId).catch(() => {}); return NextResponse.json({ error: 'Could not write the article. Try a more specific topic.' }, { status: 500 }) }
+      let heroUrl: string | null = null
+      if (body.withImage !== false) heroUrl = await generateHero(article, store.shop_name || undefined).catch(() => null)
+      const html = renderArticleHtml(article, heroUrl)
+      const { data: saved } = await admin.from('geo_assets').insert({
+        brand_id: store.brand_id, user_id: userId, kind: 'blog',
+        title: article.title, target_prompt: topic || article.dek, body_markdown: html, status: 'draft',
+        published_url: heroUrl,   // stash hero url here until published (published_url is overwritten on publish)
+      }).select('id, created_at').maybeSingle()
+      await commitCredits(admin, txId, { kind: 'blog_draft', title: article.title }).catch(() => {})
+      return NextResponse.json({ ok: true, id: saved?.id || null, article, heroUrl, html })
+    } catch (e) {
+      if (txId) await refundCredits(admin, txId).catch(() => {})
+      return NextResponse.json({ error: 'draft_failed', detail: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })
+    }
   }
 
   if (action === 'publish') {

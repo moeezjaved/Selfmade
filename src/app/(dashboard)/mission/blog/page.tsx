@@ -36,7 +36,7 @@ export default function BlogPage() {
       const r = await fetch('/api/shopify/blog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'draft', topic: topic.trim() || undefined, withImage }) })
       const j = await r.json()
       if (r.ok) { setPreview({ id: j.id, html: j.html, title: j.article?.title || 'Draft' }); setNote('Drafted — review below, then publish.'); await load() }
-      else if (r.status === 402) { openCredits('plan', j.reason || 'The Content agent is a paid feature — upgrade to write blogs.') }
+      else if (r.status === 402) { openCredits('buy', j.reason || 'Writing a blog costs credits — top up to continue.') }   // free auto-coerces to Upgrade
       else setNote(j.error || 'Could not generate.')
     } catch { setNote('Network error.') }
     setBusy(null)
