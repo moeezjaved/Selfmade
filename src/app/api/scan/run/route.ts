@@ -211,15 +211,14 @@ export async function POST(req: NextRequest) {
     const payload = { brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, rivalVideo, ...result }
 
     // Capture the anonymous ADS audit as a LEAD (mirrors the SEO scan's audit_scans). Best-effort — it
-    // must never block or break the scan. Skip the "building" placeholder (no real result yet).
-    if (!building) {
-      try {
-        await admin.from('ads_audit_scans').upsert({
-          page_id: pageId, brand_name: brandName || null, niche: niche || null,
-          score: (result as any)?.score?.total ?? null, result: payload, updated_at: new Date().toISOString(),
-        }, { onConflict: 'page_id' })
-      } catch { /* additive; never break the scan */ }
-    }
+    // must never block or break the scan. We record EVERY attempt (the lead = they ran an ads audit),
+    // even a not-yet-indexed "building" one; a later re-run upserts the real score once the crawl fills in.
+    try {
+      await admin.from('ads_audit_scans').upsert({
+        page_id: pageId, brand_name: brandName || null, niche: niche || null,
+        score: building ? null : ((result as any)?.score?.total ?? null), result: payload, updated_at: new Date().toISOString(),
+      }, { onConflict: 'page_id' })
+    } catch { /* additive; never break the scan */ }
 
     return NextResponse.json(payload)
   } catch (e) {
