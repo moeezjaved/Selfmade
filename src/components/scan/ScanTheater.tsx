@@ -403,7 +403,7 @@ export default function ScanTheater() {
       <aside style={{ background: DARK, color: CREAM, display: 'flex', ...(isMobile
         ? { flexDirection: 'row', alignItems: 'center', gap: 14, padding: '11px 16px', position: 'sticky', top: 0, zIndex: 5 }
         : { flexDirection: 'column', padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100dvh' }) }}>
-        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: isMobile ? 16 : 22, color: '#fff', flex: 'none' }}>{phase === 'done' ? 'Audit complete' : 'Auditing your ads'}</div>
+        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: isMobile ? 16 : 22, color: '#fff', flex: 'none' }}>{phase === 'done' ? (res?.building ? 'Crawling your ads…' : 'Audit complete') : 'Auditing your ads'}</div>
         <div style={{ display: isMobile ? 'none' : 'block', color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
         <div style={{ display: isMobile ? 'none' : 'block', flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {steps.map((s) => (

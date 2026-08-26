@@ -100,6 +100,75 @@ function FunnelBars({ steps, denomLabel }: { steps: Step[]; denomLabel: string }
 
 const scoreColor = (s: number | null) => s == null ? '#9ca3af' : s >= 70 ? '#16a34a' : s >= 45 ? '#d97706' : '#dc2626'
 
+// Inline render of an ADS audit (the DNA result) — score, subscores, gaps, and the real crawled ads.
+function AdsReport({ data }: { data: any }) {
+  if (!data) return <div style={{ padding: 16, color: '#aaa', fontSize: 13 }}>Loading audit…</div>
+  if (data.building) return (
+    <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 16, fontSize: 13, color: '#c2410c' }}>
+      ⏳ Still crawling this brand&rsquo;s Meta Ad Library — no ads on file yet, so there&rsquo;s no audit to show. We never score without real ads. Re-open in a few minutes.
+    </div>
+  )
+  const score = data.score || {}
+  const winners = data.winners?.examples || []
+  const own = data.own?.examples || []
+  const gaps = data.gaps || []
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eceeec', borderRadius: 8, padding: 16 }}>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 14, alignItems: 'baseline' }}>
+        <div><div style={{ fontSize: 22, fontWeight: 800, color: scoreColor(score.total) }}>{score.total ?? '—'}{score.band ? ` · ${score.band}` : ''}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>Ad-presence score</div></div>
+        <div><div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{data.own?.totalAds ?? 0}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>Your ads</div></div>
+        <div><div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{data.winners?.sampleSize ?? 0}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>Rival ads analysed</div></div>
+      </div>
+      {(score.subscores || []).length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 8, marginBottom: 14 }}>
+          {score.subscores.map((s: any) => (
+            <div key={s.key} style={{ border: '1px solid #f0f2f0', borderRadius: 8, padding: '8px 10px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span style={{ fontSize: 12, color: '#333', fontWeight: 600 }}>{s.label}</span><span style={{ fontSize: 12, fontWeight: 800, color: scoreColor(s.value) }}>{s.value == null ? 'No data' : s.value}</span></div>
+              {s.note && <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>{s.note}</div>}
+            </div>
+          ))}
+        </div>
+      )}
+      {gaps.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>Gaps vs rivals</div>
+          <ul style={{ margin: 0, paddingLeft: 16 }}>
+            {gaps.slice(0, 10).map((g: any, i: number) => <li key={i} style={{ fontSize: 12, color: '#333', lineHeight: 1.5 }}><b>{g.label}</b> — you {g.yourPct}% vs winners {g.winnerPct}% <span style={{ color: '#c2410c' }}>({g.kind})</span></li>)}
+          </ul>
+        </div>
+      )}
+      {winners.length > 0 && (
+        <div style={{ marginBottom: own.length ? 14 : 0 }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>Rival winning ads ({winners.length})</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(90px,1fr))', gap: 8 }}>
+            {winners.slice(0, 18).map((a: any, i: number) => (
+              <div key={i} style={{ border: '1px solid #eee', borderRadius: 6, overflow: 'hidden', background: '#fafafa' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div style={{ aspectRatio: '1', background: '#f0f0f0' }}>{a.thumb && <img src={a.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
+                <div style={{ fontSize: 9, color: '#888', padding: '3px 5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={`${a.brand} · ${a.daysRunning}d`}>{a.brand} · {a.daysRunning}d</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      {own.length > 0 && (
+        <div>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>Their own ads ({own.length})</div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(90px,1fr))', gap: 8 }}>
+            {own.slice(0, 12).map((a: any, i: number) => (
+              <div key={i} style={{ border: '1px solid #eee', borderRadius: 6, overflow: 'hidden', background: '#fafafa' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <div style={{ aspectRatio: '1', background: '#f0f0f0' }}>{a.thumb && <img src={a.thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
+                <div style={{ fontSize: 9, color: '#888', padding: '3px 5px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.daysRunning}d</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function FunnelPage() {
   const [steps, setSteps] = useState<Step[]>([])
   const [auditFunnel, setAuditFunnel] = useState<Step[]>([])
@@ -110,6 +179,9 @@ export default function FunnelPage() {
   const [scans, setScans] = useState<Record<string, any>>({})
   const router = useRouter()
 
+  const [openAds, setOpenAds] = useState<string | null>(null)
+  const [adsData, setAdsData] = useState<Record<string, any>>({})
+
   const toggleLead = (domain: string) => {
     if (openDomain === domain) { setOpenDomain(null); return }
     setOpenDomain(domain)
@@ -118,6 +190,18 @@ export default function FunnelPage() {
         .then(r => r.json())
         .then(d => setScans(prev => ({ ...prev, [domain]: d.result || null })))
         .catch(() => setScans(prev => ({ ...prev, [domain]: null })))
+    }
+  }
+
+  const toggleAds = (pageId: string) => {
+    if (openAds === pageId) { setOpenAds(null); return }
+    setOpenAds(pageId)
+    if (!(pageId in adsData)) {
+      // completes the audit server-side if the crawl has since landed, then returns the full result
+      fetch(`/api/admin/ads-audit?page_id=${encodeURIComponent(pageId)}`)
+        .then(r => r.json())
+        .then(d => setAdsData(prev => ({ ...prev, [pageId]: d.result || null })))
+        .catch(() => setAdsData(prev => ({ ...prev, [pageId]: null })))
     }
   }
 
@@ -168,12 +252,12 @@ export default function FunnelPage() {
                   {anon.map((a, i) => {
                     const isAds = a.type === 'ads'
                     const key = a.domain || a.page_id || String(i)
-                    const open = !isAds && openDomain === a.domain
+                    const open = isAds ? (openAds === a.page_id) : (openDomain === a.domain)
                     return (
                     <React.Fragment key={key + i}>
-                      <tr onClick={() => { if (!isAds && a.domain) toggleLead(a.domain) }} style={{ borderBottom: '1px solid #f6f6f6', cursor: isAds ? 'default' : 'pointer', background: open ? '#faf9f6' : 'transparent' }}>
+                      <tr onClick={() => { if (isAds) { if (a.page_id) toggleAds(a.page_id) } else if (a.domain) toggleLead(a.domain) }} style={{ borderBottom: '1px solid #f6f6f6', cursor: 'pointer', background: open ? '#faf9f6' : 'transparent' }}>
                         <td style={{ padding: '10px 20px', fontWeight: 600 }}>
-                          {!isAds && <span style={{ color: '#c3c7c3', marginRight: 6 }}>{open ? '▾' : '▸'}</span>}
+                          <span style={{ color: '#c3c7c3', marginRight: 6 }}>{open ? '▾' : '▸'}</span>
                           {isAds ? (
                             <span style={{ color: '#111' }}>{a.site_name || a.page_id}</span>
                           ) : (
@@ -193,8 +277,8 @@ export default function FunnelPage() {
                       {open && (
                         <tr>
                           <td colSpan={6} style={{ padding: '4px 20px 16px' }}>
-                            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-                              <ScanReport result={scans[a.domain!]} />
+                            <div style={{ maxHeight: 560, overflowY: 'auto' }}>
+                              {isAds ? <AdsReport data={a.page_id ? adsData[a.page_id] : null} /> : <ScanReport result={scans[a.domain!]} />}
                             </div>
                           </td>
                         </tr>
