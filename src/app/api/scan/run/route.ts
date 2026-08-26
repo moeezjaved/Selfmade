@@ -183,7 +183,24 @@ export async function POST(req: NextRequest) {
       competitorPageIds = competitorPageIds.slice(0, 12)
     }
 
-    const result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
+    let result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
+
+    // Own ads not in the crawl index yet → DON'T defer the report. Pull their live ads on-demand (droplet,
+    // ~seconds, no IPRoyal media download), classify them in-session, and re-run the DNA so the FULL audit —
+    // with all findings — is ready RIGHT NOW while the user is in the theater. The background crawl below
+    // still fires to enrich/persist the deep set for next time.
+    if (!result.own.found) {
+      try {
+        const [{ fetchLiveAdsByPage }, { classifyLiveOwnAds }] = await Promise.all([
+          import('@/lib/ads-studio/adlibrary'), import('@/lib/dna/classify-live'),
+        ])
+        const live = await fetchLiveAdsByPage(pageId, 20)
+        if (live.length) {
+          const ownRows = await classifyLiveOwnAds(live, brandName, niche)
+          if (ownRows.length) result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche, ownRows })
+        }
+      } catch { /* on-demand pull failed → fall back to the crawl/building path below */ }
+    }
 
     // Payoff act inputs: concrete briefs the visitor can act on + a rival ad to remake. Pick a rival in the
     // SAME writing system as the brand — a Cyrillic/CJK store is not a believable "peer" for a Latin-script
