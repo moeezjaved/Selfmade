@@ -8,6 +8,16 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, auditDone } from '@/lib/celebrate'
+import { useRouter } from 'next/navigation'
+
+// Map a crawled SEO issue to the Catalog agent that fixes that gap on your products (one-click).
+const agentForIssue = (title: string): 'seo' | 'alt' | 'description' | null => {
+  const t = title.toLowerCase()
+  if (t.includes('alt')) return 'alt'
+  if (t.includes('title') || t.includes('meta description') || t.includes('snippet') || t.includes('description')) return 'seo'
+  if (t.includes('thin') || t.includes('word count') || t.includes('content')) return 'description'
+  return null
+}
 
 type Issue = { severity: 'high' | 'medium' | 'low'; title: string; detail: string; pages: string[] }
 type Audit = { hasData: boolean; site?: string; score?: number; pagesCrawled?: number; issues?: Issue[]; note?: string }
@@ -27,6 +37,20 @@ export default function SeoPage() {
   const [writing, setWriting] = useState<string | null>(null)
   const [openBrief, setOpenBrief] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  const [fixing, setFixing] = useState<string | null>(null)
+  const router = useRouter()
+
+  // One-click: draft product fixes for this gap via the Catalog agent, then jump to review (Apply = paid).
+  const fixIssue = async (agent: string) => {
+    if (fixing) return
+    setFixing(agent)
+    try {
+      const r = await fetch('/api/shopify/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'draft', agent, limit: 25 }) })
+      const j = await r.json().catch(() => ({}))
+      if (r.status === 400 && j.connected === false) { router.push('/connect/shopify'); return }
+      router.push('/mission/catalog')
+    } catch { setFixing(null) }
+  }
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -123,6 +147,11 @@ export default function SeoPage() {
                   <span className={`sev ${iss.severity}`}>{iss.severity}</span>
                   <span className="it">{iss.title}</span>
                   <span className="ic">{iss.pages.length} page{iss.pages.length === 1 ? '' : 's'}</span>
+                  {agentForIssue(iss.title) && (
+                    <button className="fixbtn" onClick={(e) => { e.stopPropagation(); fixIssue(agentForIssue(iss.title)!) }} disabled={!!fixing}>
+                      {fixing === agentForIssue(iss.title) ? 'Drafting…' : 'Fix →'}
+                    </button>
+                  )}
                 </div>
                 <div className="idetail">{iss.detail}</div>
                 {open === iss.title && (
@@ -133,7 +162,7 @@ export default function SeoPage() {
               </div>
             ))}
 
-            <div className="foot">Every finding is read live from your site — nothing is assumed. Next: I’ll fix these for you (needs Shopify).</div>
+            <div className="foot">Every finding is read live from your site. Hit <b>Fix →</b> on a fixable issue and the Catalog agents draft the fix for your products — review &amp; approve, and it’s live (needs Shopify connected).</div>
           </>
         )}
 
@@ -261,6 +290,8 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .sev.high{color:var(--flame);background:#fff4f0;border:1px solid #ffd9cc} .sev.medium{color:var(--warn);background:#fbf6ea;border:1px solid #ecdcb4} .sev.low{color:var(--mut);background:var(--paper);border:1px solid var(--line)}
 .it{font-family:var(--serif);font-size:18px;letter-spacing:-.005em;flex:1;min-width:0}
 .ic{font-family:var(--mono);font-size:10.5px;color:var(--mut);flex:none}
+.fixbtn{flex:none;font-family:var(--ui);font-size:12px;font-weight:700;border:none;border-radius:100px;padding:6px 13px;background:var(--flame);color:#fff;cursor:pointer}
+.fixbtn:disabled{opacity:.6;cursor:default}
 .idetail{font-size:13px;color:var(--sub);line-height:1.5;margin-top:6px}
 .ipages{margin-top:10px;border-top:1px solid var(--hair);padding-top:10px;display:flex;flex-direction:column;gap:4px}
 .pg{font-family:var(--mono);font-size:11.5px;color:var(--flame);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
