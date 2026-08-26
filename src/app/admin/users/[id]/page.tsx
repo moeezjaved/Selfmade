@@ -25,8 +25,15 @@ interface BrandWorkspace {
   id: string; name: string; website: string | null; brand_type: string | null; created_at: string | null;
   shopify: { connected: boolean; shop_domain?: string; shop_name?: string | null; status?: string };
   meta: { connected: boolean; accounts?: { name: string; status: string; primary: boolean }[] };
-  kb_present: boolean; kb_keys: string[];
-  products_count: number; templates_count: number; audiences: string[];
+  kb_present: boolean;
+  kb_facts: string[];
+  voice: { tone?: string; energy?: string; audience?: string } | null;
+  market: string | null;
+  templates: { title: string; headline: string; concept: string; image: string | null }[];
+  products_cached: { title: string; image: string | null; price: string | null; url: string | null }[];
+  products_count: number; templates_count: number;
+  audiences: { name: string; insights: string[] }[];
+  competitors: { name: string; domain: string | null; reason: string; liveAds: any[] }[];
   seo: { catalog_applied: number; catalog_drafts: number; blogs_published: number; blogs_drafts: number; wins: number };
   revenue: { total: number; organic: number; orders: number; currency: string };
 }
@@ -51,6 +58,15 @@ function Pill({ on, onLabel, offLabel, color }: { on: boolean; onLabel: string; 
       border: `1px solid ${on ? `${color}44` : '#e5e7eb'}` }}>
       {on ? onLabel : offLabel}
     </span>
+  )
+}
+
+function SubBlock({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px dashed #eceeec' }}>
+      <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>{label}</div>
+      {children}
+    </div>
   )
 }
 
@@ -313,14 +329,105 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                   ))}
                 </div>
 
-                {/* audiences */}
+                {/* ── Knowledge base (what Mello read off their website) ── */}
+                {(b.kb_facts.length > 0 || b.voice) && (
+                  <SubBlock label={`Knowledge base${b.market ? ` · ${b.market}` : ''}`}>
+                    {b.voice && (
+                      <div style={{ fontSize: 12, color: '#555', marginBottom: 8 }}>
+                        <b>Voice:</b> {[b.voice.tone, b.voice.energy, b.voice.audience].filter(Boolean).join(' · ') || '—'}
+                      </div>
+                    )}
+                    <ul style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                      {b.kb_facts.slice(0, 12).map((f, i) => (
+                        <li key={i} style={{ fontSize: 12, color: '#333', lineHeight: 1.5 }}>{f}</li>
+                      ))}
+                    </ul>
+                    {b.kb_facts.length > 12 && <div style={{ fontSize: 11, color: '#aaa', marginTop: 4 }}>+{b.kb_facts.length - 12} more facts</div>}
+                  </SubBlock>
+                )}
+
+                {/* ── Products (real cards with images) ── */}
+                {b.products_cached.length > 0 && (
+                  <SubBlock label={`Products (${b.products_cached.length}${b.products_count > b.products_cached.length ? ` of ${b.products_count}` : ''})`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(100px, 1fr))', gap: 10 }}>
+                      {b.products_cached.slice(0, 18).map((p, i) => (
+                        <a key={i} href={p.url || '#'} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', border: '1px solid #eee', borderRadius: 8, overflow: 'hidden', background: '#fafafa' }}>
+                          <div style={{ aspectRatio: '1', background: '#f0f0f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {p.image ? <img src={p.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#bbb' }}>no image</span>}
+                          </div>
+                          <div style={{ padding: '5px 7px' }}>
+                            <div style={{ fontSize: 11, color: '#222', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title || 'Product'}</div>
+                            {p.price && <div style={{ fontSize: 10.5, color: '#16a34a', fontWeight: 700 }}>{p.price}</div>}
+                          </div>
+                        </a>
+                      ))}
+                    </div>
+                  </SubBlock>
+                )}
+
+                {/* ── Templates (their generated ad templates) ── */}
+                {b.templates.length > 0 && (
+                  <SubBlock label={`Templates (${b.templates.length})`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 10 }}>
+                      {b.templates.map((t, i) => (
+                        <div key={i} style={{ border: '1px solid #eee', borderRadius: 8, overflow: 'hidden', background: '#fafafa' }}>
+                          <div style={{ aspectRatio: '4/5', background: '#111', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            {t.image ? <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: '#888', padding: 8, textAlign: 'center' }}>not generated yet</span>}
+                          </div>
+                          <div style={{ padding: '5px 7px' }}>
+                            <div style={{ fontSize: 11, color: '#222', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.title}</div>
+                            {t.headline && <div style={{ fontSize: 10, color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t.headline}</div>}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </SubBlock>
+                )}
+
+                {/* ── Audiences (full personas) ── */}
                 {b.audiences.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                    <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginRight: 4 }}>Audiences:</span>
-                    {b.audiences.map((a, i) => (
-                      <span key={i} style={{ fontSize: 11.5, color: '#333', background: '#f5f6f5', border: '1px solid #eceeec', borderRadius: 20, padding: '3px 10px' }}>{typeof a === 'string' ? a : (a as any)?.name || (a as any)?.label || 'audience'}</span>
-                    ))}
-                  </div>
+                  <SubBlock label={`Audiences (${b.audiences.length})`}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10 }}>
+                      {b.audiences.map((a, i) => (
+                        <div key={i} style={{ border: '1px solid #eef0ee', borderRadius: 8, padding: 10 }}>
+                          <div style={{ fontSize: 12.5, fontWeight: 700, color: '#111', marginBottom: 4 }}>{a.name}</div>
+                          <ul style={{ margin: 0, paddingLeft: 16 }}>
+                            {a.insights.map((s, j) => <li key={j} style={{ fontSize: 11.5, color: '#555', lineHeight: 1.5 }}>{s}</li>)}
+                          </ul>
+                        </div>
+                      ))}
+                    </div>
+                  </SubBlock>
+                )}
+
+                {/* ── Competitors (discovered cards + their live ads) ── */}
+                {b.competitors.length > 0 && (
+                  <SubBlock label={`Competitors (${b.competitors.length})`}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {b.competitors.map((c, i) => (
+                        <div key={i} style={{ border: '1px solid #eef0ee', borderRadius: 8, padding: 10 }}>
+                          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: 12.5, fontWeight: 700, color: '#111' }}>{c.name}</span>
+                            {c.domain && <a href={`https://${c.domain}`} target="_blank" rel="noreferrer" style={{ fontSize: 11, color: '#2563eb', textDecoration: 'none' }}>{c.domain}</a>}
+                          </div>
+                          {c.reason && <div style={{ fontSize: 11.5, color: '#666', marginTop: 3 }}>{c.reason}</div>}
+                          {c.liveAds.length > 0 && (
+                            <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
+                              {c.liveAds.slice(0, 6).map((ad: any, j: number) => {
+                                const img = ad?.image || ad?.image_url || ad?.thumbnail || ad?.creative || null
+                                return img ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img key={j} src={img} alt="" style={{ width: 56, height: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid #eee' }} />
+                                ) : null
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </SubBlock>
                 )}
               </div>
             ))}
