@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
-import { celebrate, shopifyApplied } from '@/lib/celebrate'
+import { celebrate, catalogApplied } from '@/lib/celebrate'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -52,13 +52,13 @@ export default function CatalogPage() {
     setBusy(null)
   }
 
-  const apply = async (ids: string[]) => {
+  const apply = async (ids: string[], kind?: string) => {
     if (!ids.length) { setNote('Select at least one to approve.'); return }
     setBusy('apply'); setNote(null)
     try {
       const r = await fetch('/api/shopify/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', draftIds: ids }) })
       const j = await r.json()
-      if (r.ok) { if (j.applied > 0) celebrate(shopifyApplied(j.applied)); setNote(j.failed ? `${j.failed} couldn’t apply — we’ll retry those.` : null); setSelected({}); await load() }
+      if (r.ok) { if (j.applied > 0) celebrate(catalogApplied(j.applied, kind)); setNote(j.failed ? `${j.failed} couldn’t apply — we’ll retry those.` : null); setSelected({}); await load() }
       else setNote(j.error || 'Could not apply.')
     } catch { setNote('Network error.') }
     setBusy(null)
@@ -117,8 +117,8 @@ export default function CatalogPage() {
               {expanded && drafts.length > 0 && (
                 <div style={{ borderTop: `1px solid ${LINE}`, background: PAPER, padding: 16 }}>
                   <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
-                    <button onClick={() => apply(drafts.map((d) => d.id))} disabled={busy === 'apply'} style={{ ...primaryBtn, background: GOOD, opacity: busy === 'apply' ? 0.6 : 1 }}>{busy === 'apply' ? 'Applying…' : `Approve all ${drafts.length} → Shopify`}</button>
-                    <button onClick={() => apply(drafts.filter((d) => selected[d.id]).map((d) => d.id))} disabled={busy === 'apply'} style={ghostBtn}>Approve selected</button>
+                    <button onClick={() => apply(drafts.map((d) => d.id), a.key)} disabled={busy === 'apply'} style={{ ...primaryBtn, background: GOOD, opacity: busy === 'apply' ? 0.6 : 1 }}>{busy === 'apply' ? 'Applying…' : `Approve all ${drafts.length} → Shopify`}</button>
+                    <button onClick={() => apply(drafts.filter((d) => selected[d.id]).map((d) => d.id), a.key)} disabled={busy === 'apply'} style={ghostBtn}>Approve selected</button>
                     <button onClick={() => skip(drafts.filter((d) => selected[d.id]).map((d) => d.id))} disabled={!!busy} style={ghostBtn}>Skip selected</button>
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>

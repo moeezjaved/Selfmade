@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { Monitor, Instagram as IgIcon, Facebook as FbIcon, Linkedin as LiIcon } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
 
 type StudioTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
 const StudioCtx = createContext<{ addToChat: (t: StudioTag) => void }>({ addToChat: () => {} })
@@ -188,7 +189,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         while (Date.now() < deadline) {
           await sleep(2500)
           const s = await fetch(`/api/discovery/clone-image/status?id=${enq.jobId}`).then((r) => r.json()).catch(() => ({}))
-          if (s.done && s.url) { setMsgs((m) => replaceLast(m, { role: 'assistant', image: s.url, caption: 'Remade from your reference — your product in their winning layout.', format: fmt })); settled = true; break }
+          if (s.done && s.url) { setMsgs((m) => replaceLast(m, { role: 'assistant', image: s.url, caption: 'Remade from your reference — your product in their winning layout.', format: fmt })); celebrate(adReady()); settled = true; break }
           if (s.failed) { setMsgs((m) => replaceLast(m, { role: 'assistant', error: s.error || 'The remake failed — your credits were refunded. Try again.', format: fmt })); settled = true; break }
         }
         if (!settled) setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Still rendering — it’ll land in My Creatives shortly.', format: fmt }))
@@ -251,6 +252,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
     } else {
       setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: pick.caption, format: fmt }))
+      if (d.url || d.image) celebrate(adReady())
     }
   }
 
@@ -935,7 +937,9 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
     setRefreshing(true); setComps(null); setStep(0)
     try {
       const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}&force=1`).then((r) => r.json())
-      setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null)
+      const found = Array.isArray(d.competitors) ? d.competitors : []
+      setComps(found); setSeed(d.seed || null)
+      if (found.length) celebrate(competitorsFound(found.length))
     } catch { setComps([]) }
     setRefreshing(false)
   }
