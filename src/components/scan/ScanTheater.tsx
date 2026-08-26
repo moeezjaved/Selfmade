@@ -154,9 +154,10 @@ export default function ScanTheater() {
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
       let data: ScanResult = await r.json()
       setRes(data)
-      // Cold brand (not indexed yet, no rival data) → we've kicked off a crawl; show the building state
-      // instead of staging empty acts + a meaningless score.
-      if (data.building) { stopProg(); setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
+      // Cold brand with NOTHING to wait for (no crawl kicked off) → show the building/re-run state. But if
+      // a crawl IS pending (ownPending), do NOT bail here — fall through to the WAIT-FOR-CRAWL path below so
+      // the user waits on this step and sees REAL results, instead of a scoreless screen they'd never revisit.
+      if (data.building && !data.ownPending) { stopProg(); setSteps((s) => s.map((x) => ({ ...x, status: 'done', metric: x.id === 'ads' ? 'crawling…' : '' }))); setPct(100); setPhase('done'); running.current = false; return }
 
       const brandNameOf = (d: ScanResult) => (d.brand?.name && d.brand.name !== 'your brand' ? d.brand.name : 'your brand')
 
