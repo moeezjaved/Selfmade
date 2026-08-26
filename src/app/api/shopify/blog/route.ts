@@ -11,7 +11,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, generateHero, renderArticleHtml, publishToShopifyBlog, suggestTopics, type Article } from '@/lib/shopify/blog'
-import { getPlanId } from '@/lib/entitlements'
+import { getPlanId, isGrandfathered } from '@/lib/entitlements'
 import { resolveBillingOwner } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
@@ -25,7 +25,7 @@ async function ctx(req: NextRequest) {
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
   const store = await resolveStore(admin, user.id, brandId)
   if (!store) return { error: NextResponse.json({ error: 'No Shopify store connected', connected: false }, { status: 400 }) }
-  return { admin, store, userId: user.id }
+  return { admin, store, userId: user.id, userCreatedAt: user.created_at }
 }
 
 export async function GET(req: NextRequest) {
@@ -42,7 +42,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store, userId } = c
+  const { admin, store, userId, userCreatedAt } = c
   const body = await req.json().catch(() => ({}))
   const action = body.action
 
@@ -62,9 +62,9 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'publish') {
-    // Free to preview/draft, pay to publish live.
+    // Free to preview/draft, pay to publish live. Existing users are grandfathered.
     const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
-    if ((await getPlanId(admin, owner)) === 'free') {
+    if (!isGrandfathered(userCreatedAt) && (await getPlanId(admin, owner)) === 'free') {
       return NextResponse.json({ error: 'upgrade_required', reason: 'Publishing to your live blog is a paid feature — drafting stays free. Upgrade to publish.' }, { status: 402 })
     }
     const id = String(body.id || '')

@@ -12,7 +12,7 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { generateDrafts, applyDrafts, catalogTargets, type Agent } from '@/lib/shopify/catalog'
 import { catalogHealth } from '@/lib/shopify/sync'
-import { getPlanId } from '@/lib/entitlements'
+import { getPlanId, isGrandfathered } from '@/lib/entitlements'
 import { resolveBillingOwner } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
@@ -73,8 +73,9 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: ids.length })
     }
     // Free to PREVIEW (draft), pay to APPLY: pushing changes live to Shopify needs a paid plan.
+    // Existing users (created before the cutoff) are grandfathered and keep applying free.
     const owner = await resolveBillingOwner(admin, user.id).catch(() => user.id)
-    if ((await getPlanId(admin, owner)) === 'free') {
+    if (!isGrandfathered(user.created_at) && (await getPlanId(admin, owner)) === 'free') {
       return NextResponse.json({ error: 'upgrade_required', reason: 'Applying fixes to your live store is a paid feature — drafting stays free. Upgrade to push these live.' }, { status: 402 })
     }
     const res = await applyDrafts(admin, store, ids)
