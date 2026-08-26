@@ -6,7 +6,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { planAction, executeAction } from '@/lib/mello/ads-actions'
+import { planAction, planAttach, executeAction } from '@/lib/mello/ads-actions'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -20,6 +20,11 @@ export async function POST(req: NextRequest) {
   if (body.mode === 'plan') {
     if (!body.message || typeof body.message !== 'string') return NextResponse.json({ error: 'Tell me what to do with your ads.' }, { status: 400 })
     const res = await planAction(user.id, { message: body.message, attach: body.attach })
+    return NextResponse.json(res)
+  }
+  if (body.mode === 'plan-attach') {
+    if (!body.creativeUrl || !body.variant || !body.targetAdId) return NextResponse.json({ error: 'Pick a creative, a variant, and the ad to target.' }, { status: 400 })
+    const res = await planAttach(user.id, { creativeUrl: body.creativeUrl, brandName: body.brandName, website: body.website, variant: body.variant, targetAdId: body.targetAdId })
     return NextResponse.json(res)
   }
   if (body.mode === 'execute') {

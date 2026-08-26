@@ -196,6 +196,26 @@ export class MetaClient {
     return res.data
   }
 
+  /** Flat list of the account's ads (for the Refresh/Carousel picker): id, name, status, ad set, campaign,
+   *  thumbnail, and the existing copy/link so we can inherit it. Active + paused only. */
+  async listAdsForPicker(): Promise<{ adId: string; name: string; status: string; adsetId: string; campaignName: string; image: string | null; headline: string; primaryText: string; linkUrl: string }[]> {
+    try {
+      const res = await this.client.get(`/${this.accountId}/ads`, { params: {
+        fields: 'id,name,status,effective_status,adset_id,campaign{name},creative{thumbnail_url,object_story_spec,image_url}',
+        limit: 100, effective_status: '["ACTIVE","PAUSED"]',
+      } })
+      return (res.data?.data || []).map((a: any) => {
+        const ld = a.creative?.object_story_spec?.link_data || {}
+        return {
+          adId: String(a.id), name: String(a.name || ''), status: String(a.effective_status || a.status || ''),
+          adsetId: String(a.adset_id || ''), campaignName: String(a.campaign?.name || ''),
+          image: a.creative?.image_url || a.creative?.thumbnail_url || ld.picture || null,
+          headline: String(ld.name || ''), primaryText: String(ld.message || ''), linkUrl: String(ld.link || ''),
+        }
+      }).filter((a: any) => a.adsetId)
+    } catch { return [] }
+  }
+
   /** Pause / resume a single AD (not the whole campaign). status: 'PAUSED' | 'ACTIVE'. */
   async setAdStatus(adId: string, status: 'PAUSED' | 'ACTIVE') {
     const res = await this.client.post(`/${adId}`, { status })
@@ -216,6 +236,35 @@ export class MetaClient {
       const res = await this.client.get(`/${campaignId}/adsets`, { params: { fields: 'targeting', limit: 1 } })
       return res.data?.data?.[0]?.targeting || null
     } catch { return null }
+  }
+
+  /** Create a single-image ad INSIDE an existing ad set (inherits its targeting + budget). Used for
+   *  "Refresh" — swap the creative on a live ad by adding a fresh ad next to it, then pausing the old. */
+  async createImageAdInAdSet(adSetId: string, pageId: string, imageHash: string, copy: { headline: string; primaryText: string; cta: string; linkUrl: string }, name: string, status: 'PAUSED' | 'ACTIVE' = 'PAUSED') {
+    const creative = await this.createAdCreative({
+      name: `${name} — Creative`,
+      object_story_spec: {
+        page_id: pageId,
+        link_data: { image_hash: imageHash, link: copy.linkUrl, message: copy.primaryText, name: copy.headline, call_to_action: { type: copy.cta, value: { link: copy.linkUrl } } },
+      },
+    })
+    return this.createAd({ name, adset_id: adSetId, creative: { creative_id: creative.id }, status })
+  }
+
+  /** Create a CAROUSEL ad in an existing ad set — multiple image cards in one ad (old + new creatives). */
+  async createCarouselAdInAdSet(adSetId: string, pageId: string, cards: { imageHash: string; link: string; name?: string }[], copy: { primaryText: string; cta: string; linkUrl: string }, name: string, status: 'PAUSED' | 'ACTIVE' = 'PAUSED') {
+    const creative = await this.createAdCreative({
+      name: `${name} — Carousel`,
+      object_story_spec: {
+        page_id: pageId,
+        link_data: {
+          link: copy.linkUrl, message: copy.primaryText,
+          child_attachments: cards.map((c) => ({ image_hash: c.imageHash, link: c.link || copy.linkUrl, name: c.name || '' })),
+          call_to_action: { type: copy.cta, value: { link: copy.linkUrl } },
+        },
+      },
+    })
+    return this.createAd({ name, adset_id: adSetId, creative: { creative_id: creative.id }, status })
   }
 
   async updateAdSet(adSetId: string, updates: Record<string, unknown>) {
