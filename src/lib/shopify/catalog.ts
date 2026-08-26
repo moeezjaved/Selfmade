@@ -15,7 +15,7 @@
 import { llm } from '@/lib/llm'
 import { shopifyGraphql, tokenFor, type StoreRow } from '@/lib/shopify/client'
 
-export type Agent = 'seo' | 'description' | 'alt' | 'title' | 'tags' | 'collection'
+export type Agent = 'seo' | 'description' | 'alt' | 'title' | 'tags' | 'collection' | 'page'
 
 function stripHtml(html: string, max = 600): string {
   return String(html || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
@@ -164,9 +164,66 @@ export async function draftCollection(c: any): Promise<{ title: { current: strin
   } catch { return null }
 }
 
+/* ── Online-store pages (About, FAQ, etc.) — fetched live; SEO written via metafields ──────────── */
+const PAGES_QUERY = /* GraphQL */ `
+  query($cursor: String) {
+    pages(first: 50, after: $cursor) {
+      pageInfo { hasNextPage endCursor }
+      nodes {
+        id title handle bodySummary
+        t: metafield(namespace: "global", key: "title_tag") { value }
+        d: metafield(namespace: "global", key: "description_tag") { value }
+      }
+    }
+  }
+`
+export async function fetchPages(shop: string, token: string, limit = 30): Promise<any[]> {
+  const out: any[] = []
+  let cursor: string | null = null
+  while (out.length < limit) {
+    const data: any = await shopifyGraphql(shop, token, PAGES_QUERY, { cursor })
+    const conn = data?.pages
+    out.push(...(conn?.nodes || []))
+    if (!conn?.pageInfo?.hasNextPage) break
+    cursor = conn.pageInfo.endCursor
+  }
+  // Only pages that are actually missing an SEO title or meta description.
+  return out.filter((p) => !p.t?.value || !p.d?.value).slice(0, limit)
+}
+
+export async function draftPage(p: any): Promise<{ title: { current: string | null; proposed: string }; description: { current: string | null; proposed: string } } | null> {
+  const sys = 'You are a Shopify SEO copywriter writing the search-result snippet for an online-store PAGE (e.g. About, FAQ, Contact). Write (1) an SEO title ≤ 60 chars and (2) a meta description 140-158 chars. Ground everything in the page title + content — invent no facts, prices or claims. Return ONLY JSON: {"seoTitle":"...","metaDescription":"..."}'
+  try {
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 300, temperature: 0.5, messages: [{ role: 'user', content: `${sys}\n\nPAGE: ${JSON.stringify({ title: p.title, handle: p.handle, content: String(p.bodySummary || '').slice(0, 500) })}` }] })
+    const j = firstJson(res.content?.[0]?.text || '')
+    if (!j?.seoTitle || !j?.metaDescription) return null
+    return {
+      title: { current: p.t?.value || null, proposed: String(j.seoTitle).slice(0, 70) },
+      description: { current: p.d?.value || null, proposed: String(j.metaDescription).slice(0, 320) },
+    }
+  } catch { return null }
+}
+
 /* ── Draft persistence ────────────────────────────────────────────────────────────────────────── */
 
 export async function generateDrafts(admin: any, store: StoreRow, agent: Agent, limit = 25): Promise<{ created: number; scanned: number }> {
+  // Pages aren't in the product cache — fetch them live and draft SEO title + meta (never touch the body).
+  if (agent === 'page') {
+    const token = tokenFor(store)
+    const pages = await fetchPages(store.shop_domain, token, limit)
+    let created = 0
+    for (const pg of pages) {
+      const proposal = await draftPage(pg)
+      if (!proposal) continue
+      await admin.from('shopify_catalog_drafts').delete().eq('store_id', store.id).eq('product_gid', pg.id).eq('agent', agent).eq('status', 'draft')
+      await admin.from('shopify_catalog_drafts').insert({
+        store_id: store.id, brand_id: store.brand_id, user_id: store.user_id,
+        product_gid: pg.id, product_title: pg.title, agent, proposal, status: 'draft',
+      })
+      created++
+    }
+    return { created, scanned: pages.length }
+  }
   // Collections aren't in the product cache — fetch them live and draft against them.
   if (agent === 'collection') {
     const token = tokenFor(store)
@@ -224,6 +281,13 @@ const COLLECTION_UPDATE = /* GraphQL */ `
     collectionUpdate(input: $input) { collection { id } userErrors { field message } }
   }
 `
+// Pages have no native `seo` input — SEO title/description live in the global.title_tag / description_tag
+// metafields, which Shopify reads for the page's search snippet. metafieldsSet works for any owner gid.
+const METAFIELDS_SET = /* GraphQL */ `
+  mutation($metafields: [MetafieldsSetInput!]!) {
+    metafieldsSet(metafields: $metafields) { metafields { id } userErrors { field message } }
+  }
+`
 
 async function productUpdate(shop: string, token: string, input: any): Promise<void> {
   const d = await shopifyGraphql(shop, token, PRODUCT_UPDATE, { input })
@@ -245,6 +309,16 @@ async function applyOne(shop: string, token: string, row: any): Promise<void> {
     const input: any = { id: row.product_gid, descriptionHtml: pr.body?.proposed, seo: { title: pr.title?.proposed, description: pr.description?.proposed } }
     const d = await shopifyGraphql(shop, token, COLLECTION_UPDATE, { input })
     const errs = d?.collectionUpdate?.userErrors || []
+    if (errs.length) throw new Error(errs.map((e: any) => e.message).join('; '))
+  } else if (row.agent === 'page') {
+    // Set the page's SEO title + meta description via global metafields (never touch the page body).
+    const metafields = [
+      pr.title?.proposed && { ownerId: row.product_gid, namespace: 'global', key: 'title_tag', type: 'single_line_text_field', value: String(pr.title.proposed).slice(0, 70) },
+      pr.description?.proposed && { ownerId: row.product_gid, namespace: 'global', key: 'description_tag', type: 'single_line_text_field', value: String(pr.description.proposed).slice(0, 320) },
+    ].filter(Boolean)
+    if (!metafields.length) return
+    const d = await shopifyGraphql(shop, token, METAFIELDS_SET, { metafields })
+    const errs = d?.metafieldsSet?.userErrors || []
     if (errs.length) throw new Error(errs.map((e: any) => e.message).join('; '))
   } else if (row.agent === 'alt') {
     const files = (pr.images || []).map((im: any) => ({ id: im.mediaId, alt: im.proposed }))
