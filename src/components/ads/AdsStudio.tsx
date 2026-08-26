@@ -646,8 +646,8 @@ function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   return (
     <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={a.id} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', aspectRatio: '4/5' }}>
-          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+        <div key={a.id} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', minHeight: 140 }}>
+          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -716,9 +716,9 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
   return (
     <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={i} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', aspectRatio: '4/5' }}>
+        <div key={i} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', minHeight: 140 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -1029,10 +1029,12 @@ function Discover({ isMobile }: { isMobile: boolean }) {
       {ads === null ? <div style={{ color: SUB, textAlign: 'center', padding: '40px 0' }}>Loading trending ads…</div>
         : shown.length === 0 ? <EmptyState title="Nothing to show yet" body="We couldn’t load trending ads right now — try again shortly." cta="Retry" />
           : (
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginTop: 20 }}>
+            // Masonry columns so every ad shows in FULL (no crop) at its natural aspect, filling the
+            // column width with no whitespace — the Lapis browse-feed look.
+            <div style={{ columnCount: isMobile ? 2 : 4, columnGap: 14, marginTop: 20 }}>
               {shown.map((a) => (
-                <div key={a.id} className="sf-thumb" style={{ position: 'relative', overflow: 'hidden', aspectRatio: '4/5' }}>
-                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                <div key={a.id} className="sf-thumb" style={{ position: 'relative', overflow: 'hidden', marginBottom: 14, breakInside: 'avoid' }}>
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                   <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
                     <div style={{ color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
                     <button onClick={() => addToChat({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
