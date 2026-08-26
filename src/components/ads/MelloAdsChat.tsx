@@ -76,6 +76,28 @@ export default function MelloAdsChat({ website, brandName }: { website?: string;
     mello('Last thing — daily budget?', { chips: BUDGETS.map((b) => ({ label: `€${b}/day`, onClick: () => { draft.current.budget = b; you(`€${b}/day`); finalize() } })) })
   }
 
+  // The user ASKED instead of describing (e.g. "what audience for this product?") — treat it as a real
+  // question, not the audience value. True if it's phrased as a question / advice request.
+  const isAudienceQuestion = (s: string) => /\?\s*$/.test(s.trim())
+    || /^(what|which|who|how|why|recommend|suggest|best|ideal|help|idk|not sure|any idea|give me|can you|don'?t know|no idea)\b/i.test(s.trim())
+    || /you think|your (opinion|recommendation|suggestion)|right audience|best audience|which audience|good audience|target/i.test(s)
+
+  // Read the store and suggest real audiences → tap one and Mello builds it (then straight to budget).
+  const recommendAudience = async () => {
+    mello('Good question — let me read your store and suggest the audiences I’d run…')
+    try {
+      const dom = (website || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+      const r = await fetch(`/api/ads-studio/audiences?domain=${encodeURIComponent(dom)}`)
+      const j = await r.json().catch(() => ({}))
+      const auds: { name: string; insights: string[] }[] = Array.isArray(j?.audiences) ? j.audiences.slice(0, 4) : []
+      if (!auds.length) { mello('I couldn’t read enough from your store to suggest — describe your buyer (e.g. “women 25–40 into wellness & clean beauty”) and I’ll build it. 👇'); return }
+      push({ who: 'mello', text: `For ${brandName || 'your store'}${j.market ? ` (${j.market})` : ''}, here are the audiences I’d run — tap one and I’ll build it:`, chips: auds.map((a) => ({
+        label: `🎯 ${a.name}`, sub: a.insights?.[0]?.slice(0, 64),
+        onClick: () => { draft.current.audience = `${a.name} — ${(a.insights || []).slice(0, 3).join('; ')}`; you(a.name); askBudget() },
+      })) })
+    } catch { mello('Couldn’t pull suggestions just now — describe your buyer and I’ll build it. 👇') }
+  }
+
   const finalize = async () => {
     const d = draft.current
     if (!d.creativeUrl || !d.budget) return
@@ -95,8 +117,10 @@ export default function MelloAdsChat({ website, brandName }: { website?: string;
   const send = async () => {
     if (!input.trim() || busy) return
     const message = input.trim(); setInput(''); you(message); setStarted(true); setBusy(true)
-    // If we're mid-launch waiting for an audience description, treat this as the description.
+    // Mid-launch, waiting for a targeted audience. If they ASKED (a question) rather than described one,
+    // recommend audiences from their store instead of silently treating the question as the audience.
     if (draft.current.audienceLabel === 'targeted' && draft.current.creativeUrl && !draft.current.budget && !draft.current.audience) {
+      if (isAudienceQuestion(message)) { await recommendAudience(); setBusy(false); return }
       draft.current.audience = message; setBusy(false); return askBudget()
     }
     try {

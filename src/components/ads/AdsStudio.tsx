@@ -93,7 +93,7 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
           {active === 'home' ? <Home isMobile={isMobile} domain={domain} tags={chatTags} setTags={setChatTags} />
-            : active === 'ads' ? <YourAds isMobile={isMobile} />
+            : active === 'ads' ? <YourAds isMobile={isMobile} domain={domain} />
               : active === 'competitors' ? <Competitors isMobile={isMobile} domain={domain} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
                   : active === 'products' ? <Products isMobile={isMobile} domain={domain} />
@@ -756,7 +756,7 @@ function TemplateCard({ label, variant }: { label: string; variant: 'showcase' |
 
 /* ── Your Ads ───────────────────────────────────────────────────────────── */
 type OwnAd = { adId: string; title: string; body: string; isActive: boolean; image: string | null; link: string; isVideo: boolean }
-function YourAds({ isMobile }: { isMobile: boolean }) {
+function YourAds({ isMobile, domain }: { isMobile: boolean; domain?: string }) {
   const { addToChat } = useContext(StudioCtx)
   const [data, setData] = useState<{ ads: OwnAd[]; pageId: string | null; connected?: boolean } | null>(null)
   const [link, setLink] = useState('')
@@ -779,7 +779,7 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>{connected ? 'Your live Facebook ads — and Mello runs them for you. Just tell it what to do.' : 'Connect Facebook and Mello runs your ads for you — create, launch, scale, pause, all by typing.'}</div>
 
       {/* Run your ads by chatting — templates + guided launch. Only when connected. */}
-      {connected && <div style={{ marginBottom: 22 }}><MelloAdsChat /></div>}
+      {connected && <div style={{ marginBottom: 22 }}><MelloAdsChat website={domain} /></div>}
 
       {data === null ? (
         <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
