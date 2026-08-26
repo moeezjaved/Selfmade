@@ -18,9 +18,9 @@ type Finding = { id: string; title: string; detail: string; severity: 'high' | '
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 type AiRead = { engine: string; mentioned: boolean; question: string; answer: string }
 type CatalogProduct = { title: string; price: number | null; image: string | null; url: string; missingAlt: number; thin: boolean; noSchema: boolean }
-type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
+type Section = { key: string; name: string; sub: string; score: number | null; findings: Finding[]; ladder?: LadderRow[]; ai?: { question: string; reads: AiRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 type RevenueModel = { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
-type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number; visibilityScore: number; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
+type Result = { domain: string; siteName: string; category: string; score: number; grade: string; websiteScore: number | null; visibilityScore: number | null; sections: Section[]; ai: { question: string; reads: AiRead[] }; revenueLostPerYear: number; currency: string; problemCount: number; revenueModel?: RevenueModel }
 
 const STEPS = [
   { key: 'health', label: 'Website health' }, { key: 'speed', label: 'Website speed' }, { key: 'spam', label: 'Spam-update check' },
@@ -739,7 +739,7 @@ function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; op
         <section key={sec.key} style={{ marginBottom: 34 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, borderBottom: `1px solid ${LINE}`, paddingBottom: 10, marginBottom: 14 }}>
             <div><div style={{ fontSize: isMobile ? 18 : 21, fontWeight: 800, color: INK }}><span style={{ color: LIME, fontWeight: 800, marginRight: 8 }}>{si + 1}.</span>{sec.name}</div><div style={{ fontSize: 13.5, color: SUB, marginTop: 2 }}>{sec.sub}</div></div>
-            <div style={{ fontSize: 18, fontWeight: 800, color: sec.score >= 70 ? GOOD : sec.score >= 40 ? '#c98a1a' : RED, flex: 'none' }}>{sec.score}/100</div>
+            <div style={{ fontSize: 18, fontWeight: 800, color: sec.score == null ? 'rgba(0,0,0,.35)' : sec.score >= 70 ? GOOD : sec.score >= 40 ? '#c98a1a' : RED, flex: 'none' }}>{sec.score == null ? 'No data' : `${sec.score}/100`}</div>
           </div>
           {sec.findings.length === 0 ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${LINE}`, borderRadius: 14, padding: 16, background: '#fff' }}><span style={{ color: GOOD, fontSize: 18 }}>✓</span><span style={{ fontSize: 14.5, fontWeight: 600, color: INK }}>Looks good — nothing to fix here.</span></div>
@@ -841,8 +841,8 @@ function Gauge({ score, grade }: { score: number; grade: string }) {
     </div>
   )
 }
-function SubScore({ label, value }: { label: string; value: number }) {
-  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: 'rgba(255,255,255,.03)' }}><div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{label}</div><div style={{ fontSize: 13, color: value >= 60 ? GOOD : value >= 40 ? '#e0a92b' : RED, fontWeight: 800 }}>{value} of 100</div></div>
+function SubScore({ label, value }: { label: string; value: number | null }) {
+  return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, border: '1px solid rgba(255,255,255,.08)', borderRadius: 12, padding: '12px 14px', marginBottom: 10, background: 'rgba(255,255,255,.03)' }}><div style={{ fontSize: 14, fontWeight: 700, color: '#fff' }}>{label}</div><div style={{ fontSize: 13, color: value == null ? 'rgba(255,255,255,.4)' : value >= 60 ? GOOD : value >= 40 ? '#e0a92b' : RED, fontWeight: 800 }}>{value == null ? 'No data' : `${value} of 100`}</div></div>
 }
 
 /** Completion gate — the theater stops here; the report opens only on click (Ryze-style). */

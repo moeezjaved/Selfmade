@@ -17,10 +17,12 @@ export type Finding = { id: string; title: string; detail: string; severity: 'hi
 export type SerpLadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
 export type AiEngineRead = { engine: string; mentioned: boolean; question: string; answer: string }
 export type CatalogProduct = { title: string; price: number | null; image: string | null; url: string; missingAlt: number; thin: boolean; noSchema: boolean }
-export type Section = { key: string; name: string; sub: string; score: number; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
+// score is null when the section couldn't be MEASURED (no products, no live rankings, no backlink source)
+// — an honest "no data", NOT a perfect 100. Null sections are excluded from the overall score.
+export type Section = { key: string; name: string; sub: string; score: number | null; findings: Finding[]; ladder?: SerpLadderRow[]; ai?: { question: string; reads: AiEngineRead[] }; read?: { urls: string[]; thumbs: (string | null)[]; total: number; metaMissing: number; h1Missing: number; altMissing: number }; speed?: { lcpS: number | null; cls: number | null }; products?: CatalogProduct[]; backlinks?: { mineRef: number; mineLinks: number; rivalRef: number | null; rivalDomain: string | null } }
 export type ScanResult = {
   domain: string; siteName: string; category: string; score: number; grade: 'Poor' | 'Fair' | 'Good' | 'Great'
-  websiteScore: number; visibilityScore: number; sections: Section[]
+  websiteScore: number | null; visibilityScore: number | null; sections: Section[]
   ai: { question: string; reads: AiEngineRead[] }; revenueLostPerYear: number; currency: string; problemCount: number
   revenueModel: { lostVisits: number; conversion: number; aov: number; fromSearch: number; fromCatalog: number; fromAi: number; catalogGapProducts: number; missReads: number; missTotal: number; keywordLeaks: { keyword: string; visits: number; rival: string | null }[] }
 }
@@ -144,7 +146,7 @@ function stepSpam(ctx: Ctx): Section {
   const f: Finding[] = []
   const maxDay = Math.max(0, ...Array.from(ctx.sm.byDay.values()))
   if (maxDay >= 20) f.push({ id: 'masspub', title: `${maxDay} pages published in a single day`, detail: 'Google’s spam update demotes scaled, template-looking content published in bursts.', severity: maxDay >= 60 ? 'high' : 'medium', fixable: true })
-  return { key: 'spam', name: 'Spam-update risk', sub: `${ctx.sm.urls.length} URLs in your sitemap`, score: f.length ? scoreFrom(f) : 100, findings: f }
+  return { key: 'spam', name: 'Spam-update risk', sub: `${ctx.sm.urls.length} URLs in your sitemap`, score: f.length ? scoreFrom(f) : null, findings: f }
 }
 function stepCatalog(ctx: Ctx): Section {
   const f: Finding[] = []
@@ -161,7 +163,7 @@ function stepCatalog(ctx: Ctx): Section {
   }
   const slugName = (url: string) => { try { const s = new URL(url).pathname.split('/').filter(Boolean).pop() || ''; return s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).slice(0, 60) } catch { return '' } }
   const products: CatalogProduct[] = P.map((p) => { const t = strip(p.title).replace(/\s*[|–—-]\s*[^|–—-]*$/, '').trim(); return { title: t || slugName(p.url) || 'Product', price: p.price, image: p.image, url: p.url, missingAlt: p.imgsNoAlt, thin: p.words < 200, noSchema: !p.schema } })
-  return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : 100, findings: f, products }
+  return { key: 'catalog', name: 'Your catalog', sub: P.length ? `${P.length} products checked one by one` : 'No product pages found', score: P.length ? scoreFrom(f) : null, findings: f, products }
 }
 async function stepAi(ctx: Ctx): Promise<Section> {
   const engines = availableEngines().slice(0, 4)
@@ -175,7 +177,7 @@ async function stepAi(ctx: Ctx): Promise<Section> {
   }))
   const misses = reads.filter((r) => !r.mentioned)
   const f: Finding[] = misses.map((r) => ({ id: `ai-${r.engine}`, title: `${r.engine} doesn’t mention you`, detail: question, severity: 'high', fixable: true }))
-  return { key: 'ai', name: 'AI visibility', sub: 'What ChatGPT, Gemini & Perplexity say', score: reads.length ? scoreFrom(f) : 100, findings: f, ai: { question, reads } }
+  return { key: 'ai', name: 'AI visibility', sub: 'What ChatGPT, Gemini & Perplexity say', score: reads.length ? scoreFrom(f) : null, findings: f, ai: { question, reads } }
 }
 async function stepGoogle(ctx: Ctx): Promise<Section> {
   if (!dfsConfigured()) {
@@ -193,7 +195,7 @@ async function stepGoogle(ctx: Ctx): Promise<Section> {
     detail: `${r.volume ? `${r.volume.toLocaleString()} searches/mo · ` : ''}${r.top[0]?.domain || 'a rival'} takes the click uncontested.`, severity: 'high', fixable: true,
   }))
   const sub = rows.length ? 'Where buyers find you first' : 'We couldn’t pull live rankings for your keywords'
-  return { key: 'google', name: 'Google visibility', sub, score: rows.length ? scoreFrom(f) : 100, findings: f, ladder: rows }
+  return { key: 'google', name: 'Google visibility', sub, score: rows.length ? scoreFrom(f) : null, findings: f, ladder: rows }
 }
 
 function stepSpeed(ctx: Ctx, ps: Awaited<ReturnType<typeof pageSpeed>>): Section | null {
@@ -229,7 +231,7 @@ async function stepBacklinks(ctx: Ctx, ladder: SerpLadderRow[], userRival?: stri
     f.push({ id: 'bl-thin', title: `Only ${mine.referringDomains.toLocaleString()} domains link to you`, detail: 'Too few for competitive terms. We build high-quality backlinks every month to close the gap.', severity: 'medium', fixable: true })
   }
   const backlinks = mine ? { mineRef: mine.referringDomains, mineLinks: mine.backlinks, rivalRef: rival?.referringDomains ?? null, rivalDomain: rivalDomain ?? null } : undefined
-  return { key: 'backlinks', name: 'Backlinks', sub: 'Who vouches for you across the web', score: f.length ? scoreFrom(f) : 100, findings: f, backlinks }
+  return { key: 'backlinks', name: 'Backlinks', sub: 'Who vouches for you across the web', score: f.length ? scoreFrom(f) : null, findings: f, backlinks }
 }
 
 /* ── Stream ────────────────────────────────────────────────────────────────────────────────────── */
@@ -258,11 +260,17 @@ export async function* scanStream(domain0: string, rival0?: string): AsyncGenera
   const ai = await stepAi(ctx); yield emit(ai)
 
   // Scores + revenue
-  const get = (k: string) => sections.find((s) => s.key === k)!
-  const opt = (k: string) => sections.find((s) => s.key === k)?.score ?? 100
-  const websiteScore = Math.round((get('health').score + get('catalog').score + get('spam').score + (speed ? speed.score : 0)) / (speed ? 4 : 3))
-  const visibilityScore = Math.round((get('ai').score + get('google').score + opt('backlinks')) / (bl ? 3 : 2))
-  const score = Math.round(websiteScore * 0.55 + visibilityScore * 0.45)
+  // Average ONLY the sections we could actually measure (score !== null). A section with no data is
+  // excluded — never counted as a fake 100. If a whole group is unmeasured, its score is null too.
+  const sc = (k: string): number | null => { const v = sections.find((s) => s.key === k)?.score; return typeof v === 'number' ? v : null }
+  const avg = (xs: (number | null)[]): number | null => { const v = xs.filter((x): x is number => typeof x === 'number'); return v.length ? Math.round(v.reduce((a, b) => a + b, 0) / v.length) : null }
+  const websiteScore = avg([sc('health'), sc('catalog'), sc('spam'), speed ? speed.score : null])
+  const visibilityScore = avg([sc('ai'), sc('google'), bl ? sc('backlinks') : null])
+  // Overall = weighted blend of whichever halves were measured (weights renormalized if one is missing).
+  const parts: { v: number; w: number }[] = []
+  if (websiteScore != null) parts.push({ v: websiteScore, w: 0.55 })
+  if (visibilityScore != null) parts.push({ v: visibilityScore, w: 0.45 })
+  const score = parts.length ? Math.round(parts.reduce((a, p) => a + p.v * p.w, 0) / parts.reduce((a, p) => a + p.w, 0)) : 0
   const grade: ScanResult['grade'] = score >= 80 ? 'Great' : score >= 60 ? 'Good' : score >= 40 ? 'Fair' : 'Poor'
   const problemCount = sections.reduce((a, s) => a + s.findings.filter((f) => f.fixable).length, 0)
 
@@ -272,7 +280,7 @@ export async function* scanStream(domain0: string, rival0?: string): AsyncGenera
     .sort((a, b) => a - b)
   const aov = prices.length ? Math.min(1500, Math.max(10, prices[Math.floor(prices.length / 2)])) : 60
   const CONV = 0.009
-  const ladder = get('google').ladder || []
+  const ladder = google.ladder || []
   const lostRows = ladder.filter((r) => r.yourPosition == null || r.yourPosition > 10)
   const keywordLeaks = lostRows.map((r) => ({ keyword: r.keyword, visits: Math.round((r.volume || 0) * 0.3), rival: r.top[0]?.domain ?? null }))
   const lostVisits = Math.round(keywordLeaks.reduce((a, k) => a + k.visits, 0))

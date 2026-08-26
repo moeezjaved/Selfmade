@@ -16,8 +16,8 @@ function ScanReport({ result }: { result: any }) {
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 14 }}>
         {[
           ['Overall', `${result.score} · ${result.grade}`],
-          ['Website', result.websiteScore],
-          ['Visibility', result.visibilityScore],
+          ['Website', result.websiteScore ?? 'No data'],
+          ['Visibility', result.visibilityScore ?? 'No data'],
           ['Problems', result.problemCount],
           ['Revenue lost / yr', money(result.revenueLostPerYear, result.currency)],
         ].map(([k, v]) => (
@@ -33,7 +33,7 @@ function ScanReport({ result }: { result: any }) {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
               <span style={{ fontWeight: 700, color: '#111', fontSize: 13 }}>{s.name}</span>
               <span style={{ fontSize: 11, color: '#9ca3af' }}>{s.sub}</span>
-              <span style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 13, color: s.score >= 70 ? '#16a34a' : s.score >= 45 ? '#d97706' : '#dc2626' }}>{s.score}</span>
+              <span style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 13, color: s.score == null ? '#9ca3af' : s.score >= 70 ? '#16a34a' : s.score >= 45 ? '#d97706' : '#dc2626' }}>{s.score == null ? 'No data' : s.score}</span>
             </div>
             {(s.findings || []).length > 0 && (
               <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -171,6 +171,7 @@ export default function FunnelPage() {
                         <td style={{ padding: '10px 20px', fontWeight: 600 }}>
                           <span style={{ color: '#c3c7c3', marginRight: 6 }}>{openDomain === a.domain ? '▾' : '▸'}</span>
                           <span onClick={(e) => { e.stopPropagation(); router.push(`/admin/site/${encodeURIComponent(a.domain)}`) }} style={{ color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">{a.domain}</span>
+                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#7c3aed14', borderRadius: 20, padding: '1px 7px' }} title="Which audit they ran">SEO audit</span>
                           <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#9ca3af', textDecoration: 'none', marginLeft: 6, fontSize: 11 }}>↗</a>
                         </td>
                         <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
