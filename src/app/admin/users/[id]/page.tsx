@@ -14,6 +14,21 @@ interface UserDetail {
   errors: { id: string; error_message: string; page_url: string | null; created_at: string }[];
   follows: { page_id: string; brand_name: string | null; email_alerts: boolean; created_at: string }[];
   creatives: { id: string; type: string; tier: string; media_type: string | null; status: string | null; prompt: string | null; image_url: string | null; brand_name: string | null; source_ad_id: string | null; created_at: string }[];
+  credit_balance?: number | null;
+  logins?: { d7: number; d30: number; total: number; recent: string[] };
+  revenue?: { total: number; organic: number; orders: number; currency: string };
+  reports?: { id: string; kind: string; title: string; subject: string | null; model: string | null; ad_count: number | null; created_at: string }[];
+  brands_workspace?: BrandWorkspace[];
+}
+
+interface BrandWorkspace {
+  id: string; name: string; website: string | null; brand_type: string | null; created_at: string | null;
+  shopify: { connected: boolean; shop_domain?: string; shop_name?: string | null; status?: string };
+  meta: { connected: boolean; accounts?: { name: string; status: string; primary: boolean }[] };
+  kb_present: boolean; kb_keys: string[];
+  products_count: number; templates_count: number; audiences: string[];
+  seo: { catalog_applied: number; catalog_drafts: number; blogs_published: number; blogs_drafts: number; wins: number };
+  revenue: { total: number; organic: number; orders: number; currency: string };
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -27,6 +42,16 @@ function fmt(d: string | null) {
 
 function Check({ yes }: { yes: boolean }) {
   return <span style={{ fontSize: '15px' }}>{yes ? '✅' : '❌'}</span>
+}
+
+function Pill({ on, onLabel, offLabel, color }: { on: boolean; onLabel: string; offLabel: string; color: string }) {
+  return (
+    <span style={{ fontSize: 11, fontWeight: 700, borderRadius: 20, padding: '3px 10px',
+      background: on ? `${color}1a` : '#f3f4f6', color: on ? color : '#9ca3af',
+      border: `1px solid ${on ? `${color}44` : '#e5e7eb'}` }}>
+      {on ? onLabel : offLabel}
+    </span>
+  )
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -172,6 +197,33 @@ export default function UserProfile({ params }: { params: { id: string } }) {
         </span>
       </div>
 
+      {/* KPI strip — logins (activity), Shopify revenue, credits: the "is this user actually working" glance. */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))', gap: '12px', marginBottom: '20px' }}>
+        {[
+          { k: 'Logins · 7d', v: user.logins?.d7 ?? 0 },
+          { k: 'Logins · 30d', v: user.logins?.d30 ?? 0 },
+          { k: 'Logins · all', v: user.logins?.total ?? 0 },
+          { k: 'Shopify revenue', v: user.revenue ? money(user.revenue.total, user.revenue.currency) : '—' },
+          { k: 'Orders', v: user.revenue?.orders ?? 0 },
+          { k: 'Credits', v: user.credit_balance != null ? user.credit_balance.toLocaleString() : '—' },
+        ].map((s) => (
+          <div key={s.k} style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 12, padding: '14px 16px' }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: '#111' }}>{s.v as any}</div>
+            <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 2 }}>{s.k}</div>
+          </div>
+        ))}
+      </div>
+      {user.logins?.recent && user.logins.recent.length > 0 && (
+        <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 12, padding: '14px 20px', marginBottom: 20 }}>
+          <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>Recent logins</div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {user.logins.recent.slice(0, 12).map((t, i) => (
+              <span key={i} style={{ fontSize: 11.5, color: '#444', background: '#f5f6f5', border: '1px solid #eceeec', borderRadius: 6, padding: '3px 8px' }}>{fmt(t)}</span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Extend trial */}
       <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: '12px', padding: '16px 20px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
         <div>
@@ -204,6 +256,7 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           {/* The TRUE plan (entitlement), not the raw subscription status. Status is the badge up top. */}
           <Row label="Plan" value={<span style={{ textTransform: 'capitalize', fontWeight: 700 }}>{user.plan_label || user.subscription_status}</span>} />
           <Row label="Billing status" value={<span style={{ textTransform: 'capitalize' }}>{user.subscription_status}</span>} />
+          <Row label="Credit balance" value={user.credit_balance != null ? <span style={{ fontWeight: 700 }}>{user.credit_balance.toLocaleString()} cr</span> : '—'} />
           <Row label="Signup Date" value={fmt(user.created_at)} />
           <Row label="Last active" value={fmt(user.last_active_at || user.last_sign_in_at)} />
           <Row label="Last sign-in" value={fmt(user.last_sign_in_at)} />
@@ -223,6 +276,84 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           <Row label="Brands Created" value={user.brands_count ?? 0} />
         </Section>
       </div>
+
+      {/* Per-brand workspace — website, connections, KB, products, templates, audiences, SEO push, revenue. */}
+      {(user.brands_workspace?.length ?? 0) > 0 && (
+        <Section title={`Workspaces (${user.brands_workspace!.length})`}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {user.brands_workspace!.map((b) => (
+              <div key={b.id} style={{ border: '1px solid #eef0ee', borderRadius: 12, padding: 18 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
+                  <span style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>{b.name || 'Untitled brand'}</span>
+                  {b.website
+                    ? <a href={b.website.startsWith('http') ? b.website : `https://${b.website}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none' }}>🌐 {b.website.replace(/^https?:\/\//, '')}</a>
+                    : <span style={{ fontSize: 12, color: '#d97706' }}>🌐 no website</span>}
+                  <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    <Pill on={b.shopify.connected} onLabel={`Shopify · ${b.shopify.shop_domain || 'connected'}`} offLabel="Shopify ✕" color="#96bf48" />
+                    <Pill on={b.meta.connected} onLabel={`Meta · ${b.meta.accounts?.length || 0} acct`} offLabel="Meta ✕" color="#1877F2" />
+                    <Pill on={b.kb_present} onLabel="Knowledge base" offLabel="No KB" color="#7c3aed" />
+                  </span>
+                </div>
+
+                {/* metrics row */}
+                <div style={{ display: 'flex', gap: 22, flexWrap: 'wrap', marginBottom: 12 }}>
+                  {[
+                    ['Revenue', money(b.revenue.total, b.revenue.currency), `${b.revenue.orders} orders${b.revenue.organic ? ` · ${money(b.revenue.organic, b.revenue.currency)} organic` : ''}`],
+                    ['Products', b.products_count, 'synced'],
+                    ['Templates', b.templates_count, 'generated'],
+                    ['SEO applied', b.seo.catalog_applied, `${b.seo.catalog_drafts} pending`],
+                    ['Blogs', b.seo.blogs_published, `${b.seo.blogs_drafts} draft`],
+                    ['Wins', b.seo.wins, 'logged'],
+                  ].map(([k, v, sub]) => (
+                    <div key={String(k)}>
+                      <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{v as any}</div>
+                      <div style={{ fontSize: 11, color: '#9ca3af' }}>{k as any}</div>
+                      <div style={{ fontSize: 10, color: '#c3c7c3' }}>{sub as any}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* audiences */}
+                {b.audiences.length > 0 && (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                    <span style={{ fontSize: 11, color: '#9ca3af', fontWeight: 700, marginRight: 4 }}>Audiences:</span>
+                    {b.audiences.map((a, i) => (
+                      <span key={i} style={{ fontSize: 11.5, color: '#333', background: '#f5f6f5', border: '1px solid #eceeec', borderRadius: 20, padding: '3px 10px' }}>{typeof a === 'string' ? a : (a as any)?.name || (a as any)?.label || 'audience'}</span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* Facebook / competitor reports Mello authored for this user. */}
+      {(user.reports?.length ?? 0) > 0 && (
+        <Section title={`Reports (${user.reports!.length})`}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid #f0f0f0' }}>
+                {['Title', 'Type', 'Subject', 'Ads', 'Model', 'Created'].map(h => (
+                  <th key={h} style={{ padding: '6px 8px', textAlign: 'left', color: '#999', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {user.reports!.map(r => (
+                <tr key={r.id} style={{ borderBottom: '1px solid #f8f8f8' }}>
+                  <td style={{ padding: '9px 8px', color: '#111', fontWeight: 600 }}>{r.title}</td>
+                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.kind.replace(/_/g, ' ')}</td>
+                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.subject || '—'}</td>
+                  <td style={{ padding: '9px 8px', color: '#555' }}>{r.ad_count ?? '—'}</td>
+                  <td style={{ padding: '9px 8px', color: '#888', fontSize: 11 }}>{r.model || '—'}</td>
+                  <td style={{ padding: '9px 8px', color: '#888' }}>{fmt(r.created_at)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Section>
+      )}
 
       {/* Campaigns */}
       {user.campaigns.length > 0 && (

@@ -7,6 +7,13 @@ interface User {
   plan_id?: string; plan_label?: string;
   created_at: string; last_sign_in_at: string | null;
   meta_connected?: boolean; meta_accounts?: number;
+  shopify_connected?: boolean; seo_active?: boolean; ads_count?: number;
+  revenue?: number; revenue_currency?: string;
+}
+
+const money = (n: number, cur: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)}` } }
+function MiniPill({ on, label, color }: { on: boolean; label: string; color: string }) {
+  return <span style={{ padding: '2px 8px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: on ? `${color}18` : '#9ca3af14', color: on ? color : '#c3c7c3' }}>{on ? label : '✕'}</span>
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -50,16 +57,16 @@ export default function UsersPage() {
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
           <thead>
             <tr style={{ background: '#fafafa', borderBottom: '1px solid #f0f0f0' }}>
-              {['Name', 'Email', 'Facebook', 'Plan', 'Signup Date', 'Last Active'].map(h => (
+              {['Name', 'Email', 'Facebook', 'Shopify', 'SEO', 'Ads', 'Revenue', 'Plan', 'Signup Date', 'Last Active'].map(h => (
                 <th key={h} style={{ padding: '11px 16px', textAlign: 'left', fontWeight: '600', color: '#888', fontSize: '12px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {loading ? (
-              <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#aaa' }}>Loading…</td></tr>
+              <tr><td colSpan={10} style={{ padding: '32px', textAlign: 'center', color: '#aaa' }}>Loading…</td></tr>
             ) : users.length === 0 ? (
-              <tr><td colSpan={6} style={{ padding: '32px', textAlign: 'center', color: '#aaa' }}>No users found</td></tr>
+              <tr><td colSpan={10} style={{ padding: '32px', textAlign: 'center', color: '#aaa' }}>No users found</td></tr>
             ) : users.map(u => (
               <tr
                 key={u.id}
@@ -79,6 +86,10 @@ export default function UsersPage() {
                     <span style={{ padding: '2px 9px', borderRadius: 20, fontSize: 11, fontWeight: 600, background: '#9ca3af18', color: '#9ca3af' }}>Not connected</span>
                   )}
                 </td>
+                <td style={{ padding: '12px 16px' }}><MiniPill on={!!u.shopify_connected} label="✓" color="#5a8f2b" /></td>
+                <td style={{ padding: '12px 16px' }}><MiniPill on={!!u.seo_active} label="active" color="#7c3aed" /></td>
+                <td style={{ padding: '12px 16px', color: (u.ads_count || 0) > 0 ? '#111' : '#c3c7c3', fontWeight: (u.ads_count || 0) > 0 ? 700 : 400 }}>{u.ads_count || 0}</td>
+                <td style={{ padding: '12px 16px', color: (u.revenue || 0) > 0 ? '#16a34a' : '#c3c7c3', fontWeight: (u.revenue || 0) > 0 ? 700 : 400 }}>{(u.revenue || 0) > 0 ? money(u.revenue!, u.revenue_currency || 'USD') : '—'}</td>
                 <td style={{ padding: '12px 16px' }}>
                   {(() => {
                     const paid = !!u.plan_id && u.plan_id !== 'free'

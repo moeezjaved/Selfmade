@@ -39,6 +39,35 @@ export async function GET(request: NextRequest) {
     if (String((m as any).status) === 'active') metaCount[(m as any).user_id] = (metaCount[(m as any).user_id] || 0) + 1
   }
 
+  // Shopify connected? · SEO active? · #ads · revenue — the at-a-glance "is this user working" columns.
+  const [storesRes, geoRes, creativesRes, ordersRes] = await Promise.all([
+    admin.from('shopify_stores').select('id, user_id, status').in('user_id', userIds),
+    admin.from('geo_assets').select('user_id, status').in('user_id', userIds).eq('status', 'published'),
+    admin.from('creative_generations').select('user_id').in('user_id', userIds),
+    admin.from('shopify_orders').select('user_id, total_price, currency').in('user_id', userIds),
+  ])
+  const stores = storesRes.data || []
+  const shopifyByUser: Record<string, boolean> = {}
+  const storeToUser: Record<string, string> = {}
+  for (const s of stores) { shopifyByUser[(s as any).user_id] = true; storeToUser[(s as any).id] = (s as any).user_id }
+  // Applied catalog fixes → which users are actively pushing SEO to their live store.
+  const storeIds = stores.map((s: any) => s.id)
+  const seoByUser: Record<string, boolean> = {}
+  for (const g of (geoRes.data || [])) seoByUser[(g as any).user_id] = true   // published a blog
+  if (storeIds.length) {
+    const { data: applied } = await admin.from('shopify_catalog_drafts').select('store_id').in('store_id', storeIds).eq('status', 'applied')
+    for (const a of (applied || [])) { const uid = storeToUser[(a as any).store_id]; if (uid) seoByUser[uid] = true }
+  }
+  const adsByUser: Record<string, number> = {}
+  for (const c of (creativesRes.data || [])) adsByUser[(c as any).user_id] = (adsByUser[(c as any).user_id] || 0) + 1
+  const revByUser: Record<string, { total: number; currency: string }> = {}
+  for (const o of (ordersRes.data || [])) {
+    const uid = (o as any).user_id
+    const cur = revByUser[uid] || { total: 0, currency: (o as any).currency || 'USD' }
+    cur.total += (typeof (o as any).total_price === 'number' ? (o as any).total_price : parseFloat((o as any).total_price)) || 0
+    revByUser[uid] = cur
+  }
+
   let users = authUsers.map((u: User) => {
     const planId = (profileMap[u.id]?.plan_id || 'free') as PlanId
     return {
@@ -52,6 +81,11 @@ export async function GET(request: NextRequest) {
     last_sign_in_at: u.last_sign_in_at || null,
     meta_accounts: metaCount[u.id] || 0,
     meta_connected: (metaCount[u.id] || 0) > 0,
+    shopify_connected: !!shopifyByUser[u.id],
+    seo_active: !!seoByUser[u.id],
+    ads_count: adsByUser[u.id] || 0,
+    revenue: revByUser[u.id]?.total || 0,
+    revenue_currency: revByUser[u.id]?.currency || 'USD',
     }
   })
 
