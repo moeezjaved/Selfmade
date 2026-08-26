@@ -544,7 +544,7 @@ export default function InterviewPage() {
       const j = await r.json().catch(() => ({}))
       if (j?.url) { window.location.href = j.url; return }
     } catch { /* fall through */ }
-    setPlanBusy(''); router.push('/brief')
+    setPlanBusy(''); router.push('/hq')
   }
 
   // WhatsApp founder-connect removed from onboarding — founder briefs/approvals are Slack-only for now
@@ -564,7 +564,7 @@ export default function InterviewPage() {
           </p>
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', flexWrap: 'wrap' }}>
             <button onClick={() => router.push('/billing')} style={{ background: GREEN, color: '#fff', border: 'none', borderRadius: 100, padding: '12px 26px', fontWeight: 800, fontSize: 15, cursor: 'pointer' }}>{atTopTier ? 'Contact us →' : 'Upgrade →'}</button>
-            <button onClick={() => router.push('/brief')} style={{ background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Back to dashboard</button>
+            <button onClick={() => router.push('/hq')} style={{ background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 100, padding: '12px 22px', fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Back to dashboard</button>
           </div>
         </div>
       </div>

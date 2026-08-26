@@ -4,6 +4,7 @@
  * BriefClient as initialBrief; the client only adds interactivity (chat, approve/kill), never the
  * first paint. This kills the "pulling the room together…" hang caused by hydration failures.
  */
+import { redirect } from 'next/navigation'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { assembleBrief, type Brief } from '@/lib/brief/assemble'
 import { resolveActiveBrandId } from '@/lib/brand/active'
@@ -12,7 +13,20 @@ import BriefClient from './BriefClient'
 
 export const dynamic = 'force-dynamic'
 
+// Retired 2026-08-26: the chat-first Home (/hq) is the one Home now. The old morning-brief page redirects
+// there so no link, bookmark, or stale open tab lands on it. Query params (welcome/brand) carry over so
+// the first-time reveal still fires on /hq. BriefClient is kept in the tree for rollback, just unreached.
 export default async function BriefPage({ searchParams }: { searchParams?: { view?: string; brand?: string; welcome?: string } }) {
+  const qs = new URLSearchParams()
+  if (searchParams?.welcome) qs.set('welcome', searchParams.welcome)
+  if (searchParams?.brand) qs.set('brand', searchParams.brand)
+  redirect(`/hq${qs.toString() ? `?${qs}` : ''}`)
+
+  // eslint-disable-next-line no-unreachable
+  return legacyBrief({ searchParams })
+}
+
+async function legacyBrief({ searchParams }: { searchParams?: { view?: string; brand?: string; welcome?: string } }) {
   // The view AND the selected brand are resolved on the SERVER and rendered into the HTML. Reading
   // either in a useEffect meant a failed hydration (broken extensions) silently fell back to the
   // default — same class of bug as the studio's mode/source seeding. Never gate first paint on the

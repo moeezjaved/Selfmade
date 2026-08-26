@@ -17,7 +17,7 @@ export default async function LegalShell({ eyebrow = 'Legal', title, updated, in
   // should get in-app nav + a logo that returns to the app, not the logged-out marketing home.
   let signedIn = false
   try { const s = await createClient(); signedIn = !!(await s.auth.getUser()).data.user } catch { /* treat as logged out */ }
-  const home = signedIn ? '/brief' : '/'
+  const home = signedIn ? '/hq' : '/'
   return (
     <div style={{ fontFamily: "'Inter', -apple-system, system-ui, sans-serif", color: INK, background: '#fff', overflowX: 'hidden' }}>
       {/* ── Nav — mirrors the landing ── */}
@@ -26,7 +26,7 @@ export default async function LegalShell({ eyebrow = 'Legal', title, updated, in
           <Link href={home} style={{ display: 'flex', alignItems: 'center' }}>{/* eslint-disable-next-line @next/next/no-img-element */}<img src="/logo.png" alt="Selfmade" style={{ height: 30, filter: 'brightness(0)' }} /></Link>
           <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
             {signedIn ? (
-              <Link href="/brief" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Dashboard →</Link>
+              <Link href="/hq" style={{ background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Dashboard →</Link>
             ) : (
               <>
                 <Link href="/login" className="ls-hide-sm" style={{ fontSize: 14.5, fontWeight: 700, color: INK, textDecoration: 'none' }}>Log in</Link>
