@@ -5,6 +5,7 @@
  * per session on login → dashboard. Auto-dismisses after the sequence; honors prefers-reduced-motion.
  */
 import { useEffect, useState } from 'react'
+import { MarkDecode } from '@/components/brand/Mark'
 
 const WORD = 'selfmade'.split('')
 const KEYFRAMES = `
@@ -17,7 +18,6 @@ const KEYFRAMES = `
 @keyframes li-fadeout { to { opacity:0; visibility:hidden; } }
 @media (prefers-reduced-motion: reduce){ .li-anim{animation:none !important;} .li-draw-path{stroke-dashoffset:0 !important;} }
 `
-const S_PATH = 'M66,30 C66,21 50,18 42,24 C33,30 34,42 48,47 C62,52 65,61 59,70 C53,79 38,80 30,72'
 
 export default function LogoIntro({ onDone }: { onDone?: () => void }) {
   const [gone, setGone] = useState(false)
@@ -34,12 +34,8 @@ export default function LogoIntro({ onDone }: { onDone?: () => void }) {
       <style>{KEYFRAMES}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, position: 'relative' }}>
         <div className="li-anim" style={{ position: 'absolute', left: -10, top: '50%', width: 230, height: 230, transform: 'translateY(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,90,44,.85) 0%, rgba(255,90,44,0) 70%)', filter: 'blur(30px)', opacity: 0.5, animation: 'li-glow .5s ease .9s both', zIndex: 0 }} />
-        <div style={{ position: 'relative', width: 96, height: 96, flex: '0 0 auto', zIndex: 1 }}>
-          <div className="li-anim" style={{ position: 'absolute', inset: 0, borderRadius: 21, background: '#ff5a2c', boxShadow: '0 10px 30px -8px rgba(255,90,44,.55)', transformOrigin: 'center', animation: 'li-stamp .45s cubic-bezier(.34,1.56,.64,1) .9s both' }} />
-          <svg viewBox="0 0 96 96" width={96} height={96} fill="none" style={{ position: 'absolute', inset: 0, zIndex: 2 }}>
-            <path className="li-anim li-draw-path" d={S_PATH} stroke="#ff5a2c" strokeWidth={11} strokeLinecap="round" strokeLinejoin="round" strokeDasharray={240} strokeDashoffset={240} style={{ opacity: 0, animation: 'li-draw .85s ease-in-out .15s both, li-strokeFade .18s linear .95s both' }} />
-            <path className="li-anim" d={S_PATH} stroke="#0e1b12" strokeWidth={11} strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 1, animation: 'li-fillIn .25s ease .95s both' }} />
-          </svg>
+        <div style={{ position: 'relative', width: 96, height: 96, flex: '0 0 auto', zIndex: 1, borderRadius: 21, overflow: 'hidden', boxShadow: '0 10px 30px -8px rgba(239,74,30,.55)' }}>
+          <MarkDecode size={96} durationMs={1300} />
         </div>
         <div style={{ display: 'flex', zIndex: 1 }}>
           {WORD.map((c, i) => (

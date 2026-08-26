@@ -270,7 +270,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
             <Menu size={22} />
           </button>
           <Link href="/brief" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <div style={{ width: 28, height: 28, borderRadius: 8, overflow: 'hidden', flex: 'none' }}><Mark size={28} /></div>
+            <div style={{ width: 28, height: 28, flex: 'none' }}><Mark size={28} /></div>
           </Link>
           <div style={{ display: 'flex', alignItems: 'center' }}><NotificationBell /></div>
         </div>
@@ -318,7 +318,7 @@ export default function AppShell({ children, brands = [], activeBrand = '' }: { 
           onMouseLeave={() => setFlyout(null)}
           style={{ width: RAIL_W, position: 'fixed', top: 0, left: 0, bottom: 0, zIndex: 50, background: '#f7f8f6', borderRight: '1px solid #e9ece8', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '14px 0 12px', gap: 3 }}>
           <Link href="/brief" title="Home" style={{ marginBottom: 8 }} onMouseEnter={() => setFlyout(null)}>
-            <div style={{ width: 34, height: 34, borderRadius: 11, overflow: 'hidden', flex: 'none' }}><Mark size={34} /></div>
+            <div style={{ width: 34, height: 34, flex: 'none' }}><Mark size={34} /></div>
           </Link>
 
           {/* Create — the ONE bold thing on the rail; opens the full 3-way chooser */}

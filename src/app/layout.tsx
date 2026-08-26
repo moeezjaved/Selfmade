@@ -55,7 +55,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         width: 32px; height: 32px;
         background: url(/mark.svg) center/contain no-repeat;
         animation: sm-pulse 1.3s ease-in-out infinite;
-        border-radius: 9px;
+        border-radius: 0;
       }
     `}</style>
   </head>

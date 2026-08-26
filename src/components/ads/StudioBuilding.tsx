@@ -123,7 +123,7 @@ export default function StudioBuilding({ domain }: { domain: string }) {
       <style>{`@keyframes sbspin{to{transform:rotate(360deg)}}@keyframes sbpulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
       <div style={{ width: '100%', maxWidth: 520, textAlign: 'center' }}>
         <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
-          <div style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 50px -24px rgba(239,74,30,.5)' }}><MarkDecode size={68} loop durationMs={2000} /></div>
+          <div style={{ overflow: 'hidden', boxShadow: '0 20px 50px -24px rgba(239,74,30,.5)' }}><MarkDecode size={68} loop durationMs={2000} /></div>
         </div>
         <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE, marginBottom: 14 }}>Setting up {cleanDomain}</div>
         <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 46, lineHeight: 1.04, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Building your studio</h1>
