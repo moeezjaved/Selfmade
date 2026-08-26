@@ -59,16 +59,22 @@ async function main() {
   const allSizes = await listSizesByPrefix('')
   const videoSizes = new Map<string, number>()
   const posterSizes = new Map<string, number>()
-  let totalBytes = 0, videoBytesAll = 0, imageBytesAll = 0
+  let totalBytes = 0, videoBytesAll = 0, imageBytesAll = 0, posterBytesAll = 0, otherBytes = 0
+  let videoCount = 0, imageCount = 0, posterCount = 0
   for (const [k, sz] of allSizes) {
     totalBytes += sz
-    if (k.startsWith('videos/')) { videoSizes.set(k, sz); videoBytesAll += sz }
-    else if (k.startsWith('posters/')) posterSizes.set(k, sz)
-    else if (k.startsWith('thumbnails/') || k.startsWith('thumbs/')) imageBytesAll += sz
+    if (k.startsWith('videos/')) { videoSizes.set(k, sz); videoBytesAll += sz; videoCount++ }
+    else if (k.startsWith('posters/')) { posterSizes.set(k, sz); posterBytesAll += sz; posterCount++ }
+    else if (k.startsWith('thumbnails/') || k.startsWith('thumbs/')) { imageBytesAll += sz; imageCount++ }
+    else otherBytes += sz
   }
   const gbAll = (n: number) => (n / 1073741824).toFixed(2)
-  console.log(`   ${allSizes.size} objects · total ${gbAll(totalBytes)} GB` +
-    ` (videos ${gbAll(videoBytesAll)} GB · images ${gbAll(imageBytesAll)} GB)\n`)
+  console.log(`\n📁 Bucket breakdown (${allSizes.size} objects · ${gbAll(totalBytes)} GB total)`)
+  console.log(`   Videos:   ${videoCount.toLocaleString()} objects · ${gbAll(videoBytesAll)} GB`)
+  console.log(`   Images:   ${imageCount.toLocaleString()} objects · ${gbAll(imageBytesAll)} GB  (thumbnails/ + thumbs/ — never deleted)`)
+  console.log(`   Posters:  ${posterCount.toLocaleString()} objects · ${gbAll(posterBytesAll)} GB`)
+  if (otherBytes > 0) console.log(`   Other:    ${gbAll(otherBytes)} GB`)
+  console.log('')
 
   // 3) Scan every ad that has an R2 video, decide keep/strip/delete
   let scanned = 0, keptSpied = 0, keptSaved = 0, delEntire = 0, stripped = 0
