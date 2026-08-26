@@ -3,6 +3,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
+import { confirmAction } from '@/components/ConfirmDialog'
 import { ChannelLogo } from '@/components/brand/logos'
 
 // Chrome Web Store listing (approved 2026-07-08).
@@ -211,6 +212,20 @@ export default function SettingsPage() {
   }
 
   // In-app confirmation (was a browser window.confirm — every prompt should live inside the app UI).
+  // Disconnect Shopify — remove the store connection (encrypted token) from Selfmade. Synced products
+  // stay; reconnecting re-links. App-level confirm (no native window.confirm).
+  const [shopifyDisc, setShopifyDisc] = useState(false)
+  const disconnectShopify = async () => {
+    if (shopifyDisc) return
+    if (!(await confirmAction({ title: 'Disconnect Shopify?', body: 'Selfmade will stop reading your store. Your already-synced products stay, and you can reconnect anytime.', confirmLabel: 'Disconnect' }))) return
+    setShopifyDisc(true)
+    try {
+      const res = await fetch('/api/shopify/connect', { method: 'DELETE' })
+      if (res.ok) { setShopifyConnected(false); toast.success('Shopify disconnected') }
+      else { const j = await res.json().catch(() => ({})); toast.error(j?.error || 'Failed to disconnect') }
+    } catch { toast.error('Failed to disconnect') }
+    finally { setShopifyDisc(false) }
+  }
   const disconnectMeta = () => setMetaConfirm(true)
   const doDisconnectMeta = async () => {
     setMetaConfirm(false)
@@ -478,11 +493,18 @@ export default function SettingsPage() {
             <div style={{fontSize:14,color: shopifyConnected ? '#3a5a3a' : '#9ca3af'}}>
               {shopifyConnected == null ? 'Shopify — checking…' : shopifyConnected ? 'Shopify — Connected ✓' : 'Shopify'}
             </div>
-            <a href="/connect/shopify" style={shopifyConnected
-              ? {fontSize:13,color:'#141d15',fontWeight:700,textDecoration:'none'}
-              : {background:'#ff5a2c',color:'#fff',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
-              {shopifyConnected ? 'Manage →' : 'Connect →'}
-            </a>
+            <div style={{display:'flex',alignItems:'center',gap:16}}>
+              <a href="/connect/shopify" style={shopifyConnected
+                ? {fontSize:13,color:'#141d15',fontWeight:700,textDecoration:'none'}
+                : {background:'#ff5a2c',color:'#fff',padding:'7px 16px',borderRadius:100,fontSize:13,fontWeight:800,textDecoration:'none',whiteSpace:'nowrap'}}>
+                {shopifyConnected ? 'Manage →' : 'Connect →'}
+              </a>
+              {shopifyConnected && (
+                <button onClick={disconnectShopify} disabled={shopifyDisc} style={{fontSize:13,color:'#c0392b',fontWeight:700,background:'none',border:'none',fontFamily:'inherit',cursor:shopifyDisc?'default':'pointer',opacity:shopifyDisc?0.5:1,padding:0}}>
+                  {shopifyDisc ? 'Disconnecting…' : 'Disconnect'}
+                </button>
+              )}
+            </div>
           </div>
         </div>
       </div>

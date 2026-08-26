@@ -43,6 +43,22 @@ export async function GET(_req: NextRequest) {
   })
 }
 
+// DELETE → disconnect Shopify from Selfmade for the active brand (removes the stored, encrypted token).
+// Product data already synced stays; reconnecting re-links and re-syncs. Precise: removes exactly the
+// store GET/resolveStore resolves for this user + brand.
+export async function DELETE(_req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const admin = createAdminClient() as any
+  const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+  const store = await resolveStore(admin, user.id, brandId)
+  if (!store) return NextResponse.json({ ok: true, alreadyDisconnected: true })
+  const { error } = await admin.from('shopify_stores').delete().eq('id', (store as any).id)
+  if (error) return NextResponse.json({ error: 'Could not disconnect — try again.' }, { status: 500 })
+  return NextResponse.json({ ok: true })
+}
+
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
