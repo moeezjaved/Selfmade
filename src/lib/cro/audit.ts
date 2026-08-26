@@ -13,9 +13,10 @@
  */
 import { llm } from '@/lib/llm'
 import { crawlStore } from '@/lib/ads-studio/store'
+import { critiqueScreens } from '@/lib/gemini/vision'
 
 export type CroSeverity = 'high' | 'medium' | 'low'
-export type CroFinding = { area: 'product' | 'home' | 'global'; severity: CroSeverity; title: string; detail: string; impact?: string; source: 'rule' | 'ai' }
+export type CroFinding = { area: 'product' | 'home' | 'global'; severity: CroSeverity; title: string; detail: string; impact?: string; source: 'rule' | 'ai' | 'vision' }
 export type CroAudit = { hasData: boolean; site?: string; domain?: string; score?: number; productUrl?: string | null; findings?: CroFinding[]; note?: string; scannedAt?: string }
 
 async function fetchHtml(url: string): Promise<string> {
@@ -61,9 +62,11 @@ function ruleFindings(homeHtml: string, prodHtml: string, hasProduct: boolean): 
 
   // ── Product page ──
   if (hasProduct) {
-    if (!has(P, /review|rating|\bstars?\b|★|⭐|judge\.me|yotpo|loox|okendo|stamped|trustpilot|reviews\.io/)) f.push({ area: 'product', severity: 'high', title: 'No product reviews or ratings visible', detail: 'The product page shows no reviews, star ratings, or review-app widget. Shoppers look for proof before buying.', impact: IMPACT.reviews, source: 'rule' })
+    // Reviews must be a real WIDGET or a rating/count — not just the word "review" in a footer link.
+    if (!has(P, /judge\.me|yotpo|loox|okendo|stamped|reviews\.io|trustpilot|\d[\d,]*\s*reviews?\b|\d(?:\.\d)?\s*(?:out of|\/)\s*5|★{3,}|rated\s*\d/)) f.push({ area: 'product', severity: 'high', title: 'No product reviews or ratings visible', detail: 'No review widget, star rating, or review count detected on the product page. Shoppers look for proof before buying.', impact: IMPACT.reviews, source: 'rule' })
     if (!has(P, /shop pay|apple pay|google pay|klarna|afterpay|clearpay|paypal|amazon pay/)) f.push({ area: 'product', severity: 'medium', title: 'No express checkout / BNPL badges', detail: 'No Shop Pay, Apple Pay, Klarna or similar detected near checkout — one-tap pay and “pay later” reduce friction.', impact: IMPACT.express, source: 'rule' })
-    if (!has(P, /free shipping|shipping|returns?|refund|money[- ]?back|guarantee|delivery/)) f.push({ area: 'product', severity: 'medium', title: 'Shipping & returns not stated on the page', detail: 'No shipping, returns, or guarantee copy detected near the buy button — this is the top pre-purchase question.', impact: IMPACT.shipping, source: 'rule' })
+    // Require a concrete shipping/returns CLAIM, not just the word appearing somewhere in the page.
+    if (!has(P, /free shipping|free returns|money[- ]?back|satisfaction guarantee|\d+[- ]?day (?:returns?|refunds?|guarantee|money)|ships? (?:in|within|free)|delivery (?:in|within)|easy returns/)) f.push({ area: 'product', severity: 'medium', title: 'Shipping & returns not stated on the page', detail: 'No concrete shipping, returns, or guarantee promise detected near the buy button — the top pre-purchase question.', impact: IMPACT.shipping, source: 'rule' })
     const imgCount = (prodHtml.match(/<img[^>]+(?:cdn\/shop|\/products\/|product)[^>]*>/gi) || []).length
     const hasVideo = has(P, /<video|youtube\.com|youtu\.be|vimeo|\.mp4|product.*video/)
     if (imgCount < 3 && !hasVideo) f.push({ area: 'product', severity: 'medium', title: 'Thin product media (few images, no video)', detail: `Detected ${imgCount} product image${imgCount === 1 ? '' : 's'} and no video. Multiple angles + a short video meaningfully lift PDP conversion.`, impact: IMPACT.images, source: 'rule' })
@@ -73,7 +76,8 @@ function ruleFindings(homeHtml: string, prodHtml: string, hasProduct: boolean): 
   // ── Homepage ──
   if (!has(homeHtml, /<h1[^>]*>[^<]{3,}/i)) f.push({ area: 'home', severity: 'high', title: 'No clear value proposition above the fold', detail: 'No prominent H1 headline found. Visitors should understand what you sell and why in 5 seconds.', impact: IMPACT.h1, source: 'rule' })
   if (!has(H, /shop now|shop all|buy now|get \d+%|start|browse|explore|order/)) f.push({ area: 'home', severity: 'medium', title: 'Weak / missing primary CTA', detail: 'No obvious primary call-to-action detected on the homepage. Give traffic one clear next step.', impact: IMPACT.cta, source: 'rule' })
-  if (!has(H, /review|rating|★|as seen|featured in|trusted by|\d[\d,]* (happy )?customers|press|testimonial/)) f.push({ area: 'home', severity: 'medium', title: 'No social proof on the homepage', detail: 'No reviews, press mentions, customer counts or testimonials detected. Trust signals lift the whole funnel.', impact: IMPACT.social, source: 'rule' })
+  // Social proof must be a real claim/number, not just the word "review" somewhere on the page.
+  if (!has(H, /\d[\d,]*\+?\s*(?:happy )?(?:customers|orders|reviews|sold|five[- ]star)|as seen (?:in|on)|featured in|trusted by|\d(?:\.\d)?\s*(?:out of|\/)\s*5|★{3,}|verified (?:buyer|purchase)|\d[\d,]*\s*reviews?/)) f.push({ area: 'home', severity: 'medium', title: 'No social proof on the homepage', detail: 'No customer count, rating, press mention or testimonial detected. Trust signals lift the whole funnel.', impact: IMPACT.social, source: 'rule' })
 
   // ── Global ──
   if (!has(homeHtml, /<meta[^>]+name=["']viewport["']/i)) f.push({ area: 'global', severity: 'medium', title: 'No mobile viewport tag', detail: 'The page is missing a responsive viewport meta tag — it may render poorly on phones, where most DTC traffic is.', impact: IMPACT.viewport, source: 'rule' })
@@ -110,6 +114,47 @@ Return ONLY JSON: {"findings":[{"area":"...","severity":"...","title":"...","det
   } catch { return [] }
 }
 
+// The vision rubric — the model gets the RENDERED screenshots (desktop + mobile, above the fold) and
+// judges what only the eye can: 5-second clarity, CTA prominence, hierarchy/clutter, visible trust,
+// PDP essentials, and mobile. It must reference what it actually sees and never invent.
+const CRO_VISION_PROMPT = `You are a senior DTC conversion-rate-optimization expert. You are shown the ABOVE-THE-FOLD screenshots of an online store's homepage — desktop and mobile. Critique ONLY what you can actually see; never invent details.
+
+Judge, in priority order:
+1. 5-SECOND CLARITY: can a first-time visitor tell what's sold and who it's for within 5 seconds? Is the headline a real benefit or just a vague slogan? Is the product visible?
+2. CTA PROMINENCE: is there ONE obvious primary button above the fold, high-contrast and clearly clickable — or does it blend in / compete with other buttons?
+3. HIERARCHY & CLUTTER: does the eye land on product + CTA, or is it noisy/cramped? Enough whitespace? Any popup or banner blocking the view?
+4. VISIBLE TRUST: star ratings, a review count, payment/security badges, guarantees, press logos, real photos vs generic stock. Does it LOOK premium/legit or cheap/templated?
+5. MOBILE (the mobile shot): legible without zoom, tappable, hero not cut off, no full-screen popup on load, sticky add-to-cart if visible.
+6. DESIGN QUALITY: overall — does it read as a premium brand, a generic template, or low-trust?
+
+Return 3–6 of the HIGHEST-IMPACT problems, specific to THIS store (reference what you see, e.g. "the hero is dark and the 'Shop' button blends into it"). Each: area ("home"|"product"|"global"), severity ("high"|"medium"|"low"), a short title, a concrete detail, and a one-line "impact" on conversion (a conservative, clearly-estimated range — never a fake precise number).
+Return ONLY JSON: {"findings":[{"area":"...","severity":"...","title":"...","detail":"...","impact":"..."}]}`
+
+/** Layer 3 — VISION: screenshot the store (via the droplet) and let a vision model critique the design. */
+async function visionFindings(domain: string): Promise<CroFinding[]> {
+  const base = process.env.DROPLET_PREVIEW_URL, secret = process.env.PREVIEW_SECRET
+  if (!base || !secret) return []
+  try {
+    const r = await fetch(`${base.replace(/\/$/, '')}/screenshot?url=${encodeURIComponent('https://' + domain + '/')}`, { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(70_000) })
+    if (!r.ok) return []
+    const shots = await r.json() as { desktop?: string | null; mobile?: string | null }
+    if (!shots.desktop && !shots.mobile) return []
+    const txt = await critiqueScreens(shots, CRO_VISION_PROMPT)
+    if (!txt) return []
+    const clean = txt.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '')
+    const j = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1))
+    const arr = Array.isArray(j?.findings) ? j.findings : []
+    return arr.slice(0, 6).map((x: any): CroFinding => ({
+      area: (['home', 'product', 'global'].includes(x.area) ? x.area : 'home'),
+      severity: (['high', 'medium', 'low'].includes(x.severity) ? x.severity : 'medium'),
+      title: String(x.title || '').slice(0, 120),
+      detail: String(x.detail || '').slice(0, 400),
+      impact: x.impact ? String(x.impact).slice(0, 200) : undefined,
+      source: 'vision',
+    })).filter((x: CroFinding) => x.title)
+  } catch { return [] }
+}
+
 const WEIGHT: Record<CroSeverity, number> = { high: 12, medium: 7, low: 3 }
 
 export async function runCroAudit(domain0: string): Promise<CroAudit> {
@@ -125,12 +170,16 @@ export async function runCroAudit(domain0: string): Promise<CroAudit> {
   if (!home && !prod) return { hasData: false, domain, note: 'Couldn’t read the store — check the URL is public.' }
 
   const rules = ruleFindings(home, prod, !!prod)
-  const ai = await reviewFindings(site, visibleText(home), visibleText(prod))
+  // Text review + vision critique run in parallel; vision is best-effort (needs the droplet + screenshot).
+  const [ai, vision] = await Promise.all([
+    reviewFindings(site, visibleText(home), visibleText(prod)),
+    visionFindings(domain).catch(() => [] as CroFinding[]),
+  ])
 
-  // Merge, de-dupe near-identical titles (prefer rule over ai when they overlap).
+  // Merge, de-dupe near-identical titles. Order: rules (provable) → vision (design) → ai (copy).
   const seen = new Set<string>()
   const findings: CroFinding[] = []
-  for (const f of [...rules, ...ai]) {
+  for (const f of [...rules, ...vision, ...ai]) {
     const key = f.title.toLowerCase().replace(/[^a-z]/g, '').slice(0, 22)
     if (seen.has(key)) continue
     seen.add(key); findings.push(f)

@@ -120,3 +120,28 @@ export async function inferNiche(
     return nicheVocab.find((n) => n.toLowerCase() === niche.trim().toLowerCase()) || null
   } catch { return null }
 }
+
+/**
+ * CRO vision critique — given rendered screenshots (desktop + mobile, above-the-fold) and a rubric
+ * prompt, return the model's raw JSON text. The caller owns the prompt + parsing (see lib/cro/audit).
+ * Multi-image: pass any of { desktop, mobile } as base64 JPEG. Returns '' on any failure (fail-open).
+ */
+export async function critiqueScreens(
+  images: { desktop?: string | null; mobile?: string | null },
+  prompt: string,
+): Promise<string> {
+  if (!KEY) return ''
+  const parts: any[] = [{ text: prompt }]
+  if (images.desktop) parts.push({ text: 'DESKTOP (above the fold):' }, { inline_data: { mime_type: 'image/jpeg', data: images.desktop } })
+  if (images.mobile) parts.push({ text: 'MOBILE (above the fold):' }, { inline_data: { mime_type: 'image/jpeg', data: images.mobile } })
+  if (parts.length === 1) return ''   // no images
+  try {
+    const r = await fetch(`${BASE}/${MODEL}:generateContent?key=${KEY}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.3, maxOutputTokens: 1600 } }),
+    })
+    if (!r.ok) return ''
+    const j = await r.json()
+    return (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('').trim()
+  } catch { return '' }
+}
