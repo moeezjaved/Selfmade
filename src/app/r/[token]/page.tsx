@@ -68,7 +68,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
       {/* Top bar */}
       <div style={{ background: '#141d15', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://tryselfmade.ai" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <span style={{ width: 26, height: 26, display: 'inline-block', flex: 'none' }}><Mark size={26} /></span>
+          <span style={{ width: 20, height: 20, display: 'inline-block', flex: 'none' }}><Mark size={20} /></span>
           <span style={{ color: '#ff5a2c', fontWeight: 800, fontSize: 15 }}>Selfmade</span>
         </a>
         <a href="https://tryselfmade.ai" style={{ color: '#fff', background: '#ff5a2c', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>

@@ -52,7 +52,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       @keyframes sm-pulse { 0%,100% { transform: scale(1); opacity: 1 } 50% { transform: scale(.9); opacity: .78 } }
       .selfmade-loading {
         display: inline-block;
-        width: 32px; height: 32px;
+        width: 24px; height: 24px;
         background: url(/mark.svg) center/contain no-repeat;
         animation: sm-pulse 1.3s ease-in-out infinite;
         border-radius: 0;

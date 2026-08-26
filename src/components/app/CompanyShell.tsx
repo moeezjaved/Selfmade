@@ -103,7 +103,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const Sidebar = (
     <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, height: '100dvh', boxSizing: 'border-box', overflow: 'hidden', position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'flex-start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 6px 12px', flex: 'none' }}>
-        <div style={{ width: 32, height: 32, flex: 'none' }}><Mark size={32} /></div>
+        <div style={{ width: 32, height: 32, display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 'none' }}><Mark size={24} /></div>
         <div style={{ minWidth: 0, flex: 1 }}><ProjectSwitcher initialBrands={brands} initialActive={activeBrand} /></div>
         {isMobile && <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: SUB, padding: 4 }}><X size={20} /></button>}
       </div>

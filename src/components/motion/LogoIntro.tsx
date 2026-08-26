@@ -34,8 +34,8 @@ export default function LogoIntro({ onDone }: { onDone?: () => void }) {
       <style>{KEYFRAMES}</style>
       <div style={{ display: 'flex', alignItems: 'center', gap: 22, position: 'relative' }}>
         <div className="li-anim" style={{ position: 'absolute', left: -10, top: '50%', width: 230, height: 230, transform: 'translateY(-50%)', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,90,44,.85) 0%, rgba(255,90,44,0) 70%)', filter: 'blur(30px)', opacity: 0.5, animation: 'li-glow .5s ease .9s both', zIndex: 0 }} />
-        <div style={{ position: 'relative', width: 96, height: 96, flex: '0 0 auto', zIndex: 1, borderRadius: 21, overflow: 'hidden', boxShadow: '0 10px 30px -8px rgba(239,74,30,.55)' }}>
-          <MarkDecode size={96} durationMs={1300} />
+        <div style={{ position: 'relative', width: 72, height: 72, flex: '0 0 auto', zIndex: 1, boxShadow: '0 10px 30px -8px rgba(239,74,30,.55)' }}>
+          <MarkDecode size={72} durationMs={1300} />
         </div>
         <div style={{ display: 'flex', zIndex: 1 }}>
           {WORD.map((c, i) => (
