@@ -21,7 +21,7 @@ function SBadge({ size, color, radius, className, title, animate = false, durati
     <svg width={size} height={size} viewBox="0 0 700 700" className={className} role="img" aria-label={title} style={style}>
       {animate && <style>{`@keyframes sfmk{0%{opacity:0;transform:scale(.9)}60%{opacity:1;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}@media (prefers-reduced-motion:reduce){svg[aria-label="${title}"]{animation:none!important}}`}</style>}
       <rect width="700" height="700" rx={rx} fill={color} />
-      <text x="350" y="392" textAnchor="middle" fontFamily={SERIF_STACK} fontWeight="700" fontSize="500" fill="#ffffff">S</text>
+      <text x="350" y="360" textAnchor="middle" dominantBaseline="central" fontFamily={SERIF_STACK} fontWeight="700" fontSize="440" fill="#ffffff">S</text>
     </svg>
   )
 }
