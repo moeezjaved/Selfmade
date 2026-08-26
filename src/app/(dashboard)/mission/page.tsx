@@ -106,6 +106,9 @@ export default function MissionPage() {
   type AdIssue = { kind: string; severity: 'high' | 'med'; title: string; body: string }
   const [adIssues, setAdIssues] = useState<AdIssue[] | null>(null)
   useEffect(() => { (async () => { try { const r = await fetch('/api/meta/health'); const j = await r.json(); if (r.ok && Array.isArray(j.issues)) setAdIssues(j.issues) } catch { /* optional */ } })() }, [])
+  // Real Shopify connection state for the Connect section (so it shows Connected, not a dead "Connect").
+  const [shopifyConnected, setShopifyConnected] = useState(false)
+  useEffect(() => { (async () => { try { const r = await fetch('/api/shopify/connect'); const j = await r.json(); setShopifyConnected(!!j?.connected) } catch { /* optional */ } })() }, [])
 
   // "Your ads" = the SAME per-ad view /reports shows (Meta level=ad: spend/CTR/ROAS + creative thumbnail).
   // Reuse that data path so the mission desk matches how we already display ads.
@@ -512,8 +515,8 @@ export default function MissionPage() {
           <div className="ms-note sm">Mello drafts every reply and follow-up — you approve before anything sends. Email &amp; SMS unlock with Klaviyo below.</div>
 
           <h2 className="ms-sec sec2">Connect</h2>
-          <div className="ms-conn">🛍️ Shopify <span className="st"><a href="/settings" className="ms-btn tiny">Connect</a></span></div>
-          <div className="ms-conn">✉️ Klaviyo <span className="st"><a href="/settings" className="ms-btn tiny">Connect</a></span></div>
+          <div className="ms-conn">🛍️ Shopify <span className="st">{shopifyConnected ? <span className="on">● CONNECTED</span> : <a href="/settings?tab=integrations" className="ms-btn tiny">Connect</a>}</span></div>
+          <div className="ms-conn">✉️ Klaviyo <span className="st"><span className="on" style={{ color: '#9ca3af' }}>Coming soon</span></span></div>
           <div className="ms-conn">📈 Meta <span className="st">{sig?.metaConnected ? <span className="on">● CONNECTED</span> : <a href="/connect/meta" className="ms-btn tiny">Connect</a>}</span></div>
         </div>
 
