@@ -28,7 +28,7 @@ const mediaUrl = (u: string | null | undefined) => {
   return /fbcdn|xx\.fbcdn|scontent/i.test(u) ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : u
 }
 
-async function resolve(): Promise<{ admin: any; brandId: string; kit: any } | null> {
+async function resolve(): Promise<{ admin: any; brandId: string; kit: any; userId: string } | null> {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
@@ -36,13 +36,20 @@ async function resolve(): Promise<{ admin: any; brandId: string; kit: any } | nu
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
   if (!brandId) return null
   const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
-  return { admin, brandId, kit: (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {} }
+  return { admin, brandId, userId: user.id, kit: (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {} }
 }
 
 export async function GET() {
   const r = await resolve()
   if (!r) return NextResponse.json({ ads: [], pageId: null })
-  const pageId = r.kit?.ownMetaPageId ? String(r.kit.ownMetaPageId) : null
+  // Prefer the pasted/onboarding page; else fall back to the CONNECTED Meta account's page so Your Ads
+  // auto-shows for founders who connected Meta but never pasted an Ad Library link.
+  let pageId = r.kit?.ownMetaPageId ? String(r.kit.ownMetaPageId) : null
+  let connected = false
+  if (!pageId) {
+    const { data: acct } = await r.admin.from('meta_accounts').select('page_id').eq('user_id', r.userId).eq('is_primary', true).maybeSingle()
+    if (acct?.page_id) { pageId = String(acct.page_id); connected = true }
+  }
   if (!pageId) return NextResponse.json({ ads: [], pageId: null })
   try {
     const live = await fetchLiveAdsByPage(pageId, 24)
