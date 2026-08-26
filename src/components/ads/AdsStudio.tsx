@@ -749,7 +749,7 @@ function TemplateCard({ label, variant }: { label: string; variant: 'showcase' |
 type OwnAd = { adId: string; title: string; body: string; isActive: boolean; image: string | null; link: string; isVideo: boolean }
 function YourAds({ isMobile }: { isMobile: boolean }) {
   const { addToChat } = useContext(StudioCtx)
-  const [data, setData] = useState<{ ads: OwnAd[]; pageId: string | null } | null>(null)
+  const [data, setData] = useState<{ ads: OwnAd[]; pageId: string | null; connected?: boolean } | null>(null)
   const [link, setLink] = useState('')
   const [saving, setSaving] = useState(false)
   const load = () => fetch('/api/ads-studio/your-ads').then((r) => r.json()).then(setData).catch(() => setData({ ads: [], pageId: null }))
@@ -763,29 +763,34 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
     } finally { setSaving(false) }
   }
 
+  const connected = !!(data?.connected || data?.pageId)
   return (
     <div>
       <Header title="Your Ads" isMobile={isMobile} />
-      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The live ads running on your Facebook page — pulled straight from the Meta Ad Library.</div>
+      <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>{connected ? 'Your live Facebook ads — and Mello runs them for you. Just tell it what to do.' : 'Connect Facebook and Mello runs your ads for you — create, launch, scale, pause, all by typing.'}</div>
 
-      {/* Run your ads by typing — scale, pause, resume, launch. Works off your CONNECTED Meta account
-          (not the pasted Ad Library link), so it shows here always; if Meta isn't connected it says so. */}
-      <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>
+      {/* Run your ads by typing — only when connected (there's an account to act on). */}
+      {connected && <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>}
 
       {data === null ? (
         <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
-      ) : !data.pageId ? (
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? '28px 20px' : '40px 34px', textAlign: 'center', maxWidth: 560, margin: '10px auto 0' }}>
-          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>Pull in your live ads</div>
-          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, marginBottom: 18 }}>Paste your <b style={{ color: INK }}>Facebook Ad Library</b> link and we&rsquo;ll show the ads you&rsquo;re running right now — then help you make better ones.</div>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-            <input value={link} onChange={(e) => setLink(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && save()} placeholder="facebook.com/ads/library/?…view_all_page_id=…" style={{ flex: 1, minWidth: 220, border: `1px solid ${LINE}`, borderRadius: 100, padding: '13px 18px', fontSize: 14.5, outline: 'none', fontFamily: SANS, color: INK }} />
-            <button onClick={save} disabled={saving || !link.trim()} style={{ ...primaryBtn, opacity: saving || !link.trim() ? 0.6 : 1 }}>{saving ? 'Reading…' : 'Show my ads →'}</button>
-          </div>
-          <a href="https://www.facebook.com/ads/library/" target="_blank" rel="noreferrer" style={{ display: 'inline-block', marginTop: 14, fontSize: 12.5, color: ORANGE, fontWeight: 700, textDecoration: 'none' }}>Where do I find this? →</a>
+      ) : !connected ? (
+        // ── Not connected → one clean "Connect your Facebook" card (layperson-friendly, Ad-Studio style) ──
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 20, background: '#fff', padding: isMobile ? '32px 22px' : '48px 40px', textAlign: 'center', maxWidth: 560, margin: '10px auto 0', boxShadow: '0 30px 70px -50px rgba(0,0,0,.4)' }}>
+          <div style={{ width: 56, height: 56, borderRadius: 15, background: '#1877F2', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 18px' }}><FbIcon size={30} color="#fff" /></div>
+          <div style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 700, marginBottom: 10 }}>Connect your Facebook</div>
+          <div style={{ color: SUB, fontSize: 15, lineHeight: 1.55, marginBottom: 22, maxWidth: 420, marginLeft: 'auto', marginRight: 'auto' }}>Link your ad account once, and Mello shows every campaign here — then you run them just by typing: <i>“scale my best ad”, “pause the slow one”, “launch this creative”.</i></div>
+          <a href="/connect/meta" style={{ ...primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', padding: '13px 26px', fontSize: 15 }}><FbIcon size={17} /> Connect Facebook →</a>
+          <div style={{ marginTop: 14, fontSize: 12.5, color: SUB }}>Takes a minute · you approve every change · nothing spends without your OK</div>
         </div>
       ) : data.ads.length === 0 ? (
-        <EmptyState title="No live ads found" body="We couldn’t find active ads on this page right now. Double-check the Facebook Ad Library link, or start creating with Ad Studio." cta="Change link" onCta={() => setData({ ads: [], pageId: null })} />
+        // ── Connected, no ads yet → nudge to launch (not an error) ──
+        <div style={{ border: `1px solid ${LINE}`, borderRadius: 20, background: '#fff', padding: isMobile ? '30px 22px' : '40px 34px', textAlign: 'center', maxWidth: 560, margin: '4px auto 0' }}>
+          <div style={{ fontSize: 30, marginBottom: 10 }}>🚀</div>
+          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No ads running yet</div>
+          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, marginBottom: 18 }}>You&rsquo;re connected. Make a creative in <b style={{ color: INK }}>Ad Studio</b>, then launch it from <b style={{ color: INK }}>My Creatives</b> — or just tell Mello above what to run.</div>
+          <a href="/ads-workspace" style={{ ...primaryBtn, display: 'inline-flex', textDecoration: 'none', padding: '11px 22px' }}>Open Ad Studio →</a>
+        </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16 }}>
           {data.ads.map((a) => (
