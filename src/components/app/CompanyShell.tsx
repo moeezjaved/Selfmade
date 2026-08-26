@@ -8,6 +8,7 @@
  */
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
+import { Mark } from '@/components/brand/Mark'
 import { usePathname, useRouter } from 'next/navigation'
 import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
@@ -102,7 +103,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const Sidebar = (
     <aside style={{ width: isMobile ? '82%' : 248, maxWidth: 300, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '16px 12px', display: 'flex', flexDirection: 'column', gap: 2, height: '100dvh', boxSizing: 'border-box', overflow: 'hidden', position: isMobile ? 'relative' : 'sticky', top: 0, alignSelf: 'flex-start' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '2px 6px 12px', flex: 'none' }}>
-        <div style={{ width: 32, height: 32, borderRadius: 8, background: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontFamily: SERIF, fontWeight: 800, fontSize: 17, flex: 'none' }}>S</div>
+        <div style={{ width: 32, height: 32, borderRadius: 8, overflow: 'hidden', flex: 'none' }}><Mark size={32} /></div>
         <div style={{ minWidth: 0, flex: 1 }}><ProjectSwitcher initialBrands={brands} initialActive={activeBrand} /></div>
         {isMobile && <button onClick={() => setOpen(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: SUB, padding: 4 }}><X size={20} /></button>}
       </div>

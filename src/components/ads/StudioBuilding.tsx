@@ -10,6 +10,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { MarkDecode } from '@/components/brand/Mark'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#e02f06', PAPER = '#fbf4e2'
 const SANS = 'Inter, system-ui, sans-serif'
@@ -121,6 +122,9 @@ export default function StudioBuilding({ domain }: { domain: string }) {
     <div style={{ minHeight: '100dvh', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, fontFamily: SANS, color: INK }}>
       <style>{`@keyframes sbspin{to{transform:rotate(360deg)}}@keyframes sbpulse{0%,100%{opacity:.5}50%{opacity:1}}`}</style>
       <div style={{ width: '100%', maxWidth: 520, textAlign: 'center' }}>
+        <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 22 }}>
+          <div style={{ borderRadius: 16, overflow: 'hidden', boxShadow: '0 20px 50px -24px rgba(239,74,30,.5)' }}><MarkDecode size={68} loop durationMs={2000} /></div>
+        </div>
         <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE, marginBottom: 14 }}>Setting up {cleanDomain}</div>
         <h1 style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 46, lineHeight: 1.04, letterSpacing: '-0.02em', margin: '0 0 10px' }}>Building your studio</h1>
         <p style={{ color: SUB, fontSize: 15.5, lineHeight: 1.5, margin: '0 0 28px' }}>Reading your site and creating your first ads — brand kit, products, competitors and on-brand concepts. One moment.</p>
