@@ -1,5 +1,6 @@
 'use client'
 import React, { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 
 interface Step { label: string; count: number; pct: number }
 interface AnonAudit { domain: string; site_name: string | null; score: number | null; category: string | null; created_at: string }
@@ -107,6 +108,7 @@ export default function FunnelPage() {
   const [loading, setLoading] = useState(true)
   const [openDomain, setOpenDomain] = useState<string | null>(null)
   const [scans, setScans] = useState<Record<string, any>>({})
+  const router = useRouter()
 
   const toggleLead = (domain: string) => {
     if (openDomain === domain) { setOpenDomain(null); return }
@@ -168,7 +170,8 @@ export default function FunnelPage() {
                       <tr onClick={() => toggleLead(a.domain)} style={{ borderBottom: '1px solid #f6f6f6', cursor: 'pointer', background: openDomain === a.domain ? '#faf9f6' : 'transparent' }}>
                         <td style={{ padding: '10px 20px', fontWeight: 600 }}>
                           <span style={{ color: '#c3c7c3', marginRight: 6 }}>{openDomain === a.domain ? '▾' : '▸'}</span>
-                          <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#2563eb', textDecoration: 'none' }}>{a.domain}</a>
+                          <span onClick={(e) => { e.stopPropagation(); router.push(`/admin/site/${encodeURIComponent(a.domain)}`) }} style={{ color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">{a.domain}</span>
+                          <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#9ca3af', textDecoration: 'none', marginLeft: 6, fontSize: 11 }}>↗</a>
                         </td>
                         <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
                         <td style={{ padding: '10px 20px', color: '#777' }}>{a.category || '—'}</td>
