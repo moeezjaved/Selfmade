@@ -42,6 +42,22 @@ export function seoCopy(): CelebratePayload {
   return { emoji: '📝', title: 'Your search snippets got an upgrade', sub: 'This is the copy Google shows before anyone clicks. You just wrote a much better first impression.' }
 }
 
+/** SEO technical audit finished. Positive framing — a roadmap, not a scolding. */
+export function auditDone(score?: number, issues?: number): CelebratePayload {
+  const s = typeof score === 'number' ? score : null
+  const n = typeof issues === 'number' ? issues : null
+  return {
+    emoji: '🔍',
+    title: s != null ? `Audit complete — ${s}/100` : 'Audit complete!',
+    sub: n && n > 0
+      ? pick([
+          `Found ${n} things quietly holding back your Google rank. Good news: every one is fixable — and the agents can draft the fixes.`,
+          `${n} ranking leaks spotted. Plug them and you climb — most competitors never even look.`,
+        ])
+      : `Clean bill of health — your site's already built to rank. Now let's go win the keywords.`,
+  }
+}
+
 /** Keywords discovered. */
 export function keywordsFound(n: number): CelebratePayload {
   return { emoji: '🔑', title: `${n} keywords worth winning`, sub: `The exact searches your buyers type — now you know precisely where to show up.` }
