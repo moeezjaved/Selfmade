@@ -393,3 +393,22 @@
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.65), transparent);
   animation: shimmer 1.3s infinite;
 }
+
+/* ── Shared creative thumbnail (Discover / Competitors / My Creatives / Ad Studio / SEO) ──
+   One consistent treatment: a calm WHITE tile, the creative contained (never cropped weird), and on
+   HOVER the ground shifts to warm paper with a soft lift — the Lapis feel, everywhere. The image never
+   downloads through IPRoyal; fbcdn loads direct via referrerPolicy on the <img>. */
+.sf-thumb {
+  background: #ffffff;
+  border: 1px solid var(--line, rgba(26,20,16,.1));
+  border-radius: 14px;
+  overflow: hidden;
+  transition: background .18s ease, box-shadow .2s ease, transform .18s ease, border-color .18s ease;
+}
+.sf-thumb:hover {
+  background: #f4f0e7;
+  border-color: rgba(239,74,30,.35);
+  box-shadow: 0 20px 44px -26px rgba(20,20,16,.45);
+  transform: translateY(-2px);
+}
+.sf-thumb-img { width: 100%; height: 100%; object-fit: contain; display: block; }

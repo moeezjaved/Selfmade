@@ -154,7 +154,7 @@ function Generations() {
                   {g.media_type === 'video'
                     ? <video src={g.image_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    : <img src={g.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                    : <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleOf(g)}</div>
@@ -182,8 +182,8 @@ function Generations() {
         ) : (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(200px,100%), 1fr))', gap: 14 }}>
             {shown.map((g) => (
-              <div key={g.id} style={card}>
-                <button onClick={() => openGen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: '#0d120e', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
+              <div key={g.id} className="sf-thumb" style={{ overflow: 'hidden' }}>
+                <button onClick={() => openGen(g)} style={{ display: 'block', width: '100%', border: 'none', padding: 0, cursor: g.status === 'processing' ? 'default' : 'pointer', background: 'transparent', aspectRatio: '1', overflow: 'hidden', position: 'relative' }}>
                   {g.status === 'processing' ? (
                     <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center', justifyContent: 'center', color: LIME, fontSize: 12, fontWeight: 600 }}><Loader2 size={20} className="spin" /> Generating {g.media_type === 'video' ? 'video' : 'ad'}…</div>
                   ) : !g.image_url ? (
@@ -195,10 +195,10 @@ function Generations() {
                         : <><span style={{ fontSize: 20 }}>📝</span> Draft — not generated yet<span style={{ fontWeight: 400, fontSize: 11, color: '#6f7f73' }}>{g.source_ad_id ? 'Click to open the ad and finish it →' : 'Open it in Discovery and hit Remake to finish'}</span></>}
                     </div>
                   ) : g.media_type === 'video' ? (
-                    <video src={g.image_url} muted loop autoPlay playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <video src={g.image_url} muted loop autoPlay playsInline className="sf-thumb-img" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={g.image_url || ''} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />
                   )}
                   {g.media_type === 'video' && g.status !== 'processing' && <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', color: '#fff', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '2px 6px' }}>🎬 Video</span>}
                   {/* Subtle "cloned from" chip — the competitor ad this output was cloned from, so the
