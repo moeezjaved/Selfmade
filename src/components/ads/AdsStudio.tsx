@@ -7,6 +7,7 @@
  */
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { Monitor, Instagram as IgIcon, Facebook as FbIcon, Linkedin as LiIcon } from 'lucide-react'
+import MelloAdsActions from '@/components/ads/MelloAdsActions'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
 
@@ -766,6 +767,9 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
     <div>
       <Header title="Your Ads" isMobile={isMobile} />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The live ads running on your Facebook page — pulled straight from the Meta Ad Library.</div>
+
+      {/* Run your ads by typing — scale, pause, resume, launch. Confirms before any live change. */}
+      {data?.pageId && <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>}
 
       {data === null ? (
         <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
