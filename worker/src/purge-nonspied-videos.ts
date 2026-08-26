@@ -24,6 +24,7 @@ import { supabase } from './db.js'
 import { r2UrlToKey, listSizesByPrefix, deleteManyFromR2 } from './r2.js'
 
 const DRY = process.argv.includes('--dry-run')
+const WITH_IMAGES = process.argv.includes('--with-images')
 const PAGE = 500
 // Cloudflare R2 standard storage: $0.015 per GB-month (egress is free). Dashboard is authoritative;
 // this is just to turn "GB reclaimed" into an at-a-glance $/month so you don't have to do the math.
@@ -53,27 +54,33 @@ async function main() {
   const keepAds = await loadIdSet('discovery_saved_ads', 'ad_id')
   console.log(`   Keep: ${keepPages.size} spied brands · ${keepAds.size} saved ads\n`)
 
-  // 2) R2 sizes — one full-bucket listing so we can show current TOTAL, what's freed, and the new
-  //    total. Cheap (Class B list ops), no HEAD-per-object.
-  console.log('📦 Listing the whole bucket to measure sizes…')
-  const allSizes = await listSizesByPrefix('')
-  const videoSizes = new Map<string, number>()
-  const posterSizes = new Map<string, number>()
-  let totalBytes = 0, videoBytesAll = 0, imageBytesAll = 0, posterBytesAll = 0, otherBytes = 0
-  let videoCount = 0, imageCount = 0, posterCount = 0
-  for (const [k, sz] of allSizes) {
-    totalBytes += sz
-    if (k.startsWith('videos/')) { videoSizes.set(k, sz); videoBytesAll += sz; videoCount++ }
-    else if (k.startsWith('posters/')) { posterSizes.set(k, sz); posterBytesAll += sz; posterCount++ }
-    else if (k.startsWith('thumbnails/') || k.startsWith('thumbs/')) { imageBytesAll += sz; imageCount++ }
-    else otherBytes += sz
-  }
+  // 2) R2 sizes. By DEFAULT we list only the prefixes we may delete (videos/ + posters/) — that's all
+  //    that's needed to price the reclaim, and it's fast. Pass --with-images to ALSO measure the image
+  //    prefixes (thumbnails/ + thumbs/) for a full bucket breakdown — slower (millions of small objects).
   const gbAll = (n: number) => (n / 1073741824).toFixed(2)
-  console.log(`\n📁 Bucket breakdown (${allSizes.size} objects · ${gbAll(totalBytes)} GB total)`)
-  console.log(`   Videos:   ${videoCount.toLocaleString()} objects · ${gbAll(videoBytesAll)} GB`)
-  console.log(`   Images:   ${imageCount.toLocaleString()} objects · ${gbAll(imageBytesAll)} GB  (thumbnails/ + thumbs/ — never deleted)`)
-  console.log(`   Posters:  ${posterCount.toLocaleString()} objects · ${gbAll(posterBytesAll)} GB`)
-  if (otherBytes > 0) console.log(`   Other:    ${gbAll(otherBytes)} GB`)
+  const prog = (label: string) => (count: number, bytes: number) => process.stdout.write(`\r   …${label}: ${count.toLocaleString()} objects (${gbAll(bytes)} GB)   `)
+
+  console.log('📦 Listing videos/ …')
+  const videoSizes = await listSizesByPrefix('videos/', prog('videos'))
+  console.log('\n📦 Listing posters/ …')
+  const posterSizes = await listSizesByPrefix('posters/', prog('posters'))
+  const videoBytesAll = [...videoSizes.values()].reduce((s, n) => s + n, 0)
+  const posterBytesAll = [...posterSizes.values()].reduce((s, n) => s + n, 0)
+
+  let imageBytesAll = 0, imageCount = 0, imagesMeasured = false
+  if (WITH_IMAGES) {
+    console.log('\n📦 Listing thumbnails/ …'); const t1 = await listSizesByPrefix('thumbnails/', prog('thumbnails'))
+    console.log('\n📦 Listing thumbs/ …'); const t2 = await listSizesByPrefix('thumbs/', prog('thumbs'))
+    imageCount = t1.size + t2.size
+    imageBytesAll = [...t1.values()].reduce((s, n) => s + n, 0) + [...t2.values()].reduce((s, n) => s + n, 0)
+    imagesMeasured = true
+  }
+
+  console.log(`\n\n📁 Bucket breakdown`)
+  console.log(`   Videos:   ${videoSizes.size.toLocaleString()} objects · ${gbAll(videoBytesAll)} GB`)
+  console.log(`   Posters:  ${posterSizes.size.toLocaleString()} objects · ${gbAll(posterBytesAll)} GB`)
+  if (imagesMeasured) console.log(`   Images:   ${imageCount.toLocaleString()} objects · ${gbAll(imageBytesAll)} GB  (thumbnails/ + thumbs/ — never deleted)`)
+  else console.log(`   Images:   not measured (pass --with-images to include them)`)
   console.log('')
 
   // 3) Scan every ad that has an R2 video, decide keep/strip/delete
@@ -144,11 +151,10 @@ async function main() {
   const freedBytes = vBytes + pBytes
   const gb = (n: number) => (n / 1073741824).toFixed(2)
   const freedGB = freedBytes / 1073741824
-  const totalGB = totalBytes / 1073741824
-  const afterGB = Math.max(0, totalGB - freedGB)
-  const pct = totalGB > 0 ? (freedGB / totalGB) * 100 : 0
-  const usdNow = totalGB * R2_USD_PER_GB_MONTH
-  const usdAfter = afterGB * R2_USD_PER_GB_MONTH
+  // "Known" bucket size from the prefixes we measured. If images weren't measured we still report the
+  // reclaim + $ saved exactly; the % / after-total only show when --with-images gave us the full bucket.
+  const measuredBytes = videoBytesAll + posterBytesAll + imageBytesAll
+  const measuredGB = measuredBytes / 1073741824
   const usdSaved = freedGB * R2_USD_PER_GB_MONTH
 
   console.log(`\n📊 Result`)
@@ -162,13 +168,17 @@ async function main() {
   if (skipped) console.log(`   ⚠️  Skipped ${skipped} keys outside videos/ or posters/ (safety guard)`)
 
   console.log(`\n💾 Storage`)
-  console.log(`   Bucket now:        ${totalGB.toFixed(2)} GB`)
-  console.log(`   Freed by purge:   -${freedGB.toFixed(2)} GB  (${pct.toFixed(0)}% of the bucket)`)
-  console.log(`   Bucket after:      ${afterGB.toFixed(2)} GB`)
+  console.log(`   Video storage now:  ${gbAll(videoBytesAll)} GB  (${videoSizes.size.toLocaleString()} objects)`)
+  console.log(`   Freed by purge:    -${freedGB.toFixed(2)} GB`)
+  console.log(`   Video storage after: ${(videoBytesAll / 1073741824 - freedGB).toFixed(2)} GB`)
+  if (imagesMeasured) {
+    const afterGB = Math.max(0, measuredGB - freedGB)
+    console.log(`   Whole bucket now:   ${measuredGB.toFixed(2)} GB  →  after: ${afterGB.toFixed(2)} GB  (freeing ${measuredGB > 0 ? ((freedGB / measuredGB) * 100).toFixed(0) : '0'}%)`)
+  }
   console.log(`\n💰 Cost (R2 storage @ $${R2_USD_PER_GB_MONTH}/GB-month; egress is free)`)
-  console.log(`   Storage now:       ~$${usdNow.toFixed(2)}/month`)
-  console.log(`   Storage after:     ~$${usdAfter.toFixed(2)}/month`)
-  console.log(`   You save:          ~$${usdSaved.toFixed(2)}/month\n`)
+  console.log(`   You save:          ~$${usdSaved.toFixed(2)}/month`)
+  if (imagesMeasured) console.log(`   Bucket after:      ~$${(measuredGB - freedGB) > 0 ? ((measuredGB - freedGB) * R2_USD_PER_GB_MONTH).toFixed(2) : '0.00'}/month`)
+  console.log('')
 
   if (DRY) { console.log('✅ Dry run complete — nothing deleted. Re-run without --dry-run to execute.\n'); return }
 
