@@ -127,18 +127,19 @@ export async function inferNiche(
  * Multi-image: pass any of { desktop, mobile } as base64 JPEG. Returns '' on any failure (fail-open).
  */
 export async function critiqueScreens(
-  images: { desktop?: string | null; mobile?: string | null },
+  images: { label: string; b64: string }[],
   prompt: string,
+  opts?: { model?: string; maxTokens?: number; temperature?: number },
 ): Promise<string> {
   if (!KEY) return ''
   const parts: any[] = [{ text: prompt }]
-  if (images.desktop) parts.push({ text: 'DESKTOP (above the fold):' }, { inline_data: { mime_type: 'image/jpeg', data: images.desktop } })
-  if (images.mobile) parts.push({ text: 'MOBILE (above the fold):' }, { inline_data: { mime_type: 'image/jpeg', data: images.mobile } })
-  if (parts.length === 1) return ''   // no images
+  for (const im of images) if (im?.b64) parts.push({ text: im.label }, { inline_data: { mime_type: 'image/jpeg', data: im.b64 } })
+  // Text-only is allowed (parts has the prompt) — the CRO report falls back to text when no screenshots.
+  const model = opts?.model || process.env.GEMINI_CRO_MODEL || MODEL
   try {
-    const r = await fetch(`${BASE}/${MODEL}:generateContent?key=${KEY}`, {
+    const r = await fetch(`${BASE}/${model}:generateContent?key=${KEY}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: 0.3, maxOutputTokens: 1600 } }),
+      body: JSON.stringify({ contents: [{ parts }], generationConfig: { temperature: opts?.temperature ?? 0.3, maxOutputTokens: opts?.maxTokens ?? 4000 } }),
     })
     if (!r.ok) return ''
     const j = await r.json()
