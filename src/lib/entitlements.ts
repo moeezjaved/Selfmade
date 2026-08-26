@@ -6,6 +6,14 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { planEntitlements, normalizePlan, nextPlan, firstPlanWith, PLAN_ORDER, type PlanEntitlements, type PlanId, type UpsellResponse } from '@/lib/plans'
 
+// Accounts created BEFORE this cutoff are grandfathered out of the new pay-to-apply + sign-agreement
+// gates (they keep the free behaviour they signed up with). New signups on/after it are gated.
+export const GRANDFATHER_BEFORE = process.env.GRANDFATHER_BEFORE || '2026-08-27T00:00:00Z'
+export function isGrandfathered(createdAt?: string | null): boolean {
+  if (!createdAt) return false
+  try { return new Date(createdAt).getTime() < new Date(GRANDFATHER_BEFORE).getTime() } catch { return false }
+}
+
 export async function getPlanId(admin: SupabaseClient, ownerId: string): Promise<PlanId> {
   // Two sources can disagree: the Stripe-synced `subscriptions.plan` and the profile's `plan_id`
   // (what the Billing page shows + what admin grants set). If they mismatch (e.g. a mis-synced or

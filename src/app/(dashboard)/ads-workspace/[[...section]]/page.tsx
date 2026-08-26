@@ -9,6 +9,7 @@ import { cookies } from 'next/headers'
 import AdsStudio from '@/components/ads/AdsStudio'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { isGrandfathered } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,7 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
       // Signup → SIGN the agreement → workspace. Gate until signed (cookie is the immediate signal;
       // user_metadata is the durable one once the JWT refreshes). /welcome records both.
       const signed = !!(user.user_metadata as any)?.hire_agreement_accepted_at || (await cookies()).get('sf_hired')?.value === '1'
-      if (!signed) needsAgreement = true
+      if (!signed && !isGrandfathered(user.created_at)) needsAgreement = true
       const admin = createAdminClient() as any
       const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
       if (brandId) {
