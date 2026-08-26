@@ -41,16 +41,24 @@ async function resolve(): Promise<{ admin: any; brandId: string; kit: any; userI
 
 export async function GET() {
   const r = await resolve()
-  if (!r) return NextResponse.json({ ads: [], pageId: null })
-  // Prefer the pasted/onboarding page; else fall back to the CONNECTED Meta account's page so Your Ads
-  // auto-shows for founders who connected Meta but never pasted an Ad Library link.
-  let pageId = r.kit?.ownMetaPageId ? String(r.kit.ownMetaPageId) : null
-  let connected = false
-  if (!pageId) {
-    const { data: acct } = await r.admin.from('meta_accounts').select('page_id').eq('user_id', r.userId).eq('is_primary', true).maybeSingle()
-    if (acct?.page_id) { pageId = String(acct.page_id); connected = true }
-  }
-  if (!pageId) return NextResponse.json({ ads: [], pageId: null })
+  if (!r) return NextResponse.json({ ads: [], pageId: null, connected: false })
+
+  // Meta CONNECTED → show the founder's REAL account ads straight from the Graph API (same source as the
+  // brief). `connected` is reported even with zero ads so the UI can show "connected · no ads yet" rather
+  // than a generic empty state.
+  try {
+    const { createMetaClientForUser } = await import('@/lib/meta/client')
+    const mc = await createMetaClientForUser(r.userId).catch(() => null)
+    if (mc) {
+      const live = await mc.listAdsForPicker().catch(() => [])
+      const ads = live.map((a) => ({ adId: a.adId, title: a.headline || a.name, body: a.primaryText || '', isActive: /ACTIVE/i.test(a.status), image: a.image, link: a.linkUrl || '', isVideo: false }))
+      return NextResponse.json({ ads, pageId: 'connected', connected: true })
+    }
+  } catch { /* fall through */ }
+
+  // Not connected → tell the UI so it shows "Connect your Facebook" (not the paste-a-link box).
+  const pageId = r.kit?.ownMetaPageId ? String(r.kit.ownMetaPageId) : null
+  if (!pageId) return NextResponse.json({ ads: [], pageId: null, connected: false })
   try {
     const live = await fetchLiveAdsByPage(pageId, 24)
     const ads = live.map((a) => ({
