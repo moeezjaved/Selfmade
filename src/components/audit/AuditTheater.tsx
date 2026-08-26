@@ -129,11 +129,16 @@ function remark(key: string, sec?: Section & { _lost?: number; _cur?: string }):
   return null
 }
 
-export default function AuditTheater() {
+export default function AuditTheater({ embedded = false, seedDomain, seedRival, onDone }: {
+  embedded?: boolean
+  seedDomain?: string
+  seedRival?: string
+  onDone?: (result: any) => void
+} = {}) {
   const isMobile = useIsMobile()
   const [phase, setPhase] = useState<'idle' | 'running' | 'ready' | 'report' | 'offer'>('idle')
-  const [domain, setDomain] = useState('')
-  const [rival, setRival] = useState('')
+  const [domain, setDomain] = useState(embedded ? (seedDomain ?? '') : '')
+  const [rival, setRival] = useState(embedded ? (seedRival ?? '') : '')
   const [result, setResult] = useState<Result | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [step, setStep] = useState(0)
@@ -155,7 +160,7 @@ export default function AuditTheater() {
     // health lingers longest (many live screenshots load); speed waits on PageSpeed; others steady.
     const dwellFor = (key: string) => (key === 'health' ? 13000 : key === 'google' ? 12000 : key === 'speed' ? 11000 : 8000)
     let i = 0, stopped = false
-    const finish = () => { if (doneRef.current) { setResult(doneRef.current); setPhase('ready') } }
+    const finish = () => { if (doneRef.current) { setResult(doneRef.current); if (embedded) onDone?.(doneRef.current); setPhase(embedded ? 'report' : 'ready') } }
     const walk = () => {
       if (stopped) return
       setStep(i)
@@ -203,8 +208,23 @@ export default function AuditTheater() {
       }
       if (!doneRef.current) { stop(); setError('Scan didn’t finish — try again.'); setPhase('idle') }
     } catch { stop(); setError('Network error — try again.'); setPhase('idle') }
-  }, [domain, rival])
+  }, [domain, rival, embedded, onDone])
   useEffect(() => () => clearTimeout(timer.current), [])
+
+  // Embedded mode: auto-start the scan once, from the seeded domain.
+  const autoStarted = useRef(false)
+  useEffect(() => {
+    if (embedded && seedDomain && phase === 'idle' && !autoStarted.current) {
+      autoStarted.current = true
+      run()
+    }
+  }, [embedded, seedDomain, phase, run])
+
+  if (phase === 'idle' && embedded) return (
+    <div style={{ minHeight: 'auto', padding: '40px 20px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: SUB, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14 }}>
+      {error ? <span style={{ color: RED }}>{error}</span> : 'Preparing…'}
+    </div>
+  )
 
   if (phase === 'idle') return (
     <>
@@ -248,16 +268,16 @@ export default function AuditTheater() {
             <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 800, color: '#fff', lineHeight: 1.05, marginTop: 5 }}>−{result.currency}{result.revenueLostPerYear.toLocaleString()}<span style={{ fontSize: 15, fontWeight: 700, opacity: .8 }}>/yr</span></div>
             <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.9)', marginTop: 3 }}>{result.problemCount} problems · all fixable</div>
           </div>
-          <div style={{ marginTop: 18 }}>
+          {!embedded && <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,.4)', marginBottom: 11 }}>Your agent will</div>
             {['Fix titles, metas, schema & alt text', 'Publish content that ranks', 'Get you cited in AI answers', 'Build DA 40+ backlinks', 'Track every rank daily'].map((t) => (
               <div key={t} style={{ display: 'flex', gap: 9, fontSize: 13, color: 'rgba(255,255,255,.82)', marginBottom: 9, lineHeight: 1.35 }}><span style={{ color: GOOD, flex: 'none' }}>✓</span>{t}</div>
             ))}
-          </div>
-          <div style={{ marginTop: 'auto', paddingTop: 24 }}>
+          </div>}
+          {!embedded && <div style={{ marginTop: 'auto', paddingTop: 24 }}>
             <button onClick={() => setPhase('offer')} style={{ width: '100%', background: LIME, color: '#fff', border: 'none', borderRadius: 12, padding: '15px', fontSize: 15.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>⚡ Fix in 30 minutes</button>
             <div style={{ fontSize: 11, color: 'rgba(255,255,255,.4)', textAlign: 'center', marginTop: 10 }}>Read-only until you approve each fix</div>
-          </div>
+          </div>}
         </>
       ) : (
         <>
@@ -298,15 +318,15 @@ export default function AuditTheater() {
     </aside>
   )
 
-  if (phase === 'ready' && result) return <Ready result={result} onSee={() => setPhase('report')} isMobile={isMobile} />
-  if (phase === 'offer' && result) return <Offer result={result} onBack={() => setPhase('report')} isMobile={isMobile} />
+  if (!embedded && phase === 'ready' && result) return <Ready result={result} onSee={() => setPhase('report')} isMobile={isMobile} />
+  if (!embedded && phase === 'offer' && result) return <Offer result={result} onBack={() => setPhase('report')} isMobile={isMobile} />
 
   return (
-    <div style={{ minHeight: '100dvh', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,300px) minmax(0,1fr)', background: PAPER, fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: embedded ? 'auto' : '100dvh', display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,300px) minmax(0,1fr)', background: PAPER, fontFamily: 'Inter, system-ui, sans-serif' }}>
       <Sidebar />
       <main style={{ padding: isMobile ? '22px 18px 60px' : '40px 48px 80px', minWidth: 0, background: PAPER }}>
         {phase === 'running' ? <RunningStage step={step} live={live} isMobile={isMobile} domain={domain.trim()} />
-          : result ? <Report result={result} open={open} setOpen={setOpen} isMobile={isMobile} onFix={() => setPhase('offer')} /> : null}
+          : result ? <Report result={result} open={open} setOpen={setOpen} isMobile={isMobile} embedded={embedded} onFix={() => setPhase('offer')} /> : null}
       </main>
     </div>
   )
@@ -727,20 +747,20 @@ function RevenueTally({ sec, live, isMobile }: { sec?: (Section & { _lost?: numb
 }
 
 /* ── Report ───────────────────────────────────────────────────────────────────────────────────── */
-function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; open: Record<string, boolean>; setOpen: (f: (o: Record<string, boolean>) => Record<string, boolean>) => void; isMobile: boolean; onFix: () => void }) {
+function Report({ result, open, setOpen, isMobile, onFix, embedded = false }: { result: Result; open: Record<string, boolean>; setOpen: (f: (o: Record<string, boolean>) => Record<string, boolean>) => void; isMobile: boolean; onFix: () => void; embedded?: boolean }) {
   const money = (n: number) => `${result.currency}${n.toLocaleString()}`
   return (
     <>
       <h1 style={{ fontFamily: SERIF, fontSize: isMobile ? 26 : 34, fontWeight: 700, letterSpacing: '-.02em', margin: '0 0 6px', color: INK }}>Your full report — {result.problemCount} problems found</h1>
       <p style={{ fontSize: 15.5, color: SUB, margin: '0 0 18px', lineHeight: 1.5, maxWidth: 640 }}>Everything we found across Google, your catalog, AI assistants and your site — and what fixing it is worth.</p>
-      <div style={{ background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: isMobile ? 14 : 28, marginBottom: 34, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)' }}>
+      {!embedded && <div style={{ background: ENTRY_BG, borderRadius: 16, padding: isMobile ? '16px 18px' : '18px 24px', display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: isMobile ? 14 : 28, marginBottom: 34, boxShadow: '0 18px 40px -24px rgba(224,47,6,.7)' }}>
         {[[`${result.problemCount}`, 'problems found'], [`−${money(result.revenueLostPerYear)}/yr`, 'at stake'], ['30 min', 'to first fixes'], ['You', 'approve each one']].map(([big, sub], i) => (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
             <span style={{ fontFamily: SERIF, fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#fff', lineHeight: 1 }}>{big}</span>
             <span style={{ fontSize: 12.5, color: 'rgba(255,255,255,.85)', marginTop: 3 }}>{sub}</span>
           </div>
         ))}
-      </div>
+      </div>}
 
       {result.sections.map((sec, si) => (
         <section key={sec.key} style={{ marginBottom: 34 }}>
@@ -824,13 +844,13 @@ function Report({ result, open, setOpen, isMobile, onFix }: { result: Result; op
       </section>
 
       {/* Bottom CTA — dark card, our agent fixes it */}
-      <div style={{ background: DARK, borderRadius: 18, padding: isMobile ? '24px 20px' : '32px 36px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
+      {!embedded && <div style={{ background: DARK, borderRadius: 18, padding: isMobile ? '24px 20px' : '32px 36px', display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', justifyContent: 'space-between', gap: 20, marginBottom: 20 }}>
         <div style={{ minWidth: 0 }}>
           <div style={{ fontFamily: SERIF, fontSize: isMobile ? 22 : 27, fontWeight: 700, color: '#fff', letterSpacing: '-.01em', lineHeight: 1.1 }}>Every problem here — our agent fixes automatically.</div>
           <div style={{ fontSize: 14.5, color: 'rgba(255,255,255,.62)', marginTop: 8, lineHeight: 1.5, maxWidth: 520 }}>Hire your AI team and watch the fixes go live in the next 30 minutes. Nothing ships without your approval.</div>
         </div>
         <button onClick={onFix} style={{ flex: 'none', background: LIME, color: '#fff', border: 'none', borderRadius: 100, padding: isMobile ? '14px 26px' : '16px 32px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Fix in 30 minutes →</button>
-      </div>
+      </div>}
     </>
   )
 }

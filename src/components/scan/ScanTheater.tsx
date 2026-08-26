@@ -72,7 +72,11 @@ function Count({ n, dur = 900 }: { n: number; dur?: number }) {
   return <>{v.toLocaleString()}</>
 }
 
-export default function ScanTheater() {
+export default function ScanTheater({ embedded = false, seed, onDone }: {
+  embedded?: boolean
+  seed?: { pageId?: string; adLibraryUrl?: string; name?: string; competitors?: { pageId: string; name: string }[] }
+  onDone?: (res: any) => void
+} = {}) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Brand[]>([])
   const [showLink, setShowLink] = useState(false)
@@ -97,6 +101,7 @@ export default function ScanTheater() {
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
+  const autoStarted = useRef(false)   // embedded mode: fire the seed-driven auto-run exactly once
   const mainRef = useRef<HTMLElement>(null)
   const isMobile = useIsMobile()   // stack the theater to one column on phones (client-only; SSR-safe)
   // Each act is a full-viewport frame that SWAPS in place (Ryze-style) — reset the pane to the top when
@@ -296,13 +301,31 @@ export default function ScanTheater() {
       }
       stopProg(); setPct(100); await sleep(600)
       setPhase('done'); running.current = false
+      if (embedded) onDone?.(data)   // ONLY on true success — never on the building/timeout non-complete exits above
     } catch (e) {
       stopProg(); setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
     }
-  }, [setStep, addFinding])
+  }, [setStep, addFinding, embedded, onDone])
+
+  // EMBEDDED — auto-start from the seed once (Act 1 of the combined audit page). Placed after run() so it
+  // sits in scope; a ref guards against re-firing. No effect at all in standalone mode.
+  useEffect(() => {
+    if (!embedded || !seed || autoStarted.current) return
+    if (!(seed.pageId || seed.adLibraryUrl)) return
+    if (phase !== 'idle') return
+    autoStarted.current = true
+    run({ pageId: seed.pageId, adLibraryUrl: seed.adLibraryUrl, competitors: (seed.competitors || []).map((c) => c.pageId) })
+  }, [embedded, seed, phase, run])
 
   // ── IDLE — audit framing + brand picker (or ad-library link) ──
   if (phase === 'idle') {
+    // EMBEDDED — the combined page owns the picker; never show the standalone brand/competitor screen.
+    // While the seed-driven auto-run is spinning up, show a minimal centered loader (not the hero form).
+    if (embedded) {
+      return (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', color: SUB, fontSize: 15 }}>Preparing…</div>
+      )
+    }
     return (
       <div style={{ position: 'relative', minHeight: '100vh', background: '#e02f06', display: 'flex', alignItems: 'center', justifyContent: 'flex-start', padding: 'clamp(32px,6vw,80px)', color: '#fff', overflow: 'hidden' }}>
         {/* full-bleed hero film, like the landing page */}
@@ -405,8 +428,14 @@ export default function ScanTheater() {
   const winners = res?.winners
   const own = res?.own
 
+  // EMBEDDED — never own the viewport: flow inside the parent's scroll container (Act 1 of the combined
+  // page). Running still gets a 100dvh deck pane (below) so the slides fill a screen; the report flows.
+  const rootFrame: CSSProperties = embedded
+    ? { minHeight: 'auto', height: 'auto', overflow: 'visible' }
+    : { minHeight: '100dvh', height: phase === 'done' ? 'auto' : '100dvh', overflow: phase === 'done' ? 'visible' : 'hidden' }
+
   return (
-    <div style={{ minHeight: '100dvh', height: phase === 'done' ? 'auto' : '100dvh', overflow: phase === 'done' ? 'visible' : 'hidden', background: PAPER, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,300px) minmax(0,1fr)', gridTemplateRows: isMobile && phase !== 'done' ? 'auto minmax(0,1fr)' : undefined }}>
+    <div style={{ ...rootFrame, background: PAPER, display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0,300px) minmax(0,1fr)', gridTemplateRows: isMobile && phase !== 'done' ? 'auto minmax(0,1fr)' : undefined }}>
       <style>{REVEAL_CSS}</style>
       {/* Sidebar → on phones a COMPACT top bar (title + progress only; the step/findings list is hidden so
           the slide gets the whole screen). On desktop it's the full sticky rail. */}
@@ -444,14 +473,18 @@ export default function ScanTheater() {
 
       {/* RUNNING: a fixed 100dvh pane holding ONE slide (no scroll). DONE: the report flows + scrolls with
           the page (root goes overflow:visible), which Moeez approved. */}
-      <main ref={mainRef} style={{ padding: isMobile ? 'clamp(18px,5vw,24px)' : 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: '100%', overflow: isMobile ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
+      <main ref={mainRef} style={{ padding: isMobile ? 'clamp(18px,5vw,24px)' : 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: embedded ? '100dvh' : '100%', overflow: isMobile ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
         {phase === 'error' && (
           <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
         )}
         {phase === 'running' && (slides.length
           ? <SlideFrame key={slides[slideIdx]?.key}>{slides[slideIdx]?.render()}</SlideFrame>
           : <SlideFrame><h2 style={h2}>Reading your ads…</h2><p style={sub}>Pulling every ad on your page.</p></SlideFrame>)}
-        {phase === 'done' && res && (res.building ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} /> : revealed ? <FullReport res={res} own={own!} winners={winners!} onReaudit={(ids) => run({ ...lastPayload.current, competitors: ids })} /> : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
+        {phase === 'done' && res && (res.building
+          ? <BuildingScreen res={res} onRerun={() => run(lastPayload.current)} />
+          : (embedded || revealed)   // embedded skips the manual unlock gate → report renders directly
+            ? <FullReport res={res} own={own!} winners={winners!} onReaudit={(ids) => run({ ...lastPayload.current, competitors: ids })} embedded={embedded} />
+            : <ScanSummary res={res} onUnlock={() => setRevealed(true)} />)}
       </main>
     </div>
   )
@@ -1061,7 +1094,7 @@ function BuildingScreen({ res, onRerun }: { res: ScanResult; onRerun: () => void
   )
 }
 
-function ScoreAct({ res }: { res: ScanResult }) {
+function ScoreAct({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
   const s = res.score
   const color = s.total < 40 ? '#c0281a' : s.total < 60 ? '#b7791f' : '#1e7a4f'
   const C = 2 * Math.PI * 78
@@ -1109,7 +1142,7 @@ function ScoreAct({ res }: { res: ScanResult }) {
               </div>
             ))}
           </div>
-          <a href="/signup" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Let Selfmade make these →</a>
+          {!embedded && <a href="/signup" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, textDecoration: 'none' }}>Let Selfmade make these →</a>}
         </div>
       )}
     </div>
@@ -1160,7 +1193,7 @@ function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief;
     </div>
   )
 }
-function TheFix({ res }: { res: ScanResult }) {
+function TheFix({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
   if (!res.briefs?.length) return null
   const briefs = res.briefs.slice(0, 2)
   const rv = res.rivalVideo || null
@@ -1206,13 +1239,15 @@ function TheFix({ res }: { res: ScanResult }) {
         </div>
       </div>
 
-      <div style={{ marginTop: 18 }}>
-        <div aria-disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(26,20,16,.14)', color: '#7c7266', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, cursor: 'not-allowed', userSelect: 'none' }}>
-          <span>🎬 Generate this video →</span>
-          <span style={{ fontSize: 11.5, fontWeight: 700, background: 'rgba(26,20,16,.1)', borderRadius: 100, padding: '3px 10px' }}>Included in your trial</span>
+      {!embedded && (
+        <div style={{ marginTop: 18 }}>
+          <div aria-disabled style={{ display: 'inline-flex', alignItems: 'center', gap: 10, background: 'rgba(26,20,16,.14)', color: '#7c7266', borderRadius: 100, padding: '13px 28px', fontSize: 15, fontWeight: 800, cursor: 'not-allowed', userSelect: 'none' }}>
+            <span>🎬 Generate this video →</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, background: 'rgba(26,20,16,.1)', borderRadius: 100, padding: '3px 10px' }}>Included in your trial</span>
+          </div>
+          <div style={{ fontSize: 12, color: MUT, marginTop: 8 }}>🔒 Unlocks when you start your trial.</div>
         </div>
-        <div style={{ fontSize: 12, color: MUT, marginTop: 8 }}>🔒 Unlocks when you start your trial.</div>
-      </div>
+      )}
 
       {/* Fallback image-remake teaser — only when there's no rival VIDEO to show above */}
       {!rv && rival && (
@@ -1227,15 +1262,17 @@ function TheFix({ res }: { res: ScanResult }) {
                 <div style={{ fontSize: 13, color: INK, lineHeight: 1.35, marginTop: 3, maxHeight: 46, overflow: 'hidden' }}>{rival.hook || rival.brand}</div>
               </div>
             </div>
-            <div style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
-              <div style={{ aspectRatio: '1 / 1', background: rival.thumb ? `#f1ece2 url(${rival.thumb}) center/cover` : 'linear-gradient(135deg,#ff5a2e,#e02f06)', filter: 'blur(14px)', transform: 'scale(1.1)' }} />
-              <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 20px', background: 'rgba(28,22,17,.28)' }}>
-                <div style={{ textAlign: 'center' }}>
-                  <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
-                  <div style={{ fontSize: 13.5, color: '#fff', fontWeight: 800, lineHeight: 1.4, textShadow: '0 2px 10px rgba(0,0,0,.4)' }}>Start free trial to see it in your brand</div>
+            {!embedded && (
+              <div style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
+                <div style={{ aspectRatio: '1 / 1', background: rival.thumb ? `#f1ece2 url(${rival.thumb}) center/cover` : 'linear-gradient(135deg,#ff5a2e,#e02f06)', filter: 'blur(14px)', transform: 'scale(1.1)' }} />
+                <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 20px', background: 'rgba(28,22,17,.28)' }}>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontSize: 22, marginBottom: 6 }}>🔒</div>
+                    <div style={{ fontSize: 13.5, color: '#fff', fontWeight: 800, lineHeight: 1.4, textShadow: '0 2px 10px rgba(0,0,0,.4)' }}>Start free trial to see it in your brand</div>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       )}
@@ -1281,15 +1318,16 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
 // The REPORT is deliberately compact (Ryze-sized): the rich DNA panels + ad grids + side-by-side live in
 // the THEATER (the reveal acts). Here we show only the distilled result — score, the gaps that matter, the
 // upside (gated on connecting Meta), the fixes, and the door.
-function FullReport({ res, onReaudit }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners']; onReaudit: (ids: string[]) => void }) {
+function FullReport({ res, onReaudit, embedded }: { res: ScanResult; own: FullDnaResult['own']; winners: FullDnaResult['winners']; onReaudit: (ids: string[]) => void; embedded?: boolean }) {
   return (
     <div>
-      <ScoreAct res={res} />
+      <ScoreAct res={res} embedded={embedded} />
       <div style={{ marginTop: 40 }}><TopGaps gaps={res.gaps} /></div>
       <div style={{ marginTop: 40 }}><CompetitorRefine pageId={res.brand.pageId} onReaudit={onReaudit} /></div>
-      <div style={{ marginTop: 40 }}><UpsideTeaser cost={res.cost} gaps={res.gaps.length} /></div>
-      <div style={{ marginTop: 40 }}><TheFix res={res} /></div>
-      <div style={{ marginTop: 40 }}><ForwardCta brand={res.brand} /></div>
+      <div style={{ marginTop: 40 }}><UpsideTeaser cost={res.cost} gaps={res.gaps.length} embedded={embedded} /></div>
+      <div style={{ marginTop: 40 }}><TheFix res={res} embedded={embedded} /></div>
+      {/* embedded: the combined page owns ONE shared conversion CTA — suppress this standalone door. */}
+      {!embedded && <div style={{ marginTop: 40 }}><ForwardCta brand={res.brand} /></div>}
     </div>
   )
 }
@@ -1376,7 +1414,7 @@ function TopGaps({ gaps }: { gaps: ScanResult['gaps'] }) {
 
 // The money — POSITIVE upside framing, and the REAL number is gated behind connecting Meta (we can't see
 // spend/revenue from outside). Before connect: the potential-sales-lift teaser + the connect CTA.
-function UpsideTeaser({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }) {
+function UpsideTeaser({ cost, gaps, embedded }: { cost: ScanResult['cost']; gaps: number; embedded?: boolean }) {
   const upside = cost.lostPerYear
   return (
     <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '26px 28px' }}>
@@ -1389,9 +1427,11 @@ function UpsideTeaser({ cost, gaps }: { cost: ScanResult['cost']; gaps: number }
             <div style={{ fontSize: 12, color: MUT, marginTop: 4 }}>estimated potential — from your ad volume + benchmarks</div>
           </div>
         )}
-        <div style={{ flex: '1 1 240px', minWidth: 0 }}>
-          <MetaCta size="lg" label="Connect Meta to see your real number" note="Sign up free, then connect Meta — we’ll replace this estimate with your true numbers: real revenue at risk and the exact lift from fixing it." />
-        </div>
+        {!embedded && (
+          <div style={{ flex: '1 1 240px', minWidth: 0 }}>
+            <MetaCta size="lg" label="Connect Meta to see your real number" note="Sign up free, then connect Meta — we’ll replace this estimate with your true numbers: real revenue at risk and the exact lift from fixing it." />
+          </div>
+        )}
       </div>
     </div>
   )
