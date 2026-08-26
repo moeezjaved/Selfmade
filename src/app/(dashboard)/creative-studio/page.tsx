@@ -160,7 +160,7 @@ function Generations() {
                   {g.media_type === 'video'
                     ? <video src={g.image_url || ''} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                     /* eslint-disable-next-line @next/next/no-img-element */
-                    : <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />}
+                    : <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img contain" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ fontSize: 13.5, fontWeight: 700, color: DARK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{titleOf(g)}</div>
@@ -201,10 +201,10 @@ function Generations() {
                         : <><span style={{ fontSize: 20 }}>📝</span> Draft — not generated yet<span style={{ fontWeight: 400, fontSize: 11, color: '#6f7f73' }}>{g.source_ad_id ? 'Click to open the ad and finish it →' : 'Open it in Discovery and hit Remake to finish'}</span></>}
                     </div>
                   ) : g.media_type === 'video' ? (
-                    <video src={g.image_url} muted loop autoPlay playsInline className="sf-thumb-img" />
+                    <video src={g.image_url} muted loop autoPlay playsInline className="sf-thumb-img contain" />
                   ) : (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />
+                    <img src={g.image_url || ''} alt="" referrerPolicy="no-referrer" className="sf-thumb-img contain" />
                   )}
                   {g.media_type === 'video' && g.status !== 'processing' && <span style={{ position: 'absolute', top: 6, right: 6, background: 'rgba(0,0,0,.6)', color: '#fff', borderRadius: 6, fontSize: 10, fontWeight: 700, padding: '2px 6px' }}>🎬 Video</span>}
                   {/* Subtle "cloned from" chip — the competitor ad this output was cloned from, so the

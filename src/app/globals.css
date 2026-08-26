@@ -411,4 +411,8 @@
   box-shadow: 0 20px 44px -26px rgba(20,20,16,.45);
   transform: translateY(-2px);
 }
-.sf-thumb-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Default: edge-to-edge FILL (the Lapis browse-feed look) — the creative covers the whole tile. */
+.sf-thumb-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* `.contain` opt-out — for the user's OWN finished creatives, show the whole ad so nothing at the
+   edges (headline, CTA) gets cropped. */
+.sf-thumb-img.contain { object-fit: contain; }
