@@ -12,7 +12,7 @@ function ScanReport({ result }: { result: any }) {
   return (
     <div style={{ background: '#fff', border: '1px solid #e8e8e8', borderRadius: 12, padding: 24 }}>
       <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginBottom: 18 }}>
-        {[['Overall', `${result.score} · ${result.grade}`], ['Website', result.websiteScore], ['Visibility', result.visibilityScore], ['Problems', result.problemCount], ['Revenue lost / yr', money(result.revenueLostPerYear, result.currency)]].map(([k, v]) => (
+        {[['Overall', `${result.score} · ${result.grade}`], ['Website', result.websiteScore ?? 'No data'], ['Visibility', result.visibilityScore ?? 'No data'], ['Problems', result.problemCount], ['Revenue lost / yr', money(result.revenueLostPerYear, result.currency)]].map(([k, v]) => (
           <div key={String(k)}><div style={{ fontSize: 22, fontWeight: 800, color: '#111' }}>{v as any}</div><div style={{ fontSize: 11, color: '#9ca3af' }}>{k as any}</div></div>
         ))}
       </div>
@@ -22,7 +22,7 @@ function ScanReport({ result }: { result: any }) {
             <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
               <span style={{ fontWeight: 700, color: '#111', fontSize: 14 }}>{s.name}</span>
               <span style={{ fontSize: 11, color: '#9ca3af' }}>{s.sub}</span>
-              <span style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 14, color: scoreColor(s.score) }}>{s.score}</span>
+              <span style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 14, color: s.score == null ? '#9ca3af' : scoreColor(s.score) }}>{s.score == null ? 'No data' : s.score}</span>
             </div>
             {(s.findings || []).length > 0 && (
               <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
