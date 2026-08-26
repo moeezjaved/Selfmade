@@ -79,11 +79,16 @@ export async function planAction(
   if (!mc) return { error: 'Meta isn’t connected (or access expired). Reconnect Meta and I can run your ads.' }
   const { currency, pageId } = await accountCtx(userId)
   const camps = await liveCampaigns(mc)
+  // Ads too — needed to resolve "change the copy on X" (edit_copy) + to reuse a winner's creative (duplicate).
+  const ads = await mc.listAdsForPicker().catch(() => [] as Awaited<ReturnType<typeof mc.listAdsForPicker>>)
 
-  // ── LLM intent parse, grounded on the REAL campaign list (so "the retargeting one" resolves to an id) ──
+  // ── LLM intent parse, grounded on the REAL campaign + ad list (so "the retargeting one" resolves to an id) ──
   const campList = camps.map((c: any) => `- id=${c.id} · "${c.name}" · ${c.status} · ${c.daily_budget != null ? money(c.daily_budget, currency) + '/day' : 'no daily budget'}`).join('\n') || '(no campaigns)'
+  const adList = ads.slice(0, 40).map((a) => `- adId=${a.adId} · "${a.name}" · in "${a.campaignName}"`).join('\n') || '(no ads)'
   const prompt = `You turn a founder's plain-English ads request into ONE structured action. Their LIVE campaigns:
 ${campList}
+Their LIVE ads:
+${adList}
 ${input.attach ? `They also attached a creative to launch/attach (image URL present). Brand: ${input.attach.brandName || ''} ${input.attach.website || ''}` : ''}
 
 Request: "${input.message}"
@@ -93,9 +98,11 @@ Return ONLY JSON, one of:
 {"kind":"pause","campaignId":"<id>"}
 {"kind":"resume","campaignId":"<id>"}
 {"kind":"launch","campaignName":"<short name>","dailyBudget":<number>,"description":"<who to target, in their words>","copyWinnerId":"<id or null>"}
+{"kind":"edit_copy","adId":"<id>","headline":"<new headline or null>","primaryText":"<new body or null>","cta":"<SHOP_NOW|LEARN_MORE|SIGN_UP|GET_OFFER or null>"}
+{"kind":"duplicate","campaignId":"<id>","description":"<the NEW audience to target>","dailyBudget":<number>}
 {"clarify":"<one short question>"}  // if the target or a required number is ambiguous/missing
 
-Rules: match the campaign by name loosely. If they say scale/increase/raise budget → scale. Stop/turn off/pause → pause. Turn on/resume/restart → resume. Launch/run/create/start an ad or campaign → launch. If a launch has no budget, ask for it. If a target campaign is ambiguous, ask which. Never invent a campaignId not in the list.`
+Rules: match by name loosely. scale/increase/raise budget → scale. stop/turn off/pause → pause. turn on/resume → resume. launch/run/create a NEW ad → launch. change/edit/rewrite the headline/text/copy on an ad → edit_copy (only set the field(s) they want changed; others null). duplicate/clone/copy a campaign to a different/new audience → duplicate. Ask for a missing budget. Never invent an id not in the lists.`
   let parsed: any = {}
   try {
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 300, temperature: 0.1, messages: [{ role: 'user', content: prompt }] })
@@ -125,6 +132,39 @@ Rules: match the campaign by name loosely. If they say scale/increase/raise budg
       summary: resume ? 'This campaign will start spending again.' : 'This campaign will stop spending today.',
       confirmLabel: `Approve — ${resume ? 'resume' : 'pause'} “${c.name}”`, currency,
       action: { kind: resume ? 'resume' : 'pause', metaCampaignId: c.id, campaignName: c.name },
+    } }
+  }
+  if (parsed.kind === 'edit_copy') {
+    if (!pageId) return { error: 'No Facebook Page linked — reconnect Meta to edit ads.' }
+    const ad = ads.find((a) => a.adId === String(parsed.adId)); if (!ad) return { clarify: 'Which ad’s copy should I change?' }
+    if (!ad.image) return { error: `I couldn’t read “${ad.name}”’s image to keep it — use Refresh with a fresh creative instead.` }
+    const headline = parsed.headline ? String(parsed.headline).slice(0, 60) : (ad.headline || 'Shop now')
+    const primaryText = parsed.primaryText ? String(parsed.primaryText).slice(0, 200) : ad.primaryText
+    const cta = /^(SHOP_NOW|LEARN_MORE|SIGN_UP|GET_OFFER)$/.test(parsed.cta) ? parsed.cta : CTA_DEFAULT
+    const changed = [parsed.headline && 'headline', parsed.primaryText && 'body', parsed.cta && 'CTA'].filter(Boolean).join(', ') || 'copy'
+    return { ok: true, card: {
+      title: `Update ${changed} on “${ad.name}”`,
+      summary: 'Keeps the same image; creates a fresh ad in the same campaign with the new copy and pauses the old one. Launches PAUSED.',
+      lines: [`Headline: ${headline}`, ...(primaryText ? [`Body: ${primaryText.slice(0, 90)}${primaryText.length > 90 ? '…' : ''}`] : [])],
+      confirmLabel: 'Approve — update copy (paused)', currency,
+      action: { kind: 'launch', mode: 'refresh', creativeUrl: ad.image, adsetId: ad.adsetId, pauseAdId: ad.adId, campaignName: ad.campaignName || 'Updated ad', dailyBudget: 0, description: '', headline, primaryText, cta, linkUrl: ad.linkUrl || 'https://' },
+    } }
+  }
+  if (parsed.kind === 'duplicate') {
+    if (!pageId) return { error: 'No Facebook Page linked — reconnect Meta to duplicate campaigns.' }
+    const c = byId(String(parsed.campaignId)); if (!c) return { clarify: 'Which campaign should I duplicate?' }
+    const nb = Number(parsed.dailyBudget); if (!nb || nb <= 0) return { clarify: `What daily budget for the duplicate of “${c.name}”?` }
+    const src = ads.find((a) => a.campaignName === c.name && a.image)
+    if (!src?.image) return { error: `I couldn’t find a creative in “${c.name}” to reuse — try launching a fresh ad instead.` }
+    const description = String(parsed.description || 'a new audience').slice(0, 240)
+    const kw = await interestKeywords(description)
+    const found = (await Promise.all(kw.slice(0, 4).map((q) => mc.searchInterests(q)))).flat()
+    const seen = new Set<string>(); const interests = found.filter((i) => !seen.has(i.id) && seen.add(i.id)).slice(0, 6)
+    return { ok: true, card: {
+      title: `Duplicate “${c.name}” to a new audience — ${money(nb, currency)}/day`,
+      summary: `${interests.length ? `Interests: ${interests.map((i) => i.name).join(', ')}` : 'Broad audience'}. Reuses the winning creative + copy. Launches PAUSED.`,
+      confirmLabel: 'Approve — create duplicate (paused)', currency,
+      action: { kind: 'launch', mode: 'new', creativeUrl: src.image, campaignName: `${c.name} — ${description.slice(0, 22)}`.slice(0, 60), dailyBudget: nb, description, interests, headline: src.headline || 'Shop now', primaryText: src.primaryText || '', cta: CTA_DEFAULT, linkUrl: src.linkUrl || 'https://' },
     } }
   }
   if (parsed.kind === 'launch') {
