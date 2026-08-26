@@ -389,7 +389,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
           ) : (
             <div key={i} style={{ width: 236, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
               <div className="sf-thumb" style={{ aspectRatio: '4 / 5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />}
+                {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" referrerPolicy="no-referrer" className="sf-thumb-img contain" />}
               </div>
               <div style={{ padding: 11 }}>
                 {m.caption && <div style={{ fontSize: 12, color: '#43403a', lineHeight: 1.4, marginBottom: 9, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.caption}</div>}
