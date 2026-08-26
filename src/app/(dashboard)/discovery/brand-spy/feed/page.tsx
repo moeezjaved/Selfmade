@@ -79,8 +79,8 @@ export default function BrandSpyFeed() {
           const d = daysAgo(a.startDate)
           return (
             <div key={a.id} className="bs-feed-card" style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflow: 'hidden' }}>
-              <div style={{ position: 'relative', aspectRatio: '1/1', background: '#f3f4f6' }}>
-                <img src={cdn(thumbOf(a))} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              <div className="sf-thumb" style={{ position: 'relative', aspectRatio: '1/1' }}>
+                <img src={cdn(thumbOf(a))} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />
                 {d !== null && (
                   <span style={{ position: 'absolute', top: 8, left: 8, background: d === 0 ? '#10b981' : 'rgba(17,17,17,0.8)', color: '#fff', fontSize: 11, fontWeight: 800, padding: '3px 8px', borderRadius: 999 }}>
                     {d === 0 ? 'NEW · 0D' : `${d}D`}

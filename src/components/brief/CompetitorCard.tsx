@@ -62,11 +62,11 @@ export default function CompetitorCard({ brandId }: { brandId?: string | null })
       <div style={{ display: 'flex', gap: 20, padding: '14px 22px 18px', flexWrap: 'wrap' }}>
         {/* the ad itself — playable when it's a video, Discovery-style */}
         <div style={{ width: 168, flexShrink: 0 }}>
-          <div style={{ borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, aspectRatio: '4/5', background: '#0d120e' }}>
+          <div className="sf-thumb" style={{ aspectRatio: '4/5', width: 168 }}>
             {hero.isVideo && hero.videoUrl
               ? <HoverScrubVideo src={hero.videoUrl} poster={hero.image || undefined} initials={hero.brandName.charAt(0)} />
               : hero.image
-                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={hero.image} alt={hero.brandName} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={hero.image} alt={hero.brandName} referrerPolicy="no-referrer" className="sf-thumb-img" />
                 : <div style={{ width: '100%', height: '100%', display: 'grid', placeItems: 'center', color: LIME, fontSize: 28, fontWeight: 800 }}>{hero.brandName.charAt(0)}</div>}
           </div>
         </div>

@@ -344,14 +344,14 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
       </div>
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(a.startDate)}{a.isActive ? ' – Present' : a.stopDate ? ` – ${fmtDate(a.stopDate)}` : ''}</div>
       {(copy || dco) && <div style={{ fontSize: 12, color: dco && !copy ? '#9ca3af' : '#374151', fontStyle: dco && !copy ? 'italic' : 'normal', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{copy ? copy.slice(0, 120) : 'Dynamic catalog ad — copy & image vary per shopper.'}</div>}
-      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
+      <div className="sf-thumb" style={{ position: 'relative', aspectRatio: '4 / 5' }}>
         {/* Video → Motion-style hover-scrub + lime play/progress ring (parity with Discovery). Loads
             the video lazily on hover, so nothing downloads until the user engages. Falls back to the
             poster if the source is dead/expired. Non-video (or missing src) → static poster. */}
         {a.videoUrl
           ? <HoverScrubVideo src={a.videoUrl} poster={img || undefined} initials={(a.pageName || '?').split(' ').map((w) => w[0]).join('').toUpperCase().slice(0, 2)} />
           : img && !imgFailed
-            ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} referrerPolicy="no-referrer" className="sf-thumb-img" />
             : <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#b3b3b3', fontSize: 11.5, gap: 5, padding: 16, textAlign: 'center' }}>
                 <span style={{ fontSize: 20, opacity: .6 }}>{dco ? '🛍️' : '🖼️'}</span>
                 {dco ? 'Dynamic catalog ad' : 'Preview not captured yet'}
@@ -679,8 +679,8 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
             <a key={a.adId} href={a.snapshot_url || '#'} target="_blank" rel="noreferrer" style={{ textDecoration: 'none', color: 'inherit', border: '1px solid #e6e6e6', borderRadius: 10, overflow: 'hidden', position: 'relative', display: 'block' }}>
               <span style={{ position: 'absolute', top: 6, left: 6, zIndex: 1, fontSize: 10, fontWeight: 800, color: '#111', background: ACCENT, padding: '2px 7px', borderRadius: 6 }}>#{i + 1}</span>
               <span style={{ position: 'absolute', top: 6, right: 6, zIndex: 1, fontSize: 10, fontWeight: 800, color: '#fff', background: '#2075ff', padding: '2px 7px', borderRadius: 6 }}>{a.score}</span>
-              <div style={{ aspectRatio: '4 / 5', background: '#f3f4f6' }}>
-                {a.thumb ? <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 11 }}>no preview</div>}
+              <div className="sf-thumb" style={{ aspectRatio: '4 / 5' }}>
+                {a.thumb ? <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" /> : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 11 }}>no preview</div>}
               </div>
               <div style={{ padding: '7px 9px', fontSize: 11, color: '#374151', lineHeight: 1.3, maxHeight: 46, overflow: 'hidden' }}>{a.hook}</div>
               <div style={{ padding: '0 9px 8px', fontSize: 11, fontWeight: 700, color: a.active ? '#ef4a1e' : '#9ca3af' }}>{a.active ? '● ' : ''}{a.days}d</div>

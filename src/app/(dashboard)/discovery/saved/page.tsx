@@ -431,7 +431,7 @@ export default function SavedAdsPage() {
                       </button>
                     </div>
                     {/* media — playable video (controls) with graceful fallback; image = link to original */}
-                    <div style={{ position: 'relative', width: '100%', paddingBottom: '118%', background: '#0f172a', overflow: 'hidden' }}>
+                    <div className="sf-thumb" style={{ position: 'relative', width: '100%', paddingBottom: '118%', overflow: 'hidden' }}>
                       {videoSrc && !vidFailed.has(saved.id) ? (
                         // A real R2 mp4 → hover-scrub + play. A dead src (blob/YouTube that couldn't be
                         // fetched at save time) fires onError → fall through to poster / "open original".
@@ -440,7 +440,7 @@ export default function SavedAdsPage() {
                       ) : media ? (
                         <a href={openUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'block', position: 'absolute', inset: 0 }}>
                           <img src={media} alt={saved.page_name} loading="lazy" decoding="async"
-                            style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            referrerPolicy="no-referrer" className="sf-thumb-img" />
                         </a>
                       ) : (
                         <a href={openUrl} target="_blank" rel="noopener noreferrer"

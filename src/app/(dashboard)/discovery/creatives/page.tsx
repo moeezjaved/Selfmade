@@ -191,14 +191,14 @@ function CreativeCard({ creative: c, onOpen }: { creative: Creative; onOpen: () 
       onMouseEnter={e => e.currentTarget.style.boxShadow = '0 4px 16px rgba(0,0,0,0.08)'}
       onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}>
       {/* Visual */}
-      <div style={{ position: 'relative', background: '#000', overflow: 'hidden', lineHeight: 0 }}>
+      <div className="sf-thumb" style={{ position: 'relative', overflow: 'hidden', lineHeight: 0 }}>
         {url ? (
           c.type === 'video' ? (
             <div style={{ position: 'relative', width: '100%', aspectRatio: '4 / 5' }}>
               <HoverScrubVideo src={url} brandBg="#000" />
             </div>
           ) : (
-            <img src={url} alt="" loading="lazy" style={{ width: '100%', height: 'auto', display: 'block', verticalAlign: 'top' }} />
+            <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" style={{ verticalAlign: 'top' }} />
           )
         ) : (
           <div style={{ width: '100%', aspectRatio: '4/5', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#9ca3af', fontSize: 12 }}>

@@ -899,11 +899,11 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
     {cloneOpen && <CloneModal ad={{ id: ad.id, pageId: ad.pageId, pageName: ad.pageName, sourceThumb: slide?.poster || slide?.url }} onClose={() => setCloneOpen(false)} />}
     {videoCloneOpen && <CloneVideoModal sourceAdId={ad.id} sourcePoster={slide?.poster || undefined} onClose={() => setVideoCloneOpen(false)} />}
     <div
-      className="ad-card-visual"
+      className="ad-card-visual sf-thumb"
       onClick={() => { saveDiscoSnapNow(); router.push(`/discovery/${ad.id}`) }}
       style={{
         position: 'relative', width: '100%', paddingBottom: `${aspectPct}%`,
-        background: '#f1f3f5', overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
+        overflow: 'hidden', lineHeight: 0, cursor: 'pointer',
       }}
     >
       {slide.type === 'image' ? (
@@ -924,11 +924,12 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               alt={ad.pageName}
               loading="lazy"
               decoding="async"
+              referrerPolicy="no-referrer"
+              className="sf-thumb-img"
               onLoad={() => setImgLoaded(true)}
               onError={() => setImgError(true)}
               style={{
-                position: 'absolute', inset: 0, width: '100%', height: '100%',
-                objectFit: 'cover', display: 'block',
+                position: 'absolute', inset: 0,
                 opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.12s linear', zIndex: 2,
               }}
             />

@@ -81,7 +81,7 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
   return (
     <StudioCtx.Provider value={{ addToChat }}>
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: embedded ? 'auto' : '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-disc:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}@keyframes sfShimmer{0%{background-position:150% center}100%{background-position:-150% center}}.sf-scroll-wrap:hover .sf-scroll-btn{opacity:1}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-thumb:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}@keyframes sfShimmer{0%{background-position:150% center}100%{background-position:-150% center}}.sf-scroll-wrap:hover .sf-scroll-btn{opacity:1}`}</style>
       {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -388,8 +388,8 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
             <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
           ) : (
             <div key={i} style={{ width: 236, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
-              <div style={{ aspectRatio: '4 / 5', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />}
+              <div className="sf-thumb" style={{ aspectRatio: '4 / 5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {m.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={m.image} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />}
               </div>
               <div style={{ padding: 11 }}>
                 {m.caption && <div style={{ fontSize: 12, color: '#43403a', lineHeight: 1.4, marginBottom: 9, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{m.caption}</div>}
@@ -511,18 +511,17 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   }, [tpls, canGen, kit, products, domain])
 
   if (tpls !== null && tpls.length === 0) return null
-  const grad = ['#f4ede2', '#e9efe6', '#eef2f8', '#f7f0e0', '#efe7ea', '#eef3ee']
   return (
     <div style={{ marginTop: 48 }}>
       <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Personalized templates" sub="Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.">
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <div key={i} className="sf-disc" onClick={() => t && !t.generating && !t.failed && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating && !t.failed ? 'pointer' : 'default', fontFamily: SANS }}>
+          <div key={i} onClick={() => t && !t.generating && !t.failed && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating && !t.failed ? 'pointer' : 'default', fontFamily: SANS }}>
             {/* Title on top, like the reference — no description below. */}
             <div style={{ padding: '11px 14px 9px', fontSize: 14, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t?.title || '…'}</div>
-            <div style={{ aspectRatio: '4/5', background: t?.image ? PAPER : `linear-gradient(150deg, ${grad[i % 6]}, #fff)`, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
+            <div className="sf-thumb" style={{ aspectRatio: '4/5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
               {t?.image ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={t.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                <img src={t.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />
               ) : t?.generating ? (
                 <>
                   <span style={{ width: 26, height: 26, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
@@ -581,9 +580,9 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
           <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
         </button>
         {els.map((e) => (
-          <div key={e.id} className="sf-disc" style={{ position: 'relative', width: 124, height: 124, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, cursor: 'pointer' }} onClick={() => onUse(e)}>
+          <div key={e.id} className="sf-thumb" style={{ position: 'relative', width: 124, height: 124, flex: 'none', overflow: 'hidden', cursor: 'pointer' }} onClick={() => onUse(e)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={e.url} alt={e.label} loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <img src={e.url} alt={e.label} loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />
             <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 55%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 7, opacity: 0, transition: 'opacity .15s' }}>
               <button onClick={(ev) => { ev.stopPropagation(); del(e.id) }} title="Remove" style={{ alignSelf: 'flex-end', border: 'none', background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: 100, width: 22, height: 22, cursor: 'pointer', fontSize: 13 }}>×</button>
               <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.label}</div>
@@ -647,8 +646,8 @@ function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   return (
     <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={a.id} className="sf-disc" style={{ position: 'relative', width: 212, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
-          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+        <div key={a.id} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', aspectRatio: '4/5' }}>
+          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -665,7 +664,7 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
     <HomeCarousel title="Products" sub="Straight from your store — tap one to build an ad around it.">
       {products.slice(0, 24).map((p, i) => (
         <button key={i} onClick={() => onTag({ label: p.title.slice(0, 24), image: p.image, kind: 'product' })} style={{ width: 150, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: SANS, padding: 0 }}>
-          <div style={{ aspectRatio: '1', background: PAPER, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}</div>
+          <div className="sf-thumb" style={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />}</div>
           <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>
         </button>
       ))}
@@ -717,9 +716,9 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
   return (
     <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={i} className="sf-disc" style={{ position: 'relative', width: 212, flex: 'none', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
+        <div key={i} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', aspectRatio: '4/5' }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -847,8 +846,8 @@ function CompCard({ c, isMobile, onSpy }: { c: Comp; isMobile: boolean; onSpy?: 
         <div style={{ display: 'flex', gap: 12, overflowX: 'auto', marginTop: 16, paddingBottom: 6 }}>
           {c.ads.map((a) => (
             <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-              <div style={{ aspectRatio: '4 / 5', background: PAPER, position: 'relative' }}>
-                {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+              <div className="sf-thumb" style={{ aspectRatio: '4 / 5', position: 'relative' }}>
+                {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                 {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
                 {a.format === 'video' && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 100, padding: '2px 8px' }}>▶ VIDEO</span>}
               </div>
@@ -1032,8 +1031,8 @@ function Discover({ isMobile }: { isMobile: boolean }) {
           : (
             <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 14, marginTop: 20 }}>
               {shown.map((a) => (
-                <div key={a.id} className="sf-disc" style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: PAPER, aspectRatio: '4/5' }}>
-                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                <div key={a.id} className="sf-thumb" style={{ position: 'relative', overflow: 'hidden', aspectRatio: '4/5' }}>
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                   <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
                     <div style={{ color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
                     <button onClick={() => addToChat({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -1080,8 +1079,8 @@ function Products({ isMobile, domain, hideHeader }: { isMobile: boolean; domain:
                 const on = !!sel[p.url]
                 return (
                   <div key={p.url + i} onClick={() => setSel((s) => ({ ...s, [p.url]: !s[p.url] }))} style={{ border: `1px solid ${on ? ORANGE : LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', cursor: 'pointer', boxShadow: on ? `0 0 0 2px ${ORANGE}22` : 'none' }}>
-                    <div style={{ aspectRatio: '1', background: PAPER, position: 'relative' }}>
-                      {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                    <div className="sf-thumb" style={{ aspectRatio: '1', position: 'relative' }}>
+                      {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                       <span style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? ORANGE : '#fff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     </div>
                     <div style={{ padding: '10px 12px' }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>{p.price && <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>{p.price}</div>}</div>
@@ -1215,9 +1214,9 @@ function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
               <Card title="Your visual world" sub="These images shape how we design for you." action="Add">
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3,1fr)', gap: 12 }}>
                   {(data.visualPages || []).map((u, i) => (
-                    <div key={i} style={{ aspectRatio: '4/3', borderRadius: 10, background: PAPER, border: `1px solid ${LINE}`, overflow: 'hidden' }}>
+                    <div key={i} className="sf-thumb" style={{ aspectRatio: '4/3', overflow: 'hidden' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={shotUrl(u)} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'top' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+                      <img src={shotUrl(u)} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" style={{ objectPosition: 'top' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
                     </div>
                   ))}
                 </div>
