@@ -13,7 +13,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
-import { openCredits } from '@/components/credits/CreditModal'
+import { openCredits, CreditModal } from '@/components/credits/CreditModal'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
@@ -172,6 +172,9 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   return (
     <div style={{ display: 'flex', minHeight: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
       <Celebration />
+      {/* Global credits/plan modal — listens for openCredits() from the account menu + the Top-up pill.
+          Without this mounted, those clicks fired an event nobody heard (the "nothing happens" bug). */}
+      <CreditModal />
       {!isMobile && Sidebar}
       {isMobile && open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>
