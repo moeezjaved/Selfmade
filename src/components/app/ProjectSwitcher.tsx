@@ -8,6 +8,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BRAND_COOKIE } from '@/lib/brand/cookie'
+import { openCredits } from '@/components/credits/CreditModal'
 
 type Brand = { id: string; name: string }
 
@@ -24,7 +25,25 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
   const [brands, setBrands] = useState<Brand[]>(initialBrands)
   const [active, setActive] = useState<string>(initialActive)
   const [open, setOpen] = useState(false)
+  const [newBusy, setNewBusy] = useState(false)
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // "New brand": gate on the plan's brand quota BEFORE navigating, so an at-cap user (Free = 1 brand)
+  // gets the upgrade modal immediately instead of the onboarding flashing then bouncing to upgrade.
+  const newBrand = async () => {
+    if (newBusy) return
+    setNewBusy(true)
+    try {
+      const j = await fetch('/api/brands', { cache: 'no-store' }).then(r => r.ok ? r.json() : null).catch(() => null)
+      const used = Number(j?.quota?.used ?? 0), limit = Number(j?.quota?.limit ?? -1)
+      if (limit >= 0 && used >= limit) {
+        setOpen(false)
+        openCredits('plan', `You’re on ${limit} brand${limit === 1 ? '' : 's'} — upgrade to add another.`)
+        return
+      }
+      router.push('/onboarding?new=1')
+    } finally { setNewBusy(false) }
+  }
 
   useEffect(() => {
     const c = readCookie(BRAND_COOKIE); if (c) setActive(c)
@@ -85,12 +104,13 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
               ))}
             </div>
             <div style={{ height: 1, background: '#eef1ec', margin: '6px 4px' }} />
-            {/* New brand runs the FULL onboarding interview (crawl → competitors → async pulls → first
-                report), same as the first brand — not the lighter wizard. ?new=1 marks it as an Nth brand. */}
-            <a href="/onboarding?new=1" style={{ ...rowStyle(false), color: '#3b6d11', fontWeight: 750, textDecoration: 'none' }}>
+            {/* New brand runs the FULL onboarding interview (?new=1). But check the plan's brand quota on
+                CLICK first: an at-cap (e.g. Free) user goes STRAIGHT to the upgrade modal — no 2-second
+                onboarding flash before the wall. Allowed users proceed to onboarding. */}
+            <button onClick={newBrand} disabled={newBusy} style={{ ...rowStyle(false), width: '100%', border: 'none', background: 'transparent', cursor: newBusy ? 'default' : 'pointer', color: '#3b6d11', fontWeight: 750, fontFamily: 'inherit', textAlign: 'left' }}>
               <span style={{ width: 18, height: 18, borderRadius: 6, background: '#eaf3de', color: '#3b6d11', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 800, marginRight: 9 }}>+</span>
-              New brand
-            </a>
+              {newBusy ? 'Checking…' : 'New brand'}
+            </button>
           </div>
         </div>
       )}

@@ -47,6 +47,12 @@ export async function POST(req: NextRequest) {
   const action = body.action
 
   if (action === 'draft') {
+    // Content agent is a paid feature — Free plan can't generate (draft or publish). Existing/grandfathered
+    // users are exempt. (No credits are charged either way; this is a plan gate, not a credit gate.)
+    const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
+    if (!isGrandfathered(userCreatedAt) && (await getPlanId(admin, owner)) === 'free') {
+      return NextResponse.json({ error: 'upgrade_required', reason: 'The Content agent is a paid feature — upgrade to write and publish blogs.' }, { status: 402 })
+    }
     const topic = body.topic ? String(body.topic) : undefined
     const article = await writeArticle(admin, store, userId, topic)
     if (!article) return NextResponse.json({ error: 'Could not write the article. Try a more specific topic.' }, { status: 500 })
