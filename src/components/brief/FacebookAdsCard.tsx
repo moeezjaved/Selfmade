@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
 import { showUpsell } from '@/components/UpsellModal'
 
-const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e'
+const INK = '#111111', MUTED = '#6b6b6b', LINE = '#ecede8', LIME = '#ff5a2c', FOREST = '#141d15', GREEN = '#ef4a1e', ORANGE = '#ef4a1e'
 
 type Camp = { name: string; roas: number; spend: number; conversions: number; dailyBudget: number | null; metaCampaignId?: string | null; ctr?: number; impressions?: number; clicks?: number }
 type Ad = { adId: string; name: string; campaignName?: string | null; metaCampaignId?: string | null; spend: number; impressions: number; clicks: number; ctr: number; cpc: number; roas: number; conversions: number; thumbnail_url?: string | null; preview_url?: string | null }
@@ -24,6 +24,85 @@ type Summary = {
 }
 
 const RANGE_LABEL: Record<string, string> = { last_3d: '3d', last_7d: '7d', last_14d: '14d', last_30d: '30d' }
+
+// Per-row quick actions on the Top-ads table — change ONE campaign in one tap, no typing. Each chip
+// compiles a plain-English instruction pre-targeting THIS campaign, runs it through the same
+// plan → confirm card → execute spine as the "run ads by typing" bar. Nothing writes without Approve.
+function RowManage({ campaignName }: { campaignName: string }) {
+  const [busy, setBusy] = useState(false)
+  const [card, setCard] = useState<{ title: string; summary: string; lines?: string[]; confirmLabel: string; action: any } | null>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [done, setDone] = useState<string | null>(null)
+  const [editing, setEditing] = useState(false)
+  const [copyText, setCopyText] = useState('')
+
+  const plan = async (message: string) => {
+    if (busy) return
+    setBusy(true); setError(null); setDone(null); setCard(null)
+    try {
+      const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'plan', message }) })
+      const d = await r.json()
+      if (d.card) setCard(d.card); else setError(d.clarify || d.error || 'Couldn’t plan that — open Campaigns.')
+    } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
+  }
+  const approve = async () => {
+    if (!card || busy) return
+    setBusy(true); setError(null)
+    try {
+      const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'execute', action: card.action }) })
+      const d = await r.json()
+      if (d.ok) { setDone(d.message || 'Done.'); setCard(null) } else setError(d.error || 'Meta rejected that.')
+    } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
+  }
+
+  const Chip = ({ label, onClick }: { label: string; onClick: () => void }) => (
+    <button onClick={onClick} disabled={busy}
+      style={{ border: `1px solid ${ORANGE}33`, background: '#fff', color: ORANGE, borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>{label}</button>
+  )
+
+  return (
+    <div style={{ padding: '10px 0 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      {!editing ? (
+        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
+          <Chip label="Scale +20%" onClick={() => plan(`Scale the campaign "${campaignName}" by +20% per day.`)} />
+          <Chip label="Scale +50%" onClick={() => plan(`Scale the campaign "${campaignName}" by +50% per day.`)} />
+          <Chip label="Pause" onClick={() => plan(`Pause the campaign "${campaignName}".`)} />
+          <Chip label="Duplicate" onClick={() => plan(`Duplicate the campaign "${campaignName}" as a fresh copy.`)} />
+          <Chip label="Edit copy" onClick={() => { setEditing(true); setCard(null); setError(null); setDone(null) }} />
+        </div>
+      ) : (
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <input value={copyText} autoFocus onChange={(e) => setCopyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && copyText.trim() && plan(`Edit the copy of the campaign "${campaignName}" — set the primary text to: ${copyText.trim()}`)}
+            placeholder="New primary text for this campaign…"
+            style={{ flex: 1, minWidth: 220, padding: '9px 13px', fontSize: 13, borderRadius: 100, border: '1px solid #e3ded2', background: '#fff', color: '#1a1410', outline: 'none' }} />
+          <button onClick={() => copyText.trim() && plan(`Edit the copy of the campaign "${campaignName}" — set the primary text to: ${copyText.trim()}`)} disabled={busy || !copyText.trim()}
+            style={{ background: copyText.trim() ? ORANGE : '#e3ded2', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: copyText.trim() ? 'pointer' : 'default' }}>{busy ? 'Thinking…' : 'Preview'}</button>
+          <button onClick={() => { setEditing(false); setCopyText('') }} disabled={busy}
+            style={{ background: 'none', border: '1px solid #e3ded2', borderRadius: 100, padding: '9px 14px', fontSize: 13, fontWeight: 600, color: '#555', fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
+        </div>
+      )}
+
+      {error && <div style={{ fontSize: 12.5, color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{error}</div>}
+      {done && <div style={{ fontSize: 12.5, color: '#15803d', background: '#f0f9f2', border: '1px solid #bbe6c6', borderRadius: 10, padding: '9px 12px' }}>✅ {done}</div>}
+
+      {card && (
+        <div style={{ border: `1px solid ${ORANGE}33`, borderRadius: 12, background: '#fff', padding: 14, boxShadow: '0 18px 44px -28px rgba(239,74,30,.4)' }}>
+          <div style={{ fontSize: 14, fontWeight: 800, color: '#111', marginBottom: 4 }}>{card.title}</div>
+          <div style={{ fontSize: 13, color: '#555', marginBottom: card.lines?.length ? 9 : 12 }}>{card.summary}</div>
+          {card.lines && card.lines.length > 0 && (
+            <ul style={{ margin: '0 0 12px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>
+              {card.lines.map((l, i) => <li key={i} style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{l}</li>)}
+            </ul>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={approve} disabled={busy} style={{ background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 17px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>{busy ? 'Working…' : card.confirmLabel}</button>
+            <button onClick={() => setCard(null)} disabled={busy} style={{ background: 'none', border: '1px solid #e3ded2', borderRadius: 100, padding: '9px 15px', fontSize: 13.5, fontWeight: 600, color: '#555', fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
 
 const headline = (d: Summary) => {
   const c = d.counts || { scale: d.scale.length, watch: d.watch.length, pause: d.pause.length }
@@ -48,6 +127,7 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
   const [sel, setSel] = useState<string>('')
   const [range, setRange] = useState<string>('last_30d')   // default: 30 days
   const [busy, setBusy] = useState(false)
+  const [openRow, setOpenRow] = useState<string | null>(null)   // top-ads row whose Manage panel is expanded
   // Start in the healing (loading) state: the card ALWAYS pulls live numbers on mount, so we must never
   // paint the stale nightly-stored `initial` figures for even one frame — that first frame was the
   // "wrong numbers, then blink, then correct" the founder saw. Open on "Loading…", settle on the truth.
@@ -335,31 +415,45 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
         <div style={{ borderTop: `1px solid ${LINE}`, padding: '14px 24px 4px' }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: '#9aa79a', marginBottom: 8 }}>Top ads · {RANGE_LABEL[range] || '30d'}</div>
           <div style={{ overflowX: 'auto' }}>
-            <div style={{ minWidth: 520 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px', gap: 8, padding: '0 0 6px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#a7b0a5' }}>
-                <span>Ad</span><span style={{ textAlign: 'right' }}>Spend</span><span style={{ textAlign: 'right' }}>Impr.</span><span style={{ textAlign: 'right' }}>Clicks</span><span style={{ textAlign: 'right' }}>CTR</span><span style={{ textAlign: 'right' }}>CPC</span>
+            <div style={{ minWidth: 560 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px 78px', gap: 8, padding: '0 0 6px', fontSize: 10.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#a7b0a5' }}>
+                <span>Ad</span><span style={{ textAlign: 'right' }}>Spend</span><span style={{ textAlign: 'right' }}>Impr.</span><span style={{ textAlign: 'right' }}>Clicks</span><span style={{ textAlign: 'right' }}>CTR</span><span style={{ textAlign: 'right' }}>CPC</span><span style={{ textAlign: 'right' }}>Manage</span>
               </div>
-              {d.ads.map((a, i) => (
-                // Row → the campaign it belongs to (the Ads cockpit), where they can manage it with
-                // Mello. Bigger thumbnail + campaign name under the ad name so it's readable at a glance.
-                <Link key={a.adId || i} href="/campaigns"
-                  style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px', gap: 8, alignItems: 'center', padding: '8px 0', borderTop: `1px solid ${LINE}`, textDecoration: 'none', color: INK }}>
-                  <span style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0 }}>
-                    <span style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
-                      {a.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={a.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 14, opacity: .5 }}>🎬</span>}
-                    </span>
-                    <span style={{ minWidth: 0 }}>
-                      <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#141d15' }}>{a.campaignName || a.name}</span>
-                      {a.campaignName && <span style={{ display: 'block', fontSize: 11, color: '#9aa79a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>}
-                    </span>
-                  </span>
-                  <span style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(a.spend)}</span>
-                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.impressions.toLocaleString()}</span>
-                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.clicks.toLocaleString()}</span>
-                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.ctr.toFixed(2)}%</span>
-                  <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{money(a.cpc)}</span>
-                </Link>
-              ))}
+              {d.ads.map((a, i) => {
+                const rowKey = a.adId || String(i)
+                const isOpen = openRow === rowKey
+                const campName = a.campaignName || a.name
+                return (
+                  // Row shows the numbers; the last cell is a one-tap Manage toggle that expands quick
+                  // actions (Scale / Pause / Duplicate / Edit copy) pre-targeted to THIS campaign — no
+                  // typing, no naming it. The ad name still deep-links to the campaign cockpit.
+                  <div key={rowKey} style={{ borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 74px 78px 62px 56px 66px 78px', gap: 8, alignItems: 'center', padding: '8px 0', color: INK }}>
+                      <Link href="/campaigns" style={{ display: 'flex', alignItems: 'center', gap: 10, minWidth: 0, textDecoration: 'none', color: INK }}>
+                        <span style={{ width: 40, height: 40, borderRadius: 8, overflow: 'hidden', flexShrink: 0, background: '#eef2ec', display: 'grid', placeItems: 'center' }}>
+                          {a.thumbnail_url ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={a.thumbnail_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={(e: any) => { e.target.style.display = 'none' }} /> : <span style={{ fontSize: 14, opacity: .5 }}>🎬</span>}
+                        </span>
+                        <span style={{ minWidth: 0 }}>
+                          <span style={{ display: 'block', fontSize: 12.5, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#141d15' }}>{campName}</span>
+                          {a.campaignName && <span style={{ display: 'block', fontSize: 11, color: '#9aa79a', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.name}</span>}
+                        </span>
+                      </Link>
+                      <span style={{ textAlign: 'right', fontSize: 12.5, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{money(a.spend)}</span>
+                      <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.impressions.toLocaleString()}</span>
+                      <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.clicks.toLocaleString()}</span>
+                      <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{a.ctr.toFixed(2)}%</span>
+                      <span style={{ textAlign: 'right', fontSize: 12.5, color: MUTED, fontVariantNumeric: 'tabular-nums' }}>{money(a.cpc)}</span>
+                      <span style={{ textAlign: 'right' }}>
+                        <button onClick={() => setOpenRow(isOpen ? null : rowKey)}
+                          style={{ border: `1px solid ${isOpen ? ORANGE : '#e3ded2'}`, background: isOpen ? `${ORANGE}12` : '#fff', color: isOpen ? ORANGE : MUTED, borderRadius: 100, padding: '5px 11px', fontSize: 11.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                          {isOpen ? 'Close' : 'Manage'}
+                        </button>
+                      </span>
+                    </div>
+                    {isOpen && <RowManage campaignName={campName} />}
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
