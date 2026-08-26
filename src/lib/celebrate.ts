@@ -13,18 +13,48 @@ export function celebrate(p: CelebratePayload) {
 
 const pick = (arr: string[]) => arr[Math.floor(Math.random() * arr.length)]
 
-/** SEO/catalog fixes pushed live to Shopify. */
+/** SEO/catalog fixes pushed live to Shopify (aggregate apply). */
 export function shopifyApplied(n: number): CelebratePayload {
   return {
     emoji: '🍩',
     title: `${n} fixes are live on Shopify!`,
     sub: pick([
+      `Your storefront got ${n} notches more findable. Somewhere out there, a competitor just felt a cold breeze.`,
       `That's ${n} more products Google can actually read — and ${n} more shoppers who find you before your competitor does. Woo-hoo!`,
       `${n} tiny salespeople just clocked in for the night shift. They don't take breaks and they never ask for a raise.`,
-      `Your storefront got ${n} notches more findable. Somewhere out there, a competitor just felt a cold breeze.`,
       `${n} fixes shipped while you sipped your chai. This is what "working smarter" actually looks like.`,
     ]),
   }
+}
+
+/** Product titles rewritten. */
+export function productTitles(n: number): CelebratePayload {
+  return { emoji: '🏷️', title: `${n} sharper product titles shipped`, sub: `Shoppers judge a title in about 0.4 seconds. Yours just got ${n}× harder to scroll past.` }
+}
+
+/** Image alt text added. */
+export function altText(n: number): CelebratePayload {
+  return { emoji: '👁️', title: `${n} images can finally be “seen”`, sub: `${n} photos went from invisible to searchable on Google Images. Free traffic doesn't get easier than this.` }
+}
+
+/** SEO title & meta description copy written. */
+export function seoCopy(): CelebratePayload {
+  return { emoji: '📝', title: 'Your search snippets got an upgrade', sub: 'This is the copy Google shows before anyone clicks. You just wrote a much better first impression.' }
+}
+
+/** Keywords discovered. */
+export function keywordsFound(n: number): CelebratePayload {
+  return { emoji: '🔑', title: `${n} keywords worth winning`, sub: `The exact searches your buyers type — now you know precisely where to show up.` }
+}
+
+/** Best-fit celebration for a batch of catalog fixes, chosen by the dominant fix type. */
+export function catalogApplied(n: number, kind?: string): CelebratePayload {
+  const k = (kind || '').toLowerCase()
+  if (k.includes('alt')) return altText(n)
+  if (k.includes('title') && !k.includes('seo')) return productTitles(n)
+  if (k.includes('seo') || k.includes('desc') || k.includes('meta')) return seoCopy()
+  if (k.includes('keyword') || k.includes('tag')) return keywordsFound(n)
+  return shopifyApplied(n)
 }
 
 /** A blog / content piece published. */
