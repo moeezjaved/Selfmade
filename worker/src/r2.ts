@@ -70,13 +70,15 @@ export function r2UrlToKey(url: string | null | undefined): string | null {
  * List every object under a prefix, returning a Map of key → size (bytes). Used by the video purge to
  * price the reclaim (GB) accurately without a HEAD per object. Paginates 1000 at a time.
  */
-export async function listSizesByPrefix(prefix: string): Promise<Map<string, number>> {
+export async function listSizesByPrefix(prefix: string, onProgress?: (count: number, bytes: number) => void): Promise<Map<string, number>> {
   const sizes = new Map<string, number>()
   let token: string | undefined
+  let bytes = 0
   do {
     const res = await client.send(new ListObjectsV2Command({ Bucket: config.r2.bucket, Prefix: prefix, ContinuationToken: token, MaxKeys: 1000 }))
-    for (const o of res.Contents || []) if (o.Key) sizes.set(o.Key, o.Size || 0)
+    for (const o of res.Contents || []) if (o.Key) { sizes.set(o.Key, o.Size || 0); bytes += o.Size || 0 }
     token = res.IsTruncated ? res.NextContinuationToken : undefined
+    if (onProgress && sizes.size % 50000 < 1000) onProgress(sizes.size, bytes)
   } while (token)
   return sizes
 }
