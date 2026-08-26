@@ -25,6 +25,7 @@ const AGENTS = [
   { key: 'alt', name: 'Image alt text', blurb: 'Accessibility + image SEO for photos with no alt', gap: (h?: Health | null) => h?.imagesMissingAlt ?? 0, gapLabel: 'images without alt' },
   { key: 'tags', name: 'Search filter tags', blurb: 'Discovery/filter tags shoppers actually use', gap: () => null, gapLabel: '' },
   { key: 'collection', name: 'Collection pages', blurb: 'SEO + intro copy for your collections', gap: () => null, gapLabel: '' },
+  { key: 'page', name: 'Store pages (About, FAQ…)', blurb: 'SEO title + meta for pages missing them — never touches the page body', gap: () => null, gapLabel: '' },
 ] as const
 
 export default function CatalogPage() {

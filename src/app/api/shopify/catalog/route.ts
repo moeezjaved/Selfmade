@@ -18,7 +18,7 @@ import { resolveBillingOwner } from '@/lib/org'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const AGENTS: Agent[] = ['seo', 'description', 'alt', 'title', 'tags', 'collection']
+const AGENTS: Agent[] = ['seo', 'description', 'alt', 'title', 'tags', 'collection', 'page']
 const isAgent = (a: any): a is Agent => AGENTS.includes(a)
 
 async function ctx(req: NextRequest) {
@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
   const { data: drafts } = await admin.from('shopify_catalog_drafts')
     .select('id, product_gid, product_title, agent, proposal, status, error, created_at')
     .eq('store_id', store.id).eq('status', 'draft').order('created_at', { ascending: false }).limit(500)
-  const byAgent: Record<string, any[]> = { seo: [], description: [], alt: [], title: [], tags: [], collection: [] }
+  const byAgent: Record<string, any[]> = { seo: [], description: [], alt: [], title: [], tags: [], collection: [], page: [] }
   for (const d of (drafts || [])) (byAgent[d.agent] ||= []).push(d)
   const counts: Record<string, number> = {}
   for (const a of AGENTS) counts[a] = (byAgent[a] || []).length
