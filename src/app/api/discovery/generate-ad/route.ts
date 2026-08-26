@@ -163,7 +163,7 @@ async function handle(req: NextRequest) {
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
     const saved = await saveGeneration({
-      userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'inspired', tier: 'pro',
+      userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'inspired', tier: 'pro', model: gen.model,
       brandId: brandId || null, prompt: newHeadline || null,
     })
 

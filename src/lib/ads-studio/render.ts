@@ -67,13 +67,13 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
   // wrong. Free templates weren't QA'd before, so garbled text or a wrong product slipped through; now
   // they self-heal like the paid clone path. verifyClonedAd fails OPEN on any API error (never blocks).
   const MAX_GENS = 2
-  let best: { mimeType: string; dataB64: string } | null = null
+  let best: { mimeType: string; dataB64: string; model: string } | null = null
   let fix = ''
   for (let i = 0; i < MAX_GENS; i++) {
     const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${fix}`
     const gen = await generateImage(attemptPrompt, genImages, 'pro', { aspectRatio: aspect, imageSize: '2K' })
     if (!gen.ok) break                                   // busy → keep best-so-far (or null on 1st attempt)
-    best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+    best = { mimeType: gen.mimeType, dataB64: gen.dataB64, model: gen.model }
     if (!products[0]) break                              // no product to verify against → accept
     const v = await verifyClonedAd(best, products[0], opts.brandName)
     if (v.pass) break
@@ -86,6 +86,6 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
   }
   if (!best) return null
 
-  const saved = await saveGeneration({ userId, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', brandId, prompt: opts.headline || null }).catch(() => null)
+  const saved = await saveGeneration({ userId, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', model: best.model, brandId, prompt: opts.headline || null }).catch(() => null)
   return { url: saved?.url || null, image: `data:${best.mimeType};base64,${best.dataB64}` }
 }

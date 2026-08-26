@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
     if (!best) { await refund(); return NextResponse.json({ error: 'generation-failed' }, { status: 502 }) }
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
-    const saved = await saveGeneration({ userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', brandId: body.brandId || null, prompt: headline || null }).catch(() => null)
+    const saved = await saveGeneration({ userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', model: best.model, brandId: body.brandId || null, prompt: headline || null }).catch(() => null)
     return NextResponse.json({ image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null, model: best.model })
   } catch (e: any) {
     await refund()
