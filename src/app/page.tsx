@@ -11,8 +11,8 @@ import AmbientAudio from './AmbientAudio'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const TITLE = 'Selfmade — Ecommerce, version two'
-const DESC = 'The growth team your store could never afford — now AI. Ads, SEO, conversion, and website design, on autopilot. Selfmade learns your brand, does the marketing, and brings you the work already done. Nothing ships without your yes.'
-const OG_DESC = 'Ecommerce, version two. The growth team your store could never afford — now AI. Ads, SEO, conversion & website design on autopilot. You approve; it ships.'
+const DESC = 'Ecommerce, version two. AI that runs your store’s ads, SEO, conversion, and website design — on autopilot. Selfmade learns your brand, does the work, and brings it to you already done. Nothing ships without your yes.'
+const OG_DESC = 'Ecommerce, version two. AI that runs your store’s ads, SEO, conversion & website design — on autopilot. You approve every move; it ships.'
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
