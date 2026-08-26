@@ -84,13 +84,13 @@ export async function POST(req: NextRequest) {
     // Generate → VISION-VERIFY the product/text/size against the real product photo → regenerate once
     // with a correction if it's wrong. Fixes "the product didn't come right" on element ads.
     const MAX_GENS = hasProduct ? 2 : 1
-    let best: Img | null = null
+    let best: (Img & { model?: string }) | null = null
     let fix = ''
     for (let i = 0; i < MAX_GENS; i++) {
       const attemptPrompt = i === 0 ? prompt : `${prompt}\nIMPORTANT CORRECTION: ${fix}`
       const gen = await generateImage(attemptPrompt, images, 'pro', { aspectRatio, imageSize: '2K' })
       if (!gen.ok) { if (best) break; await refund(); return NextResponse.json({ error: gen.error || 'generation-failed' }, { status: 502 }) }
-      best = { mimeType: gen.mimeType, dataB64: gen.dataB64 }
+      best = { mimeType: gen.mimeType, dataB64: gen.dataB64, model: gen.model }
       if (!hasProduct) break
       const v = await verifyClonedAd(best, product[0], brandName)
       if (v.pass) break
@@ -104,7 +104,7 @@ export async function POST(req: NextRequest) {
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
     const saved = await saveGeneration({ userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', brandId: body.brandId || null, prompt: headline || null }).catch(() => null)
-    return NextResponse.json({ image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null })
+    return NextResponse.json({ image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null, model: best.model })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: String(e?.message || e).slice(0, 200) }, { status: 500 })
