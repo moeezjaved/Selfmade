@@ -768,8 +768,9 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
       <Header title="Your Ads" isMobile={isMobile} />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>The live ads running on your Facebook page — pulled straight from the Meta Ad Library.</div>
 
-      {/* Run your ads by typing — scale, pause, resume, launch. Confirms before any live change. */}
-      {data?.pageId && <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>}
+      {/* Run your ads by typing — scale, pause, resume, launch. Works off your CONNECTED Meta account
+          (not the pasted Ad Library link), so it shows here always; if Meta isn't connected it says so. */}
+      <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>
 
       {data === null ? (
         <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
