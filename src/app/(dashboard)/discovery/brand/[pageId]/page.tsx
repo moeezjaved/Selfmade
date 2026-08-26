@@ -73,9 +73,9 @@ function MiniAdCard({ ad, onClone }: { ad: Ad; onClone?: (ad: Ad) => void }) {
       </div>
       <div style={{ fontSize: 11, color: '#9ca3af', padding: '0 12px 8px' }}>{fmtDate(ad.startDate)}{ad.isActive ? ' – Present' : ad.stopDate ? ` – ${fmtDate(ad.stopDate)}` : ''}</div>
       {body && <div style={{ fontSize: 12, color: '#374151', padding: '0 12px 8px', lineHeight: 1.4, maxHeight: 52, overflow: 'hidden' }}>{body.slice(0, 120)}</div>}
-      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f3f4f6' }}>
+      <div className="sf-thumb" style={{ position: 'relative', aspectRatio: '4 / 5' }}>
         {img && !imgFailed
-          ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ? <img src={img} alt="" loading="lazy" onError={() => setImgFailed(true)} referrerPolicy="no-referrer" className="sf-thumb-img" />
           : <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: '#c4c4c4', fontSize: 12 }}>no preview</div>}
         {isVideo && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', pointerEvents: 'none' }}><div style={{ width: 44, height: 44, borderRadius: '50%', background: 'rgba(0,0,0,0.45)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>▶</div></div>}
         <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[fmt] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{fmt}</span>

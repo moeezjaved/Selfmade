@@ -62,17 +62,17 @@ export default function HoverScrubVideo({ src, poster, brandBg = '#1c2b1c', init
 
       {/* poster frame */}
       {poster && (
-        <img src={poster} alt="" loading="lazy" decoding="async" onLoad={() => setImgLoaded(true)}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: imgLoaded && !(mountVideo && ready) ? 1 : (mountVideo && ready ? 0 : imgLoaded ? 1 : 0), transition: 'opacity .15s' }} />
+        <img src={poster} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" className="sf-thumb-img" onLoad={() => setImgLoaded(true)}
+          style={{ position: 'absolute', inset: 0, opacity: imgLoaded && !(mountVideo && ready) ? 1 : (mountVideo && ready ? 0 : imgLoaded ? 1 : 0), transition: 'opacity .15s' }} />
       )}
 
       {/* lazily-mounted video */}
       {mountVideo && (
-        <video ref={vidRef} key={src} src={src} muted playsInline preload="metadata"
+        <video ref={vidRef} key={src} src={src} muted playsInline preload="metadata" className="sf-thumb-img"
           onLoadedMetadata={() => setReady(true)} onCanPlay={() => setLoading(false)} onWaiting={() => setLoading(true)} onError={() => onError?.()}
           onPlaying={() => setLoading(false)} onTimeUpdate={() => { if (playing) { const v = vidRef.current!; setProgress(v.duration ? v.currentTime / v.duration : 0) } }}
           onEnded={() => { setPlay(false); setProgress(0) }}
-          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
+          style={{ position: 'absolute', inset: 0, background: '#000', opacity: ready ? 1 : 0, transition: 'opacity .15s', zIndex: 2 }} />
       )}
 
       {/* Vertical scrub playhead at the cursor (Motion-style) — sweeps across as you move; the frame

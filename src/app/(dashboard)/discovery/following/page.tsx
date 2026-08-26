@@ -77,8 +77,9 @@ export default function FollowingPage() {
             <div key={ci} style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 12 }}>
               {ads.filter((_, i) => i % cols === ci).map(ad => (
                 <div key={ad.id} onClick={() => router.push(`/discovery/${ad.id}`)}
-                  style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: 12, overflow: 'hidden', cursor: 'pointer' }}>
-                  {thumb(ad) && <img src={thumb(ad) as string} alt="" style={{ width: '100%', height: 'auto', display: 'block' }} />}
+                  className="sf-thumb"
+                  style={{ overflow: 'hidden', cursor: 'pointer' }}>
+                  {thumb(ad) && <img src={thumb(ad) as string} alt="" referrerPolicy="no-referrer" className="sf-thumb-img" />}
                   <div style={{ padding: '10px 12px' }}>
                     <div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{ad.pageName}</div>
                     <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{cleanCopy(ad.body)}</div>
