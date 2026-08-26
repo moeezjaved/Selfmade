@@ -1,8 +1,55 @@
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 
 interface Step { label: string; count: number; pct: number }
 interface AnonAudit { domain: string; site_name: string | null; score: number | null; category: string | null; created_at: string }
+
+const SEV_COLOR: Record<string, string> = { high: '#dc2626', medium: '#d97706', low: '#6b7280' }
+const money = (n: number, cur: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)} ${cur}` } }
+
+// Inline render of a stored ScanResult — the exact audit the anonymous lead saw.
+function ScanReport({ result }: { result: any }) {
+  if (!result) return <div style={{ padding: 16, color: '#aaa', fontSize: 13 }}>Loading report…</div>
+  return (
+    <div style={{ background: '#fff', border: '1px solid #eceeec', borderRadius: 8, padding: 16 }}>
+      <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', marginBottom: 14 }}>
+        {[
+          ['Overall', `${result.score} · ${result.grade}`],
+          ['Website', result.websiteScore],
+          ['Visibility', result.visibilityScore],
+          ['Problems', result.problemCount],
+          ['Revenue lost / yr', money(result.revenueLostPerYear, result.currency)],
+        ].map(([k, v]) => (
+          <div key={String(k)}>
+            <div style={{ fontSize: 17, fontWeight: 800, color: '#111' }}>{v as any}</div>
+            <div style={{ fontSize: 11, color: '#9ca3af' }}>{k as any}</div>
+          </div>
+        ))}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        {(result.sections || []).map((s: any) => (
+          <div key={s.key} style={{ border: '1px solid #f0f2f0', borderRadius: 8, padding: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 6 }}>
+              <span style={{ fontWeight: 700, color: '#111', fontSize: 13 }}>{s.name}</span>
+              <span style={{ fontSize: 11, color: '#9ca3af' }}>{s.sub}</span>
+              <span style={{ marginLeft: 'auto', fontWeight: 800, fontSize: 13, color: s.score >= 70 ? '#16a34a' : s.score >= 45 ? '#d97706' : '#dc2626' }}>{s.score}</span>
+            </div>
+            {(s.findings || []).length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {(s.findings || []).map((f: any) => (
+                  <li key={f.id} style={{ fontSize: 12, color: '#333', lineHeight: 1.5 }}>
+                    <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: '50%', background: SEV_COLOR[f.severity] || '#6b7280', marginRight: 7 }} />
+                    <b>{f.title}</b>{f.detail ? ` — ${f.detail}` : ''}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
 
 const COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#16a34a']
 
@@ -58,6 +105,19 @@ export default function FunnelPage() {
   const [anon, setAnon] = useState<AnonAudit[]>([])
   const [anonCount, setAnonCount] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [openDomain, setOpenDomain] = useState<string | null>(null)
+  const [scans, setScans] = useState<Record<string, any>>({})
+
+  const toggleLead = (domain: string) => {
+    if (openDomain === domain) { setOpenDomain(null); return }
+    setOpenDomain(domain)
+    if (!(domain in scans)) {
+      fetch(`/api/admin/audit-scan?domain=${encodeURIComponent(domain)}`)
+        .then(r => r.json())
+        .then(d => setScans(prev => ({ ...prev, [domain]: d.result || null })))
+        .catch(() => setScans(prev => ({ ...prev, [domain]: null })))
+    }
+  }
 
   useEffect(() => {
     fetch('/api/admin/funnel')
@@ -97,24 +157,35 @@ export default function FunnelPage() {
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: '#fafafa', borderTop: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }}>
-                    {['Domain', 'Store', 'Category', 'Score', 'Scanned'].map(h => (
+                    {['Domain', 'Store', 'Category', 'Score', 'Email', 'Scanned'].map(h => (
                       <th key={h} style={{ padding: '9px 20px', textAlign: 'left', color: '#999', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {anon.map((a, i) => (
-                    <tr key={a.domain + i} style={{ borderBottom: '1px solid #f6f6f6' }}>
-                      <td style={{ padding: '10px 20px' }}>
-                        <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" style={{ color: '#2563eb', textDecoration: 'none', fontWeight: 600 }}>{a.domain}</a>
-                      </td>
-                      <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
-                      <td style={{ padding: '10px 20px', color: '#777' }}>{a.category || '—'}</td>
-                      <td style={{ padding: '10px 20px' }}>
-                        <span style={{ fontWeight: 800, color: scoreColor(a.score) }}>{a.score ?? '—'}</span>
-                      </td>
-                      <td style={{ padding: '10px 20px', color: '#888' }}>{fmt(a.created_at)}</td>
-                    </tr>
+                    <React.Fragment key={a.domain + i}>
+                      <tr onClick={() => toggleLead(a.domain)} style={{ borderBottom: '1px solid #f6f6f6', cursor: 'pointer', background: openDomain === a.domain ? '#faf9f6' : 'transparent' }}>
+                        <td style={{ padding: '10px 20px', fontWeight: 600 }}>
+                          <span style={{ color: '#c3c7c3', marginRight: 6 }}>{openDomain === a.domain ? '▾' : '▸'}</span>
+                          <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#2563eb', textDecoration: 'none' }}>{a.domain}</a>
+                        </td>
+                        <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
+                        <td style={{ padding: '10px 20px', color: '#777' }}>{a.category || '—'}</td>
+                        <td style={{ padding: '10px 20px' }}><span style={{ fontWeight: 800, color: scoreColor(a.score) }}>{a.score ?? '—'}</span></td>
+                        <td style={{ padding: '10px 20px', color: '#c3c7c3' }} title="The audit runs with no login, so no email is captured. Add an email gate to the theater to collect these.">— none</td>
+                        <td style={{ padding: '10px 20px', color: '#888' }}>{fmt(a.created_at)}</td>
+                      </tr>
+                      {openDomain === a.domain && (
+                        <tr>
+                          <td colSpan={6} style={{ padding: '4px 20px 16px' }}>
+                            <div style={{ maxHeight: 520, overflowY: 'auto' }}>
+                              <ScanReport result={scans[a.domain]} />
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
