@@ -9,7 +9,7 @@
  * direct IP, which Meta's CDN gated with 1087-byte placeholders 100% of
  * the time. Removed to kill log noise + make the data flow obvious.
  */
-import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3'
+import { S3Client, PutObjectCommand, DeleteObjectsCommand, ListObjectsV2Command } from '@aws-sdk/client-s3'
 import { NodeHttpHandler } from '@smithy/node-http-handler'
 import { Agent } from 'node:https'
 import sharp from 'sharp'
@@ -54,6 +54,50 @@ export async function uploadBufferToR2(
     console.warn(`  ⚠️  R2 upload failed for ${key}:`, err instanceof Error ? err.message : err)
     return null
   }
+}
+
+/** Turn a public R2 URL back into its object key (strips the public-URL prefix). Null if it isn't ours. */
+export function r2UrlToKey(url: string | null | undefined): string | null {
+  if (!url) return null
+  const base = `${config.r2.publicUrl}/`
+  if (url.startsWith(base)) return url.slice(base.length)
+  // Fallbacks for older rows saved under the raw r2.dev / cloudflarestorage host.
+  const m = url.match(/\.r2\.dev\/(.+)$/) || url.match(/\.r2\.cloudflarestorage\.com\/[^/]+\/(.+)$/)
+  return m ? m[1] : null
+}
+
+/**
+ * List every object under a prefix, returning a Map of key → size (bytes). Used by the video purge to
+ * price the reclaim (GB) accurately without a HEAD per object. Paginates 1000 at a time.
+ */
+export async function listSizesByPrefix(prefix: string): Promise<Map<string, number>> {
+  const sizes = new Map<string, number>()
+  let token: string | undefined
+  do {
+    const res = await client.send(new ListObjectsV2Command({ Bucket: config.r2.bucket, Prefix: prefix, ContinuationToken: token, MaxKeys: 1000 }))
+    for (const o of res.Contents || []) if (o.Key) sizes.set(o.Key, o.Size || 0)
+    token = res.IsTruncated ? res.NextContinuationToken : undefined
+  } while (token)
+  return sizes
+}
+
+/**
+ * Delete objects by key, batched (S3 DeleteObjects caps at 1000/call). Returns the number deleted.
+ * Best-effort: logs and continues on a batch error so a purge run can always make progress.
+ */
+export async function deleteManyFromR2(keys: string[]): Promise<number> {
+  let deleted = 0
+  for (let i = 0; i < keys.length; i += 1000) {
+    const batch = keys.slice(i, i + 1000)
+    try {
+      const res = await client.send(new DeleteObjectsCommand({ Bucket: config.r2.bucket, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } }))
+      deleted += batch.length - (res.Errors?.length || 0)
+      if (res.Errors?.length) console.warn(`  ⚠️  ${res.Errors.length} delete errors in batch (e.g. ${res.Errors[0].Key}: ${res.Errors[0].Message})`)
+    } catch (err) {
+      console.warn(`  ⚠️  R2 batch delete failed:`, err instanceof Error ? err.message : err)
+    }
+  }
+  return deleted
 }
 
 /**
