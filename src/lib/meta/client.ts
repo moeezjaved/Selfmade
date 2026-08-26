@@ -359,9 +359,11 @@ export async function createMetaClientForUser(userId: string, accountId?: string
   const supabase = createAdminClient()
   const query = supabase.from('meta_accounts').select('*').eq('user_id', userId).eq('status', 'active')
   if (accountId) query.eq('account_id', accountId)
-  else query.eq('is_primary', true)
-  const { data: account, error } = await query.single()
-  if (error || !account) throw new Error('No connected Meta account found')
+  // Primary first, but fall back to ANY active account — a user with several connected accounts (or none
+  // flagged primary) must not throw. .single() used to error on !=1 row, which read as "not connected".
+  const { data: accounts } = await query.order('is_primary', { ascending: false }).limit(1)
+  const account = accounts?.[0]
+  if (!account) throw new Error('No connected Meta account found')
   const token = decryptToken(account.access_token)
   return new MetaClient(token, account.account_id)
 }
