@@ -11,6 +11,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, generateHero, renderArticleHtml, publishToShopifyBlog, suggestTopics, type Article } from '@/lib/shopify/blog'
+import { getPlanId } from '@/lib/entitlements'
+import { resolveBillingOwner } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 180
@@ -60,6 +62,11 @@ export async function POST(req: NextRequest) {
   }
 
   if (action === 'publish') {
+    // Free to preview/draft, pay to publish live.
+    const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
+    if ((await getPlanId(admin, owner)) === 'free') {
+      return NextResponse.json({ error: 'upgrade_required', reason: 'Publishing to your live blog is a paid feature — drafting stays free. Upgrade to publish.' }, { status: 402 })
+    }
     const id = String(body.id || '')
     if (!id) return NextResponse.json({ error: 'Missing draft id' }, { status: 400 })
     const { data: draft } = await admin.from('geo_assets').select('*').eq('id', id).eq('user_id', userId).eq('kind', 'blog').maybeSingle()
