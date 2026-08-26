@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic'
 export const metadata: Metadata = {
   title: { default: 'Selfmade', template: '%s — Selfmade' },
   description: 'AI-powered Meta ads platform. Stop guessing. Start winning.',
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai'), icons: { icon: [{ url: '/mark.svg', type: 'image/svg+xml' }, { url: '/favicon-mark.png' }], shortcut: '/mark.svg', apple: '/mark.svg' },
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai'), icons: { icon: [{ url: '/mark.svg', type: 'image/svg+xml' }], shortcut: '/mark.svg', apple: '/mark.svg' },
   openGraph: {
     title: 'Selfmade — AI Meta Ads Platform',
     description: 'Stop guessing. Start winning. AI-powered Meta ads co-pilot.',
