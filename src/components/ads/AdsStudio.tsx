@@ -8,6 +8,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { Monitor, Instagram as IgIcon, Facebook as FbIcon, Linkedin as LiIcon } from 'lucide-react'
 import MelloAdsActions from '@/components/ads/MelloAdsActions'
+import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
 
@@ -783,31 +784,9 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
           <a href="/connect/meta" style={{ ...primaryBtn, display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none', padding: '13px 26px', fontSize: 15 }}><FbIcon size={17} /> Connect Facebook →</a>
           <div style={{ marginTop: 14, fontSize: 12.5, color: SUB }}>Takes a minute · you approve every change · nothing spends without your OK</div>
         </div>
-      ) : data.ads.length === 0 ? (
-        // ── Connected, no ads yet → nudge to launch (not an error) ──
-        <div style={{ border: `1px solid ${LINE}`, borderRadius: 20, background: '#fff', padding: isMobile ? '30px 22px' : '40px 34px', textAlign: 'center', maxWidth: 560, margin: '4px auto 0' }}>
-          <div style={{ fontSize: 30, marginBottom: 10 }}>🚀</div>
-          <div style={{ fontFamily: SERIF, fontSize: 22, fontWeight: 700, marginBottom: 8 }}>No ads running yet</div>
-          <div style={{ color: SUB, fontSize: 14.5, lineHeight: 1.5, marginBottom: 18 }}>You&rsquo;re connected. Make a creative in <b style={{ color: INK }}>Ad Studio</b>, then launch it from <b style={{ color: INK }}>My Creatives</b> — or just tell Mello above what to run.</div>
-          <a href="/ads-workspace" style={{ ...primaryBtn, display: 'inline-flex', textDecoration: 'none', padding: '11px 22px' }}>Open Ad Studio →</a>
-        </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2,1fr)' : 'repeat(4,1fr)', gap: 16 }}>
-          {data.ads.map((a) => (
-            <div key={a.adId} className="sf-disc" style={{ position: 'relative', border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
-              <div style={{ aspectRatio: '4/5', background: PAPER, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {a.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
-                {a.isActive && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#16a34a', borderRadius: 6, padding: '3px 7px' }}>LIVE</span>}
-                <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
-                  <button onClick={() => addToChat({ label: 'Remake my ad', image: a.image, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Remake this</button>
-                </div>
-              </div>
-              <div style={{ padding: 11 }}>
-                <div style={{ fontSize: 12.5, color: '#43403a', lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 34 }}>{a.body || a.title}</div>
-              </div>
-            </div>
-          ))}
-        </div>
+        // ── Connected → the live campaign STATS panel (spend · ROAS · top ads), same source as the brief. ──
+        <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
       )}
     </div>
   )
