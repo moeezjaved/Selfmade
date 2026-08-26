@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
+import { celebrate, auditDone } from '@/lib/celebrate'
 
 type Issue = { severity: 'high' | 'medium' | 'low'; title: string; detail: string; pages: string[] }
 type Audit = { hasData: boolean; site?: string; score?: number; pagesCrawled?: number; issues?: Issue[]; note?: string }
@@ -39,7 +40,7 @@ export default function SeoPage() {
   const runAudit = async () => {
     if (running) return
     setRunning(true)
-    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) setAudit(j as Audit) } catch { /* keep */ }
+    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) { setAudit(j as Audit); if ((j as Audit)?.hasData) celebrate(auditDone((j as Audit).score, ((j as Audit).issues || []).length)) } } catch { /* keep */ }
     setRunning(false)
   }
   const findKeywords = async () => {
