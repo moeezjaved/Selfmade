@@ -41,11 +41,10 @@ export interface PlanEntitlements {
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
-    // canBuyCredits TRUE on Free (2026-07-14): pay-as-you-go IS the "$9 test" — a free user buys the
-    // $9 Launch Pack (900 cr) at the video-clone moment and makes a real video. Subscriptions upsell
-    // separately. 75 cr = 5 image ads to try (video is gated by balance → upsell).
-    monthlyCredits: 75, welcomeCredits: 0, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
-    aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: true,
+    // Free = a ONE-TIME 75-credit trial (5 image ads @ 15 cr each). No monthly refill, and free users
+    // CANNOT buy credits — when the 75 run out, generating media prompts an upgrade to a paid plan.
+    monthlyCredits: 0, welcomeCredits: 75, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
+    aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
     teamBoards: false, assetsGb: 0.5, videosPerMonth: 0, imagesUnlimited: false, inbox: false,
   },
   // "Creator" — the ONLY paid plan now (one-plan model, 2026-08-01). It unlocks the whole app:
@@ -129,8 +128,8 @@ export const ACTION_COSTS: Record<string, number> = {
   ask_mello: 10,
   image_clone_pro: 15,      // 2K Nano Banana Pro — DEFAULT ad clone ($0.15, matches CloneModal)
   image_clone_4k: 25,       // 4K / HD download ($0.25)
-  image_studio_pro: 100,    // 2K AI Ad Studio — original ad from inspiration + industry insights
-  image_studio_4k: 160,     // 4K / HD Studio ad
+  image_studio_pro: 15,     // 2K AI Ad Studio — original ad ($0.15). Flat "image ad = 15 cr" (mig 168), same as a clone.
+  image_studio_4k: 25,      // 4K / HD Studio ad ($0.25) — same as a 4K clone (mig 168)
   image_edit_pro: 15,       // iterative edit — one 2K Pro image, same cost as a fresh clone ($0.15). Free for subscribers.
   video_clone: 600,         // UGC 15s ($6.00 @ 1cr=1¢) — the "video ad = $6" anchor (v2 pricing)
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
