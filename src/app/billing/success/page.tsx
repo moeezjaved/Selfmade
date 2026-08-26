@@ -35,7 +35,7 @@ function Success() {
             : state === 'checking' ? 'One moment while we confirm with PayPal.'
             : 'It can take a minute to reflect. Your balance updates automatically once confirmed.'}
         </p>
-        <button onClick={() => router.push('/brief')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 28px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>Go to my brief →</button>
+        <button onClick={() => router.push('/hq')} style={{ background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '13px 28px', fontSize: 14.5, fontWeight: 800, cursor: 'pointer' }}>Go to my dashboard →</button>
       </div>
     </div>
   )

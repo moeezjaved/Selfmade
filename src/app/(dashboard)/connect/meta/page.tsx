@@ -159,7 +159,7 @@ export default function ConnectMetaByo() {
           ) : (
             <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.65, margin: '10px 0 0' }}>I&rsquo;m reading your campaigns now — the audit lands in your Morning Brief.</p>
           )}
-          <button onClick={() => router.push('/brief')} style={{ ...btnS, marginTop: 16, padding: '12px 24px', fontSize: 14 }}>Open my brief →</button>
+          <button onClick={() => router.push('/hq')} style={{ ...btnS, marginTop: 16, padding: '12px 24px', fontSize: 14 }}>Open my brief →</button>
         </div>
       ) : (
         <>

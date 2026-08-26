@@ -69,7 +69,7 @@ export default function NewBrandPage() {
   // Make the new brand the active project everywhere, then land on its brief.
   const finish = () => {
     if (brandId) document.cookie = `${BRAND_COOKIE}=${encodeURIComponent(brandId)}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax`
-    window.location.href = '/brief'
+    window.location.href = '/hq'
   }
 
   return (
@@ -105,7 +105,7 @@ export default function NewBrandPage() {
 
           {err && <div style={{ color: '#b4232a', fontSize: 13, margin: '10px 0 0' }}>{err}</div>}
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}>
-            <button style={ghost} onClick={() => router.push('/brief')}>Cancel</button>
+            <button style={ghost} onClick={() => router.push('/hq')}>Cancel</button>
             <button style={{ ...primary, opacity: busy ? 0.6 : 1 }} onClick={createBrand} disabled={busy}>{busy ? 'Creating…' : 'Continue →'}</button>
           </div>
         </div>

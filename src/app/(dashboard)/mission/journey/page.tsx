@@ -32,7 +32,7 @@ type Move = { title: string; why?: string; impact?: string; needs?: string | nul
 
 const MOVE_HREF: Record<string, string> = { meta: '/connect-meta', shopify: '/connect/shopify', klaviyo: '/inbox' }
 const DEPT_HREF: Record<string, string> = { seo: '/mission/seo', site: '/mission/catalog', media: '/reports', creative: '/studio', email: '/inbox', outreach: '/mission/competitors', research: '/mission/competitors', reports: '/reports', customer: '/inbox' }
-function moveHref(m: Move): string { return (m.needs && MOVE_HREF[m.needs]) || (m.dept && DEPT_HREF[m.dept]) || '/brief' }
+function moveHref(m: Move): string { return (m.needs && MOVE_HREF[m.needs]) || (m.dept && DEPT_HREF[m.dept]) || '/hq' }
 
 export default function JourneyPage() {
   const [data, setData] = useState<Data | null>(null)

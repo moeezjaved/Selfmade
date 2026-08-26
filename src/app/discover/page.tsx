@@ -207,7 +207,7 @@ export default async function DiscoverPage() {
                     <Link href={ed.lead.href} style={{ fontSize: 13.5, fontWeight: 800, color: INK, textDecoration: 'none', borderBottom: `2px solid ${LIME}`, paddingBottom: 2 }}>
                       Walk through all {ed.lead.now} ads →
                     </Link>
-                    <Link href="/brief" style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, textDecoration: 'none' }}>Ask Mello how your brand can use this</Link>
+                    <Link href="/hq" style={{ fontSize: 12.5, fontWeight: 700, color: MUTED, textDecoration: 'none' }}>Ask Mello how your brand can use this</Link>
                   </div>
                 </div>
               </div>
@@ -302,7 +302,7 @@ export default async function DiscoverPage() {
             <span className="vs">vs</span>
             <AdMedia img={ed.question.media[1].img} video={ed.question.media[1].video} />
           </div>
-          <Link href="/brief" style={{ textDecoration: 'none', color: INK }}>
+          <Link href="/hq" style={{ textDecoration: 'none', color: INK }}>
             <div style={{ fontSize: 'clamp(22px,3.4vw,32px)', fontWeight: 800, letterSpacing: '-.02em', maxWidth: '24ch', margin: '0 auto', lineHeight: 1.2 }}>{ed.question.title}</div>
             <div style={{ fontSize: 12.5, color: MUTED, fontWeight: 600, marginTop: 8 }}>{ed.question.sub}</div>
           </Link>
