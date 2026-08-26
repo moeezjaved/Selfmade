@@ -64,6 +64,32 @@ interface PreviewAd {
   video_preview_urls: string[]
 }
 
+// Render a URL at desktop + mobile viewports and return above-the-fold JPEGs (base64) for the CRO
+// vision audit. Above-the-fold is where 5-second-clarity / CTA / hero-trust live — and it keeps the
+// images small for the vision model.
+async function captureShots(target: string): Promise<{ desktop: string | null; mobile: string | null; error?: string }> {
+  let browser: Browser | null = null
+  try {
+    browser = await chromiumExtra.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] })
+    const grab = async (width: number, height: number, isMobile: boolean, ua: string): Promise<string | null> => {
+      const ctx = await browser!.newContext({ viewport: { width, height }, userAgent: ua, deviceScaleFactor: 1, isMobile })
+      const page = await ctx.newPage()
+      try {
+        await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+        await page.waitForTimeout(1800)   // let the hero + images paint
+        const buf = await page.screenshot({ type: 'jpeg', quality: 68, fullPage: false })
+        return Buffer.from(buf).toString('base64')
+      } finally { await ctx.close().catch(() => {}) }
+    }
+    const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+    const desktop = await grab(1280, 900, false, UA).catch(() => null)
+    const mobile = await grab(390, 844, true, MOBILE_UA).catch(() => null)
+    return { desktop, mobile }
+  } catch (e: any) {
+    return { desktop: null, mobile: null, error: String(e?.message || e).slice(0, 160) }
+  } finally { if (browser) await browser.close().catch(() => {}) }
+}
+
 const server = createServer(async (req, res) => {
   // CORS for browser-direct testing (admin UI calls go through the Vercel
   // route, which is server-side, so CORS doesn't apply there).
@@ -81,7 +107,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    if (url.pathname !== '/preview' && url.pathname !== '/search') {
+    if (url.pathname !== '/preview' && url.pathname !== '/search' && url.pathname !== '/screenshot') {
       res.statusCode = 404
       res.end('not found')
       return
@@ -111,6 +137,23 @@ const server = createServer(async (req, res) => {
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify(data))
+      return
+    }
+
+    // ── Screenshot a store page (desktop + mobile) for the CRO vision audit ──
+    if (url.pathname === '/screenshot') {
+      const target = (url.searchParams.get('url') || '').trim()
+      if (!/^https?:\/\//.test(target)) {
+        res.statusCode = 400
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: 'url required (http/https)' }))
+        return
+      }
+      console.log(`[screenshot] ${target}`)
+      const shots = await captureShots(target)
+      res.statusCode = 200
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify(shots))
       return
     }
 
