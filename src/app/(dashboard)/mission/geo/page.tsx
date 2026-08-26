@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
+import { openCredits } from '@/components/credits/CreditModal'
 
 type EngineCell = { engine: string; label: string; cited: boolean; grounded: boolean; competitorsCited: string[]; excerpt: string }
 type PromptResult = { prompt: string; engines: EngineCell[]; youCited: boolean; rivalsCited: number }
@@ -49,6 +50,7 @@ export default function GeoPage() {
       const r = await fetch('/api/geo/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, rivals }) })
       const j = await r.json()
       if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || prompt) }
+      else if (r.status === 402) openCredits('buy', j.reason || 'Writing a GEO answer page costs credits — top up to continue.')
     } catch { /* keep desk usable */ }
     setWriting(null)
   }
@@ -117,7 +119,7 @@ export default function GeoPage() {
   const runCheck = async (regenerate = false) => {
     if (running) return
     setRunning(true)
-    try { const r = await fetch('/api/geo/sweep', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ regenerate }) }); const j = await r.json(); if (r.ok) setStatus(j as Status) } catch { /* keep prior */ }
+    try { const r = await fetch('/api/geo/sweep', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ regenerate }) }); const j = await r.json(); if (r.ok) setStatus(j as Status); else if (r.status === 402) openCredits('buy', j.reason || 'An AI-visibility check costs credits — top up to run it.') } catch { /* keep prior */ }
     setRunning(false)
   }
 

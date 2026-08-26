@@ -9,6 +9,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, auditDone } from '@/lib/celebrate'
 import { useRouter } from 'next/navigation'
+import { openCredits } from '@/components/credits/CreditModal'
 
 // Map a crawled SEO issue to the Catalog agent that fixes that gap on your products (one-click).
 const agentForIssue = (title: string): 'seo' | 'alt' | 'description' | null => {
@@ -64,7 +65,7 @@ export default function SeoPage() {
   const runAudit = async () => {
     if (running) return
     setRunning(true)
-    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) { setAudit(j as Audit); if ((j as Audit)?.hasData) celebrate(auditDone((j as Audit).score, ((j as Audit).issues || []).length)) } } catch { /* keep */ }
+    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) { setAudit(j as Audit); if ((j as Audit)?.hasData) celebrate(auditDone((j as Audit).score, ((j as Audit).issues || []).length)) } else if (r.status === 402) openCredits('buy', j.reason || 'An SEO audit costs credits — top up to run it.') } catch { /* keep */ }
     setRunning(false)
   }
   const findKeywords = async () => {
