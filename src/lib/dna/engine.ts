@@ -233,6 +233,23 @@ export async function ownDna(pageId: string | null): Promise<OwnDna> {
   return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0, bench: b.axes, systemScore: b.systemScore, examples }
 }
 
+// Own DNA computed from ROWS we already hold in memory (e.g. live ads pulled on-demand + classified
+// in-session), instead of reading the crawl index. Lets the audit produce a COMPLETE report while the
+// user is still in the theater — no "your report will come later".
+export function ownDnaFromRows(rows: AdRow[]): OwnDna {
+  const active = rows.filter((r) => r.is_active === true).length
+  const b = benchmark(rows, rollup(rows))
+  const examples: WinnerExample[] = rows.filter((r) => thumbOf(r)).slice(0, 24).map((a) => ({
+    adId: String(a.ad_id || ''),
+    brand: String(a.page_name || ''),
+    daysRunning: (a.days_running as number) || 0,
+    hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
+    format: (a.format_style as string) || (a.format as string) || null,
+    thumb: thumbOf(a),
+  }))
+  return { dist: rollup(rows), media: mediaMix(rows), totalAds: rows.length, activeAds: active, found: rows.length > 0, bench: b.axes, systemScore: b.systemScore, examples }
+}
+
 export type Gap = { dimension: string; label: string; winnerPct: number; yourPct: number; kind: 'missing' | 'underweight' | 'overused' }
 
 // ── L2: the diff — winners' DNA vs yours, per dimension. Pure function, no AI. ──
@@ -397,8 +414,9 @@ export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; repo
 
 export async function runDnaEngine(opts: {
   brandName: string; competitorPageIds: string[]; ownPageId?: string | null; niche?: string | null; force?: boolean
+  ownRows?: AdRow[]   // in-session own ads (live-pulled + classified) → complete report without the crawl
 }): Promise<FullDnaResult> {
-  const { brandName, competitorPageIds, ownPageId = null, niche = null, force = false } = opts
+  const { brandName, competitorPageIds, ownPageId = null, niche = null, force = false, ownRows } = opts
   const key = cacheKey(competitorPageIds, ownPageId)
 
   // A cold brand's FIRST scan returns own.found=false (ads not crawled/drained yet). We must NOT let that
@@ -406,7 +424,8 @@ export async function runDnaEngine(opts: {
   // and see the ads. So: ignore a cached result whose own audit is empty, and only WRITE the cache once the
   // own audit is real. Brands with a genuine ownPage that stays empty just recompute cheaply each time.
   const publicUrl = r2PublicUrl(key)
-  if (!force && publicUrl) {
+  // Injected in-session own ads → always recompute (never serve a stale/empty cached own).
+  if (!force && !ownRows && publicUrl) {
     try {
       const r = await fetch(publicUrl, { cache: 'no-store' })
       if (r.ok) {
@@ -416,7 +435,10 @@ export async function runDnaEngine(opts: {
     } catch { /* miss → compute */ }
   }
 
-  const [winners, own] = await Promise.all([winnerDna(competitorPageIds, niche, brandName), ownDna(ownPageId)])
+  const [winners, own] = await Promise.all([
+    winnerDna(competitorPageIds, niche, brandName),
+    ownRows && ownRows.length ? Promise.resolve(ownDnaFromRows(ownRows)) : ownDna(ownPageId),
+  ])
   const gaps = dnaDiff(own, winners)
   const report = await synthesize({ brandName, niche, own, winners, gaps })
   const score = scoreDna(own, winners, gaps)
