@@ -249,9 +249,9 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
     return (
       <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>
         <div style={{ background: FOREST, padding: '20px 24px' }}>
-          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads</div>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED }}>Your Facebook Ads</div>
           <div style={{ fontSize: 16, fontWeight: 750, color: '#fff', marginTop: 8 }}>No ad account linked to {brandName || 'this brand'} yet.</div>
-          <div style={{ fontSize: 13, color: '#cbd7c6', marginTop: 6, lineHeight: 1.5 }}>Link {brandName || 'this brand'}&rsquo;s Facebook ad account and its real spend, ROAS and moves show up here — nothing from your other brands.</div>
+          <div style={{ fontSize: 13, color: MUTED, marginTop: 6, lineHeight: 1.5 }}>Link {brandName || 'this brand'}&rsquo;s Facebook ad account and its real spend, ROAS and moves show up here — nothing from your other brands.</div>
           <Link href="/connect-meta" style={{ display: 'inline-block', marginTop: 14, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>Connect an ad account →</Link>
         </div>
       </div>
@@ -260,19 +260,19 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
 
   return (
     <div className="bsx-e" style={{ ...card, marginBottom: 24, overflow: 'hidden', animationDelay: '.34s' }}>
-      {/* dark header — spend today + the numbers, with the account switcher */}
-      <div style={{ background: FOREST, padding: '18px 24px' }}>
+      {/* header — spend today + the numbers, with the account switcher (light/paper) */}
+      <div style={{ background: '#fff', padding: '18px 24px', borderBottom: `1px solid ${LINE}` }}>
         <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap' }}>
           <div style={{ minWidth: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: '#9db29a' }}>Your Facebook Ads</span>
+              <span style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: MUTED }}>Your Facebook Ads</span>
               {/* account switcher */}
               {accounts && accounts.length > 1 ? (
                 <select value={sel} onChange={(e) => { setSel(e.target.value); try { localStorage.setItem('sf_fb_acct', e.target.value) } catch {} ; load(e.target.value) }} disabled={busy}
-                  style={{ background: 'rgba(255,255,255,.08)', color: '#fff', border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 200 }}>
+                  style={{ background: '#f6f2ea', color: '#fff', border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 12, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 200 }}>
                   {accounts.map(a => <option key={a.accountId} value={a.accountId} style={{ color: '#111' }}>{a.name}{a.isPrimary ? ' ·  primary' : ''}</option>)}
                 </select>
-              ) : (d.accountName ? <span style={{ fontSize: 12, fontWeight: 700, color: '#cbd7c6', background: 'rgba(255,255,255,.08)', borderRadius: 100, padding: '3px 10px' }}>{d.accountName}</span> : null)}
+              ) : (d.accountName ? <span style={{ fontSize: 12, fontWeight: 700, color: MUTED, background: '#f6f2ea', borderRadius: 100, padding: '3px 10px' }}>{d.accountName}</span> : null)}
               {/* Pin the account they actually care about as the DEFAULT everywhere (brief, nightly
                   audit, Reports). Only shown when they're viewing a non-primary account — one tap sets
                   it and clears the stale extra "primary" flags that caused the €86 ↔ $687k confusion. */}
@@ -286,13 +286,13 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
               {brands.length > 0 && sel && (
                 <select value={accounts?.find(a => a.accountId === sel)?.brandId || ''} onChange={(e) => assignBrand(e.target.value)}
                   title="Which brand is this ad account for?"
-                  style={{ background: 'rgba(255,255,255,.08)', color: '#cbd7c6', border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 170 }}>
+                  style={{ background: '#f6f2ea', color: MUTED, border: '1px solid rgba(255,255,255,.18)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: 'pointer', maxWidth: 170 }}>
                   <option value="" style={{ color: '#111' }}>— link to a brand —</option>
                   {brands.map(b => <option key={b.id} value={b.id} style={{ color: '#111' }}>for {b.name}</option>)}
                 </select>
               )}
               {/* day-range picker — default 30d */}
-              <span style={{ display: 'inline-flex', gap: 2, background: 'rgba(255,255,255,.08)', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: 2 }}>
+              <span style={{ display: 'inline-flex', gap: 2, background: '#f6f2ea', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: 2 }}>
                 {['last_3d', 'last_7d', 'last_14d', 'last_30d'].map(r => (
                   <button key={r} onClick={() => { setRange(r); load(sel || undefined, r) }} disabled={busy}
                     style={{ border: 'none', borderRadius: 100, padding: '3px 9px', fontSize: 11.5, fontWeight: 750, fontFamily: 'inherit', cursor: 'pointer', background: range === r ? LIME : 'transparent', color: range === r ? FOREST : '#cbd7c6' }}>
@@ -301,18 +301,18 @@ export default function FacebookAdsCard({ initial, ctaHref = '/reports', ctaLabe
                 ))}
               </span>
               <button onClick={() => load(sel || undefined, range)} disabled={busy} title="Refresh live from Meta"
-                style={{ background: 'rgba(255,255,255,.08)', color: '#cbd7c6', border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
+                style={{ background: '#f6f2ea', color: MUTED, border: '1px solid rgba(255,255,255,.14)', borderRadius: 100, padding: '3px 10px', fontSize: 11.5, fontWeight: 700, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>
                 {busy ? 'refreshing…' : '↻ refresh'}
               </button>
             </div>
-            <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: '#fff', lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{healing ? 'Loading your account…' : headline(d).replace(/\.+$/, '')}</div>
+            <div style={{ fontSize: 16.5, fontWeight: 750, letterSpacing: '-.015em', color: INK, lineHeight: 1.3, marginTop: 8, maxWidth: 460 }}>{healing ? 'Loading your account…' : headline(d).replace(/\.+$/, '')}</div>
           </div>
           <div style={{ display: 'flex', gap: 20, flexShrink: 0, flexWrap: 'wrap', opacity: healing ? 0.45 : 1, transition: 'opacity .2s' }}>
             {/* SPEND TODAY — the live pulse, lime + labeled */}
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{healing ? '—' : (typeof d.spendToday === 'number' ? money(d.spendToday) : '—')}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spent today</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{healing ? '—' : money(d.spend)}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{healing ? '—' : `${d.avgRoas}x`}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>avg ROAS</div></div>
-            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: '#fff' }}>{healing ? '—' : d.total}</div><div style={{ fontSize: 11, color: '#9db29a', fontWeight: 600 }}>campaigns</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: LIME }}>{healing ? '—' : (typeof d.spendToday === 'number' ? money(d.spendToday) : '—')}</div><div style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>spent today</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{healing ? '—' : money(d.spend)}</div><div style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>spend · {RANGE_LABEL[range] || '30d'}</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: d.avgRoas >= 1 ? LIME : '#f0a19a' }}>{healing ? '—' : `${d.avgRoas}x`}</div><div style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>avg ROAS</div></div>
+            <div><div style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>{healing ? '—' : d.total}</div><div style={{ fontSize: 11, color: MUTED, fontWeight: 600 }}>campaigns</div></div>
           </div>
         </div>
       </div>

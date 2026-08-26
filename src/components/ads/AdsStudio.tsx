@@ -7,7 +7,7 @@
  */
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import { Monitor, Instagram as IgIcon, Facebook as FbIcon, Linkedin as LiIcon } from 'lucide-react'
-import MelloAdsActions from '@/components/ads/MelloAdsActions'
+import MelloAdsChat from '@/components/ads/MelloAdsChat'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
@@ -770,8 +770,8 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
       <Header title="Your Ads" isMobile={isMobile} />
       <div style={{ color: SUB, fontSize: 14, marginTop: -8, marginBottom: 18 }}>{connected ? 'Your live Facebook ads — and Mello runs them for you. Just tell it what to do.' : 'Connect Facebook and Mello runs your ads for you — create, launch, scale, pause, all by typing.'}</div>
 
-      {/* Run your ads by typing — only when connected (there's an account to act on). */}
-      {connected && <div style={{ marginBottom: 22 }}><MelloAdsActions /></div>}
+      {/* Run your ads by chatting — templates + guided launch. Only when connected. */}
+      {connected && <div style={{ marginBottom: 22 }}><MelloAdsChat /></div>}
 
       {data === null ? (
         <div style={{ color: SUB, textAlign: 'center', padding: '48px 0' }}><span style={{ display: 'inline-block', width: 28, height: 28, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} /></div>
