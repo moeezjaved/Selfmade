@@ -71,7 +71,8 @@ export async function POST(req: NextRequest) {
       `Create ONE polished, photorealistic advertisement image${aspectRatio ? ` (aspect ratio ${aspectRatio})` : ''}.`,
       `SUBJECT — reference image 1 is a specific real PERSON. Use THAT exact person as the human subject: preserve their face, likeness, skin tone, hair, and clothing faithfully. Do NOT replace them with a different person, do NOT add other people, do NOT beautify or change their identity.`,
       hasProduct ? `PRODUCT — reference image 2 is the ${brandName} product. Render it EXACTLY as in the photo: same shape, materials, colours, proportions and on-label text — never a different product. Size it at a natural, believable real-world scale (a small handheld device stays small). It does NOT have to be held or in use: place it wherever looks most natural — the subject MAY hold it, OR it can rest on a surface, sit beside them, or appear as a clean product inset. Never force it awkwardly into their hand or mouth.` : '',
-      logo ? `Include the brand logo once, small and tasteful (from the last reference image).` : '',
+      logo ? `Include the brand logo once, small and tasteful (from the last reference image) — reproduce it exactly; do not redraw or restyle it.`
+           : `Do NOT invent a logo, emblem, icon or symbol (no leaves, lotus, drops, monograms, etc.). If a wordmark is shown, render ONLY the brand name "${brandName}" as clean plain text — nothing more.`,
       colors.length ? `Brand colours to use: ${colors.join(', ')}.` : '',
       fonts?.heading ? `Prefer the "${fonts.heading}" typeface for the headline.` : '',
       headline ? `Add the headline text "${headline}" ONCE — clean, legible, well-placed, never duplicated.` : '',
