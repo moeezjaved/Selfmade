@@ -1,97 +1,41 @@
 /**
- * The Selfmade MARK (symbol only — the wordmark is separate). A 7×7 grid, orange with 12 white square
- * holes in a symmetric woven pattern. Pure vector → perfectly smooth edges at any size, recolorable.
- *   <Mark />                      the static mark (app badge / favicon parity)
- *   <MarkDecode />                the Lapis-style "decode" animation (cells resolve into place)
+ * The Selfmade MARK — the original "S" badge: an orange rounded square with a white serif S.
+ * (Reverted from the 7×7 grid mark.) Same exports/props as before so every call site is unchanged.
+ *   <Mark />        the static badge (app / favicon parity)
+ *   <MarkDecode />  the intro variant — a quick fade+scale settle (no grid decode)
  */
 'use client'
-import { useId } from 'react'
 
-// The 12 white cells on a 7×7 grid (col, row) — symmetric on both axes.
-const CELLS: [number, number][] = [
-  [3, 0],
-  [1, 1], [5, 1],
-  [2, 2], [4, 2],
-  [0, 3], [6, 3],
-  [2, 4], [4, 4],
-  [1, 5], [5, 5],
-  [3, 6],
-]
-const U = 100 // cell size in the 700×700 viewBox
+const SERIF_STACK = "'Instrument Serif','Iowan Old Style',Georgia,'Times New Roman',serif"
 
-export function Mark({ size = 40, color = '#ef4a1e', hole = '#ffffff', radius = 0, className, title = 'Selfmade' }: {
-  size?: number; color?: string; hole?: string; radius?: number; className?: string; title?: string
+function SBadge({ size, color, radius, className, title, animate = false, durationMs = 900, loop = false }: {
+  size: number; color: string; radius: number; className?: string; title: string; animate?: boolean; durationMs?: number; loop?: boolean
 }) {
+  // radius is given in the caller's px scale (e.g. 9 on a 34px badge). Map it onto the 700px viewBox so
+  // the corner rounding matches the old inline badge (~0.26 ratio). If unset, use that ratio of size.
+  const rx = ((radius > 0 ? radius : Math.round(size * 0.26)) / size) * 700
+  const style = animate
+    ? { transformBox: 'fill-box' as const, transformOrigin: 'center', animation: `sfmk ${(durationMs / 1000).toFixed(2)}s cubic-bezier(.2,.7,.2,1) ${loop ? 'infinite' : 'both'}` }
+    : undefined
   return (
-    <svg width={size} height={size} viewBox="0 0 700 700" className={className} role="img" aria-label={title}>
-      {radius > 0
-        ? <rect width="700" height="700" rx={radius} fill={color} />
-        : <rect width="700" height="700" fill={color} />}
-      <g fill={hole} shapeRendering="crispEdges">
-        {CELLS.map(([c, r]) => <rect key={`${c}-${r}`} x={c * U} y={r * U} width={U} height={U} />)}
-      </g>
+    <svg width={size} height={size} viewBox="0 0 700 700" className={className} role="img" aria-label={title} style={style}>
+      {animate && <style>{`@keyframes sfmk{0%{opacity:0;transform:scale(.9)}60%{opacity:1;transform:scale(1.03)}100%{opacity:1;transform:scale(1)}}@media (prefers-reduced-motion:reduce){svg[aria-label="${title}"]{animation:none!important}}`}</style>}
+      <rect width="700" height="700" rx={rx} fill={color} />
+      <text x="350" y="392" textAnchor="middle" fontFamily={SERIF_STACK} fontWeight="700" fontSize="500" fill="#ffffff">S</text>
     </svg>
   )
 }
 
-/**
- * Decode animation — the mark resolves out of a scramble (Lapis "matrix" feel). Each white cell flickers
- * through a few random grid positions, then snaps to its true place with a staggered diagonal sweep.
- * Runs once by default; `loop` keeps it cycling (e.g. a splash / loader).
- */
-export function MarkDecode({ size = 48, color = '#ef4a1e', hole = '#ffffff', radius = 0, loop = false, durationMs = 1400, className }: {
+export function Mark({ size = 40, color = '#ef4a1e', radius = 0, className, title = 'Selfmade' }: {
+  size?: number; color?: string; hole?: string; radius?: number; className?: string; title?: string
+}) {
+  return <SBadge size={size} color={color} radius={radius} className={className} title={title} />
+}
+
+export function MarkDecode({ size = 48, color = '#ef4a1e', radius = 0, loop = false, durationMs = 900, className }: {
   size?: number; color?: string; hole?: string; radius?: number; loop?: boolean; durationMs?: number; className?: string
 }) {
-  const uid = useId().replace(/[:]/g, '')
-  const total = durationMs / 1000
-  return (
-    <svg width={size} height={size} viewBox="0 0 700 700" className={className} role="img" aria-label="Selfmade">
-      <style>{`
-        @media (prefers-reduced-motion: reduce) {
-          .mk-${uid} rect.cell, .mk-bg-${uid} { animation: none !important; opacity: 1 !important; transform: none !important; }
-        }
-        /* The orange field settles first — a quick, quiet fade+scale so the decode has a stage. */
-        .mk-bg-${uid} {
-          transform-box: fill-box; transform-origin: center;
-          animation: mkbg-${uid} ${(total * 0.3).toFixed(2)}s cubic-bezier(.2,.7,.2,1) ${loop ? 'infinite' : 'both'};
-          ${loop ? `animation-duration: ${total}s;` : ''}
-        }
-        @keyframes mkbg-${uid} {
-          0%   { opacity: 0; transform: scale(.92); }
-          ${loop ? '12%' : '100%'} { opacity: 1; transform: scale(1); }
-          ${loop ? '100% { opacity: 1; transform: scale(1); }' : ''}
-        }
-        /* Cells resolve in a diagonal cascade — soft fade, gentle overshoot, clean settle. No vertical
-           jump: the old translateY read as jitter at small sizes. */
-        .mk-${uid} rect.cell {
-          opacity: 0;
-          transform-box: fill-box;
-          transform-origin: center;
-          animation: mkdec-${uid} ${total}s cubic-bezier(.22,.9,.24,1) ${loop ? 'infinite' : 'both'};
-        }
-        @keyframes mkdec-${uid} {
-          0%   { opacity: 0; transform: scale(0); }
-          45%  { opacity: .9; transform: scale(1.12); }
-          65%  { opacity: 1; transform: scale(.97); }
-          100% { opacity: 1; transform: scale(1); }
-        }
-      `}</style>
-      {radius > 0
-        ? <rect className={`mk-bg-${uid}`} width="700" height="700" rx={radius} fill={color} />
-        : <rect className={`mk-bg-${uid}`} width="700" height="700" fill={color} />}
-      <g className={`mk-${uid}`} fill={hole} shapeRendering="crispEdges">
-        {CELLS.map(([c, r]) => (
-          <rect
-            key={`${c}-${r}`} className="cell"
-            x={c * U} y={r * U} width={U} height={U}
-            // staggered by a diagonal sweep (top-left → bottom-right) for the "decode" cascade; the small
-            // base delay lets the field land before the first cell appears.
-            style={{ animationDelay: `${(total * 0.12 + ((c + r) / 12) * (total * 0.5)).toFixed(2)}s` }}
-          />
-        ))}
-      </g>
-    </svg>
-  )
+  return <SBadge size={size} color={color} radius={radius} className={className} title="Selfmade" animate durationMs={durationMs} loop={loop} />
 }
 
 export default Mark
