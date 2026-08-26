@@ -173,9 +173,18 @@ export default function ScanTheater() {
         const STEP_MS = 18000, MAX_STEPS = 27          // ~8 min cap
         const capS = Math.round((MAX_STEPS * STEP_MS) / 1000)
         let data2 = data
+        // FAST PULL — grab the brand's live ads on-demand (droplet, ~seconds) so the user sees REAL ads
+        // immediately instead of staring at a spinner for minutes. URLs only — no IPRoyal media download.
+        let liveAds: { thumb: string | null; isVideo?: boolean }[] = []
+        const cold = data.brand?.pageId
+        if (cold) {
+          fetch(`/api/scan/live-ads?page_id=${encodeURIComponent(cold)}`).then((r) => r.ok ? r.json() : null).then((d) => {
+            if (d?.ads?.length) { liveAds = d.ads; setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data), 0, capS, liveAds) }]); setSlideIdx(0) }
+          }).catch(() => {})
+        }
         for (let t = 0; t < MAX_STEPS && !data2.own.found; t++) {
           const elapsedS = t * (STEP_MS / 1000)
-          setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data), elapsedS, capS) }]); setSlideIdx(0)
+          setSlides([{ key: 'pulling', stage: 'ads', render: () => pullingSlide(brandNameOf(data), elapsedS, capS, liveAds) }]); setSlideIdx(0)
           setPct(40 + Math.round((t / MAX_STEPS) * 35))   // sidebar bar creeps 40 → 75 over the wait
           await sleep(STEP_MS)
           try { const rr = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(lastPayload.current) }); if (rr.ok) data2 = await rr.json() } catch { /* keep polling */ }
@@ -849,9 +858,12 @@ function slideScore(res: ScanResult) {
 
 // SLIDE — waiting for the crawl (never a fake "invisible/0" — we're actively pulling the ads). Shows HONEST
 // progress: an elapsed-driven bar + elapsed readout + copy that deepens, so a longer wait never looks frozen.
-function pullingSlide(brandName: string, elapsedS = 0, capS = 480) {
+function pullingSlide(brandName: string, elapsedS = 0, capS = 480, liveAds: { thumb: string | null; isVideo?: boolean }[] = []) {
   const name = brandName === 'your brand' ? 'your brand' : brandName
-  const line = elapsedS < 90
+  const withThumb = liveAds.filter((a) => a.thumb)
+  const line = withThumb.length
+    ? <>We pulled <b>{withThumb.length}</b> of {name}’s live ads instantly — the full library is finishing its deep crawl now for the complete breakdown.</>
+    : elapsedS < 90
     ? <>First time we’ve seen {name} — we kicked off a <b>priority</b> crawl of your full ad library. This usually takes a few minutes.</>
     : elapsedS < 240
       ? <>Still going — we’re reading every ad {name} is running. First-time crawls take a few minutes; hang tight, your audit builds itself.</>
@@ -861,8 +873,19 @@ function pullingSlide(brandName: string, elapsedS = 0, capS = 480) {
   return (
     <div style={{ textAlign: 'center', maxWidth: 760, margin: '0 auto', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 18 }}>
       <div style={{ fontSize: 'clamp(48px,9vw,84px)', lineHeight: 1 }}>⏳</div>
-      <h2 style={slideH}>Pulling your ads now</h2>
+      <h2 style={slideH}>{withThumb.length ? 'Found your ads' : 'Pulling your ads now'}</h2>
       <p style={{ ...sub, textAlign: 'center', margin: '0 auto' }}>{line}</p>
+      {withThumb.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(84px,1fr))', gap: 8, width: 'min(560px,88vw)' }}>
+          {withThumb.slice(0, 12).map((a, i) => (
+            // eslint-disable-next-line @next/next/no-img-element
+            <div key={i} style={{ aspectRatio: '1', borderRadius: 8, overflow: 'hidden', background: 'rgba(0,0,0,.06)', position: 'relative' }}>
+              <img src={a.thumb as string} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {a.isVideo && <span style={{ position: 'absolute', bottom: 4, right: 4, fontSize: 10 }}>▶</span>}
+            </div>
+          ))}
+        </div>
+      )}
       <div style={{ width: 'min(440px,82vw)' }}>
         <div style={{ height: 8, background: 'rgba(26,20,16,.1)', borderRadius: 100, overflow: 'hidden' }}>
           <div style={{ height: '100%', width: `${barPct}%`, background: ORANGE, borderRadius: 100, transition: 'width .7s ease' }} />
