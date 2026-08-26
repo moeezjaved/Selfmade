@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, catalogApplied } from '@/lib/celebrate'
+import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -59,6 +60,7 @@ export default function CatalogPage() {
       const r = await fetch('/api/shopify/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', draftIds: ids }) })
       const j = await r.json()
       if (r.ok) { if (j.applied > 0) celebrate(catalogApplied(j.applied, kind)); setNote(j.failed ? `${j.failed} couldn’t apply — we’ll retry those.` : null); setSelected({}); await load() }
+      else if (r.status === 402) { openCredits('plan', j.reason || 'Applying fixes to your live store is a paid feature.') }
       else setNote(j.error || 'Could not apply.')
     } catch { setNote('Network error.') }
     setBusy(null)

@@ -12,6 +12,8 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { generateDrafts, applyDrafts, catalogTargets, type Agent } from '@/lib/shopify/catalog'
 import { catalogHealth } from '@/lib/shopify/sync'
+import { getPlanId } from '@/lib/entitlements'
+import { resolveBillingOwner } from '@/lib/org'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -27,7 +29,7 @@ async function ctx(req: NextRequest) {
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
   const store = await resolveStore(admin, user.id, brandId)
   if (!store) return { error: NextResponse.json({ error: 'No Shopify store connected', connected: false }, { status: 400 }) }
-  return { admin, store }
+  return { admin, store, user }
 }
 
 export async function GET(req: NextRequest) {
@@ -52,7 +54,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store } = c
+  const { admin, store, user } = c
   const body = await req.json().catch(() => ({}))
   const action = body.action
 
@@ -69,6 +71,11 @@ export async function POST(req: NextRequest) {
     if (action === 'skip') {
       await admin.from('shopify_catalog_drafts').update({ status: 'skipped' }).in('id', ids).eq('store_id', store.id).eq('status', 'draft')
       return NextResponse.json({ ok: true, skipped: ids.length })
+    }
+    // Free to PREVIEW (draft), pay to APPLY: pushing changes live to Shopify needs a paid plan.
+    const owner = await resolveBillingOwner(admin, user.id).catch(() => user.id)
+    if ((await getPlanId(admin, owner)) === 'free') {
+      return NextResponse.json({ error: 'upgrade_required', reason: 'Applying fixes to your live store is a paid feature — drafting stays free. Upgrade to push these live.' }, { status: 402 })
     }
     const res = await applyDrafts(admin, store, ids)
     const health = await catalogHealth(admin, store.id).catch(() => null)
