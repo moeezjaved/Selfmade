@@ -196,6 +196,28 @@ export class MetaClient {
     return res.data
   }
 
+  /** Pause / resume a single AD (not the whole campaign). status: 'PAUSED' | 'ACTIVE'. */
+  async setAdStatus(adId: string, status: 'PAUSED' | 'ACTIVE') {
+    const res = await this.client.post(`/${adId}`, { status })
+    return res.data
+  }
+
+  /** Resolve interest names → Meta ad-interest targeting entries (for building an audience from text). */
+  async searchInterests(q: string): Promise<{ id: string; name: string; audience?: number }[]> {
+    try {
+      const res = await this.client.get('/search', { params: { type: 'adinterest', q, limit: 8 } })
+      return (res.data?.data || []).map((i: any) => ({ id: String(i.id), name: String(i.name), audience: i.audience_size_upper_bound }))
+    } catch { return [] }
+  }
+
+  /** The targeting of a campaign's first ad set — used to CLONE a winner's audience onto a new launch. */
+  async firstAdSetTargeting(campaignId: string): Promise<Record<string, unknown> | null> {
+    try {
+      const res = await this.client.get(`/${campaignId}/adsets`, { params: { fields: 'targeting', limit: 1 } })
+      return res.data?.data?.[0]?.targeting || null
+    } catch { return null }
+  }
+
   async updateAdSet(adSetId: string, updates: Record<string, unknown>) {
     const res = await this.client.post(`/${adSetId}`, updates)
     return res.data
