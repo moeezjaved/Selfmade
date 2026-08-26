@@ -8,7 +8,10 @@ import { planEntitlements, normalizePlan, nextPlan, firstPlanWith, PLAN_ORDER, t
 
 // Accounts created BEFORE this cutoff are grandfathered out of the new pay-to-apply + sign-agreement
 // gates (they keep the free behaviour they signed up with). New signups on/after it are gated.
-export const GRANDFATHER_BEFORE = process.env.GRANDFATHER_BEFORE || '2026-08-27T00:00:00Z'
+// IMPORTANT: this MUST be a past timestamp (the day the gates shipped) — if it's set to a FUTURE date,
+// every brand-new signup counts as "before the cutoff" and is wrongly grandfathered, so the paywall
+// never fires. Shipped 2026-08-26, so anyone who signs up from today onward is gated. Override per-env.
+export const GRANDFATHER_BEFORE = process.env.GRANDFATHER_BEFORE || '2026-08-26T00:00:00Z'
 export function isGrandfathered(createdAt?: string | null): boolean {
   if (!createdAt) return false
   try { return new Date(createdAt).getTime() < new Date(GRANDFATHER_BEFORE).getTime() } catch { return false }
