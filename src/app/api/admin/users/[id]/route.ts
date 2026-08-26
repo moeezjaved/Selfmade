@@ -92,6 +92,22 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const brandGeo = geo.filter((g: any) => g.brand_id === b.id)
     const brandWins = wins.filter((w: any) => w.brand_id === b.id)
     const meta = metaAccts.filter((m: any) => m.brand_id === b.id)
+
+    // The ACTUAL workspace content the user sees — read straight from brand_kit.adsStudio.
+    const kbFacts = Array.isArray(ads.facts) ? ads.facts.slice(0, 40) : []
+    const voice = (ads.voice && typeof ads.voice === 'object') ? ads.voice : null
+    const templates = (Array.isArray(ads.templates) ? ads.templates : [])
+      .map((t: any) => ({ title: t.title || '', headline: t.headline || '', concept: t.concept || '', image: t.image || null }))
+    const audienceData = ads.audiences?.data || {}
+    const audienceList = (Array.isArray(audienceData.audiences) ? audienceData.audiences : [])
+      .map((a: any) => ({ name: a.name || 'Audience', insights: Array.isArray(a.insights) ? a.insights.slice(0, 6) : [] }))
+    // Products: prefer the studio's cached cards (they carry image + price + url); fall back to synced count.
+    const cachedProducts = (ads.products?.data?.products || [])
+      .map((p: any) => ({ title: p.title || '', image: p.image || null, price: p.price || null, url: p.url || null }))
+    const compData = ads.competitors?.data || {}
+    const discoveredComps = (Array.isArray(compData.discovered) ? compData.discovered : [])
+      .map((c: any) => ({ name: c.name || c.domain, domain: c.domain || null, reason: c.reason || '', liveAds: (Array.isArray(c.liveAds) ? c.liveAds.slice(0, 6) : []) }))
+
     return {
       id: b.id,
       name: b.name,
@@ -101,12 +117,17 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
       // connections
       shopify: store ? { connected: true, shop_domain: store.shop_domain, shop_name: store.shop_name, status: store.status } : { connected: false },
       meta: meta.length ? { connected: true, accounts: meta.map((m: any) => ({ name: m.account_name, status: m.status, primary: m.is_primary })) } : { connected: false },
-      // knowledge base + studio assets
-      kb_present: !!(kit.knowledge || kit.brandVoice || kit.about || ads.warmedAt || Object.keys(kit).length > 1),
-      kb_keys: Object.keys(kit).filter((k) => k !== 'adsStudio'),
+      // ── the real workspace content ──
+      kb_present: kbFacts.length > 0 || !!voice,
+      kb_facts: kbFacts,
+      voice,
+      market: audienceData.market || null,
+      templates,                    // includes generated image urls when the user made them
+      products_cached: cachedProducts.slice(0, 30),
       products_count: products.filter((p: any) => p.brand_id === b.id).length,
-      templates_count: Array.isArray(ads.templates) ? ads.templates.length : 0,
-      audiences: Array.isArray(ads.audiences) ? ads.audiences.slice(0, 8) : [],
+      templates_count: templates.length,
+      audiences: audienceList,      // full personas: name + insights
+      competitors: discoveredComps, // discovered competitor cards + their live ads
       // SEO / storefront activity — is this user actually pushing SEO on Shopify?
       seo: {
         catalog_applied: brandCatalog.filter((d: any) => d.status === 'applied').length,
