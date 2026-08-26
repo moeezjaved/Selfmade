@@ -47,6 +47,7 @@ const NAV: Group[] = [
     { href: '/mission/seo', label: 'SEO', icon: Radar },
     { href: '/mission/geo', label: 'GEO', icon: Brain },
     { href: '/mission/catalog', label: 'Store', icon: Store },
+    { href: '/mission/cro', label: 'CRO', icon: Wand2 },
     { href: '/mission/blog', label: 'Content', icon: FileText },
     { href: '/mission/programmatic', label: 'Pages at scale', icon: FileText },
     { href: '/mission/competitors', label: 'SEO Competitors', icon: Eye },
