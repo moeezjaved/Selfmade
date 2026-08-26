@@ -25,6 +25,9 @@ import { r2UrlToKey, listSizesByPrefix, deleteManyFromR2 } from './r2.js'
 
 const DRY = process.argv.includes('--dry-run')
 const PAGE = 500
+// Cloudflare R2 standard storage: $0.015 per GB-month (egress is free). Dashboard is authoritative;
+// this is just to turn "GB reclaimed" into an at-a-glance $/month so you don't have to do the math.
+const R2_USD_PER_GB_MONTH = 0.015
 
 async function loadIdSet(table: string, column: string, filter?: (q: any) => any): Promise<Set<string>> {
   const set = new Set<string>()
@@ -50,10 +53,22 @@ async function main() {
   const keepAds = await loadIdSet('discovery_saved_ads', 'ad_id')
   console.log(`   Keep: ${keepPages.size} spied brands · ${keepAds.size} saved ads\n`)
 
-  // 2) R2 sizes (to price the reclaim accurately, no HEAD-per-object)
-  console.log('📦 Listing R2 object sizes (videos/ + posters/)…')
-  const [videoSizes, posterSizes] = await Promise.all([listSizesByPrefix('videos/'), listSizesByPrefix('posters/')])
-  console.log(`   ${videoSizes.size} video objects, ${posterSizes.size} poster objects in bucket\n`)
+  // 2) R2 sizes — one full-bucket listing so we can show current TOTAL, what's freed, and the new
+  //    total. Cheap (Class B list ops), no HEAD-per-object.
+  console.log('📦 Listing the whole bucket to measure sizes…')
+  const allSizes = await listSizesByPrefix('')
+  const videoSizes = new Map<string, number>()
+  const posterSizes = new Map<string, number>()
+  let totalBytes = 0, videoBytesAll = 0, imageBytesAll = 0
+  for (const [k, sz] of allSizes) {
+    totalBytes += sz
+    if (k.startsWith('videos/')) { videoSizes.set(k, sz); videoBytesAll += sz }
+    else if (k.startsWith('posters/')) posterSizes.set(k, sz)
+    else if (k.startsWith('thumbnails/') || k.startsWith('thumbs/')) imageBytesAll += sz
+  }
+  const gbAll = (n: number) => (n / 1073741824).toFixed(2)
+  console.log(`   ${allSizes.size} objects · total ${gbAll(totalBytes)} GB` +
+    ` (videos ${gbAll(videoBytesAll)} GB · images ${gbAll(imageBytesAll)} GB)\n`)
 
   // 3) Scan every ad that has an R2 video, decide keep/strip/delete
   let scanned = 0, keptSpied = 0, keptSaved = 0, delEntire = 0, stripped = 0
@@ -120,7 +135,15 @@ async function main() {
 
   const vBytes = safeVideo.reduce((s, k) => s + (videoSizes.get(k) ?? 0), 0)
   const pBytes = safePoster.reduce((s, k) => s + (posterSizes.get(k) ?? 0), 0)
+  const freedBytes = vBytes + pBytes
   const gb = (n: number) => (n / 1073741824).toFixed(2)
+  const freedGB = freedBytes / 1073741824
+  const totalGB = totalBytes / 1073741824
+  const afterGB = Math.max(0, totalGB - freedGB)
+  const pct = totalGB > 0 ? (freedGB / totalGB) * 100 : 0
+  const usdNow = totalGB * R2_USD_PER_GB_MONTH
+  const usdAfter = afterGB * R2_USD_PER_GB_MONTH
+  const usdSaved = freedGB * R2_USD_PER_GB_MONTH
 
   console.log(`\n📊 Result`)
   console.log(`   Scanned ads with an R2 video:     ${scanned}`)
@@ -131,7 +154,15 @@ async function main() {
   console.log(`   Video objects to delete:          ${safeVideo.length}  (${gb(vBytes)} GB)`)
   console.log(`   Poster objects to delete:         ${safePoster.length}  (${gb(pBytes)} GB)`)
   if (skipped) console.log(`   ⚠️  Skipped ${skipped} keys outside videos/ or posters/ (safety guard)`)
-  console.log(`   ≈ Total storage reclaimed:        ${gb(vBytes + pBytes)} GB\n`)
+
+  console.log(`\n💾 Storage`)
+  console.log(`   Bucket now:        ${totalGB.toFixed(2)} GB`)
+  console.log(`   Freed by purge:   -${freedGB.toFixed(2)} GB  (${pct.toFixed(0)}% of the bucket)`)
+  console.log(`   Bucket after:      ${afterGB.toFixed(2)} GB`)
+  console.log(`\n💰 Cost (R2 storage @ $${R2_USD_PER_GB_MONTH}/GB-month; egress is free)`)
+  console.log(`   Storage now:       ~$${usdNow.toFixed(2)}/month`)
+  console.log(`   Storage after:     ~$${usdAfter.toFixed(2)}/month`)
+  console.log(`   You save:          ~$${usdSaved.toFixed(2)}/month\n`)
 
   if (DRY) { console.log('✅ Dry run complete — nothing deleted. Re-run without --dry-run to execute.\n'); return }
 
