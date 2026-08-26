@@ -35,7 +35,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     admin.from('geo_assets').select('brand_id, kind, status').eq('user_id', userId),
     admin.from('wins').select('brand_id, category, projected_value, banked_value, created_at').eq('user_id', userId),
     // Facebook / competitor reports Mello has authored for this user.
-    admin.from('mello_documents').select('id, kind, title, subject, model, meta, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(40),
+    admin.from('mello_documents').select('id, kind, title, subject, model, meta, body_md, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(40),
     admin.from('meta_accounts').select('brand_id, account_name, status, is_primary').eq('user_id', userId),
     // Login history (SECURITY DEFINER over auth.audit_log_entries — mig 170).
     admin.rpc('admin_login_stats', { p_user: userId }),
@@ -65,6 +65,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const brandNames = new Map<string, string>((brandsRes.data || []).map((b: any) => [b.id, b.name]))
   const creatives = (creativesRes.data || []).map((c: any) => ({
     ...c,
+    brand_id: c.brand_id || null,   // kept so the admin can group ads under each workspace
     brand_name: c.brand_id ? brandNames.get(c.brand_id) || null : null,
   }))
   const follows = followsRes.data || []
@@ -158,6 +159,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   const reports = (docsRes.data || []).map((d: any) => ({
     id: d.id, kind: d.kind, title: d.title, subject: d.subject || null, model: d.model || null,
     ad_count: (d.meta && (d.meta.adCount ?? d.meta.ad_count)) || null,
+    body_md: typeof d.body_md === 'string' ? d.body_md.slice(0, 60000) : '',  // full report body, viewable inline
     created_at: d.created_at,
   }))
 
