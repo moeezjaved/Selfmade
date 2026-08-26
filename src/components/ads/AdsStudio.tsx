@@ -796,7 +796,7 @@ function YourAds({ isMobile }: { isMobile: boolean }) {
           {data.ads.map((a) => (
             <div key={a.adId} className="sf-disc" style={{ position: 'relative', border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden' }}>
               <div style={{ aspectRatio: '4/5', background: PAPER, position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
-                {a.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.image} alt="" loading="lazy" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                {a.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.image} alt="" loading="lazy" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'contain' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                 {a.isActive && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#16a34a', borderRadius: 6, padding: '3px 7px' }}>LIVE</span>}
                 <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
                   <button onClick={() => addToChat({ label: 'Remake my ad', image: a.image, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Remake this</button>

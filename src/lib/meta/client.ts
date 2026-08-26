@@ -201,16 +201,19 @@ export class MetaClient {
   async listAdsForPicker(): Promise<{ adId: string; name: string; status: string; adsetId: string; campaignName: string; image: string | null; headline: string; primaryText: string; linkUrl: string }[]> {
     try {
       const res = await this.client.get(`/${this.accountId}/ads`, { params: {
-        fields: 'id,name,status,effective_status,adset_id,campaign{name},creative{thumbnail_url,object_story_spec,image_url}',
+        fields: 'id,name,status,effective_status,adset_id,campaign{name},creative{image_url,thumbnail_url,object_story_spec{link_data{name,message,link,picture,child_attachments{picture}},video_data{image_url}}}',
         limit: 100, effective_status: '["ACTIVE","PAUSED"]',
       } })
       return (res.data?.data || []).map((a: any) => {
-        const ld = a.creative?.object_story_spec?.link_data || {}
+        const cr = a.creative || {}
+        const ld = cr.object_story_spec?.link_data || {}
+        const vd = cr.object_story_spec?.video_data || {}
+        // Meta scatters the preview across fields depending on ad type (link / post / video / carousel).
+        const image = cr.image_url || cr.thumbnail_url || ld.picture || vd.image_url || ld.child_attachments?.[0]?.picture || null
         return {
           adId: String(a.id), name: String(a.name || ''), status: String(a.effective_status || a.status || ''),
           adsetId: String(a.adset_id || ''), campaignName: String(a.campaign?.name || ''),
-          image: a.creative?.image_url || a.creative?.thumbnail_url || ld.picture || null,
-          headline: String(ld.name || ''), primaryText: String(ld.message || ''), linkUrl: String(ld.link || ''),
+          image, headline: String(ld.name || ''), primaryText: String(ld.message || ''), linkUrl: String(ld.link || ''),
         }
       }).filter((a: any) => a.adsetId)
     } catch { return [] }
