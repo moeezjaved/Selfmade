@@ -208,7 +208,20 @@ export async function POST(req: NextRequest) {
     // Nothing to show yet (your ads not indexed AND no rival data) → the UI shows a "building" state
     // instead of a meaningless score. The crawl we just kicked off fills this in within minutes.
     const building = !result.own.found && result.winners.sampleSize === 0
-    return NextResponse.json({ brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, rivalVideo, ...result })
+    const payload = { brand: { pageId, name: brandName, niche }, competitors: competitorPageIds.length, ownPending, building, briefs, rivalToRemake, rivalVideo, ...result }
+
+    // Capture the anonymous ADS audit as a LEAD (mirrors the SEO scan's audit_scans). Best-effort — it
+    // must never block or break the scan. Skip the "building" placeholder (no real result yet).
+    if (!building) {
+      try {
+        await admin.from('ads_audit_scans').upsert({
+          page_id: pageId, brand_name: brandName || null, niche: niche || null,
+          score: (result as any)?.score?.total ?? null, result: payload, updated_at: new Date().toISOString(),
+        }, { onConflict: 'page_id' })
+      } catch { /* additive; never break the scan */ }
+    }
+
+    return NextResponse.json(payload)
   } catch (e) {
     return NextResponse.json({ error: 'Scan failed', detail: String(e).slice(0, 200) }, { status: 500 })
   }

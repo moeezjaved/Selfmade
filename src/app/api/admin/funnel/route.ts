@@ -46,9 +46,23 @@ export async function GET(request: NextRequest) {
   const allScans = scans || []
   const auditsCompleted = allScans.length
   const claimedIds = Array.from(new Set(allScans.filter((s: any) => s.claimed_by).map((s: any) => s.claimed_by)))
-  const anonymousAudits = allScans
-    .filter((s: any) => !s.claimed_by)
-    .map((s: any) => ({ domain: s.domain, site_name: s.site_name, score: s.score, category: s.category, created_at: s.created_at }))
+
+  // Anonymous ADS audits (the ads counterpart, keyed by Facebook page_id — no domain).
+  const { data: adsScans } = await admin
+    .from('ads_audit_scans')
+    .select('page_id, brand_name, niche, score, claimed_by, created_at')
+    .order('created_at', { ascending: false })
+    .limit(1000)
+  const adsCompleted = (adsScans || []).length
+
+  const anonymousAudits = [
+    ...allScans.filter((s: any) => !s.claimed_by).map((s: any) => ({
+      type: 'seo', domain: s.domain, page_id: null, site_name: s.site_name, score: s.score, category: s.category, created_at: s.created_at,
+    })),
+    ...(adsScans || []).filter((s: any) => !s.claimed_by).map((s: any) => ({
+      type: 'ads', domain: null, page_id: s.page_id, site_name: s.brand_name, score: s.score, category: s.niche, created_at: s.created_at,
+    })),
+  ].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
 
   // Activation among the founders who DID claim their audit.
   let connected = 0, generatedAd = 0, paidFromAudit = 0
@@ -88,5 +102,7 @@ export async function GET(request: NextRequest) {
     ],
     anonymousAuditsCount: anonymousAudits.length,
     anonymousAudits: anonymousAudits.slice(0, 200),
+    auditsCompletedSeo: auditsCompleted,
+    auditsCompletedAds: adsCompleted,
   })
 }

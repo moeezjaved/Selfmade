@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Step { label: string; count: number; pct: number }
-interface AnonAudit { domain: string; site_name: string | null; score: number | null; category: string | null; created_at: string }
+interface AnonAudit { type?: 'seo' | 'ads'; domain: string | null; page_id?: string | null; site_name: string | null; score: number | null; category: string | null; created_at: string }
 
 const SEV_COLOR: Record<string, string> = { high: '#dc2626', medium: '#d97706', low: '#6b7280' }
 const money = (n: number, cur: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)} ${cur}` } }
@@ -165,14 +165,24 @@ export default function FunnelPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {anon.map((a, i) => (
-                    <React.Fragment key={a.domain + i}>
-                      <tr onClick={() => toggleLead(a.domain)} style={{ borderBottom: '1px solid #f6f6f6', cursor: 'pointer', background: openDomain === a.domain ? '#faf9f6' : 'transparent' }}>
+                  {anon.map((a, i) => {
+                    const isAds = a.type === 'ads'
+                    const key = a.domain || a.page_id || String(i)
+                    const open = !isAds && openDomain === a.domain
+                    return (
+                    <React.Fragment key={key + i}>
+                      <tr onClick={() => { if (!isAds && a.domain) toggleLead(a.domain) }} style={{ borderBottom: '1px solid #f6f6f6', cursor: isAds ? 'default' : 'pointer', background: open ? '#faf9f6' : 'transparent' }}>
                         <td style={{ padding: '10px 20px', fontWeight: 600 }}>
-                          <span style={{ color: '#c3c7c3', marginRight: 6 }}>{openDomain === a.domain ? '▾' : '▸'}</span>
-                          <span onClick={(e) => { e.stopPropagation(); router.push(`/admin/site/${encodeURIComponent(a.domain)}`) }} style={{ color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">{a.domain}</span>
-                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: '#7c3aed', background: '#7c3aed14', borderRadius: 20, padding: '1px 7px' }} title="Which audit they ran">SEO audit</span>
-                          <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#9ca3af', textDecoration: 'none', marginLeft: 6, fontSize: 11 }}>↗</a>
+                          {!isAds && <span style={{ color: '#c3c7c3', marginRight: 6 }}>{open ? '▾' : '▸'}</span>}
+                          {isAds ? (
+                            <span style={{ color: '#111' }}>{a.site_name || a.page_id}</span>
+                          ) : (
+                            <span onClick={(e) => { e.stopPropagation(); router.push(`/admin/site/${encodeURIComponent(a.domain!)}`) }} style={{ color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">{a.domain}</span>
+                          )}
+                          <span style={{ marginLeft: 8, fontSize: 10, fontWeight: 700, color: isAds ? '#1877F2' : '#7c3aed', background: isAds ? '#1877F214' : '#7c3aed14', borderRadius: 20, padding: '1px 7px' }} title="Which audit they ran">{isAds ? 'Ads audit' : 'SEO audit'}</span>
+                          {isAds
+                            ? <a href={`https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${a.page_id}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#9ca3af', textDecoration: 'none', marginLeft: 6, fontSize: 11 }}>ad library ↗</a>
+                            : <a href={`https://${a.domain}`} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ color: '#9ca3af', textDecoration: 'none', marginLeft: 6, fontSize: 11 }}>↗</a>}
                         </td>
                         <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
                         <td style={{ padding: '10px 20px', color: '#777' }}>{a.category || '—'}</td>
@@ -180,17 +190,17 @@ export default function FunnelPage() {
                         <td style={{ padding: '10px 20px', color: '#c3c7c3' }} title="The audit runs with no login, so no email is captured. Add an email gate to the theater to collect these.">— none</td>
                         <td style={{ padding: '10px 20px', color: '#888' }}>{fmt(a.created_at)}</td>
                       </tr>
-                      {openDomain === a.domain && (
+                      {open && (
                         <tr>
                           <td colSpan={6} style={{ padding: '4px 20px 16px' }}>
                             <div style={{ maxHeight: 520, overflowY: 'auto' }}>
-                              <ScanReport result={scans[a.domain]} />
+                              <ScanReport result={scans[a.domain!]} />
                             </div>
                           </td>
                         </tr>
                       )}
                     </React.Fragment>
-                  ))}
+                  )})}
                 </tbody>
               </table>
             )}
