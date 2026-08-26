@@ -303,7 +303,7 @@ export default function UserProfile({ params }: { params: { id: string } }) {
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                   <span style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>{b.name || 'Untitled brand'}</span>
                   {b.website
-                    ? <a href={b.website.startsWith('http') ? b.website : `https://${b.website}`} target="_blank" rel="noreferrer" style={{ fontSize: 12, color: '#2563eb', textDecoration: 'none' }}>🌐 {b.website.replace(/^https?:\/\//, '')}</a>
+                    ? <span onClick={() => router.push(`/admin/site/${encodeURIComponent(b.website!.replace(/^https?:\/\//, '').replace(/\/.*$/, ''))}`)} style={{ fontSize: 12, color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">🌐 {b.website.replace(/^https?:\/\//, '')}</span>
                     : <span style={{ fontSize: 12, color: '#d97706' }}>🌐 no website</span>}
                   <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                     <Pill on={b.shopify.connected} onLabel={`Shopify · ${b.shopify.shop_domain || 'connected'}`} offLabel="Shopify ✕" color="#96bf48" />
