@@ -62,6 +62,17 @@ export function CreditModal() {
     return () => window.removeEventListener('keydown', onKey)
   }, [open])
 
+  // Free plan can't buy credits at all — so if something asked to open the 'buy' grid for them, show the
+  // upgrade view instead (with the reason), never a dead pack grid. Runs once the balance/plan loads.
+  useEffect(() => {
+    if (!open || !bal) return
+    const canBuyNow = PLANS[normalizePlan(bal.plan)]?.canBuyCredits
+    if (!canBuyNow && view === 'buy') {
+      setView('plan')
+      setReason((r) => r || 'Buying credits is available on the Creator plan — upgrade to top up.')
+    }
+  }, [open, bal, view])
+
   if (!mounted || !open) return null
 
   const planId = normalizePlan(bal?.plan)

@@ -11,6 +11,7 @@ import MelloAdsChat from '@/components/ads/MelloAdsChat'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
+import { openCredits } from '@/components/credits/CreditModal'
 
 type StudioTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
 const StudioCtx = createContext<{ addToChat: (t: StudioTag) => void }>({ addToChat: () => {} })
@@ -198,6 +199,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       } catch (e: any) {
         const msg = e?.message === 'no-product' ? 'Add a product first — tap + and pick one of your products.' : e?.message === 'credits' ? 'You’re out of credits — top up to remake ads.' : 'Couldn’t start the remake — try again.'
         setMsgs((m) => replaceLast(m, { role: 'assistant', error: msg, format: fmt }))
+        if (e?.message === 'credits') openCredits('buy', 'You’re out of credits — top up to remake ads.')   // Free → auto-shows Upgrade
       }
       setTags([]); setBusy(false)
       return
@@ -252,6 +254,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     if (!res.ok) {
       const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : d.error === 'pro_model_busy' ? 'The image model is busy right now — please try again in a moment.' : (d.error || 'Generation failed. Try again.')
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
+      if (d.error === 'insufficient_credits') openCredits('buy', 'You’re out of credits — top up to generate more ads.')   // Free → auto-shows Upgrade
     } else {
       setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: pick.caption, format: fmt }))
       if (d.url || d.image) celebrate(adReady())
@@ -806,7 +809,7 @@ function DnaRow({ label, items }: { label: string; items: string[] }) {
   )
 }
 
-function CompCard({ c, isMobile, onSpy }: { c: Comp; isMobile: boolean; onSpy?: (c: Comp) => Promise<void> }) {
+function CompCard({ c, isMobile, onSpy, onRemake }: { c: Comp; isMobile: boolean; onSpy?: (c: Comp) => Promise<void>; onRemake?: (thumb: string, brand: string) => void }) {
   const [spying, setSpying] = useState(false)
   const hasAds = c.ads.length > 0
   const badge = c.adsSource === 'corpus' ? `${c.adCount.toLocaleString()} ads decoded` : `${c.adCount.toLocaleString()} live ad${c.adCount === 1 ? '' : 's'}`
@@ -844,16 +847,26 @@ function CompCard({ c, isMobile, onSpy }: { c: Comp; isMobile: boolean; onSpy?: 
 
       {hasAds ? (
         <div style={{ display: 'flex', gap: 12, overflowX: 'auto', marginTop: 16, paddingBottom: 6 }}>
-          {c.ads.map((a) => (
-            <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
-              <div className="sf-thumb" style={{ aspectRatio: '4 / 5', position: 'relative' }}>
-                {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
-                {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
-                {a.format === 'video' && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 100, padding: '2px 8px' }}>▶ VIDEO</span>}
+          {c.ads.map((a) => {
+            // Tap any competitor ad → start a remake from it (drops it into Mello chat as the reference,
+            // same path as the Discover "Create Similar"). Videos aren't remake sources, so no CTA there.
+            const canRemake = !!a.thumb && a.format !== 'video' && !!onRemake
+            return (
+              <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
+                <div className="sf-thumb" style={{ aspectRatio: '4 / 5', position: 'relative', cursor: canRemake ? 'pointer' : 'default' }} onClick={canRemake ? () => onRemake!(a.thumb!, c.name) : undefined}>
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                  {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
+                  {a.format === 'video' && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 100, padding: '2px 8px' }}>▶ VIDEO</span>}
+                  {canRemake && (
+                    <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
+                      <span style={{ ...primaryBtn, padding: '6px 12px', fontSize: 12, borderRadius: 8, width: '100%', textAlign: 'center' }}>✦ Create Similar</span>
+                    </div>
+                  )}
+                </div>
+                {a.copy && <div style={{ fontSize: 11.5, color: '#43403a', lineHeight: 1.4, padding: '9px 11px', maxHeight: 66, overflow: 'hidden' }}>{a.copy}</div>}
               </div>
-              {a.copy && <div style={{ fontSize: 11.5, color: '#43403a', lineHeight: 1.4, padding: '9px 11px', maxHeight: 66, overflow: 'hidden' }}>{a.copy}</div>}
-            </div>
-          ))}
+            )
+          })}
         </div>
       ) : (
         <div style={{ fontSize: 12.5, color: SUB, marginTop: 12 }}>
@@ -905,6 +918,9 @@ function SpiedBrands() {
 }
 
 function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }) {
+  const { addToChat } = useContext(StudioCtx)
+  // Tap a competitor ad → drop it into Mello chat as the remake reference (same as Discover Create Similar).
+  const remakeFromAd = (thumb: string, brand: string) => addToChat({ label: `Like ${brand}`.slice(0, 24), image: thumb, kind: 'discover' })
   const [comps, setComps] = useState<Comp[] | null>(null)
   const [seed, setSeed] = useState<CompSeed>(null)
   const [q, setQ] = useState('')
@@ -989,7 +1005,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
         const withoutAds = shown.filter((c) => c.ads.length === 0)
         return (
           <>
-            {withAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} />)}
+            {withAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} onRemake={remakeFromAd} />)}
             {withoutAds.length > 0 && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '26px 0 4px' }}>
                 <div style={{ height: 1, background: LINE, flex: 1 }} />
@@ -997,7 +1013,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
                 <div style={{ height: 1, background: LINE, flex: 1 }} />
               </div>
             )}
-            {withoutAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} />)}
+            {withoutAds.map((c) => <CompCard key={c.pageId || c.domain || c.name} c={c} isMobile={isMobile} onSpy={spy} onRemake={remakeFromAd} />)}
           </>
         )
       })()}
