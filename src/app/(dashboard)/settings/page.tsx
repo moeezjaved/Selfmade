@@ -162,9 +162,16 @@ export default function SettingsPage() {
       const comp = competitors.find(c => c.pageId === apComp)
       const r = await fetch('/api/autopilot', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ brandId: apBrand, mediaType: apMedia, settings: comp ? { competitorPageId: comp.pageId, competitorName: comp.name } : {} }) }).then(x => x.json()).catch(() => ({}))
       if (r?.id) {
+        // Optimistically add the enrollment so its "Turn off" control shows immediately (don't depend on
+        // the refetch timing — that gap looked like "nothing enrolled" with no way to disable).
+        const bn = brands.find(b => b.id === apBrand)?.name || null
+        setAutopilots(prev => prev.some(x => x.id === r.id) ? prev : [{ id: r.id, brand_name: bn, media_type: apMedia, runs: 0 }, ...prev])
         const j = await fetch('/api/autopilot').then(x => x.json()).catch(() => ({}))
-        if (Array.isArray(j.items)) setAutopilots(j.items)
-        setApBrand(''); toast.success('Daily ads turned on for this brand')
+        if (Array.isArray(j.items) && j.items.length) setAutopilots(j.items)
+        setApBrand('')
+        // Balance-aware: autopilot skips days you're out of credits, so a low balance isn't an error —
+        // just tell the user it'll start once they have credits (turn off anytime below).
+        toast.success('Daily ads on — a fresh ad is emailed daily. Low on credits? It waits and starts when you top up. Turn off anytime below.')
       } else { toast.error(r?.error || 'Could not turn on autopilot') }
     } finally { setApBusy(false) }
   }
