@@ -8,6 +8,7 @@
  */
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import MelloAdsActions from '@/components/ads/MelloAdsActions'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film, Search } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
@@ -392,6 +393,14 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
           {busy && !isVideo && <div style={{ position: 'absolute', color: LIME, display: 'flex', gap: 8, alignItems: 'center', fontWeight: 600 }}><Loader2 size={18} className="spin" /> Working…</div>}
         </div>
         <div style={{ padding: 18, display: 'flex', flexDirection: 'column', gap: 12 }}>
+          {/* Creative → Facebook: launch this creative as a new ad (or attach to a campaign). Confirms
+              before anything goes live; lands PAUSED. */}
+          {gen.image_url && (
+            <div style={{ borderBottom: '1px solid #eef0ee', paddingBottom: 16, marginBottom: 2 }}>
+              <div style={{ fontWeight: 800, fontSize: 15, color: '#111', marginBottom: 8 }}>Launch on Facebook</div>
+              <MelloAdsActions attach={{ creativeUrl: gen.image_url, brandName: gen.brand_name || undefined }} placeholder="e.g. “launch this at €30/day targeting women 25–40 into wellness”" />
+            </div>
+          )}
           {isVideo ? (
             <>
               <div style={{ fontWeight: 800, fontSize: 15, color: '#111' }}>Your video</div>
