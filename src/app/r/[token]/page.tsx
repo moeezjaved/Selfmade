@@ -4,6 +4,7 @@
  * Branded, with a soft CTA to sign up. Snapshots are frozen at share time (data won't update).
  */
 import { r2PublicUrl } from '@/lib/r2'
+import { Mark } from '@/components/brand/Mark'
 import { METRICS, type MetricKey } from '@/lib/reports/templates'
 import type { Metadata } from 'next'
 
@@ -67,7 +68,7 @@ export default async function SharedReportPage({ params }: { params: { token: st
       {/* Top bar */}
       <div style={{ background: '#141d15', padding: '12px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <a href="https://tryselfmade.ai" style={{ display: 'flex', alignItems: 'center', gap: 9, textDecoration: 'none' }}>
-          <span style={{ width: 26, height: 26, borderRadius: 8, background: '#ff5a2c', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: 15, fontStyle: 'italic', fontFamily: 'Georgia,serif' }}>S</span>
+          <span style={{ width: 26, height: 26, display: 'inline-block', flex: 'none' }}><Mark size={26} /></span>
           <span style={{ color: '#ff5a2c', fontWeight: 800, fontSize: 15 }}>Selfmade</span>
         </a>
         <a href="https://tryselfmade.ai" style={{ color: '#fff', background: '#ff5a2c', padding: '7px 15px', borderRadius: 100, textDecoration: 'none', fontWeight: 700, fontSize: 12.5 }}>Try Selfmade free</a>

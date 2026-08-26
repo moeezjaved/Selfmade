@@ -10,7 +10,7 @@ export default function DashboardLoading() {
       minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
       gap: 14, background: '#f6f8f5',
     }}>
-      <div className="selfmade-loading" style={{ width: 52, height: 52, borderRadius: 14, boxShadow: '0 12px 30px -12px rgba(239,74,30,.45)' }} />
+      <div className="selfmade-loading" style={{ width: 52, height: 52, borderRadius: 0, boxShadow: '0 12px 30px -12px rgba(239,74,30,.45)' }} />
       <div style={{ fontSize: 13, color: '#9aa79a', fontWeight: 650, fontFamily: "'Inter',-apple-system,sans-serif" }}>One moment…</div>
     </div>
   )

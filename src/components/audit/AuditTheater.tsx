@@ -7,6 +7,7 @@
  */
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { MarkDecode } from '@/components/brand/Mark'
 import AuditLanding from '@/components/audit/AuditLanding'
 
 // Matches the ads audit: orange accent, cream paper, dark sidebar, Fraunces serif headings, /hero.mp4 entry.
@@ -211,6 +212,12 @@ export default function AuditTheater() {
         <video src="/hero.mp4" autoPlay muted loop playsInline style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', zIndex: 0 }} />
         <div style={{ position: 'absolute', inset: 0, zIndex: 1, background: 'linear-gradient(100deg, rgba(224,47,6,.96) 0%, rgba(224,47,6,.9) 42%, rgba(224,47,6,.5) 100%)' }} />
         <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
+          <style>{`.audit-rival::placeholder{color:rgba(255,255,255,.75);}`}</style>
+          <div style={{ marginBottom: 22 }}>
+            <div style={{ width: 52, height: 52, overflow: 'hidden', display: 'inline-block', boxShadow: '0 14px 34px -16px rgba(0,0,0,.55)' }}>
+              <MarkDecode size={52} color="#ffffff" hole="#e02f06" durationMs={1400} />
+            </div>
+          </div>
           <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · under a minute · no login</div>
           <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(38px,6.2vw,60px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your SEO.</h1>
           <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 470 }}>See exactly where your store stands on Google &amp; AI — your search health, your catalog, and whether ChatGPT even mentions you.</p>
@@ -219,8 +226,8 @@ export default function AuditTheater() {
               style={{ flex: 1, padding: '16px 18px', fontSize: 16, borderRadius: 100, border: 'none', background: '#fff', color: INK, fontFamily: 'inherit', outline: 'none', boxShadow: '0 18px 44px -20px rgba(0,0,0,.5)' }} />
             <button onClick={run} style={{ background: '#fff', color: LIME, border: 'none', borderRadius: 100, padding: '16px 28px', fontSize: 16, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>Scan my site →</button>
           </div>
-          <input value={rival} onChange={(e) => setRival(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="your #1 competitor (optional) — e.g. rival.com"
-            style={{ width: '100%', maxWidth: 480, marginTop: 10, padding: '13px 18px', fontSize: 14.5, borderRadius: 100, border: '1px solid rgba(255,255,255,.35)', background: 'rgba(255,255,255,.12)', color: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
+          <input className="audit-rival" value={rival} onChange={(e) => setRival(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && run()} placeholder="your #1 competitor (optional) — e.g. rival.com"
+            style={{ width: '100%', maxWidth: 480, marginTop: 10, padding: '13px 18px', fontSize: 14.5, borderRadius: 100, border: '1px solid rgba(255,255,255,.45)', background: 'rgba(255,255,255,.18)', color: '#fff', fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box' }} />
           {error && <div style={{ color: '#ffe0d6', fontSize: 14, marginTop: 12 }}>{error}</div>}
           <div style={{ fontSize: 13, color: 'rgba(255,255,255,.75)', marginTop: 14 }}>Add your competitor for a head-to-head, or we’ll pick a real one. Reads only what’s public — no account, no card.</div>
         </div>
