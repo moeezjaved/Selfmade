@@ -214,8 +214,8 @@ export default function AuditTheater() {
         <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 560 }}>
           <style>{`.audit-rival::placeholder{color:rgba(255,255,255,.75);}`}</style>
           <div style={{ marginBottom: 22 }}>
-            <div style={{ width: 52, height: 52, overflow: 'hidden', display: 'inline-block', boxShadow: '0 14px 34px -16px rgba(0,0,0,.55)' }}>
-              <MarkDecode size={52} color="#ffffff" hole="#e02f06" durationMs={1400} />
+            <div style={{ width: 39, height: 39, overflow: 'hidden', display: 'inline-block', boxShadow: '0 12px 28px -14px rgba(0,0,0,.55)' }}>
+              <MarkDecode size={39} color="#ffffff" hole="#e02f06" durationMs={1400} />
             </div>
           </div>
           <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · under a minute · no login</div>

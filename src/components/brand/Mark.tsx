@@ -48,30 +48,45 @@ export function MarkDecode({ size = 48, color = '#ef4a1e', hole = '#ffffff', rad
     <svg width={size} height={size} viewBox="0 0 700 700" className={className} role="img" aria-label="Selfmade">
       <style>{`
         @media (prefers-reduced-motion: reduce) {
-          .mk-${uid} rect.cell { animation: none !important; opacity: 1 !important; transform: none !important; }
+          .mk-${uid} rect.cell, .mk-bg-${uid} { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
+        /* The orange field settles first — a quick, quiet fade+scale so the decode has a stage. */
+        .mk-bg-${uid} {
+          transform-box: fill-box; transform-origin: center;
+          animation: mkbg-${uid} ${(total * 0.3).toFixed(2)}s cubic-bezier(.2,.7,.2,1) ${loop ? 'infinite' : 'both'};
+          ${loop ? `animation-duration: ${total}s;` : ''}
+        }
+        @keyframes mkbg-${uid} {
+          0%   { opacity: 0; transform: scale(.92); }
+          ${loop ? '12%' : '100%'} { opacity: 1; transform: scale(1); }
+          ${loop ? '100% { opacity: 1; transform: scale(1); }' : ''}
+        }
+        /* Cells resolve in a diagonal cascade — soft fade, gentle overshoot, clean settle. No vertical
+           jump: the old translateY read as jitter at small sizes. */
         .mk-${uid} rect.cell {
           opacity: 0;
           transform-box: fill-box;
           transform-origin: center;
-          animation: mkdec-${uid} ${total}s cubic-bezier(.2,.7,.2,1) ${loop ? 'infinite' : 'both'};
+          animation: mkdec-${uid} ${total}s cubic-bezier(.22,.9,.24,1) ${loop ? 'infinite' : 'both'};
         }
         @keyframes mkdec-${uid} {
-          0%   { opacity: 0; transform: scale(.2) translateY(-40px); }
-          35%  { opacity: .55; transform: scale(1.18) translateY(6px); }
-          55%  { opacity: 1; transform: scale(.94); }
-          70%  { transform: scale(1.05); }
+          0%   { opacity: 0; transform: scale(0); }
+          45%  { opacity: .9; transform: scale(1.12); }
+          65%  { opacity: 1; transform: scale(.97); }
           100% { opacity: 1; transform: scale(1); }
         }
       `}</style>
-      {radius > 0 ? <rect width="700" height="700" rx={radius} fill={color} /> : <rect width="700" height="700" fill={color} />}
+      {radius > 0
+        ? <rect className={`mk-bg-${uid}`} width="700" height="700" rx={radius} fill={color} />
+        : <rect className={`mk-bg-${uid}`} width="700" height="700" fill={color} />}
       <g className={`mk-${uid}`} fill={hole} shapeRendering="crispEdges">
-        {CELLS.map(([c, r], i) => (
+        {CELLS.map(([c, r]) => (
           <rect
             key={`${c}-${r}`} className="cell"
             x={c * U} y={r * U} width={U} height={U}
-            // staggered by a diagonal sweep (top-left → bottom-right) for the "decode" cascade
-            style={{ animationDelay: `${((c + r) / 12) * (total * 0.55)}s` }}
+            // staggered by a diagonal sweep (top-left → bottom-right) for the "decode" cascade; the small
+            // base delay lets the field land before the first cell appears.
+            style={{ animationDelay: `${(total * 0.12 + ((c + r) / 12) * (total * 0.5)).toFixed(2)}s` }}
           />
         ))}
       </g>

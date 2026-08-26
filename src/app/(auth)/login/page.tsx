@@ -32,7 +32,7 @@ export default function LoginPage() {
   return (
     <AuthShell maxWidth={400}>
       <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 18 }}>
-        <div style={{ boxShadow: '0 14px 34px -18px rgba(239,74,30,.55)' }}><MarkDecode size={56} durationMs={1300} /></div>
+        <div style={{ boxShadow: '0 14px 34px -18px rgba(239,74,30,.55)' }}><MarkDecode size={42} durationMs={1300} /></div>
       </div>
       <h1 style={{ fontSize: 28, fontWeight: 800, color: '#111', textAlign: 'center', margin: '0 0 26px', letterSpacing: '-.02em' }}>Log in</h1>
 
