@@ -128,7 +128,13 @@ function Generations() {
   const matchesQ = (g: Gen) => !q.trim() || titleOf(g).toLowerCase().includes(q.trim().toLowerCase())
   const shown = (gens || []).filter((g) => (filter === 'all' || g.type === filter) && matchesQ(g))
   const searchHits = q.trim() ? (gens || []).filter((g) => g.image_url && matchesQ(g)).slice(0, 8) : []
-  const dl = (g: Gen) => { if (g.image_url) window.location.href = `/api/download?url=${encodeURIComponent(g.image_url)}&name=selfmade-ad.png` }
+  // Force a real "Save as…" through our attachment proxy, with the right extension for image vs video.
+  const dl = (g: Gen) => {
+    if (!g.image_url) return
+    const ext = g.media_type === 'video' ? 'mp4' : ((g.image_url.match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1]) || 'png')
+    const name = creativeFilename({ brand: g.brand_name, ext, kind: g.type, date: new Date(g.created_at) })
+    window.location.href = `/api/creatives/download?url=${encodeURIComponent(g.image_url)}&name=${encodeURIComponent(name)}`
+  }
 
   return (
     <div>
@@ -218,6 +224,21 @@ function Generations() {
                     <Badge>{g.type}</Badge>{g.tier === 'pro' && <Badge tone="pro">Pro</Badge>}
                   </div>
                   <div style={{ fontSize: 12, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{g.brand_name || g.prompt || 'Untitled'}</div>
+                  {/* Per-card actions (Lapis-style): Download the file directly, or Run it on Facebook —
+                      the latter opens the creative with the "Launch on Facebook" panel. Only for finished
+                      creatives with a rendered file. */}
+                  {g.image_url && g.status !== 'processing' && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 9 }}>
+                      <button onClick={(e) => { e.stopPropagation(); openGen(g) }}
+                        style={{ flex: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 8px', borderRadius: 8, border: 'none', background: '#ef4a1e', color: '#fff', fontSize: 12, fontWeight: 750, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' }}>
+                        ▶ Run on ads
+                      </button>
+                      <button onClick={(e) => { e.stopPropagation(); dl(g) }} title="Download"
+                        style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5, padding: '7px 11px', borderRadius: 8, border: '1px solid #cbd5cb', background: '#fff', color: DARK, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>
+                        <Download size={13} /> Save
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
