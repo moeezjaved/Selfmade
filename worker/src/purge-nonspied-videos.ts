@@ -25,6 +25,10 @@ import { r2UrlToKey, listSizesByPrefix, deleteManyFromR2 } from './r2.js'
 
 const DRY = process.argv.includes('--dry-run')
 const WITH_IMAGES = process.argv.includes('--with-images')
+// Orphan sweep: most of the bucket's video files have NO surviving ad row (old crawls, prior purges), so
+// the ad-driven scan can't see them. This mode deletes by KEY instead — every videos/{adId}_*.mp4 whose
+// adId isn't in the keep set (spied brands' current ads + saved ads). Reclaims the orphaned TBs.
+const ORPHANS = process.argv.includes('--orphans')
 const PAGE = 500
 // Cloudflare R2 standard storage: $0.015 per GB-month (egress is free). Dashboard is authoritative;
 // this is just to turn "GB reclaimed" into an at-a-glance $/month so you don't have to do the math.
@@ -53,6 +57,57 @@ async function main() {
   const keepPages = await loadIdSet('followed_brands', 'page_id', (q) => q.eq('spied', true))
   const keepAds = await loadIdSet('discovery_saved_ads', 'ad_id')
   console.log(`   Keep: ${keepPages.size} spied brands · ${keepAds.size} saved ads\n`)
+
+  // ── ORPHAN SWEEP ── delete by R2 key, not by DB ad. Most video files have no surviving ad row.
+  if (ORPHANS) {
+    console.log(`🧹 Orphan sweep ${DRY ? '(DRY RUN)' : '(LIVE)'} — deleting videos/{adId}.mp4 not owned by a spied/saved ad.\n`)
+    // Build keepAdIds = saved ad_ids ∪ every current ad_id under a spied page.
+    const keepAdIds = new Set<string>(keepAds)
+    if (keepPages.size) {
+      const pages = [...keepPages]
+      for (let i = 0; i < pages.length; i += 50) {
+        const chunk = pages.slice(i, i + 50)
+        let from = 0
+        for (;;) {
+          const { data, error } = await (supabase as any).from('discovery_ads_index').select('ad_id').in('page_id', chunk).range(from, from + 1000 - 1)
+          if (error) throw new Error(`spied ad_ids: ${error.message}`)
+          const rows = (data as any[]) || []
+          for (const r of rows) if (r.ad_id) keepAdIds.add(String(r.ad_id))
+          from += rows.length
+          if (rows.length < 1000) break
+        }
+      }
+    }
+    console.log(`   Keep set: ${keepAdIds.size.toLocaleString()} ad_ids (spied + saved)\n`)
+
+    console.log('📦 Listing videos/ …')
+    const gbAll = (n: number) => (n / 1073741824).toFixed(2)
+    const videoSizes = await listSizesByPrefix('videos/', (c, b) => process.stdout.write(`\r   …videos: ${c.toLocaleString()} objects (${gbAll(b)} GB)   `))
+    console.log('')
+
+    // A video key is videos/{adId}_{position}.mp4 — extract adId and keep only spied/saved.
+    const toDelete: string[] = []
+    let keptBytes = 0, delBytes = 0, unparsed = 0
+    for (const [key, size] of videoSizes) {
+      const m = key.match(/^videos\/(.+)_\d+\.mp4$/i)
+      if (!m) { unparsed++; continue }         // unexpected key shape → never touch it
+      const adId = m[1]
+      if (keepAdIds.has(adId)) { keptBytes += size; continue }
+      toDelete.push(key); delBytes += size
+    }
+    console.log(`\n📊 Orphan sweep result`)
+    console.log(`   Video objects total:   ${videoSizes.size.toLocaleString()}  (${gbAll(keptBytes + delBytes)} GB)`)
+    console.log(`   Kept (spied/saved):    ${(videoSizes.size - toDelete.length - unparsed).toLocaleString()}  (${gbAll(keptBytes)} GB)`)
+    console.log(`   To DELETE:             ${toDelete.length.toLocaleString()}  (${gbAll(delBytes)} GB)`)
+    if (unparsed) console.log(`   ⚠️  Skipped ${unparsed} keys with an unexpected shape (never deleted)`)
+    console.log(`   ≈ Save: $${((delBytes / 1073741824) * R2_USD_PER_GB_MONTH).toFixed(2)}/month\n`)
+
+    if (DRY) { console.log('✅ Dry run — nothing deleted. Re-run with --orphans (no --dry-run) to execute.\n'); return }
+    console.log('🗑  Deleting orphaned + non-spied video objects…')
+    const del = await deleteManyFromR2(toDelete)
+    console.log(`   deleted ${del.toLocaleString()} objects (${gbAll(delBytes)} GB)\n✅ Done.\n`)
+    return
+  }
 
   // 2) R2 sizes. By DEFAULT we list only the prefixes we may delete (videos/ + posters/) — that's all
   //    that's needed to price the reclaim, and it's fast. Pass --with-images to ALSO measure the image
