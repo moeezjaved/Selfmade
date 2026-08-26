@@ -39,12 +39,18 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
   const addToChat = (t: StudioTag) => { setChatTags((x) => (x.some((y) => y.label === t.label && y.image === t.image) ? x : [...x, t])); setActive('home') }
   useEffect(() => { if (section) setActive(section) }, [section])
   useEffect(() => {
-    if (domainOverride) return   // embedded in the app shell → domain comes from the active brand
-    const u = new URLSearchParams(window.location.search).get('domain')
-    const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
-    const d = (u || (c ? decodeURIComponent(c) : '') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
-    if (d) setDomain(d)
-  }, [])
+    const sp = new URLSearchParams(window.location.search)
+    if (!domainOverride) {   // embedded in the app shell → domain comes from the active brand
+      const u = sp.get('domain')
+      const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
+      const d = (u || (c ? decodeURIComponent(c) : '') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+      if (d) setDomain(d)
+    }
+    // Remake handoff from the retired /studio route (redirected here): ?img= is the reference creative,
+    // ?brand= its source. Seed it into Mello chat so the remake continues on the new surface.
+    const img = sp.get('img')
+    if (img) { addToChat({ label: `Like ${sp.get('brand') || 'this ad'}`.slice(0, 24), image: img, kind: 'discover' }) }
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
   const Sidebar = (
     <aside style={{ width: isMobile ? '100%' : 250, flex: 'none', background: '#fff', borderRight: `1px solid ${LINE}`, padding: '18px 14px', display: 'flex', flexDirection: 'column', gap: 4, minHeight: isMobile ? 'auto' : '100dvh', boxSizing: 'border-box' }}>
