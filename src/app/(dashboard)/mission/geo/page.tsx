@@ -184,6 +184,9 @@ export default function GeoPage() {
   }
 
   const engines = status?.engines?.length ? status.engines : status?.availableEngines || []
+  // First load (or right after a brand switch): show a skeleton instead of the empty "run your first check"
+  // state, so we never flash "no data" while the status is still fetching.
+  const booting = loading && !status
   const sov = status ? Math.round(status.shareOfVoice * 100) : 0
 
   return (
@@ -193,7 +196,19 @@ export default function GeoPage() {
       <div className="wrap">
         <a href="/mission" className="back">← Back to your desk</a>
 
-        <div className="top">
+        {booting && (
+          <div style={{ marginTop: 10 }} aria-busy="true">
+            <style>{`@keyframes sfShim{0%,100%{opacity:.55}50%{opacity:1}}.sfsk{animation:sfShim 1.2s ease-in-out infinite}`}</style>
+            <div className="sfsk" style={{ height: 12, width: 110, borderRadius: 6, background: '#e9ece7', marginBottom: 16 }} />
+            <div className="sfsk" style={{ height: 40, width: '58%', borderRadius: 10, background: '#e9ece7', marginBottom: 14 }} />
+            <div className="sfsk" style={{ height: 15, width: '82%', borderRadius: 6, background: '#eef1ec', marginBottom: 8 }} />
+            <div className="sfsk" style={{ height: 15, width: '68%', borderRadius: 6, background: '#eef1ec', marginBottom: 28 }} />
+            <div className="sfsk" style={{ height: 84, width: '100%', borderRadius: 12, background: '#f2f4f0', marginBottom: 14 }} />
+            <div className="sfsk" style={{ height: 120, width: '100%', borderRadius: 12, background: '#f2f4f0' }} />
+          </div>
+        )}
+
+        {!booting && <div className="top">
           <div>
             <div className="eyebrow">AI visibility · GEO</div>
             <h1>Are you in the AI answers?</h1>
@@ -206,7 +221,7 @@ export default function GeoPage() {
             )}
             {status?.hasData && <button className="regen" onClick={() => runCheck(true)} disabled={running}>↻ Re-read my site &amp; regenerate questions</button>}
           </div>
-        </div>
+        </div>}
 
         {status?.category && (
           <div className="understood">
