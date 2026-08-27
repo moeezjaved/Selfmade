@@ -178,14 +178,29 @@ export async function POST(req: NextRequest) {
       // Topics coming from the keyword-opportunities list ARE keywords → SEO-optimize the article to rank
       // for that exact keyword (title/H1/meta/first line). body.keyword lets the client mark it explicitly.
       const kw = String(body.keyword || (body.isKeyword ? topic : '')).trim() || undefined
-      const article = await writeArticle(admin, store, userId, topic, kw ? { keyword: kw } : undefined)
+      // ONE article for a whole keyword CLUSTER: pull related keywords this brand's rivals rank for that
+      // share a meaningful word with the primary, so the page also targets close variants (beats thin pages).
+      let secondaryKeywords: string[] = []
+      if (kw) {
+        const primaryTokens = new Set(kw.toLowerCase().split(/\s+/).filter((w) => w.length > 3))
+        const { data: cRows } = await admin.from('seo_competitors').select('top_keywords').eq('user_id', userId).eq('brand_id', brandId)
+        const pool = new Map<string, number>()
+        for (const r of (cRows || []) as any[]) for (const k of ((r.top_keywords || []) as any[])) {
+          const kwLc = String(k.keyword || '').toLowerCase()
+          if (!kwLc || kwLc === kw.toLowerCase()) continue
+          if (Array.from(primaryTokens).some((t) => kwLc.includes(t))) pool.set(k.keyword, Math.max(pool.get(k.keyword) || 0, Number(k.volume) || 0))
+        }
+        secondaryKeywords = Array.from(pool.entries()).sort((a, b) => b[1] - a[1]).slice(0, 4).map(([k]) => k)
+      }
+      const article = await writeArticle(admin, store, userId, topic, kw ? { keyword: kw, secondaryKeywords } : undefined)
       if (!article) { await refundCredits(admin, bTx).catch(() => {}); return NextResponse.json({ error: 'Could not draft that page — try again.' }, { status: 500 }) }
       const html = renderArticleHtml(article, null)
+      const seo = kw ? { keyword: kw, metaTitle: article.metaTitle, metaDescription: article.metaDescription, secondary: secondaryKeywords } : { metaTitle: article.metaTitle, metaDescription: article.metaDescription }
       const { data: saved } = await admin.from('geo_assets').insert({
-        brand_id: brandId, user_id: userId, kind: 'blog', title: article.title, target_prompt: topic, body_markdown: html, status: 'draft',
+        brand_id: brandId, user_id: userId, kind: 'blog', title: article.title, target_prompt: topic, body_markdown: html, status: 'draft', seo,
       }).select('id').maybeSingle()
       await commitCredits(admin, bTx, { kind: 'blog_draft', via: 'competitor_gap', topic }).catch(() => {})
-      return NextResponse.json({ ok: true, id: saved?.id, title: article.title })
+      return NextResponse.json({ ok: true, id: saved?.id, title: article.title, secondary: secondaryKeywords })
     } catch (e) {
       await refundCredits(admin, bTx).catch(() => {})
       return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })

@@ -64,19 +64,21 @@ export async function suggestTopics(admin: any, store: StoreRow, userId: string)
 }
 
 /** Write the deep article, grounded in brand understanding + the real catalog. */
-export async function writeArticle(admin: any, store: StoreRow, userId: string, topic?: string, opts?: { keyword?: string }): Promise<Article | null> {
+export async function writeArticle(admin: any, store: StoreRow, userId: string, topic?: string, opts?: { keyword?: string; secondaryKeywords?: string[] }): Promise<Article | null> {
   const brand = await describeBrand(admin, userId, store.brand_id).catch(() => null)
   const products = await catalogForBlog(admin, store, 24)
   const category = brand?.category || store.shop_name || 'the store'
   const competitors = (brand?.competitors || []).slice(0, 6)
   const keyword = (opts?.keyword || '').trim()
+  const secondary = (opts?.secondaryKeywords || []).map((k) => k.trim()).filter(Boolean).slice(0, 5)
 
   const seoBlock = keyword ? `
 SEO TARGET KEYWORD: "${keyword}" — this article must be built to RANK for this exact keyword:
 - Put the EXACT keyword in: the title (metaTitle), the article title, and the FIRST sentence of the opening answer.
 - Use the keyword (and close variants) naturally 2-4 more times across the body — never stuffed.
 - metaTitle ≤ 60 chars and leads with the keyword; metaDescription ≤ 155 chars, compelling, includes the keyword.
-- The slug should be the keyword, hyphenated.` : ''
+- The slug should be the keyword, hyphenated.${secondary.length ? `
+- ALSO rank for these RELATED keywords by covering each with its own angle/section, naturally: ${secondary.map((k) => `"${k}"`).join(', ')}. One thorough article that answers the whole cluster beats five thin ones.` : ''}` : ''
 
   const sys = `You are a senior DTC content strategist writing a buyer-intent article that ranks on Google AND gets cited by AI answer engines. You understand the product category deeply and write with real specificity — no fluff, no invented facts.
 

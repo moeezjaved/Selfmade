@@ -34,7 +34,7 @@ export async function GET(req: NextRequest) {
   if ('error' in c) return c.error
   const { admin, store, userId } = c
   const { data: drafts } = await admin.from('geo_assets')
-    .select('id, title, target_prompt, body_markdown, status, published_url, created_at')
+    .select('id, title, target_prompt, body_markdown, status, published_url, created_at, seo')
     .eq('user_id', userId).eq('kind', 'blog').order('created_at', { ascending: false }).limit(50)
   const topics = await suggestTopics(admin, store, userId).catch(() => [])
   return NextResponse.json({ connected: true, store: { shop_name: store.shop_name, shop_domain: store.shop_domain }, drafts: drafts || [], topics })
@@ -92,9 +92,11 @@ export async function POST(req: NextRequest) {
     // the hero url was stashed in published_url at draft time; body already includes it
     const heroUrl = draft.published_url && String(draft.published_url).startsWith('http') && !String(draft.published_url).includes('/blogs/') ? draft.published_url : null
     try {
+      const metaDesc = draft.seo?.metaDescription ? String(draft.seo.metaDescription) : ''
       const res = await publishToShopifyBlog(store, {
         title: draft.title, bodyHtml: draft.body_markdown || '', imageUrl: heroUrl,
         author: store.shop_name || undefined,
+        ...(metaDesc ? { summaryHtml: metaDesc } : {}),   // ships the meta description as the article summary
       })
       await admin.from('geo_assets').update({ status: 'published', published_url: res.url, shopify_article_id: String(res.articleId) }).eq('id', id)
       try { const { recordWin } = await import('@/lib/mello/wins'); await recordWin(admin, { userId, brandId: store.brand_id, category: 'content', title: 'Published a blog article', detail: draft.title, currency: store.currency, meta: { geo_asset_id: id, url: res.url } }) } catch { /* optional */ }

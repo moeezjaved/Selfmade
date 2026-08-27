@@ -11,7 +11,8 @@ import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
-type Draft = { id: string; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null; created_at: string }
+type Seo = { keyword?: string; metaTitle?: string; metaDescription?: string; secondary?: string[] }
+type Draft = { id: string; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null; created_at: string; seo?: Seo | null }
 type Data = { connected: boolean; store?: { shop_name?: string; shop_domain?: string }; drafts?: Draft[]; topics?: string[] }
 
 export default function BlogPage() {
@@ -126,19 +127,40 @@ export default function BlogPage() {
           <div style={{ fontSize: 15, fontWeight: 800, margin: '4px 0 12px' }}>Your articles</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
             {drafts.map((d) => (
-              <div key={d.id} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div style={{ fontSize: 14, fontWeight: 700 }}>{d.title}</div>
-                  <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>
-                    {d.status === 'published' && d.published_url
-                      ? <>Published · <a href={d.published_url} target="_blank" rel="noreferrer" style={{ color: GOOD }}>view live →</a></>
-                      : 'Draft'}
+              <div key={d.id} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 14 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div style={{ fontSize: 14, fontWeight: 700 }}>{d.title}</div>
+                    <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>
+                      {d.status === 'published' && d.published_url
+                        ? <>Published · <a href={d.published_url} target="_blank" rel="noreferrer" style={{ color: GOOD }}>view live →</a></>
+                        : 'Draft'}
+                      {d.seo?.keyword && <> · targeting <b style={{ color: INK }}>{d.seo.keyword}</b></>}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => openDraft(d)} style={ghostBtn}>Open</button>
+                    {d.status !== 'published' && <button onClick={() => publish(d.id)} disabled={!!busy} style={{ ...primaryBtn, background: GOOD }}>{busy === `pub:${d.id}` ? 'Publishing…' : 'Publish'}</button>}
                   </div>
                 </div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button onClick={() => openDraft(d)} style={ghostBtn}>Open</button>
-                  {d.status !== 'published' && <button onClick={() => publish(d.id)} disabled={!!busy} style={{ ...primaryBtn, background: GOOD }}>{busy === `pub:${d.id}` ? 'Publishing…' : 'Publish'}</button>}
-                </div>
+                {/* SEO at a glance — the Google search preview + the keyword cluster this page targets. */}
+                {(d.seo?.metaTitle || d.seo?.keyword) && (
+                  <div style={{ marginTop: 10, borderTop: `1px solid ${LINE}`, paddingTop: 10 }}>
+                    {d.seo?.metaTitle && (
+                      <div style={{ background: '#f7f9f6', borderRadius: 8, padding: '8px 11px' }}>
+                        <div style={{ fontSize: 10.5, color: SUB, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 4 }}>Google preview</div>
+                        <div style={{ fontSize: 14, color: '#1a0dab', fontWeight: 600, lineHeight: 1.3 }}>{d.seo.metaTitle}</div>
+                        {d.seo?.metaDescription && <div style={{ fontSize: 12, color: '#4d5156', marginTop: 2, lineHeight: 1.4 }}>{d.seo.metaDescription}</div>}
+                      </div>
+                    )}
+                    {!!(d.seo?.secondary && d.seo.secondary.length) && (
+                      <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <span style={{ fontSize: 11, color: SUB, fontWeight: 700 }}>Also targets:</span>
+                        {d.seo.secondary.map((k, i) => <span key={i} style={{ fontSize: 11.5, color: INK, background: '#eef3ea', borderRadius: 100, padding: '2px 9px' }}>{k}</span>)}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
