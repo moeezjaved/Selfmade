@@ -63,10 +63,12 @@ export async function resolveBrandScopedAccount(admin: SupabaseClient, userId: s
       if (linked) return linked
       // A brand IS active but has NOTHING linked. In strict mode (read/report surfaces like the
       // Campaigns page) return null so the UI shows an empty "connect an ad account for THIS brand"
-      // state instead of silently borrowing another brand's account — the "switched to new-spacemen
-      // but still saw Aura's campaigns" bug. Non-strict (write flow / brief seed) keeps the primary
-      // fallback so legacy accounts with no brand link still resolve.
+      // state instead of silently borrowing another brand's account.
       if (opts?.strict) return null
+      // Non-strict (write/seed): only borrow the primary when NO account is linked to ANY brand (pure
+      // legacy single-account user). Once the user has linked accounts per brand, a brand with none must
+      // NOT borrow another brand's account — that's the "one account shows under all brands" leak.
+      if (rows.some(a => a.brand_id)) return null
     }
   } catch { /* fall through to primary */ }
   return resolveScopedAccount(admin, userId)
