@@ -115,9 +115,24 @@ async function main() {
     }
     console.log(`   Keep set: ${keepAdIds.size.toLocaleString()} ad_ids (spied + saved)\n`)
 
+    // posters/ are keyed by CONTENT HASH (posters/{hash}.jpg), so we can't parse an ad_id from the key.
+    // Instead build the set of poster R2 KEYS actually referenced by KEPT ads (discovery_creatives.poster_url
+    // for our keepAdIds) → keep those, delete the rest. Reference-based, so hash-keyed posters are handled.
+    const keepPosterKeys = new Set<string>()
+    if (keepAdIds.size) {
+      const ids = [...keepAdIds]
+      for (let i = 0; i < ids.length; i += 300) {
+        const chunk = ids.slice(i, i + 300)
+        const { data, error } = await (supabase as any).from('discovery_creatives').select('poster_url').in('ad_id', chunk).not('poster_url', 'is', null)
+        if (error) throw new Error(`keep posters: ${error.message}`)
+        for (const r of (data as any[]) || []) { const k = r2UrlToKey(r.poster_url); if (k) keepPosterKeys.add(k) }
+      }
+    }
+    console.log(`   Poster keep set: ${keepPosterKeys.size.toLocaleString()} poster keys referenced by kept ads\n`)
+
     const gbAll = (n: number) => (n / 1073741824).toFixed(2)
-    // Sweep videos/ + thumbnails/ (ad images) + posters/ — all keyed {adId}_{pos}.ext. thumbs/ is keyed
-    // by HASH (shared, deduped serving thumbs) so it's intentionally NOT swept (can't map to an ad).
+    // videos/ + thumbnails/ are keyed {adId}_{pos}.ext → parse the ad_id. posters/ is hash-keyed → use the
+    // reference set above. thumbs/ (shared serving webp) is still never swept.
     const PREFIXES = ['videos/', 'thumbnails/', 'posters/']
     const EXT = /\.(mp4|jpg|jpeg|webp|png)$/i
     const toDelete: string[] = []
@@ -127,9 +142,19 @@ async function main() {
       console.log(`📦 Listing ${prefix} …`)
       const sizes = await listSizesByPrefix(prefix, (c, b) => process.stdout.write(`\r   …${prefix}: ${c.toLocaleString()} objects (${gbAll(b)} GB)   `))
       console.log('')
-      let pKept = 0, pDel = 0, pDelBytes = 0
+      let pDel = 0, pDelBytes = 0
+      // SAFETY: never delete posters if we couldn't resolve ANY kept-poster references — an empty set here
+      // almost certainly means a query/schema problem, and deleting all posters would nuke kept ads' images.
+      const posterRefSafe = prefix !== 'posters/' || keepPosterKeys.size > 0
+      if (prefix === 'posters/' && !posterRefSafe) console.log('   ⚠️  Poster keep set is empty — SKIPPING poster deletes (safety).')
       for (const [key, size] of sizes) {
         totalObjs++
+        if (prefix === 'posters/') {
+          if (!posterRefSafe) { keptBytes += size; continue }
+          if (keepPosterKeys.has(key)) { keptBytes += size; continue }
+          toDelete.push(key); delBytes += size; pDel++; pDelBytes += size
+          continue
+        }
         // {prefix}{adId}_{position}.{ext} — extract adId; hash-keyed keys (no _pos) won't match → skipped.
         const m = key.match(new RegExp(`^${prefix}(.+)_\\d+${EXT.source}`, 'i'))
         if (!m) { unparsed++; continue }
@@ -137,7 +162,7 @@ async function main() {
         if (keepAdIds.has(adId)) { keptBytes += size; continue }
         toDelete.push(key); delBytes += size; pDel++; pDelBytes += size
       }
-      pKept = sizes.size - pDel
+      const pKept = sizes.size - pDel
       console.log(`   ${prefix}  ${sizes.size.toLocaleString()} objects · delete ${pDel.toLocaleString()} (${gbAll(pDelBytes)} GB) · keep ${pKept.toLocaleString()}`)
     }
 
