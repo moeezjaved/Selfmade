@@ -43,6 +43,16 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
     kitWebsite = data.brand_kit?.website || data.brand_kit?.url || data.website || ''
   } catch { return null }
 
+  // Prefer the CONNECTED Shopify store domain over the (often stale) brands.website signup default —
+  // otherwise GEO reports "no site found" / "not read" even when the store is connected in Brand Hub.
+  try {
+    const { resolveStore } = await import('@/lib/shopify/client')
+    const store = await resolveStore(admin as any, userId, brandId).catch(() => null)
+    const shop = store?.shop_domain ? String(store.shop_domain).trim() : ''
+    const { isAppDomain } = await import('@/lib/domain-guard')
+    if (shop && (!kitWebsite || isAppDomain(kitWebsite))) kitWebsite = shop
+  } catch { /* Shopify optional — fall back to brand website */ }
+
   // competitors are cheap + can change → always fetched fresh (a strong category anchor)
   const competitors = await loadCompetitors(admin, userId, brandId)
 
@@ -142,20 +152,27 @@ If the competitors are nicotine/vaping brands, the category is nicotine/vaping �
 
 // ── landing page reader ──
 async function readLanding(url: string): Promise<{ text: string; title: string; description: string } | null> {
-  try {
-    const full = /^https?:\/\//i.test(url) ? url : `https://${url}`
-    const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
-    const r = await fetch(full, { headers: { 'user-agent': UA, accept: 'text/html' }, signal: AbortSignal.timeout(9000) })
-    const html = (await r.text()).slice(0, 300_000)
-    const grab = (re: RegExp) => re.exec(html)?.[1]?.trim() || ''
-    const title = grab(/<title[^>]*>([^<]{0,200})/i)
-    const description = grab(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']{0,400})/i) || grab(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{0,400})/i)
-    const text = html
-      .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
-      .replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500)
-    if (!text && !description && !title) return null
-    return { text, title, description }
-  } catch { return null }
+  const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+  const clean = url.replace(/^https?:\/\//i, '').replace(/\/.*$/, '')
+  // Try the given host, then toggle www — a store may serve only one of shopauranow.com / www.shopauranow.com.
+  const candidates = Array.from(new Set([
+    `https://${clean}`,
+    clean.startsWith('www.') ? `https://${clean.replace(/^www\./, '')}` : `https://www.${clean}`,
+  ]))
+  for (const full of candidates) {
+    try {
+      const r = await fetch(full, { headers: { 'user-agent': UA, accept: 'text/html' }, signal: AbortSignal.timeout(9000), redirect: 'follow' })
+      const html = (await r.text()).slice(0, 300_000)
+      const grab = (re: RegExp) => re.exec(html)?.[1]?.trim() || ''
+      const title = grab(/<title[^>]*>([^<]{0,200})/i)
+      const description = grab(/<meta[^>]+property=["']og:description["'][^>]+content=["']([^"']{0,400})/i) || grab(/<meta[^>]+name=["']description["'][^>]+content=["']([^"']{0,400})/i)
+      const text = html
+        .replace(/<script[\s\S]*?<\/script>/gi, ' ').replace(/<style[\s\S]*?<\/style>/gi, ' ')
+        .replace(/<[^>]+>/g, ' ').replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim().slice(0, 3500)
+      if (text || description || title) return { text, title, description }
+    } catch { /* try next candidate */ }
+  }
+  return null
 }
 
 function mostCommonUrl(urls: string[]): string {
