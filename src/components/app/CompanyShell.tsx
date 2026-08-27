@@ -14,6 +14,8 @@ import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChar
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { openCredits, CreditModal } from '@/components/credits/CreditModal'
+import ConfirmHost from '@/components/ConfirmDialog'
+import UpsellModalHost from '@/components/UpsellModal'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 import ProjectSwitcher from '@/components/app/ProjectSwitcher'
@@ -176,6 +178,10 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
       {/* Global credits/plan modal — listens for openCredits() from the account menu + the Top-up pill.
           Without this mounted, those clicks fired an event nobody heard (the "nothing happens" bug). */}
       <CreditModal />
+      {/* Global confirm + upsell hosts — without ConfirmHost, every confirmAction() promise hangs, so
+          disconnect/delete confirms never appear and their action never fires (was only in AppShell). */}
+      <ConfirmHost />
+      <UpsellModalHost />
       {!isMobile && Sidebar}
       {isMobile && open && (
         <div style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex' }}>

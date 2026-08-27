@@ -52,9 +52,12 @@ export async function DELETE(_req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient() as any
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
-  const store = await resolveStore(admin, user.id, brandId)
-  if (!store) return NextResponse.json({ ok: true, alreadyDisconnected: true })
-  const { error } = await admin.from('shopify_stores').delete().eq('id', (store as any).id)
+  // Remove EVERY store row for this user+brand (a user can accumulate multiple shop_domain rows) so GET
+  // can't report a leftover row as still-connected. Brand-scoped when a brand is active; else all the
+  // user's stores.
+  let q = admin.from('shopify_stores').delete().eq('user_id', user.id)
+  if (brandId) q = q.eq('brand_id', brandId)
+  const { error } = await q
   if (error) return NextResponse.json({ error: 'Could not disconnect — try again.' }, { status: 500 })
   return NextResponse.json({ ok: true })
 }
