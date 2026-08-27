@@ -127,15 +127,33 @@ export async function POST(req: NextRequest) {
     if (!tpls || !tpls[index]) return NextResponse.json({ error: 'no-template' }, { status: 404 })
     if (tpls[index].image && !body.force) return NextResponse.json({ image: tpls[index].image })   // already generated (unless force-regenerate)
 
+    // FIRST 5 renders per brand are FREE (the audit's promised concepts); beyond that each render charges
+    // image_studio_pro credits — Pro renders cost real money and unlimited-free was bleeding ~$2.5/audit.
+    const FREE_RENDERS = 5
+    const alreadyRendered = tpls.filter((t2: any) => t2.image).length
+    const isFree = alreadyRendered < FREE_RENDERS || (tpls[index].image && body.force)   // regenerating an existing one doesn't re-charge
+    let txId: string | null = null
+    if (!isFree) {
+      const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'image_studio_pro' })
+      if (rErr) {
+        const insufficient = String(rErr.message || '').includes('insufficient_credits')
+        return NextResponse.json({ error: insufficient ? 'insufficient_credits' : 'reserve_failed', reason: 'Your first 5 template renders are free — this one costs credits.' }, { status: insufficient ? 402 : 500 })
+      }
+      txId = (Array.isArray(tx) ? tx[0] : tx)?.id || null
+    }
+
     const t = tpls[index]
-    // FREE generation — the SAME Nano Banana Pro engine + buildStudioPrompt rules as the real studio
-    // (generate-ad), which already handles product sizing/composition correctly. No extra hardcoded rules.
+    // Same Nano Banana Pro engine + buildStudioPrompt rules as the real studio (generate-ad).
     const out = await renderAdFree(admin, user.id, brandId, {
       productImages: (body.productImages || []).filter(Boolean),
       headline: t.headline, angle: t.angle, aspectRatio: '4:5',
       colors: body.colors, fonts: body.fonts, logo: body.logo, brandName: body.brandName, productDesc: body.productDesc,
     })
-    if (!out?.url && !out?.image) return NextResponse.json({ error: 'generation-failed' }, { status: 502 })
+    if (!out?.url && !out?.image) {
+      if (txId) await admin.rpc('refund_credits', { p_tx: txId }).then(() => {}, () => {})
+      return NextResponse.json({ error: 'generation-failed' }, { status: 502 })
+    }
+    if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
     const img = out.url || out.image
     tpls[index] = { ...t, image: img }
     await writeCached(admin, brandId, tpls).catch(() => {})

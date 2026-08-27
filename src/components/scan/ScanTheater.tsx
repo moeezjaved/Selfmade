@@ -1175,40 +1175,31 @@ function ScoreAct({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
 
 // ── ACT 5 — "The fix" payoff: live free ads, scripted video, gated CTA + rival remake ──
 type CreativeState = { status: 'loading' | 'ready' | 'error'; imageUrl?: string }
-function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief; brandName: string; niche: string | null; pageId: string; i: number }) {
-  const [st, setSt] = useState<CreativeState>({ status: 'loading' })
-  useEffect(() => {
-    let alive = true
-    setSt({ status: 'loading' })
-    fetch('/api/scan/creative', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ brief, brandName, niche, pageId }) })
-      .then(async (r) => {
-        if (!r.ok) throw new Error(String(r.status))
-        const j = await r.json()
-        if (!j?.imageUrl) throw new Error('no image')
-        if (alive) setSt({ status: 'ready', imageUrl: j.imageUrl as string })
-      })
-      .catch(() => { if (alive) setSt({ status: 'error' }) })
-    return () => { alive = false }
-  }, [brief.key]) // eslint-disable-line react-hooks/exhaustive-deps
+// Zero-cost ad TEMPLATE — a CSS mockup built from the brief + the brand's already-crawled product image.
+// Replaces the per-brief Pro image render (gemini-3-pro-image 2K) that cost ~$1/card and looked off-brand.
+// The finished, fully-rendered creatives are generated later in the account (with credits) — not here.
+const TPL_THEMES = [
+  { bg: 'linear-gradient(160deg,#f4efe1,#e6dcc6)', ink: '#22281b', accent: '#c8410f', sub: 'rgba(34,40,27,.62)' },
+  { bg: 'linear-gradient(160deg,#1b2a1d,#0f150f)', ink: '#f4efe1', accent: '#ff9f7a', sub: 'rgba(244,239,225,.7)' },
+  { bg: 'linear-gradient(160deg,#ff6a3d,#e5401a)', ink: '#fff', accent: '#ffe1d4', sub: 'rgba(255,255,255,.82)' },
+  { bg: 'linear-gradient(160deg,#2a1c14,#3a2417)', ink: '#f7ecd9', accent: '#f2b48a', sub: 'rgba(247,236,217,.72)' },
+  { bg: 'linear-gradient(160deg,#e9e1cf,#d8ccae)', ink: '#22281b', accent: '#c8410f', sub: 'rgba(34,40,27,.6)' },
+]
+function FixCard({ brief, thumb, i }: { brief: CreativeBrief; thumb?: string | null; i: number }) {
+  const t = TPL_THEMES[i % TPL_THEMES.length]
   return (
     <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
-      {/* Container MUST match the generated aspect (route renders 4:5). A 1:1 box + object-fit:cover was
-          cropping the headline off the top AND zooming the product so it looked oversized. */}
-      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#efe8da' }}>
-        {st.status === 'loading' && <div className="sf-shim" style={{ position: 'absolute', inset: 0 }} />}
-        {st.status === 'ready' && st.imageUrl && (
-          <>
-            <img src={st.imageUrl} alt={brief.headline} style={{ width: '100%', height: '100%', objectFit: 'contain', display: 'block' }} />
-            <div aria-hidden style={{ position: 'absolute', inset: 0, pointerEvents: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ transform: 'rotate(-20deg)', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontWeight: 800, letterSpacing: '.35em', fontSize: 'clamp(26px,7vw,44px)', color: 'rgba(255,255,255,.5)', textShadow: '0 2px 12px rgba(0,0,0,.35)' }}>PREVIEW</span>
-            </div>
-          </>
-        )}
-        {st.status === 'error' && (
-          <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '18px 20px' }}>
-            <div style={{ fontSize: 13, color: SUB, textAlign: 'center', lineHeight: 1.5 }}>Our studio is busy — sign up and we&rsquo;ll render these to your account.</div>
-          </div>
-        )}
+      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: t.bg, display: 'flex', flexDirection: 'column', padding: 'clamp(16px,2.4vw,22px)' }}>
+        {/* honest badge — this is a layout template, not a finished render */}
+        <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 9.5, fontWeight: 800, letterSpacing: '.18em', color: t.sub, border: `1px solid ${t.sub}`, borderRadius: 100, padding: '3px 9px' }}>TEMPLATE</span>
+        <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 800, letterSpacing: '.02em', color: t.sub }}>{brief.headline ? '' : ''}{/* brand */}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: t.sub, textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad concept #{i + 1}</div>
+        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(20px,2.9vw,28px)', color: t.ink, lineHeight: 1.08, letterSpacing: '-.01em', marginTop: 8 }}>{brief.headline}</div>
+        {brief.angle && <div style={{ fontSize: 13, color: t.sub, marginTop: 8, lineHeight: 1.4 }}>{brief.angle}</div>}
+        <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
+          <span style={{ background: t.accent, color: t.bg.includes('#fff') || i === 2 ? '#7a1e08' : '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 100, padding: '9px 16px', alignSelf: 'flex-end' }}>Shop Now →</span>
+          {thumb && <div style={{ width: 84, height: 84, borderRadius: 12, overflow: 'hidden', border: '2px solid rgba(255,255,255,.5)', flex: 'none', background: '#fff' }}><img src={thumb} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /></div>}
+        </div>
       </div>
       <div style={{ padding: '12px 14px 14px' }}>
         <span style={{ display: 'inline-block', fontSize: 11, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#c8410f', background: `${ORANGE}14`, border: `1px solid ${ORANGE}33`, borderRadius: 100, padding: '3px 10px' }}>Fills: {brief.gapLabel}</span>
@@ -1219,18 +1210,20 @@ function FixCard({ brief, brandName, niche, pageId, i }: { brief: CreativeBrief;
 }
 function TheFix({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
   if (!res.briefs?.length) return null
-  const briefs = res.briefs.slice(0, 2)
+  const briefs = res.briefs.slice(0, 5)
+  // The brand's own best crawled ad image → the product thumb on the template cards.
+  const ownThumb = res.own?.examples?.[0]?.thumb || null
   const rv = res.rivalVideo || null
   // If a rival has a proven VIDEO, we script a remake of THAT (and show it playing); else a fresh template.
   const script = rv ? remakeScript(rv, res.brand.name, res.brand.niche) : videoShotList(res.briefs[0], res.brand.name, res.brand.niche)
   const rival = res.rivalToRemake
   return (
     <div style={{ marginTop: 40 }}>
-      <h2 style={h2}>The fix — ads we&rsquo;d run <span style={{ color: ORANGE }}>for you</span></h2>
-      <p style={sub}>Not a to-do list. Real ads, generated from the winning DNA you&rsquo;re missing.</p>
+      <h2 style={h2}>The fix — 5 ad concepts <span style={{ color: ORANGE }}>built for you</span></h2>
+      <p style={sub}>Templates from the winning DNA you&rsquo;re missing. Sign up and Mello renders them as finished ads with your product — plus 5 more of your choice.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(260px,100%),1fr))', gap: 16, marginTop: 22 }}>
-        {briefs.map((b, i) => <FixCard key={b.key} brief={b} brandName={res.brand.name} niche={res.brand.niche} pageId={res.brand.pageId} i={i} />)}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(230px,100%),1fr))', gap: 16, marginTop: 22 }}>
+        {briefs.map((b, i) => <FixCard key={b.key} brief={b} thumb={ownThumb} i={i} />)}
       </div>
 
       {/* Rival-video remake: play their proven winner, script it beat-by-beat for the user's product */}

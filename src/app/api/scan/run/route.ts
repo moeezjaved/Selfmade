@@ -206,7 +206,7 @@ export async function POST(req: NextRequest) {
     // SAME writing system as the brand — a Cyrillic/CJK store is not a believable "peer" for a Latin-script
     // brand even inside the same niche (country data is too sparse to rely on alone). Fall back to the
     // longest-running example if none match.
-    const briefs = creativeBriefs(result, brandName, niche, 2)
+    const briefs = creativeBriefs(result, brandName, niche, 5)   // 5 template concepts (zero-cost CSS mockups in the theater)
     const rivalToRemake = pickRival(result.winners.examples, brandName)
     const rivalVideo = await bestRivalVideo(admin, competitorPageIds, brandName)
 
