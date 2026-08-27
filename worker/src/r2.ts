@@ -30,7 +30,12 @@ const client = new S3Client({
   },
   requestHandler: new NodeHttpHandler({
     httpsAgent: new Agent({ keepAlive: true, maxSockets: R2_MAX_SOCKETS }),
+    // Without these a stalled socket hangs forever — a single frozen DeleteObjects call froze a whole
+    // 2.1M-object purge for 4 hours. Time out and let the retry logic recover instead.
+    connectionTimeout: 10_000,
+    requestTimeout: 30_000,
   }),
+  maxAttempts: 3,
 })
 
 /**
@@ -84,21 +89,45 @@ export async function listSizesByPrefix(prefix: string, onProgress?: (count: num
 }
 
 /**
- * Delete objects by key, batched (S3 DeleteObjects caps at 1000/call). Returns the number deleted.
- * Best-effort: logs and continues on a batch error so a purge run can always make progress.
+ * Delete objects by key, batched (S3 DeleteObjects caps at 1000/call) and run CONCURRENTLY with per-batch
+ * retry + progress logging. Best-effort: logs and continues on a batch error so a purge always makes
+ * progress and can never freeze on one stalled request (the client now has request timeouts + retries).
+ * @param onProgress called after each batch with the running deleted count and the total.
  */
-export async function deleteManyFromR2(keys: string[]): Promise<number> {
+export async function deleteManyFromR2(keys: string[], onProgress?: (deleted: number, total: number) => void): Promise<number> {
+  const CONCURRENCY = parseInt(process.env.R2_DELETE_CONCURRENCY || '12', 10)
+  const batches: string[][] = []
+  for (let i = 0; i < keys.length; i += 1000) batches.push(keys.slice(i, i + 1000))
+
   let deleted = 0
-  for (let i = 0; i < keys.length; i += 1000) {
-    const batch = keys.slice(i, i + 1000)
-    try {
-      const res = await client.send(new DeleteObjectsCommand({ Bucket: config.r2.bucket, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } }))
-      deleted += batch.length - (res.Errors?.length || 0)
-      if (res.Errors?.length) console.warn(`  ⚠️  ${res.Errors.length} delete errors in batch (e.g. ${res.Errors[0].Key}: ${res.Errors[0].Message})`)
-    } catch (err) {
-      console.warn(`  ⚠️  R2 batch delete failed:`, err instanceof Error ? err.message : err)
+  let next = 0
+  const total = keys.length
+
+  const deleteBatch = async (batch: string[]): Promise<void> => {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      try {
+        const res = await client.send(new DeleteObjectsCommand({ Bucket: config.r2.bucket, Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true } }))
+        deleted += batch.length - (res.Errors?.length || 0)
+        if (res.Errors?.length) console.warn(`  ⚠️  ${res.Errors.length} delete errors in batch (e.g. ${res.Errors[0].Key}: ${res.Errors[0].Message})`)
+        return
+      } catch (err) {
+        if (attempt === 3) { console.warn(`  ⚠️  R2 batch delete failed after 3 tries:`, err instanceof Error ? err.message : err); return }
+        await new Promise((r) => setTimeout(r, 500 * attempt))   // small backoff, then retry
+      }
     }
   }
+
+  // Worker pool: CONCURRENCY workers each pull the next batch until none remain.
+  const worker = async (): Promise<void> => {
+    while (true) {
+      const idx = next++
+      if (idx >= batches.length) return
+      await deleteBatch(batches[idx])
+      if (onProgress && (idx % 20 === 0 || deleted >= total - 1000)) onProgress(deleted, total)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batches.length) }, () => worker()))
+  onProgress?.(deleted, total)
   return deleted
 }
 
