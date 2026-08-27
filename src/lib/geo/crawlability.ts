@@ -26,10 +26,29 @@ export async function buildCrawlAsset(admin: SupabaseClient, userId: string, bra
   const description = u?.description || category || ''
   const competitors = u?.competitors || []
 
+  // Prefer the CONNECTED Shopify catalog (real products) — brand_products is often empty for Shopify-door
+  // brands, which is why llms.txt/schema/fact-sheet came out with just the brand name and no products.
   let products: Product[] = []
   try {
-    if (brandId) { const { data } = await (admin as any).from('brand_products').select('name, description, price').eq('brand_id', brandId).limit(12); products = ((data || []) as any[]).map((p) => ({ name: p.name || '', description: (p.description || '').slice(0, 200), price: p.price || '' })).filter((p) => p.name) }
-  } catch { /* ignore */ }
+    const { resolveStore } = await import('@/lib/shopify/client')
+    const store = await resolveStore(admin as any, userId, brandId).catch(() => null)
+    if (store) {
+      const { data } = await (admin as any).from('shopify_products')
+        .select('title, body_html, price_min, product_type').eq('store_id', store.id).limit(20)
+      const cur = (store as any).currency ? String((store as any).currency) : ''
+      products = ((data || []) as any[]).map((p) => ({
+        name: p.title || '',
+        description: String(p.body_html || p.product_type || '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 220),
+        price: p.price_min != null ? `${cur ? cur + ' ' : ''}${p.price_min}`.trim() : '',
+      })).filter((p) => p.name)
+    }
+  } catch { /* Shopify optional */ }
+  // Fallback: brand_products (funnel/onboarding brands with no Shopify connection).
+  if (!products.length) {
+    try {
+      if (brandId) { const { data } = await (admin as any).from('brand_products').select('name, description, price').eq('brand_id', brandId).limit(12); products = ((data || []) as any[]).map((p) => ({ name: p.name || '', description: (p.description || '').slice(0, 200), price: p.price || '' })).filter((p) => p.name) }
+    } catch { /* ignore */ }
+  }
 
   let title = '', body = ''
   if (kind === 'llms_txt') { title = 'llms.txt'; body = buildLlmsTxt(brandName, description, category, website, products) }
