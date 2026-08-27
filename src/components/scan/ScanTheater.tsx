@@ -297,7 +297,10 @@ export default function ScanTheater({ embedded = false, seed, onDone }: {
         for (const [text, bad] of slideFindings(s.key)) { addFinding(s.stage, text, bad); await sleep(1000); used += 1000 }
         // last slide of this stage → mark the sidebar step done
         if (i === deck.length - 1 || deck[i + 1].stage !== s.stage) setStep(s.stage, 'done', stageMetric(s.stage))
-        await sleep(Math.max(1400, PER_SLIDE_MS - used))
+        // Dense slides need longer to read (the score slide packs the $100k→$1M benchmark + ad-presence
+        // score; formula/DNA carry a lot). Give them extra dwell so they don't fly past.
+        const dwell = s.key === 'score' ? 13000 : (s.key === 'rivals-formula' || s.key.includes('dna')) ? 9500 : PER_SLIDE_MS
+        await sleep(Math.max(1400, dwell - used))
       }
       stopProg(); setPct(100); await sleep(600)
       setPhase('done'); running.current = false
@@ -621,6 +624,17 @@ function slideNoAds(brandName: string) {
 
 // SLIDE — creative DNA, chunked 4 panels per slide (so 7 dims split 4+3, never scroll). Each panel leads
 // with its #1 move BIG (Fraunces + a share bar), then the runners-up as chips — editorial, not a flat list.
+// Plain-English gloss for each DNA dimension — so "Emotion: trust" reads as "the feeling their ads lean on".
+const DNA_GLOSS: Record<string, string> = {
+  emotion: 'the feeling their ads lean on',
+  themes: 'what the ad is mostly about',
+  hook_type: 'how the ad grabs you in the first line',
+  angle: 'the reason they give you to buy',
+  persona: 'who they’re speaking to',
+  usp: 'the promise they make',
+  desire: 'the outcome they’re selling',
+  format_style: 'the look & style of the creative',
+}
 function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
   const panels = PANELS.filter(([k]) => (dist[k] || []).length).slice(chunk * 4, chunk * 4 + 4)
   return (
@@ -633,7 +647,8 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
           const max = items.reduce((m, t) => Math.max(m, t.count), 1)
           return (
             <div key={k} className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(13px,1.7vw,19px)' }}>
-              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 10 }}>{label}</div>
+              <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 2 }}>{label}</div>
+              {DNA_GLOSS[k] && <div style={{ fontSize: 11, color: MUT, marginBottom: 9, lineHeight: 1.3 }}>{DNA_GLOSS[k]}</div>}
               {top && (
                 <div style={{ marginBottom: items.length > 1 ? 11 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
@@ -746,18 +761,27 @@ function slideFormula(winners: FullDnaResult['winners']) {
     ['Promise', d.usp?.[0]],
   ] as [string, { label: string; pct: number } | undefined][]).filter(([, v]) => v && v.label)
   const lead = d.angle?.[0] || d.hook_type?.[0]
+  // Plain-English gloss so a non-marketer gets it at a glance.
+  const DIM_GLOSS: Record<string, string> = {
+    Hook: 'the first line that stops the scroll',
+    Angle: 'the reason they give you to buy',
+    Format: 'the kind of ad they run most',
+    Promise: 'what they promise you’ll get',
+  }
   return (
     <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'clamp(16px,2.6vw,30px)', height: '100%' }}>
       <div>
         <div style={{ ...slideEyebrow, textAlign: 'center' }}>The winning formula</div>
         <h2 style={{ ...slideH, textAlign: 'center' }}>Their winners share <span style={{ color: ORANGE }}>one recipe</span>.</h2>
+        <p style={{ ...sub, textAlign: 'center', margin: '8px auto 0', maxWidth: 560 }}>The pattern behind the ads that keep running — in plain words.</p>
       </div>
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', justifyContent: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
         {parts.map(([dim, v], i) => (
           <div key={dim} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
             {i > 0 && <span style={{ fontFamily: 'Fraunces,serif', fontSize: 'clamp(20px,3vw,34px)', color: MUT, fontWeight: 400 }}>×</span>}
-            <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.8vw,20px) clamp(14px,2vw,24px)', minWidth: 'clamp(120px,15vw,180px)', boxShadow: '0 10px 30px -18px rgba(26,20,16,.4)' }}>
-              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 7 }}>{dim}</div>
+            <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.8vw,20px) clamp(14px,2vw,24px)', minWidth: 'clamp(120px,15vw,180px)', maxWidth: 210, boxShadow: '0 10px 30px -18px rgba(26,20,16,.4)' }}>
+              <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 3 }}>{dim}</div>
+              <div style={{ fontSize: 10.5, color: MUT, marginBottom: 8, lineHeight: 1.3 }}>{DIM_GLOSS[dim] || ''}</div>
               <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(18px,2.4vw,28px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{v!.label}</div>
               <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 700, color: SUB, marginTop: 6 }}>{v!.pct}% of winners</div>
             </div>
