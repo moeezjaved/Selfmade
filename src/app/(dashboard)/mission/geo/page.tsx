@@ -73,6 +73,23 @@ export default function GeoPage() {
     setPublishing(null)
   }
 
+  // Apply a built crawlability/entity asset to the store: fact_sheet → a live Shopify Page; schema → the
+  // theme <head>. (llms.txt can't auto-apply — it must sit at the site root; we keep it copy-only.)
+  const [applying, setApplying] = useState<string | null>(null)
+  const apply = async (a: Asset) => {
+    if (!a.id || applying) return
+    setApplying(a.id)
+    try {
+      const r = await fetch('/api/geo/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', id: a.id }) })
+      const j = await r.json()
+      if (r.ok) { const live = j.url || null; setAssets((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'published', published_url: live } : x))); if (j.applied === 'theme') alert(j.alreadyPresent ? 'Schema updated in your store theme.' : 'Schema added to your store’s <head>.') }
+      else if (r.status === 402) openCredits('plan', j.reason || 'Applying live is a paid feature — upgrade.')
+      else if (j?.error === 'no_store') openCredits('plan', j.reason || 'Connect your Shopify store to apply.')
+      else alert(j?.reason || j?.detail || 'Couldn’t apply — try again.')
+    } catch { alert('Network error — try again.') }
+    setApplying(null)
+  }
+
   const [building, setBuilding] = useState<string | null>(null)
   const buildAsset = async (kind: string) => {
     if (building) return
@@ -98,12 +115,24 @@ export default function GeoPage() {
           <pre>{a.body_markdown}</pre>
           <div className="aact">
             <button className="btn tiny" onClick={() => copy(a)}>{copied === (a.id || a.target_prompt) ? 'Copied ✓' : 'Copy'}</button>
-            {a.kind === 'answer_page' ? (
+            {a.kind === 'answer_page' && (
               a.published_url
                 ? <a className="btn tiny" href={a.published_url} target="_blank" rel="noopener noreferrer">View live →</a>
                 : <button className="btn tiny lime" onClick={() => publish(a)} disabled={publishing === a.id}>{publishing === a.id ? 'Publishing…' : 'Publish to Shopify'}</button>
-            ) : (
-              <button className="btn tiny" disabled title="Auto-apply to your site coming soon">Apply to your site — soon</button>
+            )}
+            {a.kind === 'fact_sheet' && (
+              a.published_url
+                ? <a className="btn tiny" href={a.published_url} target="_blank" rel="noopener noreferrer">View page →</a>
+                : <button className="btn tiny lime" onClick={() => apply(a)} disabled={applying === a.id}>{applying === a.id ? 'Publishing…' : 'Publish as page'}</button>
+            )}
+            {a.kind === 'schema' && (
+              <button className="btn tiny lime" onClick={() => apply(a)} disabled={applying === a.id}>{applying === a.id ? 'Applying…' : a.published_url ? 'Re-apply to theme' : 'Add to store theme'}</button>
+            )}
+            {a.kind === 'llms_txt' && (
+              <span className="hint" title="llms.txt must sit at your site root — copy it in from your theme/hosting">Copy → place at /llms.txt</span>
+            )}
+            {a.kind === 'offsite' && (
+              <button className="btn tiny" disabled title="Auto-post coming soon">Post reply — soon</button>
             )}
           </div>
         </div>
