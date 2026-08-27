@@ -96,10 +96,12 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
     const oneYear = 60 * 60 * 24 * 365
     document.cookie = `${BRAND_COOKIE}=${encodeURIComponent(id)}; path=/; max-age=${oneYear}; samesite=lax`
     setActive(id); setOpen(false)
-    // Soft refresh — re-render server components with the new cookie (no white reload / no fade re-fire).
-    // Client-fetch pages (inbox) listen for this event and re-pull without a full reload.
-    router.refresh()
     window.dispatchEvent(new CustomEvent('sf:brandchange', { detail: { brandId: id } }))
+    // HARD reload after the cookie flips so EVERY page — server components AND client-fetch pages — re-pulls
+    // for the new brand. Soft router.refresh() left client-fetch pages (GEO/CRO/catalog/…) showing the old
+    // brand's data, and that was inconsistent per page. A full reload is the reliable, universal fix for an
+    // infrequent, explicit action.
+    window.location.reload()
   }
 
   return (
