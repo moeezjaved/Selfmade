@@ -90,6 +90,41 @@ async function captureShots(target: string): Promise<{ desktop: string | null; m
   } finally { if (browser) await browser.close().catch(() => {}) }
 }
 
+const MOBILE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1'
+
+// Full-page capture SLICED into viewport-height sections (desktop 1440 + mobile 390), for the CRO
+// evidence pass — so vision can map the WHOLE customer journey, not just above the fold ("your offer
+// isn't understood until section 4"). Section 0 is the above-the-fold shot. Capped at 6 sections/device.
+async function captureSectioned(target: string): Promise<{ desktop: string[]; mobile: string[]; aboveFold: { desktop: string | null; mobile: string | null }; error?: string }> {
+  let browser: Browser | null = null
+  try {
+    browser = await chromiumExtra.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] })
+    const grabSections = async (width: number, height: number, isMobile: boolean, ua: string): Promise<string[]> => {
+      const ctx = await browser!.newContext({ viewport: { width, height }, userAgent: ua, deviceScaleFactor: 1, isMobile })
+      const page = await ctx.newPage()
+      try {
+        await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+        await page.waitForTimeout(1800)
+        const total = await page.evaluate(() => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)).catch(() => height)
+        const n = Math.max(1, Math.min(6, Math.ceil((total || height) / height)))
+        const out: string[] = []
+        for (let i = 0; i < n; i++) {
+          await page.evaluate((y) => window.scrollTo(0, y), i * height).catch(() => {})
+          await page.waitForTimeout(400)   // let lazy images/sections paint on scroll
+          const buf = await page.screenshot({ type: 'jpeg', quality: 64, fullPage: false })
+          out.push(Buffer.from(buf).toString('base64'))
+        }
+        return out
+      } finally { await ctx.close().catch(() => {}) }
+    }
+    const desktop = await grabSections(1440, 900, false, UA).catch(() => [] as string[])
+    const mobile = await grabSections(390, 844, true, MOBILE_UA).catch(() => [] as string[])
+    return { desktop, mobile, aboveFold: { desktop: desktop[0] || null, mobile: mobile[0] || null } }
+  } catch (e: any) {
+    return { desktop: [], mobile: [], aboveFold: { desktop: null, mobile: null }, error: String(e?.message || e).slice(0, 160) }
+  } finally { if (browser) await browser.close().catch(() => {}) }
+}
+
 const server = createServer(async (req, res) => {
   // CORS for browser-direct testing (admin UI calls go through the Vercel
   // route, which is server-side, so CORS doesn't apply there).
@@ -149,8 +184,9 @@ const server = createServer(async (req, res) => {
         res.end(JSON.stringify({ error: 'url required (http/https)' }))
         return
       }
-      console.log(`[screenshot] ${target}`)
-      const shots = await captureShots(target)
+      const wantSections = url.searchParams.get('sections') === '1'
+      console.log(`[screenshot] ${target}${wantSections ? ' (sectioned)' : ''}`)
+      const shots = wantSections ? await captureSectioned(target) : await captureShots(target)
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify(shots))
