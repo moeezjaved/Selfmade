@@ -15,6 +15,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveOwnPageId } from '@/lib/mello/own-brand'
+import { isAppDomain } from '@/lib/domain-guard'
 
 export type BrandUnderstanding = {
   brandName: string
@@ -49,7 +50,6 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
     const { resolveStore } = await import('@/lib/shopify/client')
     const store = await resolveStore(admin as any, userId, brandId).catch(() => null)
     const shop = store?.shop_domain ? String(store.shop_domain).trim() : ''
-    const { isAppDomain } = await import('@/lib/domain-guard')
     if (shop && (!kitWebsite || isAppDomain(kitWebsite))) kitWebsite = shop
   } catch { /* Shopify optional — fall back to brand website */ }
 
@@ -64,10 +64,14 @@ export async function describeBrand(admin: SupabaseClient, userId: string, brand
     return { brandName, competitors, ...u, fromCache: false, debug: { websiteUrl: kitWebsite || null, websiteSource: 'you set it', siteRead: false, competitors, metaAdCopy: 0, uncertain: false } }
   }
 
-  // reuse the remembered understanding unless asked for a fresh read
+  // reuse the remembered understanding unless asked for a fresh read. BUT never serve a stale cache that
+  // was computed before the store was connected: if we can now resolve a real site (kitWebsite) yet the
+  // cached understanding has none (or an app-domain), recompute once so GEO actually reads the store. This
+  // self-heals the "no site found / not read even though Shopify is connected" case without a manual regen.
   if (!opts?.fresh) {
     const cached = await readCache(admin, userId, brandId)
-    if (cached) return { brandName, ...cached, competitors, fromCache: true }
+    const cacheIsStale = !!(kitWebsite && (!cached?.website || isAppDomain(String(cached.website))))
+    if (cached && !cacheIsStale) return { brandName, ...cached, competitors, fromCache: true }
   }
 
   // ── products (a strong signal — "nicotine-free vape" lives here) ──
