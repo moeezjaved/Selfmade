@@ -15,10 +15,10 @@ type HomeSection = { section: string; why: string; content?: string }
 type PdpChange = { change: string; why: string }
 type AbTest = { name: string; hypothesis: string; impact: string }
 type Shot = { key: string; label: string; url: string }
-type Lens = { score: number; take: string; findings: string[] }
+type Lens = { score: number; take: string; findings: string[]; screen?: 'home' | 'pdp' }
 type Panel = { designer: Lens; psychologist: Lens; copywriter: Lens; cro: Lens; customer: string }
-// Tolerate both the new rich lens ({score,take,findings}) and the legacy bare number in cached reports.
-const asLens = (v: any): Lens => (v && typeof v === 'object') ? { score: Number(v.score) || 0, take: String(v.take || ''), findings: Array.isArray(v.findings) ? v.findings : [] } : { score: Number(v) || 0, take: '', findings: [] }
+// Tolerate both the new rich lens ({score,take,findings,screen}) and the legacy bare number in cached reports.
+const asLens = (v: any): Lens => (v && typeof v === 'object') ? { score: Number(v.score) || 0, take: String(v.take || ''), findings: Array.isArray(v.findings) ? v.findings : [], screen: v.screen === 'pdp' ? 'pdp' : v.screen === 'home' ? 'home' : undefined } : { score: Number(v) || 0, take: '', findings: [] }
 type Report = {
   hasData: boolean; domain?: string; site?: string; productUrl?: string | null; score?: number; verdict?: string
   leaks?: Leak[]; changes?: Change[]; homepage?: HomeSection[]; productPage?: PdpChange[]; abtests?: AbTest[]; firstChange?: string
@@ -192,15 +192,24 @@ export default function CroPage() {
                 {/* Expanded expert take */}
                 {openLens && (() => {
                   const sel = lenses.find((l) => l.key === openLens); if (!sel) return null
+                  const shot = shotFor(r.shots, sel.lens.screen || 'home')
                   return (
-                    <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-                      <div style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>{sel.label}’s take</div>
-                      {sel.lens.take && <div style={{ fontSize: 13.5, color: '#3a463a', lineHeight: 1.5, fontStyle: 'italic' }}>“{sel.lens.take}”</div>}
-                      {!!sel.lens.findings.length && (
-                        <ul style={{ margin: '10px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
-                          {sel.lens.findings.map((f, i) => <li key={i} style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>{f}</li>)}
-                        </ul>
+                    <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 12, display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                      {shot && (
+                        <div onClick={() => setZoom(shot.url)} style={{ width: 200, maxWidth: '100%', flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, cursor: 'zoom-in', alignSelf: 'flex-start' }}>
+                          <img src={shot.url} alt={sel.label} style={{ display: 'block', width: '100%' }} />
+                          <div style={{ fontSize: 10.5, color: SUB, padding: '5px 8px', background: '#faf9f5' }}>What {sel.label.replace(/^\S+\s/, '')} is looking at · {sel.lens.screen === 'pdp' ? 'Product page' : 'Homepage'}</div>
+                        </div>
                       )}
+                      <div style={{ flex: 1, minWidth: 220 }}>
+                        <div style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>{sel.label}’s take</div>
+                        {sel.lens.take && <div style={{ fontSize: 13.5, color: '#3a463a', lineHeight: 1.5, fontStyle: 'italic' }}>“{sel.lens.take}”</div>}
+                        {!!sel.lens.findings.length && (
+                          <ul style={{ margin: '10px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {sel.lens.findings.map((f, i) => <li key={i} style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>{f}</li>)}
+                          </ul>
+                        )}
+                      </div>
                     </div>
                   )
                 })()}
