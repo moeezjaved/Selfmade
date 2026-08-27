@@ -6,6 +6,7 @@
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { describeBrand } from '@/lib/geo/understand'
+import { resolveStore } from '@/lib/shopify/client'
 
 export type Severity = 'high' | 'medium' | 'low'
 export type Issue = { severity: Severity; title: string; detail: string; pages: string[] }
@@ -73,8 +74,11 @@ function internalLinks(html: string, base: URL, limit: number): string[] {
  *  agent so we fetch once. Returns the per-page checks, or a note if we couldn't resolve/read the site. */
 export async function crawlSite(admin: SupabaseClient, userId: string, brandId: string | null): Promise<{ base: URL; checks: PageCheck[] } | { note: string; site?: string }> {
   const u = await describeBrand(admin, userId, brandId)
-  const siteRaw = (u?.website || '').trim()
-  if (!siteRaw) return { note: 'I don’t have your website yet — connect Meta (so I can read your ads’ landing page) or set it under “tell me exactly” on the GEO page, then re-run.' }
+  // Prefer the CONNECTED Shopify store domain — brands.website is often a stale signup default (e.g.
+  // tryselfmade.ai) that seedBrandWebsite won't overwrite, so a connected store must win.
+  const store = await resolveStore(admin as any, userId, brandId).catch(() => null)
+  const siteRaw = (store?.shop_domain || u?.website || '').trim()
+  if (!siteRaw) return { note: 'I don’t have your website yet — connect your Shopify store (or set your site on the GEO page), then re-run.' }
   let base: URL
   try { base = new URL(siteRaw.startsWith('http') ? siteRaw : `https://${siteRaw}`) } catch { return { note: 'Your website URL looks invalid — set it on the GEO page and re-run.' } }
   // Never audit Selfmade's own domain — if the brand website is the app (no real store connected), tell

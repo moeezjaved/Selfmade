@@ -152,7 +152,11 @@ export async function seedBrandWebsite(admin: any, brandId: string | null, shopD
   if (!brandId || !shopDomain) return
   try {
     const { data: b } = await admin.from('brands').select('website').eq('id', brandId).maybeSingle()
-    if (!String(b?.website || '').trim()) {
+    const cur = String(b?.website || '').trim()
+    // Set the store domain if the brand has no website OR a stale app-domain default (tryselfmade.ai etc.)
+    // that would otherwise make every audit crawl Selfmade instead of the real store.
+    const { isAppDomain } = await import('@/lib/domain-guard')
+    if (!cur || isAppDomain(cur)) {
       await admin.from('brands').update({ website: shopDomain }).eq('id', brandId)
     }
   } catch { /* best-effort; connect still succeeds if this fails */ }
