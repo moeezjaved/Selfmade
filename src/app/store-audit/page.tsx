@@ -14,7 +14,9 @@
  */
 import { useEffect, useRef, useState } from 'react'
 
-const FOREST = '#141d15', ORANGE = '#ff5a2c', PAPER = '#e9e1cf', INK = '#22281b', SUB = 'rgba(255,255,255,.72)'
+const FOREST = '#141d15', ORANGE = '#ff5a2c', PAPER = '#e9e1cf', INK = '#22281b', SUB = 'rgba(255,255,255,.82)'
+// Brand-orange treatment for the input screen (matches the landing's accent; no more off-brand green).
+const ORANGE_BG = 'linear-gradient(162deg,#ff6a3d 0%,#e8431a 100%)'
 const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
 
 type BrandRow = { pageId: string; name: string; adCount: number; crawled: boolean }
@@ -135,30 +137,32 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
     onStart({ seed, domain: d, rival: rival.trim() })
   }
 
-  const field: React.CSSProperties = { width: '100%', padding: '15px 16px', fontSize: 15.5, borderRadius: 3, border: '1px solid rgba(255,255,255,.18)', background: 'rgba(255,255,255,.06)', color: '#fff', outline: 'none', fontFamily: 'inherit' }
-  const label: React.CSSProperties = { fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,.6)', marginBottom: 8, display: 'block' }
+  const field: React.CSSProperties = { width: '100%', padding: '15px 16px', fontSize: 15.5, borderRadius: 8, border: '1.5px solid rgba(255,255,255,.4)', background: 'rgba(255,255,255,.16)', color: '#fff', outline: 'none', fontFamily: 'inherit' }
+  const label: React.CSSProperties = { fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,.85)', marginBottom: 8, display: 'block' }
   const ResultList = ({ rows, onPick }: { rows: BrandRow[]; onPick: (r: BrandRow) => void }) => (
     rows.length ? (
-      <div style={{ marginTop: 6, background: '#0f150f', border: '1px solid rgba(255,255,255,.14)', borderRadius: 8, overflow: 'hidden' }}>
+      <div style={{ marginTop: 6, background: '#fff', border: '1px solid rgba(0,0,0,.1)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,.18)' }}>
         {rows.map(r => (
-          <button key={r.pageId} onClick={() => onPick(r)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(255,255,255,.06)', color: '#fff', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <button key={r.pageId} onClick={() => onPick(r)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(0,0,0,.06)', color: INK, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>{r.name}</span>
-            <span style={{ fontSize: 11.5, color: 'rgba(255,255,255,.5)' }}>{r.adCount ? `${r.adCount.toLocaleString()} ads` : ''}{r.crawled ? ' · ready' : ''}</span>
+            <span style={{ fontSize: 11.5, color: 'rgba(0,0,0,.45)' }}>{r.adCount ? `${r.adCount.toLocaleString()} ads` : ''}{r.crawled ? ' · ready' : ''}</span>
           </button>
         ))}
       </div>
     ) : null
   )
   const Chip = ({ name, onClear }: { name: string; onClear: () => void }) => (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: `${ORANGE}22`, border: `1px solid ${ORANGE}55`, color: '#fff', borderRadius: 100, padding: '7px 8px 7px 14px', fontSize: 14, fontWeight: 600 }}>
-      {name}<button onClick={onClear} style={{ width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.15)', color: '#fff', cursor: 'pointer', lineHeight: 1 }}>×</button>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.22)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 100, padding: '7px 8px 7px 14px', fontSize: 14, fontWeight: 600 }}>
+      {name}<button onClick={onClear} style={{ width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.3)', color: '#fff', cursor: 'pointer', lineHeight: 1 }}>×</button>
     </div>
   )
 
   return (
-    <div style={{ minHeight: '100dvh', background: FOREST, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+    <div style={{ minHeight: '100dvh', background: ORANGE_BG, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
+      {/* white placeholders so they read on the orange fields */}
+      <style>{`input::placeholder{color:rgba(255,255,255,.72)}`}</style>
       <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ fontSize: 13, fontStyle: 'italic', color: ORANGE, fontFamily: SERIF }}>free · one scan · no login</div>
+        <div style={{ fontSize: 13, fontStyle: 'italic', color: '#fff', fontFamily: SERIF, opacity: .9 }}>free · one scan · no login</div>
         <h1 style={{ fontFamily: SERIF, fontSize: 46, fontWeight: 700, lineHeight: 1.02, margin: '10px 0 12px', letterSpacing: '-.02em' }}>Audit your whole store.</h1>
         <p style={{ fontSize: 15.5, color: SUB, lineHeight: 1.55, marginBottom: 26 }}>Your ads and your search &amp; AI visibility — one scan, one report. See where you stand on Facebook, Google, and ChatGPT/Gemini, and where rivals are winning.</p>
 
@@ -192,11 +196,17 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
 
         {error && <div style={{ marginTop: 16, background: '#3a1a12', border: '1px solid #7a3', borderColor: '#a5462c', color: '#ffd9cc', borderRadius: 8, padding: '11px 14px', fontSize: 13.5 }}>{error}</div>}
 
-        <button onClick={submit} style={{ marginTop: 22, width: '100%', background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 16, padding: '16px', borderRadius: 3, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Scan my store →</button>
-        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.5)', marginTop: 14, lineHeight: 1.5 }}>Reads only what&rsquo;s public — no account, no card. Competitor optional; we&rsquo;ll pick a real one if you skip it.</div>
+        <button onClick={submit} style={{ marginTop: 22, width: '100%', background: '#fff', color: '#e8431a', fontWeight: 800, fontSize: 16, padding: '16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>Scan my store →</button>
+        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', marginTop: 14, lineHeight: 1.5 }}>Reads only what&rsquo;s public — no account, no card. Competitor optional; we&rsquo;ll pick a real one if you skip it.</div>
+
+        {/* Just starting out — no store yet. The audit needs a live site to read, so send them to build one. */}
+        <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.25)', fontSize: 13.5, color: 'rgba(255,255,255,.9)', lineHeight: 1.5 }}>
+          No website yet — just starting out?{' '}
+          <a href="/signup?ref=store-audit-new" style={{ color: '#fff', fontWeight: 800, textDecoration: 'underline' }}>Build your store with Selfmade →</a>
+        </div>
       </div>
     </div>
   )
 }
 
-const linkBtn: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: ORANGE, fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0 }
+const linkBtn: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'underline', opacity: .92 }
