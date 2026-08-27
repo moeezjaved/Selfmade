@@ -108,7 +108,8 @@ export default function CroPage() {
     setApplyBusy(null)
   }
 
-  const load = useCallback(async () => { try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } }, [])
+  const [booting, setBooting] = useState(true)   // first load / after brand switch → show skeleton, not "no audit yet"
+  const load = useCallback(async () => { setBooting(true); try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } finally { setBooting(false) } }, [])
   useEffect(() => { load() }, [load])
   useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
@@ -141,7 +142,18 @@ export default function CroPage() {
       {note && <div style={{ marginTop: 16, background: '#fdf6e9', border: '1px solid #f3e2c5', color: '#8a5a1a', borderRadius: 12, padding: '11px 14px', fontSize: 13.5 }}>{note}</div>}
       {busy && <div style={{ marginTop: 16, fontSize: 13.5, color: SUB }}>Reading your homepage + product page{r?.usedVision === false ? '' : ' (and the rendered design)'} — this takes ~30–60s.</div>}
 
-      {!r?.hasData && !busy && !note && (
+      {/* Skeleton while the cached audit is still loading (esp. right after a brand switch) — so we don't
+          flash "No audit yet" before the real report arrives. */}
+      {booting && !r && !busy && (
+        <div style={{ marginTop: 22 }} aria-busy="true">
+          <style>{`@keyframes sfShim{0%,100%{opacity:.55}50%{opacity:1}}.sfsk{animation:sfShim 1.2s ease-in-out infinite}`}</style>
+          <div className="sfsk" style={{ height: 96, borderRadius: 14, background: '#f2f4f0', marginBottom: 14 }} />
+          <div className="sfsk" style={{ height: 70, borderRadius: 14, background: '#f2f4f0', marginBottom: 14 }} />
+          <div className="sfsk" style={{ height: 200, borderRadius: 14, background: '#f2f4f0' }} />
+        </div>
+      )}
+
+      {!booting && !r?.hasData && !busy && !note && (
         <div style={{ marginTop: 24, border: `1px solid ${LINE}`, borderRadius: 16, padding: 40, textAlign: 'center', color: SUB }}>
           No audit yet. Hit <b style={{ color: INK }}>Run CRO audit</b> and Mello tears down your store like a world-class CRO expert.
         </div>
