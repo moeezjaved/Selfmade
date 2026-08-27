@@ -161,6 +161,15 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   const send = async (text?: string) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
+    // Pre-flight: a remake spends credits, so if the balance can't cover it, show the upgrade modal and
+    // do NOT start the "designing…" animation — the fix for "it processed, THEN said out of credits".
+    const willRemake = !!tags.find((t) => t.kind === 'discover')?.image && !tags.some((t) => t.kind === 'element')
+    if (willRemake) {
+      try {
+        const b = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json())
+        if (typeof b?.balance === 'number' && b.balance < 15) { openCredits('buy', `Making an ad needs 15 credits — you have ${b.balance}. Top up to continue.`); return }
+      } catch { /* balance check failed — the server still gates before rendering */ }
+    }
     setBusy(true); setInput('')
     const fmt = format
     setMsgs((m) => [...m, { role: 'user', text: message, format: fmt }, { role: 'assistant', loading: true, format: fmt }])

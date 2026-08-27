@@ -77,6 +77,12 @@ export async function crawlSite(admin: SupabaseClient, userId: string, brandId: 
   if (!siteRaw) return { note: 'I don’t have your website yet — connect Meta (so I can read your ads’ landing page) or set it under “tell me exactly” on the GEO page, then re-run.' }
   let base: URL
   try { base = new URL(siteRaw.startsWith('http') ? siteRaw : `https://${siteRaw}`) } catch { return { note: 'Your website URL looks invalid — set it on the GEO page and re-run.' } }
+  // Never audit Selfmade's own domain — if the brand website is the app (no real store connected), tell
+  // the user to connect their store instead of auditing tryselfmade.ai (the /login /signup pages, etc.).
+  const host = base.hostname.replace(/^www\./, '')
+  if (/(^|\.)tryselfmade\.ai$|(^|\.)selfmade\.(ai|com)$|localhost/i.test(host)) {
+    return { note: 'Connect your store first — I audit YOUR site, not Selfmade. Connect Shopify (or set your real store URL on the GEO page), then re-run.' }
+  }
   const home = await fetchHtml(base.href)
   if (!home) return { site: base.href, note: `Couldn’t fetch ${base.hostname} — it may block bots or be down. I’ll retry next run.` }
   const urls = [base.origin + base.pathname, ...internalLinks(home, base, 12)]
