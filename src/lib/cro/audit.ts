@@ -12,6 +12,29 @@ import { llm } from '@/lib/llm'
 import { crawlStore } from '@/lib/ads-studio/store'
 import { critiqueScreens } from '@/lib/gemini/vision'
 import { uploadBufferToR2 } from '@/lib/r2'
+import OpenAI from 'openai'
+
+let _oai: OpenAI | null = null
+const oai = () => (_oai ||= new OpenAI({ apiKey: process.env.OPENAI_API_KEY }))
+
+/** gpt-4o VISION — actually looks at the screenshots (reliable, JSON mode). This is the primary analyzer:
+ *  it prevents the "missing H1 / no CTA" hallucinations that happen when the model can't see the page. */
+async function visionCritique(shots: Shot[], prompt: string): Promise<string> {
+  if (!process.env.OPENAI_API_KEY) return ''
+  try {
+    const content: any[] = [{ type: 'text', text: prompt }]
+    for (const s of shots) if (s.b64) {
+      content.push({ type: 'text', text: s.label })
+      content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${s.b64}`, detail: 'high' } })
+    }
+    const res = await oai().chat.completions.create({
+      model: 'gpt-4o', max_tokens: 3600, temperature: 0.4,
+      response_format: { type: 'json_object' },
+      messages: [{ role: 'user', content }],
+    })
+    return res.choices?.[0]?.message?.content || ''
+  } catch { return '' }
+}
 
 export type CroRegion = { x: number; y: number; w: number; h: number }   // percent of the screenshot (0-100)
 export type CroLeak = { title: string; why: string; fix: string; screen?: 'home' | 'pdp'; region?: CroRegion }
@@ -67,9 +90,13 @@ function buildPrompt(site: string, facts: string, homeText: string, prodText: st
   return `Act as one of the world's best e-commerce conversion-rate-optimization experts — years optimizing Shopify stores, millions in added revenue. IGNORE whether the site looks beautiful. Your ONLY objective: turn more existing visitors into paying customers. Be BRUTALLY honest and SPECIFIC to THIS store — no generic advice. Your pay depends only on the revenue lift you'd create.
 
 STORE: ${site}
-${hasShots ? 'You are given rendered screenshots (homepage + product page, desktop + mobile). Judge what you can SEE; never invent details.' : 'No screenshots available — analyze from the content below.'}
+${hasShots ? `You are given rendered screenshots (homepage + product page). Judge ONLY what you can actually SEE.
+CRITICAL ACCURACY RULES — breaking these makes the whole audit worthless:
+- NEVER say an element is "missing" if it is visibly present in the screenshot. If there IS a headline, do not say "missing H1/value proposition" — instead critique whether the headline is CLEAR and benefit-led. If there IS a Buy/Add-to-Cart button, do not say "no CTA" — critique its strength/urgency/placement.
+- The ground-truth below is HTML-level (e.g. "H1 tag present: NO" can be false-negative when the headline is a styled div). Trust your EYES over the tags for whether something is visually present; use the tags only for SEO-level notes.
+- Every leak must be something a person looking at THIS screenshot would agree is real. No generic checklist items.` : 'No screenshots available — analyze from the content below. Do NOT claim elements are missing unless the content clearly lacks them.'}
 
-GROUND TRUTH (detected on the pages — do NOT contradict these facts):
+GROUND TRUTH (HTML-level signals — a "NO" may just mean the element isn't a semantic tag; judge the screenshot for what's visually present):
 ${facts}
 
 HOMEPAGE CONTENT (truncated):
@@ -170,15 +197,22 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
   const shotUrlsP = persistShots(domain, shots).catch(() => [] as CroShot[])
   const prompt = buildPrompt(site, facts, visibleText(home), visibleText(prod), shots.length > 0)
 
-  // Primary: Gemini multimodal — but ONLY when we actually have screenshots for it to SEE. With no
-  // shots there's no reason to route through Gemini (and 2.5 "thinking" models can burn the whole token
-  // budget on reasoning and return empty text), so we go straight to the reliable gpt-4o JSON path.
-  let raw = shots.length ? await critiqueScreens(shots, prompt, { maxTokens: 4200, temperature: 0.35 }) : ''
+  // PRIMARY: gpt-4o VISION — it actually looks at the screenshots and returns valid JSON. This is what
+  // stops the "missing H1 / no CTA" hallucinations: the model can SEE the headline and the button, so it
+  // critiques them instead of inventing that they're absent. Only used when we have screenshots.
+  let raw = shots.length ? await visionCritique(shots, prompt) : ''
   let parsed = parseReport(raw)
+  let usedVision = !!(shots.length && parsed?.leaks?.length)
   let fallbackErr = ''
 
-  // Reliable fallback: gpt-4o in JSON mode. Runs whenever the vision pass didn't yield a PARSEABLE report
-  // — not only when it was empty. (A non-empty-but-unparseable Gemini response used to block this.)
+  // Fallback 1: Gemini multimodal (also sees the shots) if gpt-4o vision didn't yield a parseable report.
+  if ((!parsed || !parsed.leaks?.length) && shots.length) {
+    raw = await critiqueScreens(shots, prompt, { maxTokens: 4200, temperature: 0.35 })
+    parsed = parseReport(raw)
+    usedVision = !!parsed?.leaks?.length
+  }
+
+  // Fallback 2: gpt-4o TEXT (no images) — last resort so we always return something. Not vision-grounded.
   if (!parsed || !parsed.leaks?.length) {
     try {
       const res: any = await llm.messages.create({
@@ -188,6 +222,7 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
       })
       raw = res?.content?.[0]?.text || ''
       parsed = parseReport(raw)
+      usedVision = false
     } catch (e) { fallbackErr = String((e as Error)?.message || e).slice(0, 200) }
   }
 
@@ -201,5 +236,5 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
   }
 
   const shotMeta = await shotUrlsP
-  return { hasData: true, domain, site, productUrl, usedVision: shots.length > 0, scannedAt: new Date().toISOString(), shots: shotMeta, ...parsed }
+  return { hasData: true, domain, site, productUrl, usedVision, scannedAt: new Date().toISOString(), shots: shotMeta, ...parsed }
 }
