@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
+import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -35,6 +36,7 @@ export default function ProgrammaticPage() {
       const r = await fetch('/api/shopify/programmatic', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'generate', limit: batch, withImage }) })
       const j = await r.json()
       if (r.ok) { setNote(`Generated ${j.created} page${j.created === 1 ? '' : 's'}${j.failed ? `, ${j.failed} failed` : ''}. ${j.remaining} left to build.`); await load() }
+      else if (r.status === 402) openCredits('buy', j.reason || 'Generating pages costs credits — top up or upgrade.')
       else setNote(j.error || 'Could not generate.')
     } catch { setNote('Network error.') }
     setBusy(null)

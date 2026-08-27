@@ -64,6 +64,7 @@ export default function GeoPage() {
       const r = await fetch('/api/geo/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ kind }) })
       const j = await r.json()
       if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || kind) }
+      else if (r.status === 402) openCredits('buy', j.reason || 'Building a GEO asset costs credits — top up to continue.')
     } catch { /* keep prior */ }
     setBuilding(null)
   }
@@ -101,7 +102,7 @@ export default function GeoPage() {
       if (r.ok) {
         const rr = await fetch('/api/geo/answer'); const jj = await rr.json(); if (rr.ok && Array.isArray(jj?.assets)) setAssets(jj.assets)
         setReachNote(j?.note || null)
-      }
+      } else if (r.status === 402) openCredits('buy', j.reason || 'Outreach drafting costs credits — top up to continue.')
     } catch { setReachNote('Couldn’t reach out just now — try again.') }
     setReaching(false)
   }
