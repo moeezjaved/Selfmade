@@ -11,17 +11,21 @@
 import { llm } from '@/lib/llm'
 import { crawlStore } from '@/lib/ads-studio/store'
 import { critiqueScreens } from '@/lib/gemini/vision'
+import { uploadBufferToR2 } from '@/lib/r2'
 
-export type CroLeak = { title: string; why: string; fix: string }
+export type CroRegion = { x: number; y: number; w: number; h: number }   // percent of the screenshot (0-100)
+export type CroLeak = { title: string; why: string; fix: string; screen?: 'home' | 'pdp'; region?: CroRegion }
 export type CroChange = { title: string; detail: string; impact: string }
 export type CroHomeSection = { section: string; why: string; content?: string }
 export type CroPdpChange = { change: string; why: string }
 export type CroAbTest = { name: string; hypothesis: string; impact: string }
+export type CroShot = { key: string; label: string; url: string }   // key: home-desktop | home-mobile | pdp-desktop | pdp-mobile
 export type CroReport = {
   hasData: boolean
   domain?: string; site?: string; productUrl?: string | null
   score?: number; verdict?: string
   leaks?: CroLeak[]; changes?: CroChange[]; homepage?: CroHomeSection[]; productPage?: CroPdpChange[]; abtests?: CroAbTest[]; firstChange?: string
+  shots?: CroShot[]
   usedVision?: boolean; scannedAt?: string; note?: string
 }
 
@@ -80,7 +84,7 @@ Return ONLY JSON in EXACTLY this shape (no prose outside JSON):
 {
   "score": <integer 0-100, honest>,
   "verdict": "<one brutally honest sentence>",
-  "leaks": [ {"title":"...","why":"why it kills conversion","fix":"what to do instead"} ]  // EXACTLY the 5 biggest conversion leaks,
+  "leaks": [ {"title":"...","why":"why it kills conversion","fix":"what to do instead"${hasShots ? `,"screen":"home" or "pdp" (which screenshot the problem is on),"region":{"x":0-100,"y":0-100,"w":0-100,"h":0-100} (approx rectangle on that screenshot where the problem is, as % of the image — omit if you can't localize it)` : ''}} ]  // EXACTLY the 5 biggest conversion leaks,
   "changes": [ {"title":"...","detail":"...","impact":"expected conversion/revenue effect, conservative range"} ]  // 5 highest-impact changes,
   "homepage": [ {"section":"e.g. Hero","why":"why this section here","content":"the exact copy/elements to use for THIS store"} ]  // the exact new homepage structure, in order top→bottom,
   "productPage": [ {"change":"the exact change","why":"why"} ]  // exact product-page changes,
@@ -89,23 +93,37 @@ Return ONLY JSON in EXACTLY this shape (no prose outside JSON):
 }`
 }
 
-type Shot = { label: string; b64: string }
+type Shot = { key: string; label: string; b64: string }
 async function screenshots(domain: string, productUrl: string | null): Promise<Shot[]> {
   const base = process.env.DROPLET_PREVIEW_URL, secret = process.env.PREVIEW_SECRET
   if (!base || !secret) return []
-  const grab = async (u: string, tag: string): Promise<Shot[]> => {
+  const grab = async (u: string, tag: string, page: 'home' | 'pdp'): Promise<Shot[]> => {
     try {
       const r = await fetch(`${base.replace(/\/$/, '')}/screenshot?url=${encodeURIComponent(u)}`, { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(35_000) })
       if (!r.ok) return []
       const s = await r.json() as { desktop?: string | null; mobile?: string | null }
       const out: Shot[] = []
-      if (s.desktop) out.push({ label: `${tag} — DESKTOP (above the fold):`, b64: s.desktop })
-      if (s.mobile) out.push({ label: `${tag} — MOBILE (above the fold):`, b64: s.mobile })
+      if (s.desktop) out.push({ key: `${page}-desktop`, label: `${tag} — DESKTOP (above the fold):`, b64: s.desktop })
+      if (s.mobile) out.push({ key: `${page}-mobile`, label: `${tag} — MOBILE (above the fold):`, b64: s.mobile })
       return out
     } catch { return [] }
   }
-  const [home, pdp] = await Promise.all([grab(`https://${domain}/`, 'HOMEPAGE'), productUrl ? grab(productUrl, 'PRODUCT PAGE') : Promise.resolve([])])
+  const [home, pdp] = await Promise.all([grab(`https://${domain}/`, 'HOMEPAGE', 'home'), productUrl ? grab(productUrl, 'PRODUCT PAGE', 'pdp') : Promise.resolve([])])
   return [...home, ...pdp]
+}
+
+/** Upload the captured screenshots to R2 so the report can render the REAL store, and return their URLs. */
+async function persistShots(domain: string, shots: Shot[]): Promise<CroShot[]> {
+  const slug = domain.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
+  const out: CroShot[] = []
+  for (const s of shots) {
+    try {
+      const buf = Buffer.from(s.b64, 'base64')
+      const url = await uploadBufferToR2(buf, `cro/${slug}/${s.key}-${buf.length}.jpg`, 'image/jpeg')
+      if (url) out.push({ key: s.key, label: s.label, url })
+    } catch { /* skip a shot that won't upload */ }
+  }
+  return out
 }
 
 function parseReport(txt: string): Partial<CroReport> | null {
@@ -115,10 +133,18 @@ function parseReport(txt: string): Partial<CroReport> | null {
     const j = JSON.parse(clean.slice(clean.indexOf('{'), clean.lastIndexOf('}') + 1))
     const arr = (v: any) => (Array.isArray(v) ? v : [])
     const str = (v: any, n = 400) => String(v || '').slice(0, n)
+    const clamp = (v: any) => Math.max(0, Math.min(100, Number(v)))
+    const region = (v: any): CroRegion | undefined => {
+      if (!v || typeof v !== 'object') return undefined
+      const x = clamp(v.x), y = clamp(v.y), w = clamp(v.w), h = clamp(v.h)
+      if ([x, y, w, h].some((n) => Number.isNaN(n)) || w <= 0 || h <= 0) return undefined
+      return { x, y, w, h }
+    }
+    const screen = (v: any): 'home' | 'pdp' | undefined => (v === 'home' || v === 'pdp' ? v : undefined)
     return {
       score: Math.max(0, Math.min(100, Math.round(Number(j.score) || 0))),
       verdict: str(j.verdict, 240),
-      leaks: arr(j.leaks).slice(0, 5).map((x: any) => ({ title: str(x.title, 140), why: str(x.why), fix: str(x.fix) })).filter((x: CroLeak) => x.title),
+      leaks: arr(j.leaks).slice(0, 5).map((x: any) => ({ title: str(x.title, 140), why: str(x.why), fix: str(x.fix), screen: screen(x.screen), region: region(x.region) })).filter((x: CroLeak) => x.title),
       changes: arr(j.changes).slice(0, 5).map((x: any) => ({ title: str(x.title, 140), detail: str(x.detail), impact: str(x.impact, 200) })).filter((x: CroChange) => x.title),
       homepage: arr(j.homepage).slice(0, 12).map((x: any) => ({ section: str(x.section, 80), why: str(x.why, 240), content: x.content ? str(x.content, 500) : undefined })).filter((x: CroHomeSection) => x.section),
       productPage: arr(j.productPage).slice(0, 12).map((x: any) => ({ change: str(x.change, 200), why: str(x.why, 300) })).filter((x: CroPdpChange) => x.change),
@@ -140,6 +166,8 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
 
   const facts = ruleFacts(home, prod, !!prod)
   const shots = await screenshots(domain, productUrl).catch(() => [] as Shot[])
+  // Persist the real screenshots to R2 (in parallel with the analysis) so the report can SHOW the store.
+  const shotUrlsP = persistShots(domain, shots).catch(() => [] as CroShot[])
   const prompt = buildPrompt(site, facts, visibleText(home), visibleText(prod), shots.length > 0)
 
   // Primary: Gemini multimodal — but ONLY when we actually have screenshots for it to SEE. With no
@@ -172,5 +200,6 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
     return { hasData: false, domain, site, note: 'Couldn’t complete the analysis — try again.' }
   }
 
-  return { hasData: true, domain, site, productUrl, usedVision: shots.length > 0, scannedAt: new Date().toISOString(), ...parsed }
+  const shotMeta = await shotUrlsP
+  return { hasData: true, domain, site, productUrl, usedVision: shots.length > 0, scannedAt: new Date().toISOString(), shots: shotMeta, ...parsed }
 }

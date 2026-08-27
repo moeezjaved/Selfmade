@@ -7,15 +7,17 @@
 import { useCallback, useEffect, useState } from 'react'
 import { openCredits } from '@/components/credits/CreditModal'
 
-type Leak = { title: string; why: string; fix: string }
+type Region = { x: number; y: number; w: number; h: number }
+type Leak = { title: string; why: string; fix: string; screen?: 'home' | 'pdp'; region?: Region }
 type Change = { title: string; detail: string; impact: string }
 type HomeSection = { section: string; why: string; content?: string }
 type PdpChange = { change: string; why: string }
 type AbTest = { name: string; hypothesis: string; impact: string }
+type Shot = { key: string; label: string; url: string }
 type Report = {
   hasData: boolean; domain?: string; site?: string; productUrl?: string | null; score?: number; verdict?: string
   leaks?: Leak[]; changes?: Change[]; homepage?: HomeSection[]; productPage?: PdpChange[]; abtests?: AbTest[]; firstChange?: string
-  usedVision?: boolean; note?: string
+  shots?: Shot[]; usedVision?: boolean; note?: string
 }
 
 const INK = '#141d15', SUB = '#6b776b', LINE = '#e6ebe3', ORANGE = '#ef4a1e'
@@ -28,10 +30,35 @@ function SectionTitle({ n, children }: { n: string; children: React.ReactNode })
   return <h2 style={{ fontSize: 17, fontWeight: 800, margin: '30px 0 12px', display: 'flex', alignItems: 'center', gap: 9 }}><span style={{ width: 24, height: 24, borderRadius: 7, background: '#f4f0e7', color: ORANGE, display: 'grid', placeItems: 'center', fontSize: 12, fontWeight: 900 }}>{n}</span>{children}</h2>
 }
 
+// Pick the best screenshot for a page (prefer desktop, fall back to mobile).
+function shotFor(shots: Shot[] | undefined, page: 'home' | 'pdp'): Shot | null {
+  if (!shots?.length) return null
+  return shots.find(s => s.key === `${page}-desktop`) || shots.find(s => s.key === `${page}-mobile`) || null
+}
+function RegionBox({ region }: { region: Region }) {
+  return <div style={{ position: 'absolute', left: `${region.x}%`, top: `${region.y}%`, width: `${region.w}%`, height: `${region.h}%`, border: `2px solid ${ORANGE}`, background: `${ORANGE}1f`, borderRadius: 6, boxShadow: '0 0 0 9999px rgba(20,29,21,0.04)', pointerEvents: 'none' }} />
+}
+// The annotated "teardown" hero: the real screenshot with numbered pins where each leak is.
+function Teardown({ shot, pins, onJump }: { shot: Shot; pins: { n: number; region: Region }[]; onJump: (n: number) => void }) {
+  return (
+    <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff' }}>
+      <img src={shot.url} alt={shot.label} style={{ display: 'block', width: '100%' }} />
+      {pins.map(({ n, region }) => (
+        <div key={n}>
+          <RegionBox region={region} />
+          <button onClick={() => onJump(n)} title={`Leak #${n}`} style={{ position: 'absolute', left: `${region.x + region.w / 2}%`, top: `${region.y + region.h / 2}%`, transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: 100, background: ORANGE, color: '#fff', border: '2px solid #fff', fontSize: 12.5, fontWeight: 900, cursor: 'pointer', boxShadow: '0 2px 8px rgba(0,0,0,0.25)', display: 'grid', placeItems: 'center' }}>{n}</button>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 export default function CroPage() {
   const [r, setR] = useState<Report | null>(null)
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
+  const [zoom, setZoom] = useState<string | null>(null)
+  const jumpToLeak = (n: number) => { const el = document.getElementById(`leak-${n}`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.transition = 'box-shadow .3s'; el.style.boxShadow = `0 0 0 3px ${ORANGE}55`; setTimeout(() => { el.style.boxShadow = '' }, 1400) } }
 
   const load = useCallback(async () => { try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } }, [])
   useEffect(() => { load() }, [load])
@@ -92,16 +119,53 @@ export default function CroPage() {
             </Card>
           )}
 
+          {/* Annotated teardown — the REAL store with numbered pins where each leak is. */}
+          {!!r.shots?.length && (() => {
+            const homeShot = shotFor(r.shots, 'home'), pdpShot = shotFor(r.shots, 'pdp')
+            const pinsFor = (page: 'home' | 'pdp') => (r.leaks || []).map((l, i) => ({ n: i + 1, l })).filter(({ l }) => l.screen === page && l.region).map(({ n, l }) => ({ n, region: l.region! }))
+            const homePins = pinsFor('home'), pdpPins = pinsFor('pdp')
+            const panels = [homeShot && { shot: homeShot, pins: homePins, label: 'Your homepage' }, pdpShot && { shot: pdpShot, pins: pdpPins, label: 'Your product page' }].filter(Boolean) as { shot: Shot; pins: { n: number; region: Region }[]; label: string }[]
+            if (!panels.length) return null
+            return (
+              <>
+                <SectionTitle n="○">What we saw — your store, marked up</SectionTitle>
+                <div style={{ display: 'grid', gridTemplateColumns: panels.length > 1 ? 'repeat(auto-fit,minmax(300px,1fr))' : '1fr', gap: 14 }}>
+                  {panels.map((p) => (
+                    <div key={p.label}>
+                      <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 6 }}>{p.label}{p.pins.length ? ` · ${p.pins.length} issue${p.pins.length === 1 ? '' : 's'} marked` : ''}</div>
+                      <div onClick={() => setZoom(p.shot.url)} style={{ cursor: 'zoom-in' }}><Teardown shot={p.shot} pins={p.pins} onJump={jumpToLeak} /></div>
+                    </div>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, color: SUB, marginTop: 8 }}>Numbered pins match the leaks below — click a pin to jump to the fix. Pin spots are approximate.</div>
+              </>
+            )
+          })()}
+
           {!!r.leaks?.length && (<>
             <SectionTitle n="1">The 5 biggest conversion leaks</SectionTitle>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {r.leaks.map((l, i) => (
-                <Card key={i}>
-                  <div style={{ fontSize: 15, fontWeight: 750 }}>{i + 1}. {l.title}</div>
-                  <div style={{ fontSize: 13.5, color: '#a5342c', marginTop: 6, lineHeight: 1.5 }}><b>Why it costs sales:</b> {l.why}</div>
-                  <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}><b style={{ color: '#3f6b4a' }}>Replace with:</b> {l.fix}</div>
+              {r.leaks.map((l, i) => {
+                const shot = l.screen ? shotFor(r.shots, l.screen) : null
+                return (
+                <Card key={i} style={{ scrollMarginTop: 80 }}>
+                  <div id={`leak-${i + 1}`} style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+                    {shot && (
+                      <div onClick={() => setZoom(shot.url)} style={{ position: 'relative', width: 220, maxWidth: '100%', flexShrink: 0, borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, cursor: 'zoom-in', alignSelf: 'flex-start' }}>
+                        <img src={shot.url} alt={l.title} style={{ display: 'block', width: '100%' }} />
+                        {l.region && <RegionBox region={l.region} />}
+                        <div style={{ position: 'absolute', top: 6, left: 6, background: ORANGE, color: '#fff', fontSize: 10.5, fontWeight: 800, borderRadius: 6, padding: '2px 7px' }}>{i + 1} · {l.screen === 'pdp' ? 'Product page' : 'Homepage'}</div>
+                      </div>
+                    )}
+                    <div style={{ flex: 1, minWidth: 240 }}>
+                      <div style={{ fontSize: 15, fontWeight: 750 }}>{i + 1}. {l.title}</div>
+                      <div style={{ fontSize: 13.5, color: '#a5342c', marginTop: 6, lineHeight: 1.5 }}><b>Why it costs sales:</b> {l.why}</div>
+                      <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}><b style={{ color: '#3f6b4a' }}>Replace with:</b> {l.fix}</div>
+                    </div>
+                  </div>
                 </Card>
-              ))}
+                )
+              })}
             </div>
           </>)}
 
@@ -157,6 +221,12 @@ export default function CroPage() {
           </>)}
 
           <div style={{ marginTop: 20, fontSize: 12, color: SUB, textAlign: 'center' }}>Estimates are conservative. Next: one-click PDP makeover + built pages that ship these fixes.</div>
+        </div>
+      )}
+
+      {zoom && (
+        <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(20,29,21,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
+          <img src={zoom} alt="Store screenshot" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
         </div>
       )}
     </div>
