@@ -95,7 +95,7 @@ async function screenshots(domain: string, productUrl: string | null): Promise<S
   if (!base || !secret) return []
   const grab = async (u: string, tag: string): Promise<Shot[]> => {
     try {
-      const r = await fetch(`${base.replace(/\/$/, '')}/screenshot?url=${encodeURIComponent(u)}`, { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(70_000) })
+      const r = await fetch(`${base.replace(/\/$/, '')}/screenshot?url=${encodeURIComponent(u)}`, { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(35_000) })
       if (!r.ok) return []
       const s = await r.json() as { desktop?: string | null; mobile?: string | null }
       const out: Shot[] = []
@@ -142,14 +142,35 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
   const shots = await screenshots(domain, productUrl).catch(() => [] as Shot[])
   const prompt = buildPrompt(site, facts, visibleText(home), visibleText(prod), shots.length > 0)
 
-  // Primary: Gemini multimodal (uses the screenshots when present; text-only otherwise).
-  let raw = await critiqueScreens(shots, prompt, { maxTokens: 4200, temperature: 0.35 })
-  // Fallback: gpt-4o text if Gemini returned nothing (e.g. no GEMINI key). No images in this path.
-  if (!raw) {
-    try { const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 3200, temperature: 0.4, messages: [{ role: 'user', content: prompt }] }); raw = res?.content?.[0]?.text || '' } catch { /* ignore */ }
+  // Primary: Gemini multimodal — but ONLY when we actually have screenshots for it to SEE. With no
+  // shots there's no reason to route through Gemini (and 2.5 "thinking" models can burn the whole token
+  // budget on reasoning and return empty text), so we go straight to the reliable gpt-4o JSON path.
+  let raw = shots.length ? await critiqueScreens(shots, prompt, { maxTokens: 4200, temperature: 0.35 }) : ''
+  let parsed = parseReport(raw)
+  let fallbackErr = ''
+
+  // Reliable fallback: gpt-4o in JSON mode. Runs whenever the vision pass didn't yield a PARSEABLE report
+  // — not only when it was empty. (A non-empty-but-unparseable Gemini response used to block this.)
+  if (!parsed || !parsed.leaks?.length) {
+    try {
+      const res: any = await llm.messages.create({
+        model: 'gpt-4o', max_tokens: 3600, temperature: 0.4,
+        response_format: { type: 'json_object' },
+        messages: [{ role: 'user', content: prompt }],
+      })
+      raw = res?.content?.[0]?.text || ''
+      parsed = parseReport(raw)
+    } catch (e) { fallbackErr = String((e as Error)?.message || e).slice(0, 200) }
   }
-  const parsed = parseReport(raw)
-  if (!parsed || !parsed.leaks?.length) return { hasData: false, domain, site, note: 'Couldn’t complete the analysis — try again.' }
+
+  if (!parsed || !parsed.leaks?.length) {
+    // Surface WHY in the admin error log so a blank report is diagnosable instead of a silent "try again".
+    try {
+      const { logError } = await import('@/lib/admin/logError')
+      void logError({ user_id: null, error_message: `CRO audit produced no report for ${domain}`, page_url: '/mission/cro', extra: { kind: 'cro_no_report', domain, hadShots: shots.length, rawLen: (raw || '').length, homeLen: home.length, prodLen: prod.length, fallbackErr } })
+    } catch { /* never block */ }
+    return { hasData: false, domain, site, note: 'Couldn’t complete the analysis — try again.' }
+  }
 
   return { hasData: true, domain, site, productUrl, usedVision: shots.length > 0, scannedAt: new Date().toISOString(), ...parsed }
 }
