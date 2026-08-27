@@ -64,6 +64,46 @@ export default function CroPage() {
   const [zoom, setZoom] = useState<string | null>(null)
   const jumpToLeak = (n: number) => { const el = document.getElementById(`leak-${n}`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.transition = 'box-shadow .3s'; el.style.boxShadow = `0 0 0 3px ${ORANGE}55`; setTimeout(() => { el.style.boxShadow = '' }, 1400) } }
 
+  // ── CRO Phase 1: apply a fix (rewrite the product description) — preview → publish → undo. ──
+  const [rw, setRw] = useState<{ gid: string; title: string; before: string; after: string; url?: string } | null>(null)
+  const [applyBusy, setApplyBusy] = useState<string | null>(null)   // 'preview' | 'apply' | 'undo'
+  const [applyNote, setApplyNote] = useState<string | null>(null)
+  const previewRewrite = async () => {
+    if (applyBusy) return
+    setApplyBusy('preview'); setApplyNote(null)
+    try {
+      const res = await fetch('/api/cro/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'preview' }) })
+      const j = await res.json()
+      if (res.ok && j.after) setRw({ gid: j.gid, title: j.title, before: j.before, after: j.after })
+      else if (res.status === 402) openCredits(j.error === 'upgrade_required' ? 'plan' : 'buy', j.reason || 'Applying fixes is a paid feature.')
+      else if (j.error === 'no_store') openCredits('plan', j.reason || 'Connect your Shopify store first.')
+      else setApplyNote(j.reason || j.detail || 'Couldn’t generate a rewrite — try again.')
+    } catch { setApplyNote('Network error — try again.') }
+    setApplyBusy(null)
+  }
+  const doApply = async () => {
+    if (!rw || applyBusy) return
+    setApplyBusy('apply')
+    try {
+      const res = await fetch('/api/cro/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', gid: rw.gid, html: rw.after }) })
+      const j = await res.json()
+      if (res.ok && j.url) setRw((p) => p ? { ...p, url: j.url } : p)
+      else if (res.status === 402) openCredits('plan', j.reason || 'Applying is a paid feature — upgrade.')
+      else setApplyNote(j.detail || j.reason || 'Couldn’t publish — try again.')
+    } catch { setApplyNote('Network error — try again.') }
+    setApplyBusy(null)
+  }
+  const doUndo = async () => {
+    if (!rw || applyBusy) return
+    setApplyBusy('undo')
+    try {
+      const res = await fetch('/api/cro/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'undo', gid: rw.gid }) })
+      if (res.ok) { setRw(null); setApplyNote('Reverted — your product page is back to the original.') }
+      else { const j = await res.json(); setApplyNote(j.detail || 'Couldn’t undo — try again.') }
+    } catch { setApplyNote('Network error — try again.') }
+    setApplyBusy(null)
+  }
+
   const load = useCallback(async () => { try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } }, [])
   useEffect(() => { load() }, [load])
 
@@ -138,6 +178,20 @@ export default function CroPage() {
               <div style={{ fontSize: 15, fontWeight: 700, marginTop: 6, lineHeight: 1.5 }}>{r.firstChange}</div>
             </Card>
           )}
+
+          {/* CRO Phase 1 — stop reporting, start FIXING. One safe, reversible click. */}
+          <Card style={{ marginTop: 14, borderColor: `${ORANGE}55`, background: 'linear-gradient(180deg,#fff,#fffaf7)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 220 }}>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>✨ Apply a fix — rewrite your product page</div>
+                <div style={{ fontSize: 13, color: SUB, marginTop: 4, lineHeight: 1.5 }}>Mello rewrites your top product’s description to fix these leaks, then publishes it to Shopify. You preview it first, and it’s one-click reversible.</div>
+              </div>
+              <button onClick={previewRewrite} disabled={!!applyBusy} style={{ background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, cursor: applyBusy ? 'default' : 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap', opacity: applyBusy === 'preview' ? 0.7 : 1 }}>
+                {applyBusy === 'preview' ? 'Writing the fix…' : 'Rewrite my product page →'}
+              </button>
+            </div>
+            {applyNote && <div style={{ marginTop: 10, fontSize: 13, color: '#8a5a1a', background: '#fdf6e9', border: '1px solid #f3e2c5', borderRadius: 10, padding: '9px 12px' }}>{applyNote}</div>}
+          </Card>
 
           {/* Annotated teardown — the REAL store with numbered pins where each leak is. */}
           {!!r.shots?.length && (() => {
@@ -247,6 +301,43 @@ export default function CroPage() {
       {zoom && (
         <div onClick={() => setZoom(null)} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(20,29,21,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, cursor: 'zoom-out' }}>
           <img src={zoom} alt="Store screenshot" style={{ maxWidth: '100%', maxHeight: '100%', borderRadius: 10, boxShadow: '0 20px 60px rgba(0,0,0,0.5)' }} />
+        </div>
+      )}
+
+      {/* Before / after review before it touches the live store. */}
+      {rw && (
+        <div onClick={() => !applyBusy && setRw(null)} style={{ position: 'fixed', inset: 0, zIndex: 210, background: 'rgba(20,29,21,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(920px,96vw)', maxHeight: '90vh', display: 'flex', flexDirection: 'column', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 30px 80px rgba(20,29,21,0.35)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>{rw.url ? '✅ Published' : 'Review the rewrite'} — {rw.title}</div>
+              <button onClick={() => !applyBusy && setRw(null)} style={{ border: 'none', background: 'rgba(0,0,0,0.05)', width: 30, height: 30, borderRadius: 100, cursor: 'pointer', fontSize: 15 }}>✕</button>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0, overflow: 'auto', flex: 1 }}>
+              <div style={{ padding: 16, borderRight: `1px solid ${LINE}`, minWidth: 0 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>Before</div>
+                <div style={{ fontSize: 13, color: '#3a463a', lineHeight: 1.5, opacity: 0.75 }} dangerouslySetInnerHTML={{ __html: rw.before || '<p style="color:#9aa">(empty description)</p>' }} />
+              </div>
+              <div style={{ padding: 16, minWidth: 0, background: '#fbfdfa' }}>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#3f6b4a', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>After (Mello)</div>
+                <div style={{ fontSize: 13, color: INK, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: rw.after }} />
+              </div>
+            </div>
+            <div style={{ padding: '14px 20px', borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              {!rw.url ? (
+                <>
+                  <button onClick={doApply} disabled={!!applyBusy} style={{ background: '#256029', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 20px', fontSize: 14, fontWeight: 800, cursor: applyBusy ? 'default' : 'pointer', fontFamily: 'inherit' }}>{applyBusy === 'apply' ? 'Publishing to Shopify…' : 'Publish to Shopify'}</button>
+                  <button onClick={() => setRw(null)} disabled={!!applyBusy} style={{ background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 100, padding: '10px 18px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>Cancel</button>
+                  <span style={{ fontSize: 12, color: SUB, marginLeft: 'auto' }}>Publishes to your live store · reversible</span>
+                </>
+              ) : (
+                <>
+                  <a href={rw.url} target="_blank" rel="noreferrer" style={{ background: ORANGE, color: '#fff', borderRadius: 100, padding: '10px 20px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>View live →</a>
+                  <button onClick={doUndo} disabled={!!applyBusy} style={{ background: '#fff', color: '#b42318', border: '1px solid #f0c8c3', borderRadius: 100, padding: '10px 18px', fontSize: 13.5, fontWeight: 700, cursor: applyBusy ? 'default' : 'pointer', fontFamily: 'inherit' }}>{applyBusy === 'undo' ? 'Reverting…' : 'Undo'}</button>
+                  <span style={{ fontSize: 12.5, color: '#3f6b4a', marginLeft: 'auto', fontWeight: 600 }}>✅ Live on your store</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
