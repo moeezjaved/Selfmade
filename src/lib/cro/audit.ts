@@ -43,7 +43,8 @@ export type CroHomeSection = { section: string; why: string; content?: string }
 export type CroPdpChange = { change: string; why: string }
 export type CroAbTest = { name: string; hypothesis: string; impact: string }
 export type CroShot = { key: string; label: string; url: string }   // key: home-desktop | home-mobile | pdp-desktop | pdp-mobile
-export type CroPanel = { designer: number; psychologist: number; copywriter: number; cro: number; customer: string }
+export type CroLens = { score: number; take: string; findings: string[] }   // one expert's own view
+export type CroPanel = { designer: CroLens; psychologist: CroLens; copywriter: CroLens; cro: CroLens; customer: string }
 // Stage-1 visual evidence (what the eyes SEE — no conclusions). Each leak in stage 2 must cite these.
 export type CroEvidenceItem = { id: string; element: string; page: 'home' | 'pdp'; observation: string; prominence?: number; confidence: number }
 export type CroReport = {
@@ -154,10 +155,15 @@ function parseReport(txt: string, validEvidence?: Set<string>): Partial<CroRepor
       return e.split(',').map((s) => s.trim()).some((id) => validEvidence.has(id))
     }
     const p = j.panel && typeof j.panel === 'object' ? j.panel : null
+    // A lens may be a bare number (legacy) or a rich object {score, take, findings}. Normalize both.
+    const lens = (v: any): CroLens => {
+      if (v && typeof v === 'object') return { score: score10(v.score), take: str(v.take, 240), findings: (Array.isArray(v.findings) ? v.findings : []).map((f: any) => str(f, 220)).filter(Boolean).slice(0, 4) }
+      return { score: score10(v), take: '', findings: [] }
+    }
     return {
       score: Math.max(0, Math.min(100, Math.round(Number(j.score) || 0))),
       verdict: str(j.verdict, 240),
-      panel: p ? { designer: score10(p.designer), psychologist: score10(p.psychologist), copywriter: score10(p.copywriter), cro: score10(p.cro), customer: str(p.customer, 240) } : undefined,
+      panel: p ? { designer: lens(p.designer), psychologist: lens(p.psychologist), copywriter: lens(p.copywriter), cro: lens(p.cro), customer: str(p.customer, 240) } : undefined,
       leaks: arr(j.leaks).slice(0, 6)
         .map((x: any) => ({ title: str(x.title, 140), why: str(x.why), fix: str(x.fix), screen: screen(x.screen), region: region(x.region), severity: sev(x.severity), evidence: evId(x.evidence) }))
         .filter((x: CroLeak) => x.title && cited(x.evidence || ''))
@@ -225,7 +231,13 @@ Return ONLY JSON:
 {
   "score": <0-100 honest>,
   "verdict": "<one brutally honest sentence>",
-  "panel": {"designer":<0-10>,"psychologist":<0-10>,"copywriter":<0-10>,"cro":<0-10>,"customer":"<one first-person sentence a real shopper on this page would think>"},
+  "panel": {
+    "designer":     {"score":<0-10>,"take":"<one-sentence verdict through a DESIGNER's lens — visual hierarchy, whitespace, typography, imagery, premium vs cheap>","findings":["<2-3 specific issues, each quoting the exact element>"]},
+    "psychologist": {"score":<0-10>,"take":"<verdict through a buyer-PSYCHOLOGY lens — trust, objections, risk, motivation>","findings":["<2-3 specific>"]},
+    "copywriter":   {"score":<0-10>,"take":"<verdict through a COPYWRITER's lens — clarity, message, value articulation, grammar>","findings":["<2-3 specific, quoting the copy>"]},
+    "cro":          {"score":<0-10>,"take":"<verdict through a CRO lens — friction, CTA, pricing, checkout>","findings":["<2-3 specific>"]},
+    "customer":     "<one first-person sentence a real shopper on this page would think>"
+  },
   "leaks": [ {"title","why (START by quoting or naming the EXACT on-page element/text this is about, e.g. \\"The line 'A powerful solution for who want...' has a grammar error\\", so the founder can find it — never a vague label)","fix","screen":"home" or "pdp","severity":"critical|high|medium"${grounded ? ',"evidence":"ev_x"' : ''}${grounded ? ',"region":{"x":0-100,"y":0-100,"w":0-100,"h":0-100} (approx box on that page\'s above-fold screenshot, omit if unsure)' : ''}} ],  // EXACTLY 5, most severe first
   "changes": [ {"title","detail","impact":"leverage + why"} ],  // 5 highest-impact
   "homepage": [ {"section","why","content":"exact copy/elements for THIS store"} ],  // new homepage structure top→bottom
