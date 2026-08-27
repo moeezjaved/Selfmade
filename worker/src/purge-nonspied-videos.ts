@@ -115,30 +115,41 @@ async function main() {
     }
     console.log(`   Keep set: ${keepAdIds.size.toLocaleString()} ad_ids (spied + saved)\n`)
 
-    console.log('📦 Listing videos/ …')
     const gbAll = (n: number) => (n / 1073741824).toFixed(2)
-    const videoSizes = await listSizesByPrefix('videos/', (c, b) => process.stdout.write(`\r   …videos: ${c.toLocaleString()} objects (${gbAll(b)} GB)   `))
-    console.log('')
-
-    // A video key is videos/{adId}_{position}.mp4 — extract adId and keep only spied/saved.
+    // Sweep videos/ + thumbnails/ (ad images) + posters/ — all keyed {adId}_{pos}.ext. thumbs/ is keyed
+    // by HASH (shared, deduped serving thumbs) so it's intentionally NOT swept (can't map to an ad).
+    const PREFIXES = ['videos/', 'thumbnails/', 'posters/']
+    const EXT = /\.(mp4|jpg|jpeg|webp|png)$/i
     const toDelete: string[] = []
-    let keptBytes = 0, delBytes = 0, unparsed = 0
-    for (const [key, size] of videoSizes) {
-      const m = key.match(/^videos\/(.+)_\d+\.mp4$/i)
-      if (!m) { unparsed++; continue }         // unexpected key shape → never touch it
-      const adId = m[1]
-      if (keepAdIds.has(adId)) { keptBytes += size; continue }
-      toDelete.push(key); delBytes += size
+    let keptBytes = 0, delBytes = 0, unparsed = 0, totalObjs = 0
+
+    for (const prefix of PREFIXES) {
+      console.log(`📦 Listing ${prefix} …`)
+      const sizes = await listSizesByPrefix(prefix, (c, b) => process.stdout.write(`\r   …${prefix}: ${c.toLocaleString()} objects (${gbAll(b)} GB)   `))
+      console.log('')
+      let pKept = 0, pDel = 0, pDelBytes = 0
+      for (const [key, size] of sizes) {
+        totalObjs++
+        // {prefix}{adId}_{position}.{ext} — extract adId; hash-keyed keys (no _pos) won't match → skipped.
+        const m = key.match(new RegExp(`^${prefix}(.+)_\\d+${EXT.source}`, 'i'))
+        if (!m) { unparsed++; continue }
+        const adId = m[1]
+        if (keepAdIds.has(adId)) { keptBytes += size; continue }
+        toDelete.push(key); delBytes += size; pDel++; pDelBytes += size
+      }
+      pKept = sizes.size - pDel
+      console.log(`   ${prefix}  ${sizes.size.toLocaleString()} objects · delete ${pDel.toLocaleString()} (${gbAll(pDelBytes)} GB) · keep ${pKept.toLocaleString()}`)
     }
+
     console.log(`\n📊 Orphan sweep result`)
-    console.log(`   Video objects total:   ${videoSizes.size.toLocaleString()}  (${gbAll(keptBytes + delBytes)} GB)`)
-    console.log(`   Kept (spied/saved):    ${(videoSizes.size - toDelete.length - unparsed).toLocaleString()}  (${gbAll(keptBytes)} GB)`)
-    console.log(`   To DELETE:             ${toDelete.length.toLocaleString()}  (${gbAll(delBytes)} GB)`)
-    if (unparsed) console.log(`   ⚠️  Skipped ${unparsed} keys with an unexpected shape (never deleted)`)
+    console.log(`   Objects scanned:  ${totalObjs.toLocaleString()}`)
+    console.log(`   To DELETE:        ${toDelete.length.toLocaleString()}  (${gbAll(delBytes)} GB)`)
+    console.log(`   Kept (spied/saved + hash-keyed thumbs): ${(totalObjs - toDelete.length).toLocaleString()}  (${gbAll(keptBytes)} GB kept by ad)`)
+    if (unparsed) console.log(`   ⚠️  Skipped ${unparsed.toLocaleString()} hash-keyed / odd-shape keys (never deleted)`)
     console.log(`   ≈ Save: $${((delBytes / 1073741824) * R2_USD_PER_GB_MONTH).toFixed(2)}/month\n`)
 
     if (DRY) { console.log('✅ Dry run — nothing deleted. Re-run with --orphans (no --dry-run) to execute.\n'); return }
-    console.log('🗑  Deleting orphaned + non-spied video objects…')
+    console.log('🗑  Deleting orphaned + non-spied objects (videos + images + posters)…')
     const del = await deleteManyFromR2(toDelete)
     console.log(`   deleted ${del.toLocaleString()} objects (${gbAll(delBytes)} GB)\n✅ Done.\n`)
     return
