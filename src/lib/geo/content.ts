@@ -35,7 +35,9 @@ Return ONLY JSON: {"title":"…","markdown":"# …"} — clean Markdown, ~500–
   let markdown = ''
   try {
     const { llm } = await import('@/lib/llm')
-    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 1800, temperature: 0.5, messages: [{ role: 'user', content: `${sys}\n\n${user}` }] })
+    // JSON mode: the markdown body contains newlines/quotes/braces that break a hand-rolled JSON.parse —
+    // response_format guarantees valid JSON so the page actually gets written (was silently failing).
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 1800, temperature: 0.5, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: `${sys}\n\n${user}` }] })
     const txt = res?.content?.[0]?.text || ''
     const parsed = JSON.parse(txt.slice(txt.indexOf('{'), txt.lastIndexOf('}') + 1))
     if (parsed?.title) title = String(parsed.title).slice(0, 160)

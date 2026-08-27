@@ -52,7 +52,9 @@ export default function GeoPage() {
       const j = await r.json()
       if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || prompt) }
       else if (r.status === 402) openCredits('buy', j.reason || 'Writing a GEO answer page costs credits — top up to continue.')
-    } catch { /* keep desk usable */ }
+      else if (r.ok && j?.asset && !j.asset.body_markdown) alert('The writer came back empty — please try again.')
+      else alert(j?.detail || j?.error || 'Couldn’t write that page — try again.')
+    } catch { alert('Network error — try again.') }
     setWriting(null)
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
