@@ -46,9 +46,21 @@ type AdRow = Record<string, unknown>
 
 const SELECT =
   'ad_id, page_id, page_name, format, days_running, is_active, has_creative, performance_score, ' +
-  'body, title, thumbnail_url, raw_image_urls, snapshot_url, start_date, link_url, ' +
+  'body, title, thumbnail_url, raw_image_urls, snapshot_url, start_date, stop_date, last_seen, link_url, ' +
   'discovery_creatives(asset_type, r2_url, poster_url, position), ' +
   DIMS.map((d) => d.key).join(', ')
+
+// days_running is DERIVED from the real Facebook start/stop dates — the stored days_running column is
+// left 0 for on-demand competitor pulls (the nightly rollup only recomputes a narrow recent window), so
+// trusting it made "proven winners (90+ days)" always report 0. Active → now − start; ended → stop − start.
+function deriveDays(a: AdRow): number {
+  const startMs = a.start_date ? Date.parse(String(a.start_date)) : NaN
+  if (!Number.isFinite(startMs)) { const s = Number(a.days_running); return Number.isFinite(s) && s > 0 ? s : 0 }
+  const stopMs = a.stop_date ? Date.parse(String(a.stop_date)) : NaN
+  const endMs = a.is_active ? Date.now() : (Number.isFinite(stopMs) ? stopMs : (a.last_seen ? Date.parse(String(a.last_seen)) : Date.now()))
+  const d = Math.floor((endMs - startMs) / 86400000)
+  return Number.isFinite(d) ? Math.max(0, Math.min(d, 3650)) : 0
+}
 
 // ── rollup: rows → distribution per dimension (single + array columns) ──
 function rollup(rows: AdRow[]): DnaDist {
@@ -135,30 +147,22 @@ export async function winnerDna(pageIds: string[], niche?: string | null, brandN
   const db = createAdminClient()
   let rows: AdRow[] = []
 
+  // Pull the brands' ads WITHOUT gating on the stale stored days_running — we derive longevity below from
+  // the real start/stop dates, then decide winners. Order by performance so the pool is their strongest.
   if (pageIds.length) {
     const { data } = await db.from('discovery_ads_index').select(SELECT)
       .in('page_id', pageIds).eq('has_creative', true)
-      .gte('days_running', WINNER_DAYS).order('days_running', { ascending: false }).limit(1500)
+      .order('performance_score', { ascending: false, nullsFirst: false }).limit(1500)
     rows = (data as AdRow[]) || []
-    // Too few proven winners? fall back to the longest-running ads these brands run, so we still
-    // describe *their strongest*, and flag lower confidence via sampleSize.
-    if (rows.length < 15) {
-      const { data: d2 } = await db.from('discovery_ads_index').select(SELECT)
-        .in('page_id', pageIds).eq('has_creative', true)
-        .order('days_running', { ascending: false }).limit(400)
-      rows = (d2 as AdRow[]) || rows
-    }
   } else if (niche) {
     const { data } = await db.from('discovery_ads_index').select(SELECT)
       .eq('niche', niche).eq('has_creative', true)
-      .gte('days_running', WINNER_DAYS).order('days_running', { ascending: false }).limit(1500)
+      .order('performance_score', { ascending: false, nullsFirst: false }).limit(1500)
     rows = (data as AdRow[]) || []
   }
 
   // Relevance: keep rivals in the SAME writing system as the brand (a Cyrillic/CJK store is not a
-  // believable peer for a Latin-script brand). Broad niches like "Health & Wellness" otherwise surface
-  // whatever foreign brand has the most/longest-running ads. Fall back to all rows if the same-language
-  // pool is too thin to describe a playbook.
+  // believable peer for a Latin-script brand). Fall back to all rows if the same-language pool is thin.
   if (brandName) {
     const want = scriptOf(brandName)
     if (want !== 'other') {
@@ -167,19 +171,28 @@ export async function winnerDna(pageIds: string[], niche?: string | null, brandN
     }
   }
 
-  const winners = rows.filter((r) => (r.days_running as number) >= WINNER_DAYS)
+  const totalExamined = rows.length
+  // DERIVE days per ad and pick the real winners (≥ 90 days live). If too few, describe their strongest
+  // (longest-running) ads instead so the playbook is never empty — but winnerCount stays honest.
+  const withDays = rows.map((r) => ({ r, d: deriveDays(r) }))
+  const winnerRows = withDays.filter((x) => x.d >= WINNER_DAYS).map((x) => x.r)
+  const analysis = winnerRows.length >= 15
+    ? winnerRows
+    : withDays.slice().sort((a, b) => b.d - a.d).slice(0, 400).map((x) => x.r)
+  const dayFor = (a: AdRow) => deriveDays(a)
+
   // Prefer examples that actually have a thumbnail so the rivals grid is full of real ads, not blanks.
-  const withThumb = rows.filter((r) => thumbOf(r))
-  const examples: WinnerExample[] = (withThumb.length ? withThumb : rows).slice(0, 24).map((a) => ({
+  const withThumb = analysis.filter((r) => thumbOf(r))
+  const examples: WinnerExample[] = (withThumb.length ? withThumb : analysis).slice(0, 24).map((a) => ({
     adId: String(a.ad_id),
     brand: String(a.page_name || ''),
-    daysRunning: (a.days_running as number) || 0,
+    daysRunning: dayFor(a),
     hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
     format: (a.format_style as string) || (a.format as string) || null,
     thumb: thumbOf(a),
   }))
 
-  return { dist: rollup(rows), media: mediaMix(rows), sampleSize: rows.length, winnerCount: winners.length, examples }
+  return { dist: rollup(analysis), media: mediaMix(analysis), sampleSize: totalExamined, winnerCount: winnerRows.length, examples }
 }
 
 // ── The $100k → $1M maturity model. A $100k brand runs ads; a $1M brand builds a creative+conversion
@@ -225,7 +238,7 @@ export async function ownDna(pageId: string | null): Promise<OwnDna> {
   const examples: WinnerExample[] = rows.filter((r) => thumbOf(r)).slice(0, 24).map((a) => ({
     adId: String(a.ad_id),
     brand: String(a.page_name || ''),
-    daysRunning: (a.days_running as number) || 0,
+    daysRunning: deriveDays(a),
     hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
     format: (a.format_style as string) || (a.format as string) || null,
     thumb: thumbOf(a),
@@ -242,7 +255,7 @@ export function ownDnaFromRows(rows: AdRow[]): OwnDna {
   const examples: WinnerExample[] = rows.filter((r) => thumbOf(r)).slice(0, 24).map((a) => ({
     adId: String(a.ad_id || ''),
     brand: String(a.page_name || ''),
-    daysRunning: (a.days_running as number) || 0,
+    daysRunning: deriveDays(a),
     hook: cleanText((a.body as string) || (a.title as string) || '').split('\n')[0].trim().slice(0, 160),
     format: (a.format_style as string) || (a.format as string) || null,
     thumb: thumbOf(a),

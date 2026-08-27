@@ -31,7 +31,16 @@ const engLabel = (e: string) => e === 'chatgpt' ? 'ChatGPT' : e === 'gemini' ? '
 const shorten = (t: string, n = 30) => (t.length > n ? t.slice(0, n - 1) + '…' : t)
 
 /** Live sub-metrics shown under the active step in the sidebar (Ryze-style). */
+// While a step is still the ACTIVE (spinning) one, the sidebar must never claim a conclusion like
+// "No issues found" — that reads as done while the ring is still turning. Show honest in-progress copy;
+// the real pass/fail verdict lands in the main-pane stripe once the step completes.
+const CHECKING: Record<string, string> = {
+  health: 'Reading your key pages…', speed: 'Measuring load speed…', spam: 'Checking spam-update signals…',
+  catalog: 'Checking your catalog…', google: 'Running your buyer searches…', backlinks: 'Checking who links to you…',
+  ai: 'Asking the AI engines…', revenue: 'Adding up what’s at stake…',
+}
 function subRows(key: string, sec?: Section): { label: string; value: string; ok: boolean }[] {
+  if (!sec) return [{ label: CHECKING[key] || 'Checking…', value: '', ok: true }]
   if (!sec) return []
   if (key === 'health' && sec.read) {
     const r = sec.read
@@ -68,7 +77,9 @@ function subRows(key: string, sec?: Section): { label: string; value: string; ok
     ]
   }
   if (sec.findings.length) return sec.findings.slice(0, 4).map((f) => ({ label: shorten(f.title), value: '', ok: false }))
-  return [{ label: 'No issues found', value: '', ok: true }]
+  // Loaded but empty → the step is still the spinning/active one in the sidebar, so show progress, not a
+  // premature "No issues found" (that conclusion is shown in the main-pane verdict once the step completes).
+  return [{ label: CHECKING[key] || 'Checking…', value: '', ok: true }]
 }
 
 /** The per-step verdict shown as an orange stripe (returns null until the step has data). */
