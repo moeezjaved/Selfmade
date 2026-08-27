@@ -10,6 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 import { discoverCompetitors } from '@/lib/ads-studio/competitors'
+import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
 
 export const dynamic = 'force-dynamic'
@@ -90,7 +91,7 @@ export async function GET(req: NextRequest) {
       if (cached) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
       else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true }   // another run in-flight → serve spied-only for now
     }
-    if (!discoveryDone && domain && domain.includes('.')) {
+    if (!discoveryDone && domain && domain.includes('.') && !isAppDomain(domain)) {
       if (brandId) await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
       const res = await discoverCompetitors(domain).catch(() => null)
       if (res) {
