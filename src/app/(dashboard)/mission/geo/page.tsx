@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
+import LlmsGuide from '@/components/geo/LlmsGuide'
 
 type EngineCell = { engine: string; label: string; cited: boolean; grounded: boolean; competitorsCited: string[]; excerpt: string }
 type PromptResult = { prompt: string; engines: EngineCell[]; youCited: boolean; rivalsCited: number }
@@ -75,6 +76,7 @@ export default function GeoPage() {
 
   // Apply a built crawlability/entity asset to the store: fact_sheet → a live Shopify Page; schema → the
   // theme <head>. (llms.txt can't auto-apply — it must sit at the site root; we keep it copy-only.)
+  const [guideAsset, setGuideAsset] = useState<Asset | null>(null)
   const [applying, setApplying] = useState<string | null>(null)
   const apply = async (a: Asset) => {
     if (!a.id || applying) return
@@ -129,7 +131,7 @@ export default function GeoPage() {
               <button className="btn tiny lime" onClick={() => apply(a)} disabled={applying === a.id}>{applying === a.id ? 'Applying…' : a.published_url ? 'Re-apply to theme' : 'Add to store theme'}</button>
             )}
             {a.kind === 'llms_txt' && (
-              <span className="hint" title="llms.txt must sit at your site root — copy it in from your theme/hosting">Copy → place at /llms.txt</span>
+              <button className="btn tiny lime" onClick={() => setGuideAsset(a)}>▶ How to add it (2-min guide)</button>
             )}
             {a.kind === 'offsite' && (
               <button className="btn tiny" disabled title="Auto-post coming soon">Post reply — soon</button>
@@ -322,6 +324,7 @@ export default function GeoPage() {
           </>
         )}
       </div>
+      {guideAsset && <LlmsGuide content={guideAsset.body_markdown} domain={status?.understanding?.websiteUrl} onClose={() => setGuideAsset(null)} />}
     </div>
   )
 }
