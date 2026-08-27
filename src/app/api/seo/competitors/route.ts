@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { analyzeCompetitor, contentGaps, normalizeDomain, type CompetitorAnalysis } from '@/lib/seo/competitors'
+import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { describeBrand } from '@/lib/geo/understand'
 import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, renderArticleHtml } from '@/lib/shopify/blog'
@@ -69,32 +70,55 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}))
   const action = body.action
 
+  // Analyzing a rival reads its site live via the LLM → charge credits (everyone). Reserve BEFORE the
+  // work so a low balance is blocked up front, not after; refunded if the analysis fails.
+  const ANALYZE = action === 'add' || action === 'seed' || action === 'refresh'
+  let txId: string | null = null
+  if (ANALYZE) {
+    try { txId = (await reserveCredits(admin, userId, 'competitor_decode')).id }
+    catch (e) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Analyzing a competitor costs credits — top up or upgrade to continue.' }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+    }
+  }
+  const refund = async () => { if (txId) await refundCredits(admin, txId).catch(() => {}) }
+  const commit = async () => { if (txId) await commitCredits(admin, txId, { kind: 'competitor_decode', action }).catch(() => {}) }
+
   if (action === 'add') {
     const domain = normalizeDomain(body.domain || '')
-    if (!domain || !domain.includes('.')) return NextResponse.json({ error: 'Enter a competitor domain, like fum.com' }, { status: 400 })
-    const a = await analyzeCompetitor(domain)
-    await storeAnalysis(admin, userId, brandId, body.name ? String(body.name) : null, a)
-    return NextResponse.json({ ok: true, analysis: a, empty: a.pageCount === 0 })
+    if (!domain || !domain.includes('.')) { await refund(); return NextResponse.json({ error: 'Enter a competitor domain, like fum.com' }, { status: 400 }) }
+    try {
+      const a = await analyzeCompetitor(domain)
+      await storeAnalysis(admin, userId, brandId, body.name ? String(body.name) : null, a)
+      await commit()
+      return NextResponse.json({ ok: true, analysis: a, empty: a.pageCount === 0 })
+    } catch (e) { await refund(); return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 }) }
   }
 
   if (action === 'seed') {
-    const brand = await describeBrand(admin, userId, brandId).catch(() => null)
-    const names = (brand?.competitors || []).slice(0, 5)
-    let added = 0
-    for (const name of names) {
-      const guess = normalizeDomain(String(name).replace(/[^a-z0-9]/gi, '').toLowerCase()) + '.com'
-      const a = await analyzeCompetitor(guess)
-      if (a.pageCount > 0) { await storeAnalysis(admin, userId, brandId, String(name), a); added++ }
-    }
-    return NextResponse.json({ ok: true, added, considered: names.length, note: added < names.length ? 'Some competitor domains couldn’t be auto-resolved — add them manually.' : undefined })
+    try {
+      const brand = await describeBrand(admin, userId, brandId).catch(() => null)
+      const names = (brand?.competitors || []).slice(0, 5)
+      let added = 0
+      for (const name of names) {
+        const guess = normalizeDomain(String(name).replace(/[^a-z0-9]/gi, '').toLowerCase()) + '.com'
+        const a = await analyzeCompetitor(guess)
+        if (a.pageCount > 0) { await storeAnalysis(admin, userId, brandId, String(name), a); added++ }
+      }
+      await commit()
+      return NextResponse.json({ ok: true, added, considered: names.length, note: added < names.length ? 'Some competitor domains couldn’t be auto-resolved — add them manually.' : undefined })
+    } catch (e) { await refund(); return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 }) }
   }
 
   if (action === 'refresh') {
     const { data: row } = await admin.from('seo_competitors').select('domain, name').eq('id', String(body.id)).eq('user_id', userId).maybeSingle()
-    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const a = await analyzeCompetitor(row.domain)
-    await storeAnalysis(admin, userId, brandId, row.name, a)
-    return NextResponse.json({ ok: true, analysis: a })
+    if (!row) { await refund(); return NextResponse.json({ error: 'Not found' }, { status: 404 }) }
+    try {
+      const a = await analyzeCompetitor(row.domain)
+      await storeAnalysis(admin, userId, brandId, row.name, a)
+      await commit()
+      return NextResponse.json({ ok: true, analysis: a })
+    } catch (e) { await refund(); return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 }) }
   }
 
   if (action === 'remove') {

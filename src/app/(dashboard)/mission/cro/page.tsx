@@ -45,6 +45,7 @@ export default function CroPage() {
       if (res.ok && j?.hasData) setR(j as Report)
       else if (res.status === 402) openCredits('buy', j.reason || 'A CRO audit costs credits — top up to run it.')
       else if (res.status === 400) setNote(j.note || 'Connect a store or add your website first.')
+      else if (j.error === 'reserve_failed') setNote('Credits couldn’t be reserved — the CRO price isn’t set up yet. (Admin: apply the cro_audit pricing row.)')
       else setNote(j.note || j.error || 'Couldn’t run the audit — try again.')
     } catch { setNote('Something went wrong — try again.') } finally { setBusy(false) }
   }

@@ -6,6 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
+import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -32,7 +33,11 @@ export default function CompetitorsPage() {
     try {
       const r = await fetch('/api/seo/competitors', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(bodyObj) })
       const j = await r.json()
-      if (!r.ok) { setNote(j.error || 'Failed.'); setBusy(null); return null }
+      if (!r.ok) {
+        if (r.status === 402) openCredits('buy', j.reason || 'Analyzing a competitor costs credits — top up to continue.')
+        else setNote(j.error || 'Failed.')
+        setBusy(null); return null
+      }
       return j
     } catch { setNote('Network error.'); setBusy(null); return null }
   }
