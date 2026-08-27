@@ -41,6 +41,9 @@ export default function GeoPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  // Re-fetch when the founder switches brand (the switcher fires this) — otherwise the page keeps the
+  // previous brand's data because it only fetched on mount.
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
   // when we're only guessing (name-match, no trusted signal), open the correction form so it's obvious.
   useEffect(() => { if (status?.understanding?.uncertain) setShowFix(true) }, [status?.understanding?.uncertain])
 

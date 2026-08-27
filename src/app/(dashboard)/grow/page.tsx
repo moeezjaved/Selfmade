@@ -45,6 +45,7 @@ export default function GrowPage() {
     try { const r = await fetch('/api/audit/claim'); const j = await r.json(); if (r.ok && j.scan) setScan(j.scan) } catch { /* optional */ }
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const task = (k: string) => d?.stages?.flatMap((s) => s.tasks).find((t) => t.key === k)
   const rev = d?.revenue
