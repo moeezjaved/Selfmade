@@ -17,7 +17,13 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 export const runtime = 'nodejs'
 
-async function brandDomain(admin: any, brandId: string | null): Promise<string> {
+async function brandDomain(admin: any, userId: string, brandId: string | null): Promise<string> {
+  // Prefer the connected Shopify store domain over the (often stale) brands.website signup default.
+  try {
+    const { resolveStore } = await import('@/lib/shopify/client')
+    const store = await resolveStore(admin, userId, brandId).catch(() => null)
+    if (store?.shop_domain) return String(store.shop_domain).replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+  } catch { /* fall through to brand website */ }
   if (!brandId) return ''
   const { data } = await admin.from('brands').select('brand_kit, website').eq('id', brandId).maybeSingle()
   const kit = (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {}
@@ -31,7 +37,7 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient() as any
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
   const body = await req.json().catch(() => ({} as any))
-  const domain = String(body?.domain || '').trim() || await brandDomain(admin, brandId)
+  const domain = String(body?.domain || '').trim() || await brandDomain(admin, user.id, brandId)
   if (!domain || !domain.includes('.')) return NextResponse.json({ error: 'no_domain', note: 'Connect a store or add your website first.' }, { status: 400 })
   if (isAppDomain(domain)) return NextResponse.json({ error: 'no_domain', note: CONNECT_STORE_NOTE }, { status: 400 })
 
