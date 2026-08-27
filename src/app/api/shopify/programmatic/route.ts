@@ -11,6 +11,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { planPages, existingKeys, generateBatch, publishBatch } from '@/lib/shopify/programmatic'
+import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -56,8 +57,19 @@ export async function POST(req: NextRequest) {
 
   if (action === 'generate') {
     const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 12)
-    const res = await generateBatch(admin, store, userId, limit, body.withImage === true)
-    return NextResponse.json({ ok: true, ...res })
+    // Batch of pages (+ optional hero images) via paid models → charge credits up front (everyone).
+    // Out of credits → 402 upsell; refunded if generation fails.
+    let txId: string | null = null
+    try { txId = (await reserveCredits(admin, userId, 'programmatic_batch')).id }
+    catch (e) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating pages costs credits — top up or upgrade to continue.' }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+    }
+    try {
+      const res = await generateBatch(admin, store, userId, limit, body.withImage === true)
+      await commitCredits(admin, txId, { kind: 'programmatic_batch', limit }).catch(() => {})
+      return NextResponse.json({ ok: true, ...res })
+    } catch (e) { if (txId) await refundCredits(admin, txId).catch(() => {}); return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 }) }
   }
   if (action === 'publish') {
     const ids = Array.isArray(body.ids) ? body.ids.map(String).slice(0, 200) : []

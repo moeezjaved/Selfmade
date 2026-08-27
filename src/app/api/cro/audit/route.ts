@@ -11,6 +11,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { runCroAudit } from '@/lib/cro/audit'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
+import { isAppDomain, CONNECT_STORE_NOTE } from '@/lib/domain-guard'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -32,6 +33,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   const domain = String(body?.domain || '').trim() || await brandDomain(admin, brandId)
   if (!domain || !domain.includes('.')) return NextResponse.json({ error: 'no_domain', note: 'Connect a store or add your website first.' }, { status: 400 })
+  if (isAppDomain(domain)) return NextResponse.json({ error: 'no_domain', note: CONNECT_STORE_NOTE }, { status: 400 })
 
   // Crawl + LLM review → charge credits (everyone). Out of credits → 402 upsell. Refunded on failure.
   let txId: string | null = null

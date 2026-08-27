@@ -8,6 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { crawlStore, generateAudiences } from '@/lib/ads-studio/store'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload } from '@/lib/ads-studio/cache'
 
 export const dynamic = 'force-dynamic'
@@ -27,7 +28,7 @@ async function activeBrand(): Promise<{ admin: any; brandId: string } | null> {
 
 export async function GET(req: NextRequest) {
   const domain = (req.nextUrl.searchParams.get('domain') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
-  if (!domain || !domain.includes('.')) return NextResponse.json({ market: '', audiences: [], signals: [] })
+  if (!domain || !domain.includes('.') || isAppDomain(domain)) return NextResponse.json({ market: '', audiences: [], signals: [] })
   const force = req.nextUrl.searchParams.get('force') === '1'
   const brand = await activeBrand()
   if (brand && !force) {
