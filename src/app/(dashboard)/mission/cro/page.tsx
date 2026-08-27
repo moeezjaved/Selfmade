@@ -8,17 +8,21 @@ import { useCallback, useEffect, useState } from 'react'
 import { openCredits } from '@/components/credits/CreditModal'
 
 type Region = { x: number; y: number; w: number; h: number }
-type Leak = { title: string; why: string; fix: string; screen?: 'home' | 'pdp'; region?: Region }
+type Severity = 'critical' | 'high' | 'medium'
+type Leak = { title: string; why: string; fix: string; screen?: 'home' | 'pdp'; region?: Region; severity?: Severity }
 type Change = { title: string; detail: string; impact: string }
 type HomeSection = { section: string; why: string; content?: string }
 type PdpChange = { change: string; why: string }
 type AbTest = { name: string; hypothesis: string; impact: string }
 type Shot = { key: string; label: string; url: string }
+type Panel = { designer: number; psychologist: number; copywriter: number; cro: number; customer: string }
 type Report = {
   hasData: boolean; domain?: string; site?: string; productUrl?: string | null; score?: number; verdict?: string
   leaks?: Leak[]; changes?: Change[]; homepage?: HomeSection[]; productPage?: PdpChange[]; abtests?: AbTest[]; firstChange?: string
-  shots?: Shot[]; usedVision?: boolean; note?: string
+  shots?: Shot[]; panel?: Panel; issueCount?: number; criticalCount?: number; usedVision?: boolean; note?: string
 }
+
+const SEV_COLOR: Record<Severity, string> = { critical: '#b42318', high: '#c2600c', medium: '#9a6a12' }
 
 const INK = '#141d15', SUB = '#6b776b', LINE = '#e6ebe3', ORANGE = '#ef4a1e'
 const scoreColor = (s: number) => s >= 75 ? '#3f6b4a' : s >= 50 ? '#9a6a12' : '#b42318'
@@ -109,8 +113,24 @@ export default function CroPage() {
             <div style={{ flex: 1, minWidth: 220 }}>
               <div style={{ fontSize: 15, fontWeight: 750, lineHeight: 1.4 }}>{r.verdict}</div>
               <div style={{ fontSize: 12.5, color: SUB, marginTop: 6 }}>{r.site || r.domain}{r.productUrl && <> · analyzed your homepage + <a href={r.productUrl} target="_blank" rel="noreferrer" style={{ color: ORANGE, fontWeight: 600 }}>top product page ↗</a></>}{r.usedVision ? ' · incl. rendered design' : ''}</div>
+              {!!r.issueCount && <div style={{ fontSize: 12.5, color: INK, marginTop: 6, fontWeight: 600 }}>Found <b>{r.issueCount}</b> visual observations{r.criticalCount ? <> · <b style={{ color: SEV_COLOR.critical }}>{r.criticalCount} critical</b></> : ''}.</div>}
             </div>
           </Card>
+
+          {/* The panel — 5 lenses grade the same evidence. Theater, but grounded. */}
+          {r.panel && (
+            <Card style={{ marginTop: 14 }}>
+              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
+                {([['🎨 Designer', r.panel.designer], ['🧠 Psychologist', r.panel.psychologist], ['✍️ Copywriter', r.panel.copywriter], ['💰 CRO', r.panel.cro]] as [string, number][]).map(([label, v]) => (
+                  <div key={label} style={{ textAlign: 'center', minWidth: 78 }}>
+                    <div style={{ fontSize: 20, fontWeight: 900, color: scoreColor((v || 0) * 10) }}>{v}<span style={{ fontSize: 11, color: SUB, fontWeight: 700 }}>/10</span></div>
+                    <div style={{ fontSize: 11, color: SUB, marginTop: 2 }}>{label}</div>
+                  </div>
+                ))}
+              </div>
+              {r.panel.customer && <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 10, fontSize: 13.5, fontStyle: 'italic', color: '#3a463a' }}>🛍️ Your shopper: “{r.panel.customer}”</div>}
+            </Card>
+          )}
 
           {r.firstChange && (
             <Card style={{ marginTop: 14, background: '#fff7f4', borderColor: `${ORANGE}44` }}>
@@ -158,7 +178,7 @@ export default function CroPage() {
                       </div>
                     )}
                     <div style={{ flex: 1, minWidth: 240 }}>
-                      <div style={{ fontSize: 15, fontWeight: 750 }}>{i + 1}. {l.title}</div>
+                      <div style={{ fontSize: 15, fontWeight: 750 }}>{i + 1}. {l.title}{l.severity && <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: SEV_COLOR[l.severity], borderRadius: 100, padding: '2px 8px', marginLeft: 8, textTransform: 'uppercase', letterSpacing: '.03em', verticalAlign: 'middle' }}>{l.severity}</span>}</div>
                       <div style={{ fontSize: 13.5, color: '#a5342c', marginTop: 6, lineHeight: 1.5 }}><b>Why it costs sales:</b> {l.why}</div>
                       <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}><b style={{ color: '#3f6b4a' }}>Replace with:</b> {l.fix}</div>
                     </div>
