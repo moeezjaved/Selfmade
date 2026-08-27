@@ -130,14 +130,27 @@ export async function POST(req: NextRequest) {
     const topic = String(body.topic || '').trim()
     if (!topic) return NextResponse.json({ error: 'Missing topic' }, { status: 400 })
     const store = await resolveStore(admin, userId, brandId)
-    if (!store) return NextResponse.json({ error: 'Connect Shopify first to draft pages.' }, { status: 400 })
-    const article = await writeArticle(admin, store, userId, topic)
-    if (!article) return NextResponse.json({ error: 'Could not draft that page.' }, { status: 500 })
-    const html = renderArticleHtml(article, null)
-    const { data: saved } = await admin.from('geo_assets').insert({
-      brand_id: brandId, user_id: userId, kind: 'blog', title: article.title, target_prompt: topic, body_markdown: html, status: 'draft',
-    }).select('id').maybeSingle()
-    return NextResponse.json({ ok: true, id: saved?.id, title: article.title })
+    if (!store) return NextResponse.json({ error: 'no_store', reason: 'Connect your Shopify store first — I draft these pages from your real catalog.' }, { status: 400 })
+    // Writing a full article is one LLM write → charge blog_draft (same as the Content agent). Refunded on fail.
+    let bTx: string | null = null
+    try { bTx = (await reserveCredits(admin, userId, 'blog_draft')).id }
+    catch (e) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Writing a page costs credits — top up or upgrade to continue.' }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+    }
+    try {
+      const article = await writeArticle(admin, store, userId, topic)
+      if (!article) { await refundCredits(admin, bTx).catch(() => {}); return NextResponse.json({ error: 'Could not draft that page — try again.' }, { status: 500 }) }
+      const html = renderArticleHtml(article, null)
+      const { data: saved } = await admin.from('geo_assets').insert({
+        brand_id: brandId, user_id: userId, kind: 'blog', title: article.title, target_prompt: topic, body_markdown: html, status: 'draft',
+      }).select('id').maybeSingle()
+      await commitCredits(admin, bTx, { kind: 'blog_draft', via: 'competitor_gap', topic }).catch(() => {})
+      return NextResponse.json({ ok: true, id: saved?.id, title: article.title })
+    } catch (e) {
+      await refundCredits(admin, bTx).catch(() => {})
+      return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })
+    }
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

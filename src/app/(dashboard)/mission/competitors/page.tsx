@@ -51,7 +51,24 @@ export default function CompetitorsPage() {
   const seed = async () => { const j = await post({ action: 'seed' }, 'seed'); if (j) { setNote(`Added ${j.added} competitor${j.added === 1 ? '' : 's'}.${j.note ? ' ' + j.note : ''}`); await load() } setBusy(null) }
   const refresh = async (id: string) => { const j = await post({ action: 'refresh', id }, `ref:${id}`); if (j) await load(); setBusy(null) }
   const remove = async (id: string) => { await post({ action: 'remove', id }, `rm:${id}`); await load(); setBusy(null) }
-  const build = async (topic: string) => { const j = await post({ action: 'build', topic }, `build:${topic}`); if (j) setNote(`Drafted "${j.title}" — review in Content →`); setBusy(null) }
+  // Draft a page for a gap topic → lands in Content. Show the result INLINE on the row (the draft lives on
+  // another page, so a top-of-page note alone reads as "nothing happened").
+  const [built, setBuilt] = useState<Record<string, string>>({})   // topic → drafted title
+  const [buildErr, setBuildErr] = useState<Record<string, string>>({})
+  const build = async (topic: string) => {
+    setBusy(`build:${topic}`); setNote(null)
+    setBuildErr((e) => { const n = { ...e }; delete n[topic]; return n })
+    try {
+      const r = await fetch('/api/seo/competitors', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'build', topic }) })
+      const j = await r.json()
+      if (r.ok) setBuilt((b) => ({ ...b, [topic]: j.title || topic }))
+      else if (r.status === 402) openCredits('buy', j.reason || 'Writing a page costs credits — top up to continue.')
+      else if (j.error === 'no_store') setBuildErr((e) => ({ ...e, [topic]: j.reason || 'Connect your Shopify store first.' }))
+      else if (j.error === 'reserve_failed') setBuildErr((e) => ({ ...e, [topic]: 'Credits couldn’t be reserved — try again shortly.' }))
+      else setBuildErr((e) => ({ ...e, [topic]: j.error || 'Couldn’t draft that — try again.' }))
+    } catch { setBuildErr((e) => ({ ...e, [topic]: 'Network error — try again.' })) }
+    setBusy(null)
+  }
 
   if (loading) return <Shell><div style={{ color: SUB }}>Loading…</div></Shell>
   const comps = data?.competitors || []
@@ -118,12 +135,18 @@ export default function CompetitorsPage() {
       {gaps.length > 0 && (
         <div style={{ border: `1.5px solid ${LIME}`, borderRadius: 16, background: '#fff', padding: 18 }}>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Content gaps — pages to steal their traffic</div>
-          <div style={{ fontSize: 13, color: SUB, marginBottom: 14 }}>Buyer-intent topics rivals cover and you don’t. Draft one and it lands in Content for review.</div>
+          <div style={{ fontSize: 13, color: SUB, marginBottom: 14 }}>Buyer-intent topics rivals cover and you don’t. <b>“Write it”</b> drafts a full article on that topic from your real catalog (costs credits) and saves it as a draft in <b>Content</b> — review, then publish to your Shopify blog.</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {gaps.map((g, i) => (
-              <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, border: `1px solid ${LINE}`, borderRadius: 12, padding: '11px 14px' }}>
-                <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 0 }}>{g}</span>
-                <button onClick={() => build(g)} disabled={!!busy} style={{ ...primaryBtn, padding: '7px 14px' }}>{busy === `build:${g}` ? 'Drafting…' : 'Write it →'}</button>
+              <div key={i} style={{ border: `1px solid ${built[g] ? LIME : LINE}`, borderRadius: 12, padding: '11px 14px', background: built[g] ? '#f6fbef' : '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <span style={{ fontSize: 13.5, fontWeight: 600, flex: 1, minWidth: 0 }}>{g}</span>
+                  {built[g]
+                    ? <a href="/mission/blog" style={{ ...primaryBtn, padding: '7px 14px', textDecoration: 'none', display: 'inline-block' }}>Open in Content →</a>
+                    : <button onClick={() => build(g)} disabled={!!busy} style={{ ...primaryBtn, padding: '7px 14px', opacity: busy === `build:${g}` ? 0.7 : 1 }}>{busy === `build:${g}` ? 'Drafting…' : 'Write it →'}</button>}
+                </div>
+                {built[g] && <div style={{ fontSize: 12.5, color: '#3b6d11', fontWeight: 600, marginTop: 8 }}>✓ Drafted “{built[g]}” — it’s waiting in Content to review &amp; publish.</div>}
+                {buildErr[g] && <div style={{ fontSize: 12.5, color: '#c0392b', marginTop: 8 }}>{buildErr[g]}</div>}
               </div>
             ))}
           </div>
