@@ -64,20 +64,29 @@ export async function suggestTopics(admin: any, store: StoreRow, userId: string)
 }
 
 /** Write the deep article, grounded in brand understanding + the real catalog. */
-export async function writeArticle(admin: any, store: StoreRow, userId: string, topic?: string): Promise<Article | null> {
+export async function writeArticle(admin: any, store: StoreRow, userId: string, topic?: string, opts?: { keyword?: string }): Promise<Article | null> {
   const brand = await describeBrand(admin, userId, store.brand_id).catch(() => null)
   const products = await catalogForBlog(admin, store, 24)
   const category = brand?.category || store.shop_name || 'the store'
   const competitors = (brand?.competitors || []).slice(0, 6)
+  const keyword = (opts?.keyword || '').trim()
+
+  const seoBlock = keyword ? `
+SEO TARGET KEYWORD: "${keyword}" — this article must be built to RANK for this exact keyword:
+- Put the EXACT keyword in: the title (metaTitle), the article title, and the FIRST sentence of the opening answer.
+- Use the keyword (and close variants) naturally 2-4 more times across the body — never stuffed.
+- metaTitle ≤ 60 chars and leads with the keyword; metaDescription ≤ 155 chars, compelling, includes the keyword.
+- The slug should be the keyword, hyphenated.` : ''
 
   const sys = `You are a senior DTC content strategist writing a buyer-intent article that ranks on Google AND gets cited by AI answer engines. You understand the product category deeply and write with real specificity — no fluff, no invented facts.
 
 CATEGORY: ${category}
 ${brand?.description ? `WHAT THE BRAND DOES: ${brand.description}` : ''}
 ${competitors.length ? `REAL COMPETITORS: ${competitors.join(', ')}` : ''}
+${seoBlock}
 
 You will be given the store's REAL products (with prices and URLs). Rules:
-- Target ONE specific buyer question${topic ? ` — the topic is: "${topic}"` : ' (pick the highest-intent question a buyer asks before purchasing)'}.
+- Target ONE specific buyer question${keyword ? ` — optimized to rank for "${keyword}"` : topic ? ` — the topic is: "${topic}"` : ' (pick the highest-intent question a buyer asks before purchasing)'}.
 - Open with a direct, quotable one-paragraph answer (answer engines lift the first clear answer).
 - Include a "TL;DR" of 3-4 sharp, scannable takeaways.
 - 3-5 body sections with real substance — mechanisms, trade-offs, how to choose. Deep, not generic.
@@ -92,7 +101,7 @@ Return ONLY JSON:
 
   const user = JSON.stringify({ real_products: products })
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 3200, temperature: 0.6, messages: [{ role: 'user', content: `${sys}\n\nREAL PRODUCTS (use these for picks; do not invent):\n${user}` }] })
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 3200, temperature: 0.6, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: `${sys}\n\nREAL PRODUCTS (use these for picks; do not invent):\n${user}` }] })
     const j = firstJson(res.content?.[0]?.text || '')
     if (!j?.title || !Array.isArray(j?.sections)) return null
     return {

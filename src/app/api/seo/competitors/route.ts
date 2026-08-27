@@ -175,7 +175,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
     }
     try {
-      const article = await writeArticle(admin, store, userId, topic)
+      // Topics coming from the keyword-opportunities list ARE keywords → SEO-optimize the article to rank
+      // for that exact keyword (title/H1/meta/first line). body.keyword lets the client mark it explicitly.
+      const kw = String(body.keyword || (body.isKeyword ? topic : '')).trim() || undefined
+      const article = await writeArticle(admin, store, userId, topic, kw ? { keyword: kw } : undefined)
       if (!article) { await refundCredits(admin, bTx).catch(() => {}); return NextResponse.json({ error: 'Could not draft that page — try again.' }, { status: 500 }) }
       const html = renderArticleHtml(article, null)
       const { data: saved } = await admin.from('geo_assets').insert({

@@ -56,11 +56,11 @@ export default function CompetitorsPage() {
   // another page, so a top-of-page note alone reads as "nothing happened").
   const [built, setBuilt] = useState<Record<string, string>>({})   // topic → drafted title
   const [buildErr, setBuildErr] = useState<Record<string, string>>({})
-  const build = async (topic: string) => {
+  const build = async (topic: string, isKeyword = false) => {
     setBusy(`build:${topic}`); setNote(null)
     setBuildErr((e) => { const n = { ...e }; delete n[topic]; return n })
     try {
-      const r = await fetch('/api/seo/competitors', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'build', topic }) })
+      const r = await fetch('/api/seo/competitors', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'build', topic, ...(isKeyword ? { keyword: topic, isKeyword: true } : {}) }) })
       const j = await r.json()
       if (r.ok) setBuilt((b) => ({ ...b, [topic]: j.title || topic }))
       else if (r.status === 402) openCredits('buy', j.reason || 'Writing a page costs credits — top up to continue.')
@@ -147,7 +147,7 @@ export default function CompetitorsPage() {
                   </div>
                   {built[k.keyword]
                     ? <a href="/mission/blog" style={{ ...primaryBtn, padding: '7px 14px', textDecoration: 'none', display: 'inline-block' }}>Open in Content →</a>
-                    : <button onClick={() => build(k.keyword)} disabled={!!busy} style={{ ...primaryBtn, padding: '7px 14px', opacity: busy === `build:${k.keyword}` ? 0.7 : 1 }}>{busy === `build:${k.keyword}` ? 'Drafting…' : 'Write it →'}</button>}
+                    : <button onClick={() => build(k.keyword, true)} disabled={!!busy} style={{ ...primaryBtn, padding: '7px 14px', opacity: busy === `build:${k.keyword}` ? 0.7 : 1 }}>{busy === `build:${k.keyword}` ? 'Drafting…' : 'Write it →'}</button>}
                 </div>
                 {built[k.keyword] && <div style={{ fontSize: 12.5, color: '#3b6d11', fontWeight: 600, marginTop: 8 }}>✓ Drafted “{built[k.keyword]}” — waiting in Content to review &amp; publish.</div>}
                 {buildErr[k.keyword] && <div style={{ fontSize: 12.5, color: '#c0392b', marginTop: 8 }}>{buildErr[k.keyword]}</div>}
