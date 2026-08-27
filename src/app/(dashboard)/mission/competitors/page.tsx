@@ -10,8 +10,9 @@ import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
-type Comp = { id: string; name: string; domain: string; page_count: number; blog_count: number; topics: { topic: string; count: number }[]; sample_titles: string[]; est_traffic: number | null; last_crawled: string | null }
-type Data = { competitors: Comp[]; gaps: string[] }
+type KwGap = { keyword: string; volume: number; etv: number; competitor: string; theirPosition: number; youRank: boolean }
+type Comp = { id: string; name: string; domain: string; page_count: number; blog_count: number; topics: { topic: string; count: number }[]; sample_titles: string[]; est_traffic: number | null; top_keywords?: { keyword: string; position: number; volume: number }[]; last_crawled: string | null }
+type Data = { competitors: Comp[]; gaps: string[]; keywordGaps?: KwGap[]; keywordsLive?: boolean }
 
 export default function CompetitorsPage() {
   const embedded = useEmbedded()
@@ -131,7 +132,32 @@ export default function CompetitorsPage() {
         </div>
       )}
 
-      {/* Content gaps → build */}
+      {/* Keyword opportunities (real DataForSEO ranks) → write to rank on the SAME keywords */}
+      {(data?.keywordGaps?.length ?? 0) > 0 && (
+        <div style={{ border: `1.5px solid ${LIME}`, borderRadius: 16, background: '#fff', padding: 18, marginBottom: 18 }}>
+          <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Keyword opportunities — the exact terms rivals rank for</div>
+          <div style={{ fontSize: 13, color: SUB, marginBottom: 14 }}>Real Google data (search volume · rival’s position · est. monthly traffic). <b>Write it</b> drafts an article targeting that exact keyword so you can rank for it too. <span style={{ color: '#b45309', fontWeight: 700 }}>“Gap”</span> = they rank, you don’t.</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {(data?.keywordGaps || []).map((k, i) => (
+              <div key={i} style={{ border: `1px solid ${built[k.keyword] ? LIME : LINE}`, borderRadius: 12, padding: '11px 14px', background: built[k.keyword] ? '#f6fbef' : '#fff' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                  <div style={{ flex: 1, minWidth: 180 }}>
+                    <div style={{ fontSize: 13.5, fontWeight: 700 }}>{k.keyword} {!k.youRank && <span style={{ fontSize: 10.5, fontWeight: 800, color: '#b45309', background: '#fef3c7', borderRadius: 100, padding: '1px 7px', marginLeft: 4 }}>GAP</span>}</div>
+                    <div style={{ fontSize: 12, color: SUB, marginTop: 3 }}>{k.volume.toLocaleString()} searches/mo · ~{k.etv.toLocaleString()} visits/mo · {k.competitor} ranks #{k.theirPosition}</div>
+                  </div>
+                  {built[k.keyword]
+                    ? <a href="/mission/blog" style={{ ...primaryBtn, padding: '7px 14px', textDecoration: 'none', display: 'inline-block' }}>Open in Content →</a>
+                    : <button onClick={() => build(k.keyword)} disabled={!!busy} style={{ ...primaryBtn, padding: '7px 14px', opacity: busy === `build:${k.keyword}` ? 0.7 : 1 }}>{busy === `build:${k.keyword}` ? 'Drafting…' : 'Write it →'}</button>}
+                </div>
+                {built[k.keyword] && <div style={{ fontSize: 12.5, color: '#3b6d11', fontWeight: 600, marginTop: 8 }}>✓ Drafted “{built[k.keyword]}” — waiting in Content to review &amp; publish.</div>}
+                {buildErr[k.keyword] && <div style={{ fontSize: 12.5, color: '#c0392b', marginTop: 8 }}>{buildErr[k.keyword]}</div>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Content gaps → build (topic-level; the free/sitemap layer, always available) */}
       {gaps.length > 0 && (
         <div style={{ border: `1.5px solid ${LIME}`, borderRadius: 16, background: '#fff', padding: 18 }}>
           <div style={{ fontSize: 16, fontWeight: 800, marginBottom: 3 }}>Content gaps — pages to steal their traffic</div>
