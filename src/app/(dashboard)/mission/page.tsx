@@ -96,6 +96,9 @@ export default function MissionPage() {
   }
   const [journey, setJourney] = useState<Journey | null>(null)
   useEffect(() => { (async () => { try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setJourney(j as Journey) } catch { /* optional band */ } })() }, [])
+  // This home page loads its data across many mount effects; on a brand switch, reload so every band
+  // re-fetches for the new brand (otherwise it keeps the previous brand's numbers).
+  useEffect(() => { const h = () => window.location.reload(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [])
 
   // "What to make next" — the Creative Strategist ideas from the old brief, folded onto the mission.
   type Idea = { title: string; format: string; why: string; basedOn?: string; reference?: { label?: string; brand?: string; image?: string | null } | null; studioHref: string }

@@ -110,6 +110,7 @@ export default function CroPage() {
 
   const load = useCallback(async () => { try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const run = async () => {
     if (busy) return

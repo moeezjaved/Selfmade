@@ -28,6 +28,7 @@ export default function AdsPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const run = async (kind: string) => {
     setBusy(kind); setNote(null); setOpen(null)

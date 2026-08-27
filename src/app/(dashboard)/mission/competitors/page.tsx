@@ -28,6 +28,7 @@ export default function CompetitorsPage() {
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const post = async (bodyObj: any, busyKey: string) => {
     setBusy(busyKey); setNote(null)
