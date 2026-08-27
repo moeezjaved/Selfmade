@@ -149,8 +149,11 @@ async function main() {
     console.log(`   ≈ Save: $${((delBytes / 1073741824) * R2_USD_PER_GB_MONTH).toFixed(2)}/month\n`)
 
     if (DRY) { console.log('✅ Dry run — nothing deleted. Re-run with --orphans (no --dry-run) to execute.\n'); return }
-    console.log('🗑  Deleting orphaned + non-spied objects (videos + images + posters)…')
-    const del = await deleteManyFromR2(toDelete)
+    console.log(`🗑  Deleting ${toDelete.length.toLocaleString()} orphaned + non-spied objects (videos + images + posters)…`)
+    const del = await deleteManyFromR2(toDelete, (done, total) => {
+      const pct = total ? Math.round((done / total) * 100) : 100
+      console.log(`   … deleted ${done.toLocaleString()} / ${total.toLocaleString()} (${pct}%)`)
+    })
     console.log(`   deleted ${del.toLocaleString()} objects (${gbAll(delBytes)} GB)\n✅ Done.\n`)
     return
   }
