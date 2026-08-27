@@ -27,7 +27,7 @@ async function visionCritique(shots: Shot[], prompt: string): Promise<string> {
       content.push({ type: 'image_url', image_url: { url: `data:image/jpeg;base64,${s.b64}`, detail: 'high' } })
     }
     const res = await oai().chat.completions.create({
-      model: 'gpt-4o', max_tokens: 3600, temperature: 0.4,
+      model: 'gpt-4o', max_tokens: 3600, temperature: 0.15,   // low temp → stable evidence run-to-run
       response_format: { type: 'json_object' },
       messages: [{ role: 'user', content }],
     })
@@ -226,7 +226,7 @@ Return ONLY JSON:
   "score": <0-100 honest>,
   "verdict": "<one brutally honest sentence>",
   "panel": {"designer":<0-10>,"psychologist":<0-10>,"copywriter":<0-10>,"cro":<0-10>,"customer":"<one first-person sentence a real shopper on this page would think>"},
-  "leaks": [ {"title","why","fix","screen":"home" or "pdp","severity":"critical|high|medium"${grounded ? ',"evidence":"ev_x"' : ''}${grounded ? ',"region":{"x":0-100,"y":0-100,"w":0-100,"h":0-100} (approx box on that page\'s above-fold screenshot, omit if unsure)' : ''}} ],  // EXACTLY 5, most severe first
+  "leaks": [ {"title","why (START by quoting or naming the EXACT on-page element/text this is about, e.g. \\"The line 'A powerful solution for who want...' has a grammar error\\", so the founder can find it — never a vague label)","fix","screen":"home" or "pdp","severity":"critical|high|medium"${grounded ? ',"evidence":"ev_x"' : ''}${grounded ? ',"region":{"x":0-100,"y":0-100,"w":0-100,"h":0-100} (approx box on that page\'s above-fold screenshot, omit if unsure)' : ''}} ],  // EXACTLY 5, most severe first
   "changes": [ {"title","detail","impact":"leverage + why"} ],  // 5 highest-impact
   "homepage": [ {"section","why","content":"exact copy/elements for THIS store"} ],  // new homepage structure top→bottom
   "productPage": [ {"change","why"} ],
@@ -263,7 +263,7 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
   let raw = '', parsed: Partial<CroReport> | null = null, fallbackErr = ''
   try {
     const res: any = await llm.messages.create({
-      model: 'gpt-4o', max_tokens: 3800, temperature: 0.4, response_format: { type: 'json_object' },
+      model: 'gpt-4o', max_tokens: 3800, temperature: 0.2, response_format: { type: 'json_object' },   // low temp → stable, repeatable score
       messages: [{ role: 'user', content: reasoningPrompt(site, facts, visibleText(home), visibleText(prod), evidence) }],
     })
     raw = res?.content?.[0]?.text || ''
@@ -281,6 +281,11 @@ export async function runCroAudit(domain0: string): Promise<CroReport> {
 
   const leaks = parsed.leaks || []
   const criticalCount = leaks.filter((l) => l.severity === 'critical').length
+  // DETERMINISTIC score — computed from the confirmed leaks + severity, not a free LLM guess. Same store →
+  // same score run-to-run; it only moves when the findings actually change (i.e. when you fix something).
+  const PENALTY: Record<string, number> = { critical: 16, high: 10, medium: 5 }
+  const penalty = leaks.reduce((s, l) => s + (PENALTY[l.severity || 'medium'] || 5), 0)
+  const score = Math.max(20, 100 - penalty)
   const shotMeta = await shotUrlsP
-  return { hasData: true, domain, site, productUrl, usedVision, scannedAt: new Date().toISOString(), shots: shotMeta, issueCount: evidence.length || leaks.length, criticalCount, ...parsed }
+  return { hasData: true, domain, site, productUrl, usedVision, scannedAt: new Date().toISOString(), shots: shotMeta, issueCount: evidence.length || leaks.length, criticalCount, ...parsed, score }
 }
