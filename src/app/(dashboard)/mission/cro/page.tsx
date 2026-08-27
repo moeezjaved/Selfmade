@@ -15,7 +15,10 @@ type HomeSection = { section: string; why: string; content?: string }
 type PdpChange = { change: string; why: string }
 type AbTest = { name: string; hypothesis: string; impact: string }
 type Shot = { key: string; label: string; url: string }
-type Panel = { designer: number; psychologist: number; copywriter: number; cro: number; customer: string }
+type Lens = { score: number; take: string; findings: string[] }
+type Panel = { designer: Lens; psychologist: Lens; copywriter: Lens; cro: Lens; customer: string }
+// Tolerate both the new rich lens ({score,take,findings}) and the legacy bare number in cached reports.
+const asLens = (v: any): Lens => (v && typeof v === 'object') ? { score: Number(v.score) || 0, take: String(v.take || ''), findings: Array.isArray(v.findings) ? v.findings : [] } : { score: Number(v) || 0, take: '', findings: [] }
 type Report = {
   hasData: boolean; domain?: string; site?: string; productUrl?: string | null; score?: number; verdict?: string
   leaks?: Leak[]; changes?: Change[]; homepage?: HomeSection[]; productPage?: PdpChange[]; abtests?: AbTest[]; firstChange?: string
@@ -62,6 +65,7 @@ export default function CroPage() {
   const [busy, setBusy] = useState(false)
   const [note, setNote] = useState<string | null>(null)
   const [zoom, setZoom] = useState<string | null>(null)
+  const [openLens, setOpenLens] = useState<string | null>(null)
   const jumpToLeak = (n: number) => { const el = document.getElementById(`leak-${n}`); if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'center' }); el.style.transition = 'box-shadow .3s'; el.style.boxShadow = `0 0 0 3px ${ORANGE}55`; setTimeout(() => { el.style.boxShadow = '' }, 1400) } }
 
   // ── CRO Phase 1: apply a fix (rewrite the product description) — preview → publish → undo. ──
@@ -157,20 +161,53 @@ export default function CroPage() {
             </div>
           </Card>
 
-          {/* The panel — 5 lenses grade the same evidence. Theater, but grounded. */}
-          {r.panel && (
-            <Card style={{ marginTop: 14 }}>
-              <div style={{ display: 'flex', gap: 18, flexWrap: 'wrap' }}>
-                {([['🎨 Designer', r.panel.designer], ['🧠 Psychologist', r.panel.psychologist], ['✍️ Copywriter', r.panel.copywriter], ['💰 CRO', r.panel.cro]] as [string, number][]).map(([label, v]) => (
-                  <div key={label} style={{ textAlign: 'center', minWidth: 78 }}>
-                    <div style={{ fontSize: 20, fontWeight: 900, color: scoreColor((v || 0) * 10) }}>{v}<span style={{ fontSize: 11, color: SUB, fontWeight: 700 }}>/10</span></div>
-                    <div style={{ fontSize: 11, color: SUB, marginTop: 2 }}>{label}</div>
-                  </div>
-                ))}
-              </div>
-              {r.panel.customer && <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 10, fontSize: 13.5, fontStyle: 'italic', color: '#3a463a' }}>🛍️ Your shopper: “{r.panel.customer}”</div>}
-            </Card>
-          )}
+          {/* The panel — 4 experts each grade the same store through their own lens. Click one for their take. */}
+          {r.panel && (() => {
+            const lenses: { key: string; label: string; lens: Lens; blurb: string }[] = [
+              { key: 'designer', label: '🎨 Designer', lens: asLens(r.panel.designer), blurb: 'Hierarchy · whitespace · typography · imagery' },
+              { key: 'psychologist', label: '🧠 Psychologist', lens: asLens(r.panel.psychologist), blurb: 'Trust · objections · risk · motivation' },
+              { key: 'copywriter', label: '✍️ Copywriter', lens: asLens(r.panel.copywriter), blurb: 'Clarity · message · value · grammar' },
+              { key: 'cro', label: '💰 CRO', lens: asLens(r.panel.cro), blurb: 'Friction · CTA · pricing · checkout' },
+            ]
+            return (
+              <Card style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 11.5, color: SUB, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 12 }}>The panel — tap an expert for their take</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 10 }}>
+                  {lenses.map(({ key, label, lens, blurb }) => {
+                    const open = openLens === key
+                    const hasDetail = !!(lens.take || lens.findings.length)
+                    return (
+                      <div key={key} onClick={() => hasDetail && setOpenLens(open ? null : key)}
+                        style={{ border: `1px solid ${open ? ORANGE : LINE}`, borderRadius: 12, padding: '12px 14px', cursor: hasDetail ? 'pointer' : 'default', background: open ? '#fff7f4' : '#fff', transition: 'border-color .15s' }}>
+                        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700 }}>{label}</div>
+                          <div style={{ fontSize: 18, fontWeight: 900, color: scoreColor((lens.score || 0) * 10) }}>{lens.score}<span style={{ fontSize: 10, color: SUB, fontWeight: 700 }}>/10</span></div>
+                        </div>
+                        <div style={{ fontSize: 10.5, color: SUB, marginTop: 3 }}>{blurb}</div>
+                        {hasDetail && <div style={{ fontSize: 11, color: ORANGE, fontWeight: 700, marginTop: 6 }}>{open ? 'Hide ▲' : 'View take ▾'}</div>}
+                      </div>
+                    )
+                  })}
+                </div>
+                {/* Expanded expert take */}
+                {openLens && (() => {
+                  const sel = lenses.find((l) => l.key === openLens); if (!sel) return null
+                  return (
+                    <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
+                      <div style={{ fontSize: 14, fontWeight: 750, marginBottom: 4 }}>{sel.label}’s take</div>
+                      {sel.lens.take && <div style={{ fontSize: 13.5, color: '#3a463a', lineHeight: 1.5, fontStyle: 'italic' }}>“{sel.lens.take}”</div>}
+                      {!!sel.lens.findings.length && (
+                        <ul style={{ margin: '10px 0 0', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {sel.lens.findings.map((f, i) => <li key={i} style={{ fontSize: 13, color: INK, lineHeight: 1.5 }}>{f}</li>)}
+                        </ul>
+                      )}
+                    </div>
+                  )
+                })()}
+                {r.panel.customer && <div style={{ marginTop: 12, borderTop: `1px solid ${LINE}`, paddingTop: 10, fontSize: 13.5, fontStyle: 'italic', color: '#3a463a' }}>🛍️ Your shopper: “{r.panel.customer}”</div>}
+              </Card>
+            )
+          })()}
 
           {r.firstChange && (
             <Card style={{ marginTop: 14, background: '#fff7f4', borderColor: `${ORANGE}44` }}>
