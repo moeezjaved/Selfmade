@@ -9,6 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { BRAND_COOKIE } from '@/lib/brand/cookie'
 import { openCredits } from '@/components/credits/CreditModal'
+import { confirmAction } from '@/components/ConfirmDialog'
 
 type Brand = { id: string; name: string }
 
@@ -26,7 +27,26 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
   const [active, setActive] = useState<string>(initialActive)
   const [open, setOpen] = useState(false)
   const [newBusy, setNewBusy] = useState(false)
+  const [delBusy, setDelBusy] = useState<string>('')
   const wrapRef = useRef<HTMLDivElement>(null)
+
+  // Delete a brand (+ its data) from the switcher — the place founders look. App-level confirm.
+  const deleteBrand = async (id: string, name: string) => {
+    if (delBusy) return
+    if (!(await confirmAction({ title: `Delete “${name}”?`, body: 'This removes the brand and everything tied to it (creatives, competitors, connections). This can’t be undone.', confirmLabel: 'Delete brand' }))) return
+    setDelBusy(id)
+    try {
+      const r = await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+      if (!r.ok) { setDelBusy(''); return }
+      const remaining = brands.filter(b => b.id !== id)
+      setBrands(remaining)
+      if (active === id) {
+        // Deleted the active brand — switch to another, or reload if none left.
+        if (remaining[0]) pick(remaining[0].id)
+        else { setActive(''); router.refresh() }
+      }
+    } finally { setDelBusy('') }
+  }
 
   // "New brand": gate on the plan's brand quota BEFORE navigating, so an at-cap user (Free = 1 brand)
   // gets the upgrade modal immediately instead of the onboarding flashing then bouncing to upgrade.
@@ -97,10 +117,16 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
             <div style={{ maxHeight: 320, overflowY: 'auto' }}>
               {multi && <button onClick={() => pick('')} style={rowStyle(!active)}>◎&nbsp;&nbsp;All brands</button>}
               {brands.map(b => (
-                <button key={b.id} onClick={() => pick(b.id)} style={rowStyle(active === b.id)}>
-                  <span style={{ width: 18, height: 18, borderRadius: 6, background: '#ef4a1e', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, marginRight: 9, flexShrink: 0 }}>{b.name.trim().charAt(0).toUpperCase()}</span>
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
-                </button>
+                <div key={b.id} style={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                  <button onClick={() => pick(b.id)} style={{ ...rowStyle(active === b.id), flex: 1, minWidth: 0 }}>
+                    <span style={{ width: 18, height: 18, borderRadius: 6, background: '#ef4a1e', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800, marginRight: 9, flexShrink: 0 }}>{b.name.trim().charAt(0).toUpperCase()}</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name}</span>
+                  </button>
+                  <button onClick={() => deleteBrand(b.id, b.name)} disabled={delBusy === b.id} title="Delete brand"
+                    style={{ border: 'none', background: 'transparent', cursor: delBusy === b.id ? 'default' : 'pointer', color: '#b91c1c', padding: '7px 8px', fontSize: 13, flexShrink: 0, opacity: 0.65, borderRadius: 8 }}>
+                    {delBusy === b.id ? '…' : '🗑'}
+                  </button>
+                </div>
               ))}
             </div>
             <div style={{ height: 1, background: '#eef1ec', margin: '6px 4px' }} />
