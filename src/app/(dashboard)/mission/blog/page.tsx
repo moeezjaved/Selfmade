@@ -37,6 +37,7 @@ export default function BlogPage() {
       const j = await r.json()
       if (r.ok) { setPreview({ id: j.id, html: j.html, title: j.article?.title || 'Draft' }); setNote('Drafted — review below, then publish.'); await load() }
       else if (r.status === 402) { openCredits('buy', j.reason || 'Writing a blog costs credits — top up to continue.') }   // free auto-coerces to Upgrade
+      else if (j.error === 'reserve_failed') setNote('Couldn’t reserve credits for this — the pricing for blog drafts isn’t configured yet. Try again shortly.')
       else setNote(j.error || 'Could not generate.')
     } catch { setNote('Network error.') }
     setBusy(null)
