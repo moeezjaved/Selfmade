@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
 import { ChannelLogo } from '@/components/brand/logos'
+import { BRAND_COOKIE } from '@/lib/brand/cookie'
 
 // Chrome Web Store listing (approved 2026-07-08).
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
@@ -120,12 +121,12 @@ export default function SettingsPage() {
       const meta = (user.user_metadata || {}) as Record<string, string>
       setFullName(meta.full_name || meta.name || '')
       setLoading(false)
-      // Real Meta-connection status — WORKSPACE-scoped: a team member must see the team's Meta as
-      // connected even though the OWNER connected it. The old browser-client `.eq(user_id, self)` check
-      // saw only the member's own (empty) rows → falsely showed "Connect →". /api/meta/accounts returns
-      // the whole workspace pool (workspaceMemberIds, single org — no cross-workspace leak).
+      // Real Meta-connection status — scoped to the ACTIVE BRAND (project switcher), so Settings shows
+      // "Connected" only for the brand the account is linked to, not under every brand. `accounts` is the
+      // brand-filtered list (falls back to the whole workspace pool for legacy users with no per-brand
+      // links yet), so this reflects exactly what the ads surfaces use for this brand.
       fetch('/api/meta/accounts').then(r => r.json())
-        .then(j => { if (!cancelled) setMetaConnected(Array.isArray(j.workspaceAccounts) && j.workspaceAccounts.length > 0) })
+        .then(j => { if (!cancelled) setMetaConnected(Array.isArray(j.accounts) && j.accounts.length > 0) })
         .catch(() => { if (!cancelled) setMetaConnected(false) })
       fetch('/api/shopify/connect').then(r => r.json())
         .then(j => { if (!cancelled) setShopifyConnected(!!j?.connected) })
@@ -209,6 +210,28 @@ export default function SettingsPage() {
   const signOut = async () => {
     await supabase.auth.signOut()
     router.push('/login')
+  }
+
+  // Delete a brand (+ everything tied to it). Lives here in the Danger Zone as the discoverable place —
+  // the brand switcher's 🗑 is easy to miss. Defaults to the active brand (sf_brand cookie).
+  const activeBrandId = (() => { try { const m = document.cookie.match(new RegExp('(?:^|; )' + BRAND_COOKIE + '=([^;]*)')); return m ? decodeURIComponent(m[1]) : '' } catch { return '' } })()
+  const [delBrandId, setDelBrandId] = useState<string>('')
+  const [delBusy, setDelBusy] = useState(false)
+  const deleteBrand = async () => {
+    const id = delBrandId || activeBrandId || (brands[0]?.id ?? '')
+    const name = brands.find(b => b.id === id)?.name || 'this brand'
+    if (!id) { toast.error('Pick a brand to delete.'); return }
+    if (delBusy) return
+    if (!(await confirmAction({ title: `Delete “${name}”?`, body: 'This permanently removes the brand and everything tied to it — creatives, competitors, connections, and synced data. This cannot be undone.', confirmLabel: 'Delete brand' }))) return
+    setDelBusy(true)
+    try {
+      const res = await fetch(`/api/brands/${id}`, { method: 'DELETE' })
+      if (!res.ok) { toast.error('Could not delete that brand.'); return }
+      toast.success(`Deleted ${name}`)
+      setBrands(prev => prev.filter(b => b.id !== id))
+      if (id === activeBrandId) { try { document.cookie = `${BRAND_COOKIE}=; path=/; max-age=0` } catch {} }
+      setTimeout(() => { window.location.href = '/hq' }, 500)
+    } finally { setDelBusy(false) }
   }
 
   // In-app confirmation (was a browser window.confirm — every prompt should live inside the app UI).
@@ -515,6 +538,23 @@ export default function SettingsPage() {
         <div style={{fontSize:15,fontWeight:700,color:'#c0392b',marginBottom:8}}>Danger Zone</div>
         <div style={{fontSize:13,color:'#7a9a7a',marginBottom:14}}>Sign out of your Selfmade account.</div>
         <button onClick={signOut} style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.25)',color:'#c0392b',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:'pointer'}}>Sign Out</button>
+
+        {brands.length > 0 && (
+          <div style={{marginTop:20,paddingTop:18,borderTop:'1px solid rgba(248,113,113,0.15)'}}>
+            <div style={{fontSize:13.5,fontWeight:700,color:'#c0392b',marginBottom:4}}>Delete a brand</div>
+            <div style={{fontSize:12.5,color:'#7a9a7a',marginBottom:12}}>Permanently removes the brand and everything tied to it — creatives, competitors, store &amp; Meta connections, synced data. This can&rsquo;t be undone.</div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'center'}}>
+              <select value={delBrandId || activeBrandId} onChange={e=>setDelBrandId(e.target.value)}
+                style={{padding:'8px 12px',borderRadius:10,border:'1px solid rgba(0,0,0,0.12)',background:'#fff',fontSize:13,fontFamily:'inherit',color:'#141d15'}}>
+                {brands.map(b=> <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
+              <button onClick={deleteBrand} disabled={delBusy}
+                style={{background:'#c0392b',border:'1px solid #c0392b',color:'#fff',padding:'8px 18px',borderRadius:100,fontSize:13,fontWeight:700,fontFamily:'inherit',cursor:delBusy?'default':'pointer',opacity:delBusy?0.6:1}}>
+                {delBusy ? 'Deleting…' : 'Delete brand'}
+              </button>
+            </div>
+          </div>
+        )}
       </div>
       )}
 

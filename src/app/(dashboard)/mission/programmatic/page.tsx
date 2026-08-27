@@ -36,6 +36,7 @@ export default function ProgrammaticPage() {
       const r = await fetch('/api/shopify/programmatic', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'generate', limit: batch, withImage }) })
       const j = await r.json()
       if (r.ok) { setNote(`Generated ${j.created} page${j.created === 1 ? '' : 's'}${j.failed ? `, ${j.failed} failed` : ''}. ${j.remaining} left to build.`); await load() }
+      else if (r.status === 402 && j.error === 'plan_limit') openCredits('plan', j.reason || 'Pages at Scale is a paid feature — upgrade to build pages.')
       else if (r.status === 402) openCredits('buy', j.reason || 'Generating pages costs credits — top up or upgrade.')
       else if (j.error === 'reserve_failed') setNote('Couldn’t reserve credits for this — the pricing for page generation isn’t configured yet. Try again shortly.')
       else setNote(j.error || 'Could not generate.')

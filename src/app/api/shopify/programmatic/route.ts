@@ -57,19 +57,39 @@ export async function POST(req: NextRequest) {
 
   if (action === 'generate') {
     const limit = Math.min(Math.max(Number(body.limit) || 5, 1), 12)
-    // Batch of pages (+ optional hero images) via paid models → charge credits up front (everyone).
-    // Out of credits → 402 upsell; refunded if generation fails.
-    let txId: string | null = null
-    try { txId = (await reserveCredits(admin, userId, 'programmatic_batch')).id }
-    catch (e) {
-      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating pages costs credits — top up or upgrade to continue.' }, { status: 402 })
+
+    // Pages at Scale is a PAID feature: Free plan hits an upgrade wall (not just a credit top-up), paid
+    // plans are charged PER PAGE. Resolve the billing owner's plan first.
+    const { getPlanId } = await import('@/lib/entitlements')
+    const { resolveBillingOwner } = await import('@/lib/org')
+    const owner = await resolveBillingOwner(admin, userId).catch(() => userId)
+    const planId = await getPlanId(admin, owner).catch(() => 'free' as const)
+    if (planId === 'free') {
+      return NextResponse.json({ error: 'plan_limit', upgradeTo: 'starter', reason: 'Pages at Scale is a paid feature — upgrade to build pages in bulk.' }, { status: 402 })
+    }
+
+    // Charge PER PAGE: reserve one `programmatic_page` per page up front, then commit only the pages that
+    // actually got created and refund the rest. Out of credits → 402 upsell.
+    const txIds: string[] = []
+    try {
+      for (let i = 0; i < limit; i++) txIds.push((await reserveCredits(admin, userId, 'programmatic_page')).id)
+    } catch (e) {
+      for (const id of txIds) await refundCredits(admin, id).catch(() => {})   // release any we already held
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating pages costs credits per page — top up to continue.' }, { status: 402 })
       return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
     }
     try {
       const res = await generateBatch(admin, store, userId, limit, body.withImage === true)
-      await commitCredits(admin, txId, { kind: 'programmatic_batch', limit }).catch(() => {})
+      const created = Math.max(0, Math.min(limit, Number((res as any)?.created ?? limit)))
+      for (let i = 0; i < txIds.length; i++) {
+        if (i < created) await commitCredits(admin, txIds[i], { kind: 'programmatic_page' }).catch(() => {})
+        else await refundCredits(admin, txIds[i]).catch(() => {})              // page wasn't created → don't charge for it
+      }
       return NextResponse.json({ ok: true, ...res })
-    } catch (e) { if (txId) await refundCredits(admin, txId).catch(() => {}); return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 }) }
+    } catch (e) {
+      for (const id of txIds) await refundCredits(admin, id).catch(() => {})
+      return NextResponse.json({ error: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })
+    }
   }
   if (action === 'publish') {
     const ids = Array.isArray(body.ids) ? body.ids.map(String).slice(0, 200) : []
