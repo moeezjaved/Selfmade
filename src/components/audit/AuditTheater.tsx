@@ -647,6 +647,17 @@ function Speedometer({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
       </svg>
       <div style={{ fontFamily: SERIF, fontSize: isMobile ? 44 : 60, fontWeight: 800, color: col, lineHeight: 1, marginTop: -size * 0.13 }}>{lcp != null ? lcp : '··'}<span style={{ fontSize: '0.5em' }}>s</span></div>
       <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.1em', textTransform: 'uppercase', color: SUB, marginTop: 8 }}>{lcp != null ? 'real-visitor load time' : 'analyzing speed of all your pages…'}</div>
+      {lcp != null && (() => {
+        const v = lcp <= 2.5 ? { t: 'Fast — passes Google’s 2.5s bar', s: 'Speed isn’t costing you sales.' }
+          : lcp <= 4 ? { t: 'Sluggish — over Google’s 2.5s bar', s: 'Slower pages slip in rankings and lose impatient buyers.' }
+          : { t: 'Slow — costing you rankings & buyers', s: 'Google demotes slow sites and mobile shoppers bounce before it loads.' }
+        return (
+          <div style={{ marginTop: 14 }}>
+            <div style={{ fontFamily: SERIF, fontSize: isMobile ? 20 : 24, fontWeight: 700, color: col, lineHeight: 1.15 }}>{v.t}</div>
+            <div style={{ fontSize: 13.5, color: SUB, marginTop: 5, lineHeight: 1.5, maxWidth: 380, marginInline: 'auto' }}>{v.s}</div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
@@ -655,7 +666,7 @@ function Speedometer({ sec, isMobile }: { sec?: Section; isMobile: boolean }) {
 const AI_LOGO: Record<string, string> = { chatgpt: '/logos/openai.svg', claude: '/logos/claude.svg', gemini: '/logos/gemini.svg', perplexity: '/logos/perplexity.svg' }
 function AiGrid({ sec, domain, isMobile }: { sec?: Section; domain: string; isMobile: boolean }) {
   const reads = sec?.ai?.reads || []
-  const question = sec?.ai?.question || 'What are the best brands in this category?'
+  const fallbackQ = sec?.ai?.question || 'What are the best brands in this category?'
   const you = domain || 'your store'
   const engines = reads.length ? reads.map((r) => r.engine) : ['chatgpt', 'gemini', 'perplexity']
   return (
@@ -669,7 +680,7 @@ function AiGrid({ sec, domain, isMobile }: { sec?: Section; domain: string; isMo
               <img src={AI_LOGO[e]} alt="" width={24} height={24} style={{ width: 24, height: 24, objectFit: 'contain' }} onError={(ev) => { (ev.currentTarget as HTMLImageElement).style.display = 'none' }} />
               <span style={{ fontFamily: SERIF, fontSize: isMobile ? 17 : 19, fontWeight: 700, color: INK }}>{engLabel(e)}</span>
             </div>
-            <div style={{ background: '#f4f2ef', borderRadius: 12, padding: '10px 13px', fontSize: 12.5, color: '#3a352c', lineHeight: 1.4, marginBottom: 10 }}>{question}</div>
+            <div style={{ background: '#f4f2ef', borderRadius: 12, padding: '10px 13px', fontSize: 12.5, color: '#3a352c', lineHeight: 1.4, marginBottom: 10 }}><span style={{ color: SUB }}>Asked:</span> “{rd?.question || fallbackQ}”</div>
             <div style={{ position: 'relative', maxHeight: isMobile ? 84 : 96, overflow: 'hidden' }}>
               <div style={{ fontSize: 12.5, color: '#4a453b', lineHeight: 1.5 }}>{rd ? rd.answer.slice(0, 320) : <span style={{ color: SUB, animation: 'aPulseDot 1.2s ease infinite' }}>asking {engLabel(e)}…</span>}</div>
               <div style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 34, background: 'linear-gradient(transparent, #fff)' }} />

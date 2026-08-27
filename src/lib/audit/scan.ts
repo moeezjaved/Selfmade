@@ -80,26 +80,33 @@ const scoreFrom = (fs: Finding[]) => Math.max(0, Math.min(100, fs.reduce((s, f) 
 async function deriveCategory(homeHtml: string, fallback: string): Promise<string> {
   const facts = { title: tag(homeHtml, /<title[^>]*>([^<]{0,200})/i), desc: tag(homeHtml, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i) }
   try {
-    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 40, temperature: 0.2, messages: [{ role: 'user', content: `In 2-5 words, the product category this store sells (plain buyer words). Store: ${JSON.stringify(facts)}. Answer ONLY the category.` }] })
+    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 40, temperature: 0.2, messages: [{ role: 'user', content: `In 2-5 words, name the SPECIFIC product category this store sells, in the exact words a buyer would search — not a vague umbrella. e.g. "nicotine-free vape / quit-vaping aid", not "wellness device"; "magnesium sleep supplement", not "health product". Store: ${JSON.stringify(facts)}. Answer ONLY the category.` }] })
     return (res.content?.[0]?.text || '').trim().replace(/^["']|["'.]+$/g, '').slice(0, 60) || fallback
   } catch { return fallback }
 }
 
-async function seedKeywords(category: string, products: string[], siteName: string): Promise<string[]> {
+// One LLM call → BOTH the buyer Google searches AND the natural buyer questions people ask an AI. Grounded
+// in the real product titles so it's specific ("nicotine-free vape to quit"), never the generic category.
+async function seedTerms(category: string, products: string[], siteName: string): Promise<{ keywords: string[]; questions: string[] }> {
+  const brand = siteName.toLowerCase().split(/\s|[|–-]/)[0]
+  const noBrand = (s: string) => !(brand.length > 3 && s.toLowerCase().includes(brand))
   try {
-    const sample = products.slice(0, 8).join(' | ') || category
-    const prompt = `A store called "${siteName}" sells these products: ${sample}. Category: ${category}.\nGive 3 realistic, high-intent Google searches a BUYER types before buying this kind of product — generic category/problem searches, NOT the brand name and NOT a full product title. Keep each 2-5 words. Return ONLY JSON {"kw":["...","...","..."]}`
-    const res: any = await llm.messages.create({ model: 'gpt-4o-mini', max_tokens: 120, temperature: 0.3, messages: [{ role: 'user', content: prompt }] })
+    const sample = products.slice(0, 10).join(' | ') || category
+    const prompt = `A store "${siteName}" sells: ${sample}. Category: ${category}.
+Infer what a real BUYER of this SPECIFIC product wants — not the generic umbrella category.
+Return ONLY JSON:
+{"keywords":["4 high-intent Google searches a buyer types before buying THIS kind of product — 2-5 words, generic/problem-led, NOT the brand name, NOT a full product title"],
+ "questions":["3 natural questions a buyer asks ChatGPT/Gemini before buying, e.g. \\"what's the best nicotine-free vape to quit?\\" — specific to this product, NOT the brand name"]}`
+    const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 260, temperature: 0.3, response_format: { type: 'json_object' }, messages: [{ role: 'user', content: prompt }] })
     const t = res.content?.[0]?.text || ''
     const j = JSON.parse(t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1))
-    const kw = Array.isArray(j?.kw) ? j.kw.map((x: any) => String(x).trim()).filter(Boolean).slice(0, 3) : []
-    // Drop any that leaked the brand name (keeps searches buyer-generic, like Ryze).
-    const brand = siteName.toLowerCase().split(/\s|[|–-]/)[0]
-    return kw.filter((k: string) => !(brand.length > 3 && k.toLowerCase().includes(brand)))
-  } catch { return [] }
+    const keywords = (Array.isArray(j?.keywords) ? j.keywords.map((x: any) => String(x).trim()) : []).filter(Boolean).filter(noBrand).slice(0, 4)
+    const questions = (Array.isArray(j?.questions) ? j.questions.map((x: any) => String(x).trim()) : []).filter(Boolean).filter(noBrand).slice(0, 3)
+    return { keywords, questions }
+  } catch { return { keywords: [], questions: [] } }
 }
 
-type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number> }; pages: Page[]; productPages: Page[] }
+type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number> }; pages: Page[]; productPages: Page[]; terms: { keywords: string[]; questions: string[] } }
 
 const isProduct = (u: string) => /\/products?\//i.test(u)
 function internalLinksFrom(html: string, domain: string): string[] {
@@ -125,7 +132,12 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
   // Use the richer discovered set for the page-count total (Ryze shows the full crawl size, not just the sample).
   const richSm = { urls: all.length > sm.urls.length ? all : sm.urls, byDay: sm.byDay }
-  return { domain, siteName, category, sm: richSm, pages, productPages: pages.filter((p) => isProduct(p.url)) }
+  const productPages = pages.filter((p) => isProduct(p.url))
+  // Derive buyer keywords + AI questions ONCE (product-grounded) and share across the Google + AI steps —
+  // one LLM call, and the SERP searches and the AI questions stay consistent with each other.
+  const productTitles = productPages.map((p) => strip(p.title).replace(/\s*[|–—-].*$/, '').trim()).filter((t) => t.length > 2)
+  const terms = await seedTerms(category, productTitles, siteName)
+  return { domain, siteName, category, sm: richSm, pages, productPages, terms }
 }
 
 /* ── Steps ─────────────────────────────────────────────────────────────────────────────────────── */
@@ -167,24 +179,26 @@ function stepCatalog(ctx: Ctx): Section {
 }
 async function stepAi(ctx: Ctx): Promise<Section> {
   const engines = availableEngines().slice(0, 4)
-  const question = `What are the best ${ctx.category}?`
+  // Ask each engine a REAL buyer question (rotate through them) — not one generic "best {category}". Falls
+  // back to a category question if derivation failed.
+  const qList = ctx.terms.questions.length ? ctx.terms.questions : [`What are the best ${ctx.category}?`]
   const reads: AiEngineRead[] = []
   const brandTokens = [ctx.siteName.toLowerCase(), ctx.domain.split('.')[0]].filter((t) => t.length > 2)
-  await Promise.all(engines.map(async (e) => {
+  await Promise.all(engines.map(async (e, i) => {
+    const question = qList[i % qList.length]
     const a = await askEngine(e, question).catch(() => null)
     if (!a) return
     reads.push({ engine: e, mentioned: brandTokens.some((t) => a.text.toLowerCase().includes(t)), question, answer: a.text.slice(0, 1400) })
   }))
   const misses = reads.filter((r) => !r.mentioned)
-  const f: Finding[] = misses.map((r) => ({ id: `ai-${r.engine}`, title: `${r.engine} doesn’t mention you`, detail: question, severity: 'high', fixable: true }))
-  return { key: 'ai', name: 'AI visibility', sub: 'What ChatGPT, Gemini & Perplexity say', score: reads.length ? scoreFrom(f) : null, findings: f, ai: { question, reads } }
+  const f: Finding[] = misses.map((r) => ({ id: `ai-${r.engine}`, title: `${r.engine} doesn’t mention you for “${r.question}”`, detail: r.question, severity: 'high', fixable: true }))
+  return { key: 'ai', name: 'AI visibility', sub: 'What ChatGPT, Gemini & Perplexity say', score: reads.length ? scoreFrom(f) : null, findings: f, ai: { question: qList[0], reads } }
 }
 async function stepGoogle(ctx: Ctx): Promise<Section> {
   if (!dfsConfigured()) {
     return { key: 'google', name: 'Google visibility', sub: 'Where buyers find you first', score: 0, findings: [{ id: 'serp', title: 'Connect a search source to see your ranks', detail: `We’ll show exactly where ${ctx.domain} ranks for your buyer searches, and who’s taking the click.`, severity: 'medium', fixable: false }] }
   }
-  const productTitles = ctx.productPages.map((p) => strip(p.title).replace(/\s*[|–—-].*$/, '').trim()).filter((t) => t.length > 2)
-  const kws = await seedKeywords(ctx.category, productTitles, ctx.siteName)
+  const kws = ctx.terms.keywords
   const [ladders, volumes] = await Promise.all([
     Promise.all(kws.map((k) => serpGoogle(k, ctx.domain))),
     searchVolume(kws),
