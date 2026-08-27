@@ -56,6 +56,23 @@ export default function GeoPage() {
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
 
+  // Publish a reviewed answer page LIVE to the Shopify blog — this is what makes GEO real (a draft is
+  // invisible to AI engines; a published, crawlable page can be cited). Paid feature; free → upgrade.
+  const [publishing, setPublishing] = useState<string | null>(null)
+  const publish = async (a: Asset) => {
+    if (!a.id || publishing) return
+    setPublishing(a.id)
+    try {
+      const r = await fetch('/api/geo/answer', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', id: a.id }) })
+      const j = await r.json()
+      if (r.ok && j?.url) { setAssets((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'published', published_url: j.url } : x))) }
+      else if (r.status === 402) openCredits('plan', j.reason || 'Publishing live is a paid feature — upgrade to publish.')
+      else if (j?.error === 'no_store') openCredits('plan', j.reason || 'Connect your Shopify store to publish.')
+      else alert(j?.detail || j?.reason || 'Couldn’t publish — try again.')
+    } catch { alert('Network error — try again.') }
+    setPublishing(null)
+  }
+
   const [building, setBuilding] = useState<string | null>(null)
   const buildAsset = async (kind: string) => {
     if (building) return
@@ -81,7 +98,13 @@ export default function GeoPage() {
           <pre>{a.body_markdown}</pre>
           <div className="aact">
             <button className="btn tiny" onClick={() => copy(a)}>{copied === (a.id || a.target_prompt) ? 'Copied ✓' : 'Copy'}</button>
-            <button className="btn tiny" disabled title="Connect Shopify to publish/apply automatically">{a.kind === 'answer_page' ? 'Publish to Shopify — soon' : 'Apply to your site — soon'}</button>
+            {a.kind === 'answer_page' ? (
+              a.published_url
+                ? <a className="btn tiny" href={a.published_url} target="_blank" rel="noopener noreferrer">View live →</a>
+                : <button className="btn tiny lime" onClick={() => publish(a)} disabled={publishing === a.id}>{publishing === a.id ? 'Publishing…' : 'Publish to Shopify'}</button>
+            ) : (
+              <button className="btn tiny" disabled title="Auto-apply to your site coming soon">Apply to your site — soon</button>
+            )}
           </div>
         </div>
       )}

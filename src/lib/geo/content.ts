@@ -54,6 +54,32 @@ Return ONLY JSON: {"title":"…","markdown":"# …"} — clean Markdown, ~500–
   return { id, kind: 'answer_page', title, target_prompt: prompt, body_markdown: markdown, status, published_url: null }
 }
 
+/** Minimal, dependency-free Markdown → HTML for GEO answer pages (headings, bold/italic, links, lists,
+ *  paragraphs) — enough for the clean Markdown writeAnswerPage produces. Publishing needs HTML, not MD. */
+export function mdToHtml(md: string): string {
+  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const inline = (s: string) => esc(s)
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/(^|[^*])\*([^*]+)\*/g, '$1<em>$2</em>')
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, '<a href="$2">$1</a>')
+  const out: string[] = []
+  let inUl = false, inOl = false
+  const closeLists = () => { if (inUl) { out.push('</ul>'); inUl = false } if (inOl) { out.push('</ol>'); inOl = false } }
+  for (const raw of String(md || '').replace(/\r/g, '').split('\n')) {
+    const line = raw.trimEnd()
+    if (!line.trim()) { closeLists(); continue }
+    const h = /^(#{1,6})\s+(.*)$/.exec(line)
+    if (h) { closeLists(); const n = Math.min(h[1].length, 4); out.push(`<h${n}>${inline(h[2])}</h${n}>`); continue }
+    const ul = /^\s*[-*]\s+(.*)$/.exec(line)
+    if (ul) { if (!inUl) { closeLists(); out.push('<ul>'); inUl = true } out.push(`<li>${inline(ul[1])}</li>`); continue }
+    const ol = /^\s*\d+\.\s+(.*)$/.exec(line)
+    if (ol) { if (!inOl) { closeLists(); out.push('<ol>'); inOl = true } out.push(`<li>${inline(ol[1])}</li>`); continue }
+    closeLists(); out.push(`<p>${inline(line)}</p>`)
+  }
+  closeLists()
+  return out.join('\n')
+}
+
 export async function listAnswerPages(admin: SupabaseClient, userId: string, brandId: string | null): Promise<GeoAsset[]> {
   try {
     let q = (admin as any).from('geo_assets').select('id, kind, title, target_prompt, body_markdown, status, published_url, created_at').eq('user_id', userId).order('created_at', { ascending: false }).limit(30)
