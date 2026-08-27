@@ -16,6 +16,7 @@ import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError 
 import { describeBrand } from '@/lib/geo/understand'
 import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, renderArticleHtml } from '@/lib/shopify/blog'
+import { dfsConfigured, rankedKeywords, type RankedKeyword } from '@/lib/audit/dataforseo'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -47,18 +48,53 @@ export async function GET(req: NextRequest) {
     .eq('brand_id', brandId).order('page_count', { ascending: false }).limit(30)
   const rows: any[] = comps || []
   let gaps: string[] = []
+  let keywordGaps: { keyword: string; volume: number; etv: number; competitor: string; theirPosition: number; youRank: boolean }[] = []
+  const keywordsLive = dfsConfigured()
   if (rows.length) {
     const brand = await describeBrand(admin, userId, brandId).catch(() => null)
     const analyses: CompetitorAnalysis[] = rows.map((r) => ({ domain: r.domain, pageCount: r.page_count, blogCount: r.blog_count, topics: r.topics || [], sampleTitles: r.sample_titles || [] }))
     gaps = await contentGaps(analyses, await ourTitles(admin, userId, brandId), brand?.category || 'the category').catch(() => [])
+
+    // KEYWORD GAP (real data): the keywords rivals rank for that YOU don't — the exact terms to write for,
+    // ranked by traffic opportunity. Needs DataForSEO; we fetch your own ranked set once to mark true gaps.
+    if (keywordsLive) {
+      const yourKw = new Set<string>()
+      try {
+        const store = await resolveStore(admin, userId, brandId)
+        const yourDomain = store?.shop_domain || brand?.website || ''
+        if (yourDomain) (await rankedKeywords(yourDomain, 100).catch(() => [])).forEach((k) => yourKw.add(k.keyword.toLowerCase()))
+      } catch { /* if we can't read your ranks, everything shows as opportunity */ }
+      const best = new Map<string, { keyword: string; volume: number; etv: number; competitor: string; theirPosition: number; youRank: boolean }>()
+      for (const r of rows) {
+        for (const k of ((r.top_keywords || []) as RankedKeyword[])) {
+          const key = k.keyword.toLowerCase()
+          const youRank = yourKw.has(key)
+          const cur = best.get(key)
+          // keep the rival with the strongest position for each keyword
+          if (!cur || k.position < cur.theirPosition) best.set(key, { keyword: k.keyword, volume: k.volume, etv: k.etv, competitor: r.name || r.domain, theirPosition: k.position, youRank })
+        }
+      }
+      keywordGaps = Array.from(best.values()).sort((a, b) => (a.youRank === b.youRank ? b.etv - a.etv : a.youRank ? 1 : -1)).slice(0, 40)
+    }
   }
-  return NextResponse.json({ competitors: rows, gaps })
+  return NextResponse.json({ competitors: rows, gaps, keywordGaps, keywordsLive })
 }
 
 async function storeAnalysis(admin: any, userId: string, brandId: string | null, name: string | null, a: CompetitorAnalysis) {
+  // When DataForSEO is connected, pull the rival's REAL ranking keywords (keyword · position · volume ·
+  // est. monthly traffic) so we can target the exact terms they win — not just topics from their sitemap.
+  let topKeywords: RankedKeyword[] | null = null
+  let estTraffic: number | null = null
+  if (dfsConfigured()) {
+    try {
+      const kws = await rankedKeywords(a.domain, 30)
+      if (kws.length) { topKeywords = kws; estTraffic = kws.reduce((s, k) => s + (k.etv || 0), 0) }
+    } catch { /* keyword layer optional — the sitemap analysis still stands */ }
+  }
   await admin.from('seo_competitors').upsert({
     user_id: userId, brand_id: brandId, name: name || a.domain, domain: a.domain,
     page_count: a.pageCount, blog_count: a.blogCount, topics: a.topics, sample_titles: a.sampleTitles,
+    ...(topKeywords ? { top_keywords: topKeywords, est_traffic: estTraffic } : {}),
     status: 'ok', error: null, last_crawled: new Date().toISOString(),
   }, { onConflict: 'user_id,brand_id,domain' })
 }

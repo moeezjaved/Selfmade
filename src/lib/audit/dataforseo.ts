@@ -75,6 +75,33 @@ export async function backlinksSummary(domain: string): Promise<BacklinkSummary 
   } catch { return null }
 }
 
+export type RankedKeyword = { keyword: string; volume: number; position: number; etv: number; url: string }
+/**
+ * The keywords a DOMAIN actually ranks for on Google, with search volume, the domain's position, and
+ * estimated monthly organic traffic (ETV) — DataForSEO Labs. Ordered by traffic, top positions first.
+ * This is the "what do rivals rank for" data that powers keyword-gap content. US/English by default.
+ */
+export async function rankedKeywords(domain: string, limit = 25, locationCode = 2840): Promise<RankedKeyword[]> {
+  try {
+    const j = await post('/dataforseo_labs/google/ranked_keywords/live', [{
+      target: rootDomain(domain), location_code: locationCode, language_code: 'en', limit,
+      order_by: ['ranked_serp_element.serp_item.etv,desc'],
+      filters: [['ranked_serp_element.serp_item.rank_absolute', '<=', 30]],
+    }])
+    const items = j?.tasks?.[0]?.result?.[0]?.items || []
+    return items.map((it: any) => {
+      const kd = it.keyword_data || {}, se = it.ranked_serp_element?.serp_item || {}
+      return {
+        keyword: String(kd.keyword || ''),
+        volume: Number(kd.keyword_info?.search_volume) || 0,
+        position: Number(se.rank_absolute) || Number(se.rank_group) || 0,
+        etv: Math.round(Number(se.etv) || 0),
+        url: String(se.url || se.relative_url || ''),
+      }
+    }).filter((k: RankedKeyword) => k.keyword)
+  } catch { return [] }
+}
+
 /** Search volume for a batch of keywords. */
 export async function searchVolume(keywords: string[]): Promise<Record<string, number>> {
   const out: Record<string, number> = {}
