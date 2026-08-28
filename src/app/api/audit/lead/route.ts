@@ -1,10 +1,11 @@
 /**
- * POST /api/audit/lead — PUBLIC. A visitor finished the free store-audit and entered their email to unlock
- * the full report + the ads. We capture the lead, queue the nurture drip, and send email #1 instantly.
- * Body: { email, domain?, brandName?, report?, adUrls? }  (report = the client's scan snapshot).
+ * POST /api/audit/lead — signup-first funnel. A logged-in founder finished the free store-audit; we capture
+ * the lead under THEIR account email, queue the nurture drip (which converts when they go paid), and send
+ * email #1 instantly. Falls back to a body email for any legacy/anonymous caller.
+ * Body: { email?, domain?, brandName?, report?, adUrls? }  (report = the client's scan snapshot).
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { captureAuditLead } from '@/lib/audit/leads'
 
 export const dynamic = 'force-dynamic'
@@ -12,7 +13,10 @@ export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
-  const email = String(body?.email || '').trim().toLowerCase()
+  // Signup-first: prefer the session user's email; a body email is a legacy/anonymous fallback.
+  let email = ''
+  try { const { data: { user } } = await (await createClient()).auth.getUser(); email = (user?.email || '').trim().toLowerCase() } catch { /* not logged in */ }
+  if (!email) email = String(body?.email || '').trim().toLowerCase()
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: 'valid_email_required' }, { status: 400 })
   }

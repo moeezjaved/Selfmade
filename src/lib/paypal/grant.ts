@@ -41,6 +41,12 @@ export async function grantPaypalOrder(
     }, { onConflict: 'owner_id' })
     await admin.rpc('apply_plan', { p_user: owner, p_plan: order.plan, p_reset: periodEnd.toISOString() })
     void pl
+    // They went PAID → stop the audit nurture drip (convert the lead). Match by the buyer's email.
+    try {
+      const { data: u } = await admin.auth.admin.getUserById(order.user_id)
+      const email = u?.user?.email || ''
+      if (email) { const { convertAuditLeads } = await import('@/lib/audit/leads'); await convertAuditLeads(admin, email, order.user_id) }
+    } catch { /* best-effort */ }
   }
 
   await admin.from('paypal_orders').update({
