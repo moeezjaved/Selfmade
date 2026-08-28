@@ -39,21 +39,29 @@ export async function captureAuditLead(admin: Admin, input: LeadInput): Promise<
 
   const auto = await autoSend(admin)
   const now = Date.now()
-  // Queue every step (idempotent via unique(lead_id, step)). #1 is sent immediately below.
+  // Queue every step (idempotent via unique(lead_id, step)). #1 is 'approved' + due-now so that if the
+  // instant send below FAILS, the daily cron still delivers it — we only flip it to 'sent' once the send
+  // actually succeeds (previously #1 was pre-marked 'sent', so a failed send was never retried = no email).
   const rows = AUDIT_SEQUENCE.map((s) => ({
     lead_id: lead.id, step: s.step,
     subject: buildAuditEmail(s.step, lead as AuditLead)?.subject || `Your ${input.brandName || 'store'} audit`,
-    status: s.step === 1 ? 'sent' : (auto ? 'approved' : 'pending'),
+    status: s.step === 1 ? 'approved' : (auto ? 'approved' : 'pending'),
     send_after: new Date(now + s.dayOffset * 86400000).toISOString(),
-    sent_at: s.step === 1 ? new Date().toISOString() : null,
+    sent_at: null,
   }))
   await admin.from('audit_emails').upsert(rows, { onConflict: 'lead_id,step', ignoreDuplicates: true }).then(() => {}, () => {})
 
-  // Send #1 instantly (only if we just created its row as 'sent' — avoid double-send on refresh).
+  // Send #1 instantly; flip to 'sent' ONLY on a confirmed send. If it fails, it stays 'approved' + due, so
+  // the cron retries it. Guard against double-send: skip if #1 is already 'sent' (e.g. an audit re-run).
   try {
-    const built = buildAuditEmail(1, lead as AuditLead)
-    if (built) await sendEmail(email, built.subject, built.html)
-  } catch { /* best-effort; the row is marked sent regardless */ }
+    const { data: cur } = await admin.from('audit_emails').select('status').eq('lead_id', lead.id).eq('step', 1).maybeSingle()
+    if (cur?.status !== 'sent') {
+      const built = buildAuditEmail(1, lead as AuditLead)
+      if (built && await sendEmail(email, built.subject, built.html)) {
+        await admin.from('audit_emails').update({ status: 'sent', sent_at: new Date().toISOString() }).eq('lead_id', lead.id).eq('step', 1).then(() => {}, () => {})
+      }
+    }
+  } catch { /* leave #1 'approved' + due → the cron delivers it */ }
 
   return { ok: true, leadId: lead.id }
 }

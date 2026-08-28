@@ -745,7 +745,7 @@ function RevenueTally({ sec, live, isMobile }: { sec?: (Section & { _lost?: numb
   const lines = [
     searches > 0 && { icon: '🔍', title: 'Searches where rivals take the click', sub: `${searches} buyer ${searches === 1 ? 'search' : 'searches'} where you’re not #1`, amt: target * 0.86 },
     catalogGaps > 0 && { icon: '📦', title: 'Product pages missing SEO', sub: `${catalogGaps} products missing alt text, descriptions or schema`, amt: target * 0.05 },
-    aiMiss > 0 && { icon: '🤖', title: 'AI assistants recommending rivals', sub: `${aiMiss} of ${aiTotal} AI answers skip you`, amt: target * 0.09 },
+    aiMiss > 0 && { icon: '🤖', title: 'AI assistants don’t mention you', sub: `${aiMiss} of ${aiTotal} AI answers skip you`, amt: target * 0.09 },
   ].filter(Boolean) as { icon: string; title: string; sub: string; amt: number }[]
   return (
     <div style={{ width: '100%', maxWidth: 680 }}>
@@ -839,7 +839,7 @@ function Report({ result, open, setOpen, isMobile, onFix, embedded = false }: { 
           const lines = [
             m.fromSearch > 0 && { icon: '🔍', title: 'Searches where rivals take the click', sub: `${m.keywordLeaks.length} buyer ${m.keywordLeaks.length === 1 ? 'search' : 'searches'} where you’re not #1`, amt: m.fromSearch },
             m.fromCatalog > 0 && { icon: '📦', title: 'Product pages missing SEO', sub: `${m.catalogGapProducts} products missing alt text, descriptions or schema`, amt: m.fromCatalog },
-            m.fromAi > 0 && { icon: '🤖', title: 'AI assistants recommending rivals', sub: `${m.missReads} of ${m.missTotal} AI answers skip you`, amt: m.fromAi },
+            m.fromAi > 0 && { icon: '🤖', title: 'AI assistants don’t mention you', sub: `${m.missReads} of ${m.missTotal} AI answers skip you`, amt: m.fromAi },
           ].filter(Boolean) as { icon: string; title: string; sub: string; amt: number }[]
           return (
             <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden' }}>

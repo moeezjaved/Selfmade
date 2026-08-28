@@ -184,8 +184,14 @@ async function stepAi(ctx: Ctx): Promise<Section> {
   const qList = ctx.terms.questions.length ? ctx.terms.questions : [`What are the best ${ctx.category}?`]
   const reads: AiEngineRead[] = []
   const brandTokens = [ctx.siteName.toLowerCase(), ctx.domain.split('.')[0]].filter((t) => t.length > 2)
-  await Promise.all(engines.map(async (e, i) => {
-    const question = qList[i % qList.length]
+  // Check a MEANINGFUL sample (up to 5 question×engine combos), not one per engine — so "X of 5" reflects
+  // several real buyer questions across the assistants, not just how many engines are configured.
+  const MAX_READS = 5
+  const pairs: { e: string; question: string }[] = []
+  outer: for (const question of qList) {
+    for (const e of engines) { pairs.push({ e, question }); if (pairs.length >= MAX_READS) break outer }
+  }
+  await Promise.all(pairs.map(async ({ e, question }) => {
     const a = await askEngine(e, question).catch(() => null)
     if (!a) return
     reads.push({ engine: e, mentioned: brandTokens.some((t) => a.text.toLowerCase().includes(t)), question, answer: a.text.slice(0, 1400) })
