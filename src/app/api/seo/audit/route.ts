@@ -48,9 +48,10 @@ export async function GET(_req: NextRequest) {
   const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id)
   if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
   // Carry the free-audit findings into the app the first time (no re-scan, no re-charge).
-  await seedBrandFromScan(admin as any, user.id, brandId).catch(() => {})
+  const _seed = await seedBrandFromScan(admin as any, user.id, brandId).catch((e: any) => ({ err: String(e?.message || e).slice(0, 120) }))
   try {
     const audit = await loadSeoAudit(admin as any, user.id, brandId)
+    if (_req.nextUrl.searchParams.get('debug')) return NextResponse.json({ ...audit, _seed, _brandId: brandId }, { status: 200 })
     return NextResponse.json(audit, { status: 200 })
   } catch (e) {
     return NextResponse.json({ error: 'seo_audit_load_failed', detail: String((e as Error)?.message || e).slice(0, 160) }, { status: 500 })
