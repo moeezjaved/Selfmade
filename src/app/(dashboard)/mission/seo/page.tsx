@@ -136,7 +136,7 @@ export default function SeoPage() {
           </div>
           <div className="runbox">
             <button className="btn lime" onClick={runAudit} disabled={running}>{running ? 'Crawling your site…' : audit?.hasData ? '↻ Re-audit' : 'Audit my site →'}</button>
-            <div className="runcost">crawls up to 10 pages · free</div>
+            <div className="runcost">crawls up to 20 pages · free</div>
           </div>
         </div>
 

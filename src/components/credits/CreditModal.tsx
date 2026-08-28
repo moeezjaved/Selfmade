@@ -17,7 +17,7 @@ import { X, Zap, Plus, Check, Loader2, Infinity as InfinityIcon } from 'lucide-r
 import { PLANS, TOPUP_PACKS, normalizePlan } from '@/lib/plans'
 
 const LIME = '#ff5a2c'
-const INK = '#141d15'
+const INK = '#1a1410'
 
 export const OPEN_EVENT = 'credits:open'
 /** Open the modal from anywhere (e.g. after an insufficient-credits error). */
@@ -128,7 +128,7 @@ export function CreditModal() {
     <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, background: 'rgba(15,20,15,0.55)', zIndex: 4000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(560px, 96vw)', maxHeight: '90vh', overflow: 'auto', background: '#fff', borderRadius: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.4)', fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif" }}>
         {/* header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid #eef2ee' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 22px', borderBottom: '1px solid #f4f1ea' }}>
           <div style={{ fontSize: 17, fontWeight: 800, color: INK }}>{view === 'buy' ? 'Buy credits' : 'Credits & plan'}</div>
           <button onClick={() => setOpen(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#9ca3af', display: 'flex' }}><X size={20} /></button>
         </div>
@@ -139,9 +139,9 @@ export function CreditModal() {
 
         {/* Trial banner — full plan credits are held back until the trial converts (anti-abuse). */}
         {bal?.trialing && (
-          <div style={{ margin: '14px 22px 0', background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ margin: '14px 22px 0', background: '#fdeee9', border: '1px solid #f6d8cc', borderRadius: 12, padding: '14px 16px' }}>
             <div style={{ fontSize: 13.5, fontWeight: 800, color: INK }}>🎁 You're on a free trial</div>
-            <div style={{ fontSize: 12.5, color: '#3f6b4a', marginTop: 4, lineHeight: 1.5 }}>
+            <div style={{ fontSize: 12.5, color: '#6f665a', marginTop: 4, lineHeight: 1.5 }}>
               Your full {ent.label} credits{monthlyLimit != null ? ` (${monthlyLimit.toLocaleString()}/mo)` : ''} unlock when your trial ends
               {trialEndDate ? <> on <b>{trialEndDate}</b></> : ''}. Want them now?
             </div>
@@ -149,14 +149,14 @@ export function CreditModal() {
               style={{ marginTop: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: unlocking ? 'default' : 'pointer', fontFamily: 'inherit', opacity: unlocking ? 0.7 : 1 }}>
               {unlocking ? <><Loader2 size={14} className="spin" /> Unlocking…</> : <><Zap size={14} /> Pay now &amp; unlock credits</>}
             </button>
-            <div style={{ fontSize: 11, color: '#6b8f6b', marginTop: 7 }}>Ends your trial early and charges your saved card today. Cancel anytime.</div>
+            <div style={{ fontSize: 11, color: '#6f665a', marginTop: 7 }}>Ends your trial early and charges your saved card today. Cancel anytime.</div>
           </div>
         )}
 
         {view === 'plan' ? (
           <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
             {/* Current plan */}
-            <div style={{ border: '1px solid #e5e9e5', borderRadius: 14, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+            <div style={{ border: '1px solid #e8e2d6', borderRadius: 14, padding: '16px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9ca3af' }}>Current plan</div>
                 <div style={{ fontSize: 22, fontWeight: 800, color: INK, marginTop: 2 }}>{ent.label}</div>
@@ -171,27 +171,27 @@ export function CreditModal() {
             </div>
 
             {/* Credit balance */}
-            <div style={{ border: '1px solid #e5e9e5', borderRadius: 14, padding: '16px 18px' }}>
+            <div style={{ border: '1px solid #e8e2d6', borderRadius: 14, padding: '16px 18px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
                 <div style={{ fontSize: 13, fontWeight: 800, color: INK }}>AI credits</div>
                 {canBuy && (
-                  <button onClick={() => { setView('buy'); setReason(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#f0fdf4', border: '1px solid #bbf7d0', color: INK, padding: '6px 12px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
+                  <button onClick={() => { setView('buy'); setReason(null) }} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, background: '#fdeee9', border: '1px solid #f6d8cc', color: INK, padding: '6px 12px', borderRadius: 100, fontSize: 12.5, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }}>
                     <Plus size={13} /> Buy credits
                   </button>
                 )}
               </div>
               <div style={{ fontSize: 34, fontWeight: 800, color: INK, lineHeight: 1 }}>{total.toLocaleString()}</div>
-              <div style={{ fontSize: 12, color: '#6b8f6b', marginTop: 2 }}>total credits</div>
+              <div style={{ fontSize: 12, color: '#6f665a', marginTop: 2 }}>total credits</div>
               <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
                 <div style={{ flex: 1, background: '#f9f5ec', borderRadius: 10, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 11, color: '#6b8f6b', fontWeight: 600 }}>Monthly-refreshed</div>
+                  <div style={{ fontSize: 11, color: '#6f665a', fontWeight: 600 }}>Monthly-refreshed</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: INK, marginTop: 2 }}>
                     {planCredits.toLocaleString()}{monthlyLimit != null ? <span style={{ color: '#9ca3af', fontWeight: 600 }}> / {monthlyLimit.toLocaleString()}</span> : ''}
                   </div>
                   {resetDate && <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>Resets {resetDate}</div>}
                 </div>
                 <div style={{ flex: 1, background: '#f9f5ec', borderRadius: 10, padding: '10px 12px' }}>
-                  <div style={{ fontSize: 11, color: '#6b8f6b', fontWeight: 600 }}>Non-expiring</div>
+                  <div style={{ fontSize: 11, color: '#6f665a', fontWeight: 600 }}>Non-expiring</div>
                   <div style={{ fontSize: 15, fontWeight: 800, color: INK, marginTop: 2 }}>{topupCredits.toLocaleString()}</div>
                   <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 2 }}>From top-ups</div>
                 </div>
@@ -203,11 +203,11 @@ export function CreditModal() {
               )}
             </div>
 
-            <a href="/billing" style={{ textAlign: 'center', fontSize: 12.5, color: '#6b8f6b', fontWeight: 600, textDecoration: 'none' }}>Billing &amp; invoices →</a>
+            <a href="/billing" style={{ textAlign: 'center', fontSize: 12.5, color: '#6f665a', fontWeight: 600, textDecoration: 'none' }}>Billing &amp; invoices →</a>
           </div>
         ) : (
           <div style={{ padding: 22, display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <div style={{ fontSize: 14, color: '#374151' }}>Choose a credit pack. <span style={{ color: '#6b8f6b', fontWeight: 600 }}>Top-ups never expire.</span></div>
+            <div style={{ fontSize: 14, color: '#374151' }}>Choose a credit pack. <span style={{ color: '#6f665a', fontWeight: 600 }}>Top-ups never expire.</span></div>
             {(() => {
               // Best value = most credits per dollar (usually the largest pack).
               const perDollar = (p: typeof TOPUP_PACKS[number]) => p.credits / p.priceUsd
@@ -222,16 +222,16 @@ export function CreditModal() {
                     const loading = busy === p.id
                     return (
                       <button key={p.id} onClick={() => buy(p.id)} disabled={!!busy}
-                        style={{ position: 'relative', border: `2px solid ${best ? INK : '#e5e9e5'}`, borderRadius: 16, padding: '22px 12px 16px', background: best ? 'linear-gradient(180deg,#f4fbe8,#ffffff)' : '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, boxShadow: best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none', transition: 'transform .12s, box-shadow .12s, border-color .12s', opacity: busy && !loading ? 0.5 : 1 }}
+                        style={{ position: 'relative', border: `2px solid ${best ? INK : '#e8e2d6'}`, borderRadius: 16, padding: '22px 12px 16px', background: best ? 'linear-gradient(180deg,#fdeee9,#ffffff)' : '#fff', cursor: busy ? 'default' : 'pointer', textAlign: 'center', fontFamily: 'inherit', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3, boxShadow: best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none', transition: 'transform .12s, box-shadow .12s, border-color .12s', opacity: busy && !loading ? 0.5 : 1 }}
                         onMouseEnter={(e) => { if (!busy) { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 12px 30px rgba(20,29,21,0.16)'; e.currentTarget.style.borderColor = INK } }}
-                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none'; e.currentTarget.style.borderColor = best ? INK : '#e5e9e5' }}>
+                        onMouseLeave={(e) => { e.currentTarget.style.transform = 'none'; e.currentTarget.style.boxShadow = best ? '0 8px 24px rgba(20,29,21,0.12)' : 'none'; e.currentTarget.style.borderColor = best ? INK : '#e8e2d6' }}>
                         {badge && (
-                          <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', color: best ? INK : '#6b8f6b', background: best ? LIME : '#eef7dc', border: `1px solid ${best ? '#cde87a' : '#dcecc0'}`, padding: '3px 10px', borderRadius: 100 }}>{badge}</span>
+                          <span style={{ position: 'absolute', top: -10, left: '50%', transform: 'translateX(-50%)', whiteSpace: 'nowrap', fontSize: 10, fontWeight: 800, letterSpacing: '.03em', textTransform: 'uppercase', color: best ? INK : '#6f665a', background: best ? LIME : '#fdeee9', border: `1px solid ${best ? '#f6d8cc' : '#f6d8cc'}`, padding: '3px 10px', borderRadius: 100 }}>{badge}</span>
                         )}
-                        <span style={{ fontSize: 20, color: best ? '#5a7d16' : '#9cbf5a', lineHeight: 1 }}>◆</span>
+                        <span style={{ fontSize: 20, color: best ? '#e02f06' : '#d99a86', lineHeight: 1 }}>◆</span>
                         <div style={{ fontSize: 26, fontWeight: 900, color: INK, lineHeight: 1.1 }}>{p.credits.toLocaleString()}</div>
                         <div style={{ fontSize: 11, color: '#9ca3af', fontWeight: 600 }}>credits</div>
-                        <div style={{ fontSize: 18, fontWeight: 800, color: '#3f6b4a', marginTop: 6 }}>${p.priceUsd}</div>
+                        <div style={{ fontSize: 18, fontWeight: 800, color: '#6f665a', marginTop: 6 }}>${p.priceUsd}</div>
                         <div style={{ fontSize: 10.5, color: '#9ca3af', marginTop: 1 }}>{Math.round(perDollar(p))} credits / $1</div>
                         {loading && <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(255,255,255,0.7)', borderRadius: 14 }}><Loader2 size={20} className="spin" style={{ color: INK }} /></div>}
                       </button>
@@ -241,9 +241,9 @@ export function CreditModal() {
               )
             })()}
             <div style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 12, color: '#9ca3af' }}>
-              <Check size={13} style={{ color: '#6b8f6b' }} /> Secure Stripe checkout · credits added instantly after payment
+              <Check size={13} style={{ color: '#6f665a' }} /> Secure Stripe checkout · credits added instantly after payment
             </div>
-            <button onClick={() => { setView('plan'); setReason(null) }} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#6b8f6b', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>← Back to plan</button>
+            <button onClick={() => { setView('plan'); setReason(null) }} style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#6f665a', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>← Back to plan</button>
           </div>
         )}
       </div>

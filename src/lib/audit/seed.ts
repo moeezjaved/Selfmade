@@ -76,7 +76,7 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
       for (const s of (scan.sections || [])) {
         if (s.key === 'ai') continue   // that's GEO, seeded below
         for (const f of (s.findings || [])) {
-          issues.push({ severity: f.severity, title: f.title, detail: f.detail, pages: (f.sample || []).slice(0, 8) })
+          issues.push({ severity: f.severity, title: f.title, detail: f.detail, pages: (f.sample || []).slice(0, 50) })
         }
       }
       dbg.seoIssues = issues.length
