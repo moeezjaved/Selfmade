@@ -57,7 +57,7 @@ export async function GET(request: NextRequest) {
     const uid = data?.user?.id
     if (uid && (!next || next === '/discovery' || next === '/brief' || next === '/hq')) {
       const { data: prof } = await supabase.from('user_profiles').select('onboarding_completed').eq('user_id', uid).maybeSingle()
-      if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/onboarding`)
+      if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/store-audit`)   // the audit is onboarding now
     }
   } catch { /* fall through */ }
 

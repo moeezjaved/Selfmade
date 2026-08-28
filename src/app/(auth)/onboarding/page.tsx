@@ -194,7 +194,19 @@ function BrandPalette({ q, setQ, suggested, results, picks, loading, onToggle, e
   )
 }
 
-export default function InterviewPage() {
+// RETIRED: the audit (/store-audit) is the onboarding now — it collects the site, ads and competitor and
+// creates the brand. This page just forwards there. The full interview below is kept (unreachable) for
+// reference / rollback; nothing routes here anymore.
+export default function OnboardingRedirect() {
+  const router = useRouter()
+  useEffect(() => {
+    const nu = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('new') ? '?new=1' : ''
+    router.replace('/store-audit' + nu)
+  }, [router])
+  return null
+}
+
+function InterviewPage() {
   const router = useRouter()
   const supabase = createClient()
   const [phase, setPhase] = useState<Phase>('welcome')

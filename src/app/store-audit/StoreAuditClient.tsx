@@ -63,18 +63,31 @@ export default function StoreAuditClient() {
       body: JSON.stringify({ domain: dom, brandName: adsData?.brand?.name || seoData?.siteName, report: buildReport(adsData, seoData), adUrls: [] }),
     }).catch(() => {})
     // Ensure a brand exists for THIS store so we can render the real ads (and the audit carries over).
+    // This REPLACES onboarding: stamp their Meta Ad Library page (own-ads audit) + follow the competitor
+    // they picked, and mark them onboarded (the /api/audit/lead call above sets onboarding_completed).
     ;(async () => {
       const norm = (s: string) => (s || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase()
+      const seed = started.seed || {}
       try {
         const list = await fetch('/api/brands', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ brands: [] }))
         let bid: string | null = ((list.brands || []).find((b: any) => norm(b.website) === norm(dom)) || null)?.id || null
         if (!bid) {
-          const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: adsData?.brand?.name || seoData?.siteName || norm(dom), website: dom }) })
+          const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: adsData?.brand?.name || seoData?.siteName || norm(dom), website: dom, brand_kit: seed.pageId ? { ownMetaPageId: seed.pageId } : {} }) })
           const j = await r.json().catch(() => ({}))
           if (r.ok && j.brand?.id) bid = j.brand.id
           else if (r.status === 402) setAtCap(true)
         }
-        if (bid) { try { document.cookie = `sf_brand=${bid}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax` } catch { /* ignore */ } setBrandId(bid) }
+        if (bid) {
+          try { document.cookie = `sf_brand=${bid}; path=/; max-age=${60 * 60 * 24 * 365}; samesite=lax` } catch { /* ignore */ }
+          try { document.cookie = `sm_onb=1; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax` } catch { /* ignore */ }   // onboarded (audit = onboarding)
+          // Follow the competitor they picked (or typed a site for) so the rival is tracked from day one.
+          const rival = (seed.competitors || [])[0]
+          try {
+            if (rival?.pageId) await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: String(rival.pageId), brandName: rival.name, action: 'follow', brandId: bid, spied: true }) })
+            else if (started.rival) { const sp = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ url: started.rival, brand: bid }) }).then((x) => x.json()).catch(() => null); if (sp?.pageId) await fetch('/api/follows', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId: String(sp.pageId), action: 'follow', brandId: bid, spied: true }) }) }
+          } catch { /* best-effort */ }
+          setBrandId(bid)
+        }
       } catch { /* best-effort */ }
     })()
   }, [seoDone])   // eslint-disable-line react-hooks/exhaustive-deps
