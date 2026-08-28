@@ -7,6 +7,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { openCredits } from '@/components/credits/CreditModal'
 import SelectBrandNotice from '@/components/app/SelectBrandNotice'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 type Region = { x: number; y: number; w: number; h: number }
 type Severity = 'critical' | 'high' | 'medium'
@@ -75,6 +76,7 @@ export default function CroPage() {
   const [applyNote, setApplyNote] = useState<string | null>(null)
   const previewRewrite = async () => {
     if (applyBusy) return
+    if (await requireUpgrade()) return   // free → agreement + payment wall
     setApplyBusy('preview'); setApplyNote(null)
     try {
       const res = await fetch('/api/cro/apply', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'preview' }) })

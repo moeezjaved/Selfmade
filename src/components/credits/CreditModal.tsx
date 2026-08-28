@@ -164,7 +164,7 @@ export function CreditModal() {
               {/* Only Free can upgrade — Creator ($49) is the top public plan, so a paid user has
                   nothing to upgrade to. Manage/cancel lives on Billing. */}
               {planId === 'free' && (
-                <a href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
+                <a href="/upgrade" style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#ef4a1e', color: '#fff', padding: '9px 18px', borderRadius: 100, fontSize: 13, fontWeight: 800, textDecoration: 'none' }}>
                   <Zap size={14} /> Upgrade
                 </a>
               )}
