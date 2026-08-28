@@ -26,6 +26,8 @@ export async function POST(_req: NextRequest) {
       description: 'Welcome email sent', performed_by: 'system',
     })
     await sendWelcomeEmail(user.email, (user.user_metadata?.full_name as string) || '')
+    // They signed up → stop any audit nurture drip tied to this email.
+    try { const { convertAuditLeads } = await import('@/lib/audit/leads'); await convertAuditLeads(admin, user.email || '', user.id) } catch { /* best-effort */ }
   } catch { /* best-effort */ }
   return NextResponse.json({ ok: true })
 }
