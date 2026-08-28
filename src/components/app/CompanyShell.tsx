@@ -98,9 +98,13 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const planLabel = isPaid ? `${(plan || '').replace(/^\w/, (c) => c.toUpperCase())} plan` : 'Free plan'
 
   // Most-specific match wins, so /ads-workspace/competitors lights "My Competitors", not "Ad Studio".
-  const bestMatch = NAV.flatMap((g) => g.items.map((i) => i.href))
-    .filter((h) => pathname === h || pathname.startsWith(h + '/'))
-    .sort((a, b) => b.length - a.length)[0]
+  // Brand Spy lives under /discovery/brand-spy but is entered from "My Competitors" (+ Spy new brand), so
+  // light "My Competitors" there — otherwise it lit "Discover" and felt like the button jumped elsewhere.
+  const bestMatch = pathname.startsWith('/discovery/brand-spy')
+    ? '/ads-workspace/competitors'
+    : NAV.flatMap((g) => g.items.map((i) => i.href))
+      .filter((h) => pathname === h || pathname.startsWith(h + '/'))
+      .sort((a, b) => b.length - a.length)[0]
   const isActive = (href: string) => href === bestMatch || (href === '/mission' && pathname === '/' && !bestMatch)
 
   const Sidebar = (
