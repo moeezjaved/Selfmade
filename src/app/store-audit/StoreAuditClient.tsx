@@ -13,6 +13,7 @@
  * are preserved verbatim. The standalone /scan and /audit routes are untouched (rollback).
  */
 import { useEffect, useRef, useState } from 'react'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 const FOREST = '#141d15', ORANGE = '#ff5a2c', SUB = 'rgba(255,255,255,.82)'
 const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
@@ -340,7 +341,8 @@ function AuditAds({ domain }: { domain: string }) {
         const r = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         const d = await r.json().catch(() => ({}))
         if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false, failed: false, locked: false } : x)); return }
-        if (r.status === 402 || d.error === 'insufficient_credits') { setNeedCredits(true); setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, locked: true } : x)); return }
+        // Out of free credits → send them to the upgrade wall (agreement → payment). Paid users see the note.
+        if (r.status === 402 || d.error === 'insufficient_credits') { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, locked: true } : x)); if (!(await requireUpgrade())) setNeedCredits(true); return }
       } catch { /* retry */ }
       if (attempt < 2) await new Promise((r) => setTimeout(r, 4000))
     }

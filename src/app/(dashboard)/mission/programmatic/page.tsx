@@ -7,6 +7,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -32,6 +33,7 @@ export default function ProgrammaticPage() {
   useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const generate = async () => {
+    if (await requireUpgrade()) return   // Pages at Scale is paid → free goes to the agreement + payment wall
     setBusy('gen'); setNote(null)
     try {
       const r = await fetch('/api/shopify/programmatic', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'generate', limit: batch, withImage }) })
@@ -46,6 +48,7 @@ export default function ProgrammaticPage() {
   }
 
   const publish = async (ids: string[]) => {
+    if (await requireUpgrade()) return   // free → agreement + payment wall
     if (!ids.length) { setNote('Select at least one page.'); return }
     setBusy('pub'); setNote(null)
     try {

@@ -8,6 +8,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, blogPublished } from '@/lib/celebrate'
 import { openCredits } from '@/components/credits/CreditModal'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
@@ -38,7 +39,7 @@ export default function BlogPage() {
       const r = await fetch('/api/shopify/blog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'draft', topic: topic.trim() || undefined, withImage }) })
       const j = await r.json()
       if (r.ok) { setPreview({ id: j.id, html: j.html, title: j.article?.title || 'Draft' }); setNote('Drafted — review below, then publish.'); await load() }
-      else if (r.status === 402) { openCredits('buy', j.reason || 'Writing a blog costs credits — top up to continue.') }   // free auto-coerces to Upgrade
+      else if (r.status === 402) { if (!(await requireUpgrade())) openCredits('buy', j.reason || 'Writing a blog costs credits — top up to continue.') }   // free → /upgrade; paid → top up
       else if (j.error === 'reserve_failed') setNote('Couldn’t reserve credits for this — the pricing for blog drafts isn’t configured yet. Try again shortly.')
       else setNote(j.error || 'Could not generate.')
     } catch { setNote('Network error.') }
@@ -46,6 +47,7 @@ export default function BlogPage() {
   }
 
   const publish = async (id: string) => {
+    if (await requireUpgrade()) return   // free → employment agreement + payment wall
     setBusy(`pub:${id}`); setNote(null)
     try {
       const r = await fetch('/api/shopify/blog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'publish', id }) })
