@@ -215,7 +215,7 @@ export default function InboxPage() {
         <p style={{ fontSize: 14.5, color: SUB, lineHeight: 1.6, margin: '0 0 22px' }}>
           Every customer DM and WhatsApp lands here — triaged, prioritized, reply-ready — and Mello drafts the response for you to approve. Upgrade to Creator to switch it on.
         </p>
-        <Link href="/billing" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', textDecoration: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800 }}>Upgrade to Creator →</Link>
+        <Link href="/upgrade" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ef4a1e', color: '#fff', textDecoration: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 14.5, fontWeight: 800 }}>Upgrade to Creator →</Link>
       </div>
     </div>
   )

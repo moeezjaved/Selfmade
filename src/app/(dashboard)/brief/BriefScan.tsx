@@ -262,7 +262,7 @@ export default function BriefScan({ brief, melloState, onAct, onWhy, credits, pl
                 }</div>
               </div>
               {/* State-true CTA: Free → upgrade; Creator + not connected → connect; Creator + connected → run. */}
-              <Link href={!canLaunch ? '/billing' : metaConnected === false ? '/connect/meta' : '/m4'} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{!canLaunch ? 'Upgrade to Creator →' : metaConnected === false ? 'Connect Meta →' : 'Run ads →'}</Link>
+              <Link href={!canLaunch ? '/upgrade' : metaConnected === false ? '/connect/meta' : '/m4'} style={{ flexShrink: 0, background: '#ef4a1e', color: '#fff', borderRadius: 100, padding: '11px 22px', fontSize: 14, fontWeight: 800, textDecoration: 'none', whiteSpace: 'nowrap' }}>{!canLaunch ? 'Upgrade to Creator →' : metaConnected === false ? 'Connect Meta →' : 'Run ads →'}</Link>
             </div>
           )}
 

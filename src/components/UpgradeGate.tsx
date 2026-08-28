@@ -102,7 +102,7 @@ export default function UpgradeGate({ feature, name, children }: {
           ))}
         </div>
 
-        <button className="ug-cta" onClick={() => router.push('/billing')} style={{
+        <button className="ug-cta" onClick={() => router.push('/upgrade')} style={{
           background: '#ef4a1e', color: '#fff', border: 'none', borderRadius: 100, padding: '14px 30px', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit',
           display: 'inline-flex', alignItems: 'center', gap: 8,
         }}>
