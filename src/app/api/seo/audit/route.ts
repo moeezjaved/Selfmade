@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveBrandForAction } from '@/lib/brand/active'
 import { runSeoAudit, loadSeoAudit } from '@/lib/seo/crawl-audit'
+import { seedBrandFromScan } from '@/lib/audit/seed'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
@@ -46,6 +47,8 @@ export async function GET(_req: NextRequest) {
   const admin = createAdminClient()
   const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id)
   if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
+  // Carry the free-audit findings into the app the first time (no re-scan, no re-charge).
+  await seedBrandFromScan(admin as any, user.id, brandId).catch(() => {})
   try {
     const audit = await loadSeoAudit(admin as any, user.id, brandId)
     return NextResponse.json(audit, { status: 200 })
