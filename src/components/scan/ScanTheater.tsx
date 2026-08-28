@@ -1219,12 +1219,16 @@ function TheFix({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
   const rival = res.rivalToRemake
   return (
     <div style={{ marginTop: 40 }}>
-      <h2 style={h2}>The fix — 5 ad concepts <span style={{ color: ORANGE }}>built for you</span></h2>
-      <p style={sub}>Templates from the winning DNA you&rsquo;re missing. Sign up and Mello renders them as finished ads with your product — plus 5 more of your choice.</p>
+      {/* CSS layout-template cards — ONLY on the standalone /scan (logged-out). In the embedded store-audit
+          the founder is logged in, so we render REAL ads (5 free + 5 on credits) in the audit page instead. */}
+      {!embedded && <>
+        <h2 style={h2}>The fix — 5 ad concepts <span style={{ color: ORANGE }}>built for you</span></h2>
+        <p style={sub}>Templates from the winning DNA you&rsquo;re missing. Sign up and Mello renders them as finished ads with your product — plus 5 more of your choice.</p>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(230px,100%),1fr))', gap: 16, marginTop: 22 }}>
-        {briefs.map((b, i) => <FixCard key={b.key} brief={b} thumb={ownThumb} i={i} />)}
-      </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(230px,100%),1fr))', gap: 16, marginTop: 22 }}>
+          {briefs.map((b, i) => <FixCard key={b.key} brief={b} thumb={ownThumb} i={i} />)}
+        </div>
+      </>}
 
       {/* Rival-video remake: play their proven winner, script it beat-by-beat for the user's product */}
       <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>
