@@ -953,26 +953,41 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   const [q, setQ] = useState('')
   const [step, setStep] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  const [discovering, setDiscovering] = useState(false)
   // Session-scoped memory so leaving this tab and coming back shows the SAME rivals instantly — no second
   // discovery scan (which is slow and costs droplet/API work). Only a first-ever load or Refresh re-scans.
   const cacheKey = domain ? `sf_comps_v1_${domain}` : ''
   useEffect(() => {
-    let on = true
+    let on = true; let pollT: ReturnType<typeof setTimeout> | undefined
     if (cacheKey) {
       try {
         const raw = sessionStorage.getItem(cacheKey)
-        if (raw) { const c = JSON.parse(raw); setComps(Array.isArray(c.competitors) ? c.competitors : []); setSeed(c.seed || null); return () => { on = false } }
+        if (raw) { const c = JSON.parse(raw); setComps(Array.isArray(c.competitors) ? c.competitors : []); setSeed(c.seed || null); setDiscovering(false); return () => { on = false } }
       } catch { /* storage blocked → fall through to fetch */ }
     }
     setComps(null); setStep(0)
     const tick = setInterval(() => on && setStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1)), 11000)
-    fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => {
-      if (!on) return
-      const found = Array.isArray(d.competitors) ? d.competitors : []
-      setComps(found); setSeed(d.seed || null)
-      if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
-    }).catch(() => on && setComps([]))
-    return () => { on = false; clearInterval(tick) }
+    // The server runs discovery in the BACKGROUND and replies discovering:true with the spied brands right
+    // away; we poll until the full result is cached, then remember it. So the slow scan happens at most ONCE
+    // and never blocks the page again — even if the user left mid-scan last time.
+    const load = async () => {
+      try {
+        const d = await fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json())
+        if (!on) return
+        const found = Array.isArray(d.competitors) ? d.competitors : []
+        setSeed(d.seed || null)
+        if (d.discovering) {
+          setComps(found)                 // show spied brands now; keep the "finding more" state
+          setDiscovering(true)
+          pollT = setTimeout(load, 5000)  // poll for the background result
+        } else {
+          setComps(found); setDiscovering(false); clearInterval(tick)
+          if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
+        }
+      } catch { if (on) { setComps((c) => c ?? []) } }
+    }
+    load()
+    return () => { on = false; clearInterval(tick); if (pollT) clearTimeout(pollT) }
   }, [domain, cacheKey])
 
   // Force a fresh discovery pass (bypasses the per-brand cache) — used after a brand adds products, so
@@ -1024,6 +1039,13 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
       </div>
 
       <SpiedBrands />
+
+      {discovering && comps && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, padding: '11px 16px', border: `1px solid ${LINE}`, background: '#fff7f3', borderRadius: 12, fontSize: 13, color: SUB }}>
+          <span style={{ display: 'inline-block', width: 15, height: 15, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite', flex: 'none' }} />
+          Finding more rivals across Google &amp; the Meta Ad Library — this keeps running in the background, so you can leave and come back.
+        </div>
+      )}
 
       {comps === null ? (
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: '38px 28px', marginTop: 20, textAlign: 'center' }}>
