@@ -16,22 +16,27 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { loadScanForDomain, type ScanResult } from './scan'
 import { isAppDomain } from '@/lib/domain-guard'
 
-const clean = (s: string) => s.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
+const clean = (s: string) => s.replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '').trim()
 
-/** Resolve the brand's real site domain: connected Shopify store first, else the brand website. */
-async function brandDomain(admin: any, userId: string, brandId: string): Promise<string> {
-  try {
-    const { resolveStore } = await import('@/lib/shopify/client')
-    const store = await resolveStore(admin, userId, brandId).catch(() => null)
-    if (store?.shop_domain) return clean(String(store.shop_domain))
-  } catch { /* fall through */ }
+/** Every domain this brand might have been audited under — the brand website AND any connected store, since
+ *  a founder usually audits their real website even when a (possibly different) Shopify store is connected. */
+async function brandDomains(admin: any, userId: string, brandId: string): Promise<string[]> {
+  const out: string[] = []
   try {
     const { data } = await admin.from('brands').select('website, brand_kit').eq('id', brandId).maybeSingle()
     const kit = (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {}
-    const d = clean(String(data?.website || kit.website || kit.siteName || ''))
-    if (d && !isAppDomain(d)) return d
+    for (const raw of [data?.website, kit.website, kit.siteName]) {
+      const d = clean(String(raw || ''))
+      if (d && d.includes('.') && !isAppDomain(d) && !out.includes(d)) out.push(d)
+    }
   } catch { /* ignore */ }
-  return ''
+  try {
+    const { resolveStore } = await import('@/lib/shopify/client')
+    const store = await resolveStore(admin, userId, brandId).catch(() => null)
+    const d = store?.shop_domain ? clean(String(store.shop_domain)) : ''
+    if (d && d.includes('.') && !out.includes(d)) out.push(d)
+  } catch { /* ignore */ }
+  return out
 }
 
 /**
@@ -49,10 +54,16 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
     ])
     if (seoRow && geoRow) return
 
-    const domain = await brandDomain(db, userId, brandId)
-    if (!domain) return
-    const scan = await loadScanForDomain(db, domain) as ScanResult | null
-    if (!scan) return
+    // Try each candidate domain until we find the stored theater scan (founder may have audited the
+    // website even if a different store is connected).
+    const domains = await brandDomains(db, userId, brandId)
+    let scan: ScanResult | null = null
+    let domain = ''
+    for (const d of domains) {
+      const s = await loadScanForDomain(db, d) as ScanResult | null
+      if (s) { scan = s; domain = d; break }
+    }
+    if (!scan || !domain) return
 
     // ── SEO: theater section findings (everything except the AI-visibility section) → seo_audit issues ──
     if (!seoRow) {
