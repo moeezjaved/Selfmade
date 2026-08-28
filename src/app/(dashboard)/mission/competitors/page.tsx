@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
 type KwGap = { keyword: string; volume: number; etv: number; competitor: string; theirPosition: number; youRank: boolean }
 type Comp = { id: string; name: string; domain: string; page_count: number; blog_count: number; topics: { topic: string; count: number }[]; sample_titles: string[]; est_traffic: number | null; top_keywords?: { keyword: string; position: number; volume: number }[]; last_crawled: string | null }

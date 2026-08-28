@@ -10,7 +10,7 @@ import { celebrate, blogPublished } from '@/lib/celebrate'
 import { openCredits } from '@/components/credits/CreditModal'
 import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
 type Seo = { keyword?: string; metaTitle?: string; metaDescription?: string; secondary?: string[] }
 type Draft = { id: string; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null; created_at: string; seo?: Seo | null }

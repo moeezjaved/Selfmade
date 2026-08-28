@@ -9,7 +9,7 @@ import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, catalogApplied } from '@/lib/celebrate'
 import { openCredits } from '@/components/credits/CreditModal'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
 type Health = { products: number; missingSeoTitle: number; missingSeoDesc: number; imagesMissingAlt: number; drafts: number }
 type Draft = { id: string; product_gid: string; product_title: string; agent: string; proposal: any; status: string }

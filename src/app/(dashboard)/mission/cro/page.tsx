@@ -29,8 +29,8 @@ type Report = {
 
 const SEV_COLOR: Record<Severity, string> = { critical: '#b42318', high: '#c2600c', medium: '#9a6a12' }
 
-const INK = '#141d15', SUB = '#6b776b', LINE = '#e6ebe3', ORANGE = '#ef4a1e'
-const scoreColor = (s: number) => s >= 75 ? '#3f6b4a' : s >= 50 ? '#9a6a12' : '#b42318'
+const INK = '#1a1410', SUB = '#6b776b', LINE = '#e6ebe3', ORANGE = '#ef4a1e'
+const scoreColor = (s: number) => s >= 75 ? '#6f665a' : s >= 50 ? '#9a6a12' : '#b42318'
 
 function Card({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) {
   return <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: '18px 20px', background: '#fff', ...style }}>{children}</div>
@@ -304,7 +304,7 @@ export default function CroPage() {
                     <div style={{ flex: 1, minWidth: 240 }}>
                       <div style={{ fontSize: 15, fontWeight: 750 }}>{i + 1}. {l.title}{l.severity && <span style={{ fontSize: 10, fontWeight: 800, color: '#fff', background: SEV_COLOR[l.severity], borderRadius: 100, padding: '2px 8px', marginLeft: 8, textTransform: 'uppercase', letterSpacing: '.03em', verticalAlign: 'middle' }}>{l.severity}</span>}</div>
                       <div style={{ fontSize: 13.5, color: '#a5342c', marginTop: 6, lineHeight: 1.5 }}><b>Why it costs sales:</b> {l.why}</div>
-                      <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}><b style={{ color: '#3f6b4a' }}>Replace with:</b> {l.fix}</div>
+                      <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}><b style={{ color: '#6f665a' }}>Replace with:</b> {l.fix}</div>
                     </div>
                   </div>
                 </Card>
@@ -320,7 +320,7 @@ export default function CroPage() {
                 <Card key={i}>
                   <div style={{ fontSize: 15, fontWeight: 750 }}>{c.title}</div>
                   <div style={{ fontSize: 13.5, color: '#3a463a', marginTop: 6, lineHeight: 1.5 }}>{c.detail}</div>
-                  {c.impact && <div style={{ fontSize: 12.5, color: '#3f6b4a', marginTop: 8, background: '#f0f9f2', border: '1px solid #d6ecda', borderRadius: 8, padding: '7px 11px' }}>💸 {c.impact}</div>}
+                  {c.impact && <div style={{ fontSize: 12.5, color: '#6f665a', marginTop: 8, background: '#f0f9f2', border: '1px solid #d6ecda', borderRadius: 8, padding: '7px 11px' }}>💸 {c.impact}</div>}
                 </Card>
               ))}
             </div>
@@ -358,7 +358,7 @@ export default function CroPage() {
                 <Card key={i}>
                   <div style={{ fontSize: 14.5, fontWeight: 750 }}><span style={{ color: ORANGE, fontWeight: 900, marginRight: 8 }}>#{i + 1}</span>{t.name}</div>
                   <div style={{ fontSize: 13, color: '#3a463a', marginTop: 5, lineHeight: 1.5 }}>{t.hypothesis}</div>
-                  {t.impact && <div style={{ fontSize: 12.5, color: '#3f6b4a', marginTop: 6 }}>Expected: {t.impact}</div>}
+                  {t.impact && <div style={{ fontSize: 12.5, color: '#6f665a', marginTop: 6 }}>Expected: {t.impact}</div>}
                 </Card>
               ))}
             </div>
@@ -388,7 +388,7 @@ export default function CroPage() {
                 <div style={{ fontSize: 13, color: '#3a463a', lineHeight: 1.5, opacity: 0.75 }} dangerouslySetInnerHTML={{ __html: rw.before || '<p style="color:#9aa">(empty description)</p>' }} />
               </div>
               <div style={{ padding: 16, minWidth: 0, background: '#fbfdfa' }}>
-                <div style={{ fontSize: 11, fontWeight: 800, color: '#3f6b4a', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>After (Mello)</div>
+                <div style={{ fontSize: 11, fontWeight: 800, color: '#6f665a', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 8 }}>After (Mello)</div>
                 <div style={{ fontSize: 13, color: INK, lineHeight: 1.55 }} dangerouslySetInnerHTML={{ __html: rw.after }} />
               </div>
             </div>
@@ -403,7 +403,7 @@ export default function CroPage() {
                 <>
                   <a href={rw.url} target="_blank" rel="noreferrer" style={{ background: ORANGE, color: '#fff', borderRadius: 100, padding: '10px 20px', fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>View live →</a>
                   <button onClick={doUndo} disabled={!!applyBusy} style={{ background: '#fff', color: '#b42318', border: '1px solid #f0c8c3', borderRadius: 100, padding: '10px 18px', fontSize: 13.5, fontWeight: 700, cursor: applyBusy ? 'default' : 'pointer', fontFamily: 'inherit' }}>{applyBusy === 'undo' ? 'Reverting…' : 'Undo'}</button>
-                  <span style={{ fontSize: 12.5, color: '#3f6b4a', marginLeft: 'auto', fontWeight: 600 }}>✅ Live on your store</span>
+                  <span style={{ fontSize: 12.5, color: '#6f665a', marginLeft: 'auto', fontWeight: 600 }}>✅ Live on your store</span>
                 </>
               )}
             </div>

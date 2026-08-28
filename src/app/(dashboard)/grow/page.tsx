@@ -14,7 +14,7 @@ import SeoPage from '../mission/seo/page'
 import GeoPage from '../mission/geo/page'
 import CompetitorsPage from '../mission/competitors/page'
 
-const INK = '#141d15', SUB = '#8a938a', LIME = '#ff5a2c', LINE = '#ececec', GOOD = '#1f8f4e', MUT = '#c7cec7'
+const INK = '#1a1410', SUB = '#8a938a', LIME = '#ff5a2c', LINE = '#ececec', GOOD = '#1f8f4e', MUT = '#c7cec7'
 
 type Task = { key: string; label: string; done: boolean; value?: string; href: string }
 type Stage = { key: string; name: string; status: 'done' | 'active' | 'locked'; tasks: Task[] }

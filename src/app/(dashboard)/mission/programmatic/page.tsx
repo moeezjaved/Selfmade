@@ -9,7 +9,7 @@ import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
 import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029'
 
 type Plan = { total: number; byType: { guide: number; collection: number; comparison: number }; generated: number; remaining: number }
 type Draft = { id: string; title: string; target_prompt: string; status: string; published_url: string | null }

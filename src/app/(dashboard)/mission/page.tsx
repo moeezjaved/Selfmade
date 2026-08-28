@@ -642,7 +642,7 @@ export default function MissionPage() {
 
 const CSS = `
 .ms{--ink:#161c17;--ink2:#3a3a33;--sub:#6f6d5a;--mut:#9aa79a;--paper:#faf9f5;--shell:#ffffff;--card:#ffffff;
-  --hair:#ecebe3;--line:#e3e2da;--forest:#141d15;--flame:#ef4a1e;--lime:#ff5a2c;--live:#3f7a4e;--greenBg:#eef6e4;
+  --hair:#ecebe3;--line:#e3e2da;--forest:#1a1410;--flame:#ef4a1e;--lime:#ff5a2c;--live:#3f7a4e;--greenBg:#eef6e4;
   --serif:'Instrument Serif',Georgia,serif;--ui:'Inter',system-ui,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,monospace;
   background:var(--shell);color:var(--ink);min-height:100%;font-family:var(--ui);font-size:14px}
 .ms a{color:var(--flame);text-decoration:none}
