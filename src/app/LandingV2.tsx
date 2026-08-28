@@ -180,7 +180,8 @@ export default function LandingV2() {
       // Keep the landing to ONE field: stash the website, then collect the ad-library link + a competitor
       // on the next screen (/get-started) before sign-up.
       try { document.cookie = `sf_scan_domain=${encodeURIComponent(d)}; path=/; max-age=2592000; samesite=lax` } catch { /* ignore */ }
-      window.location.href = '/get-started'
+      // Signup-first: the audit is gated, so this sends them to sign up (then straight back to run it).
+      window.location.href = '/store-audit'
     }
     if (cap) { cap.addEventListener('submit', capH); offs.push(() => cap.removeEventListener('submit', capH)) }
 

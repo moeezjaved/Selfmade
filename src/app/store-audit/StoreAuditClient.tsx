@@ -14,9 +14,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 
-const FOREST = '#141d15', ORANGE = '#ff5a2c', PAPER = '#e9e1cf', INK = '#22281b', SUB = 'rgba(255,255,255,.82)'
-// Brand-orange treatment for the input screen (matches the landing's accent; no more off-brand green).
-const ORANGE_BG = 'linear-gradient(162deg,#ff6a3d 0%,#e8431a 100%)'
+const FOREST = '#141d15', ORANGE = '#ff5a2c', SUB = 'rgba(255,255,255,.82)'
 const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
 
 type BrandRow = { pageId: string; name: string; adCount: number; crawled: boolean }
@@ -126,6 +124,9 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
   const [comp, setComp] = useState<{ pageId: string; name: string } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // Carry the domain the founder typed on the landing ("See your ads") through signup into this screen.
+  useEffect(() => { try { const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/); if (m) setDomain((d) => d || decodeURIComponent(m[1])) } catch { /* ignore */ } }, [])
+
   // Debounced brand search (public endpoint the /scan picker already uses).
   useEffect(() => {
     if (brand || brandQ.trim().length < 2) { setBrandResults([]); return }
@@ -154,34 +155,37 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
     onStart({ seed, domain: d, rival: rival.trim() })
   }
 
-  const field: React.CSSProperties = { width: '100%', padding: '15px 16px', fontSize: 15.5, borderRadius: 8, border: '1.5px solid rgba(255,255,255,.4)', background: 'rgba(255,255,255,.16)', color: '#fff', outline: 'none', fontFamily: 'inherit' }
-  const label: React.CSSProperties = { fontSize: 12, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: 'rgba(255,255,255,.85)', marginBottom: 8, display: 'block' }
+  // Clean, white, centered treatment — matches /get-started (the founder just signed up; premium, calm).
+  const WINK = '#1a1410', WSUB = '#6f665a', WLINE = 'rgba(26,20,16,.14)', WORANGE = '#e02f06'
+  const WSERIF = "'Playfair Display','Times New Roman',serif"
+  const field: React.CSSProperties = { width: '100%', padding: '14px 20px', fontSize: 15, borderRadius: 100, border: `1px solid ${WLINE}`, background: '#fff', color: WINK, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box' }
+  const label: React.CSSProperties = { fontSize: 13, fontWeight: 700, color: WINK, marginBottom: 7, display: 'block' }
   const ResultList = ({ rows, onPick }: { rows: BrandRow[]; onPick: (r: BrandRow) => void }) => (
     rows.length ? (
-      <div style={{ marginTop: 6, background: '#fff', border: '1px solid rgba(0,0,0,.1)', borderRadius: 8, overflow: 'hidden', boxShadow: '0 10px 30px rgba(0,0,0,.18)' }}>
+      <div style={{ marginTop: 6, background: '#fff', border: `1px solid ${WLINE}`, borderRadius: 14, overflow: 'hidden', boxShadow: '0 10px 30px rgba(26,20,16,.1)' }}>
         {rows.map(r => (
-          <button key={r.pageId} onClick={() => onPick(r)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '10px 14px', background: 'transparent', border: 'none', borderTop: '1px solid rgba(0,0,0,.06)', color: INK, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
+          <button key={r.pageId} onClick={() => onPick(r)} style={{ display: 'flex', width: '100%', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '11px 16px', background: 'transparent', border: 'none', borderTop: `1px solid ${WLINE}`, color: WINK, cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left' }}>
             <span style={{ fontSize: 14, fontWeight: 600 }}>{r.name}</span>
-            <span style={{ fontSize: 11.5, color: 'rgba(0,0,0,.45)' }}>{r.adCount ? `${r.adCount.toLocaleString()} ads` : ''}{r.crawled ? ' · ready' : ''}</span>
+            <span style={{ fontSize: 11.5, color: WSUB }}>{r.adCount ? `${r.adCount.toLocaleString()} ads` : ''}{r.crawled ? ' · ready' : ''}</span>
           </button>
         ))}
       </div>
     ) : null
   )
   const Chip = ({ name, onClear }: { name: string; onClear: () => void }) => (
-    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: 'rgba(255,255,255,.22)', border: '1px solid rgba(255,255,255,.5)', color: '#fff', borderRadius: 100, padding: '7px 8px 7px 14px', fontSize: 14, fontWeight: 600 }}>
-      {name}<button onClick={onClear} style={{ width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(255,255,255,.3)', color: '#fff', cursor: 'pointer', lineHeight: 1 }}>×</button>
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#f6f0e6', border: `1px solid ${WLINE}`, color: WINK, borderRadius: 100, padding: '8px 8px 8px 16px', fontSize: 14, fontWeight: 600 }}>
+      {name}<button onClick={onClear} style={{ width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'rgba(26,20,16,.1)', color: WINK, cursor: 'pointer', lineHeight: 1 }}>×</button>
     </div>
   )
+  const wlink: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: WORANGE, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'none' }
 
   return (
-    <div style={{ minHeight: '100dvh', background: ORANGE_BG, color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 20px' }}>
-      {/* white placeholders so they read on the orange fields */}
-      <style>{`input::placeholder{color:rgba(255,255,255,.72)}`}</style>
-      <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ fontSize: 13, fontStyle: 'italic', color: '#fff', fontFamily: SERIF, opacity: .9 }}>free · one scan · saved to your account</div>
-        <h1 style={{ fontFamily: SERIF, fontSize: 46, fontWeight: 700, lineHeight: 1.02, margin: '10px 0 12px', letterSpacing: '-.02em' }}>Audit your whole store.</h1>
-        <p style={{ fontSize: 15.5, color: SUB, lineHeight: 1.55, marginBottom: 26 }}>Your ads and your search &amp; AI visibility — one scan, one report. See where you stand on Facebook, Google, and ChatGPT/Gemini, and where rivals are winning.</p>
+    <div style={{ minHeight: '100dvh', background: '#fff', color: WINK, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
+      <style>{`input::placeholder{color:${WSUB};opacity:.7}`}</style>
+      <div style={{ width: '100%', maxWidth: 540 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: WORANGE, marginBottom: 12, textAlign: 'center' }}>{domain ? `Auditing ${domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}` : 'Free · one scan · saved to your account'}</div>
+        <h1 style={{ fontFamily: WSERIF, fontSize: 44, fontWeight: 500, lineHeight: 1.05, margin: '0 0 10px', letterSpacing: '-.02em', textAlign: 'center' }}>Audit your whole store.</h1>
+        <p style={{ fontSize: 15.5, color: WSUB, lineHeight: 1.5, margin: '0 0 28px', textAlign: 'center' }}>Your ads and your search &amp; AI visibility — one scan, one report. See where you stand on Facebook, Google, and ChatGPT/Gemini, and where rivals are winning.</p>
 
         <label style={label}>Your store website</label>
         <input value={domain} onChange={e => setDomain(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="yourstore.com" autoFocus style={field} />
@@ -191,18 +195,18 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
         {brand ? <Chip name={brand.name} onClear={() => { setBrand(null); setBrandQ('') }} /> : showLink ? (
           <div>
             <input value={adLink} onChange={e => setAdLink(e.target.value)} placeholder="Paste your Facebook Ad Library link" style={field} />
-            <button onClick={() => { setShowLink(false); setAdLink('') }} style={linkBtn}>← search my brand instead</button>
+            <button onClick={() => { setShowLink(false); setAdLink('') }} style={wlink}>← search my brand instead</button>
           </div>
         ) : (
           <div>
             <input value={brandQ} onChange={e => setBrandQ(e.target.value)} placeholder="Search your brand name…" style={field} />
             <ResultList rows={brandResults} onPick={(r) => { setBrand({ pageId: r.pageId, name: r.name }); setBrandResults([]) }} />
-            <button onClick={() => setShowLink(true)} style={linkBtn}>or paste your Facebook Ad Library link →</button>
+            <button onClick={() => setShowLink(true)} style={wlink}>or paste your Facebook Ad Library link →</button>
           </div>
         )}
 
         <div style={{ height: 18 }} />
-        <label style={label}>Top competitor <span style={{ textTransform: 'none', fontWeight: 600, color: 'rgba(255,255,255,.45)' }}>· optional</span></label>
+        <label style={label}>Top competitor <span style={{ fontWeight: 600, color: WSUB }}>· optional</span></label>
         {comp ? <Chip name={comp.name} onClear={() => { setComp(null); setCompQ('') }} /> : (
           <div>
             <input value={compQ} onChange={e => setCompQ(e.target.value)} placeholder="Search a rival brand…" style={field} />
@@ -211,22 +215,20 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
           </div>
         )}
 
-        {error && <div style={{ marginTop: 16, background: '#3a1a12', border: '1px solid #7a3', borderColor: '#a5462c', color: '#ffd9cc', borderRadius: 8, padding: '11px 14px', fontSize: 13.5 }}>{error}</div>}
+        {error && <div style={{ marginTop: 16, background: '#fdeee9', border: `1px solid ${WORANGE}55`, color: '#8a2c10', borderRadius: 12, padding: '11px 16px', fontSize: 13.5 }}>{error}</div>}
 
-        <button onClick={submit} style={{ marginTop: 22, width: '100%', background: '#fff', color: '#e8431a', fontWeight: 800, fontSize: 16, padding: '16px', borderRadius: 8, border: 'none', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 8px 24px rgba(0,0,0,.18)' }}>Scan my store →</button>
-        <div style={{ fontSize: 12.5, color: 'rgba(255,255,255,.72)', marginTop: 14, lineHeight: 1.5 }}>Reads only what&rsquo;s public. Competitor optional; we&rsquo;ll pick a real one if you skip it. Your report saves to your account.</div>
+        <button onClick={submit} style={{ marginTop: 24, width: '100%', background: WORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 22px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit' }}>Scan my store →</button>
+        <div style={{ fontSize: 12.5, color: WSUB, marginTop: 14, lineHeight: 1.5, textAlign: 'center' }}>Reads only what&rsquo;s public. Competitor optional; we&rsquo;ll pick a real one if you skip it. Your report saves to your account.</div>
 
         {/* Just starting out — no store yet. The audit needs a live site to read, so send them into the app. */}
-        <div style={{ marginTop: 20, paddingTop: 18, borderTop: '1px solid rgba(255,255,255,.25)', fontSize: 13.5, color: 'rgba(255,255,255,.9)', lineHeight: 1.5 }}>
+        <div style={{ marginTop: 22, paddingTop: 18, borderTop: `1px solid ${WLINE}`, fontSize: 13.5, color: WSUB, lineHeight: 1.5, textAlign: 'center' }}>
           No website yet — just starting out?{' '}
-          <a href="/hq" style={{ color: '#fff', fontWeight: 800, textDecoration: 'underline' }}>Start building with Selfmade →</a>
+          <a href="/hq" style={{ color: WORANGE, fontWeight: 800, textDecoration: 'none' }}>Start building with Selfmade →</a>
         </div>
       </div>
     </div>
   )
 }
-
-const linkBtn: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'underline', opacity: .92 }
 
 /* Build the report snapshot from the two theaters' real result data — stored on the lead so the nurture
  * emails are personalised (revenue-at-stake, top leak, rival formula, AI-visibility gaps). */
