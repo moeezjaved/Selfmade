@@ -40,6 +40,9 @@ export default function StoreAuditPage() {
   const [started, setStarted] = useState<Started | null>(null)
   const [adsDone, setAdsDone] = useState(false)
   const [seoDone, setSeoDone] = useState(false)
+  const [adsData, setAdsData] = useState<any>(null)
+  const [seoData, setSeoData] = useState<any>(null)
+  const [captured, setCaptured] = useState(false)
   const act2Ref = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLDivElement>(null)
 
@@ -52,29 +55,33 @@ export default function StoreAuditPage() {
   return (
     <div style={{ background: FOREST, minHeight: '100dvh' }}>
       {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then. */}
-      <ScanTheater embedded seed={started.seed} onDone={() => setAdsDone(true)} />
+      <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} />
 
       {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished. */}
       {adsDone && (
         <div ref={act2Ref}>
           <ActDivider n={2} label="Your search & AI visibility" />
-          <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={() => setSeoDone(true)} />
+          <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
         </div>
       )}
 
-      {/* One shared CTA — both theaters' own CTAs are suppressed in embedded mode. */}
+      {/* Email gate → then CTA. Both theaters' own CTAs are suppressed in embedded mode. */}
       {seoDone && (
         <div ref={ctaRef} style={{ padding: '48px 24px 90px', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 18, padding: '30px 28px', textAlign: 'center' }}>
-            <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>Every gap here — one team fixes it.</div>
-            <div style={{ fontSize: 14.5, color: SUB, marginTop: 12, lineHeight: 1.55 }}>
-              Your ads, your search, and your AI-answer visibility — Selfmade&rsquo;s AI marketing team makes the moves, you approve each one.
-            </div>
-            <a href="/signup?ref=store-audit" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 34px', borderRadius: 3, textDecoration: 'none' }}>
-              Fix all of this — hire the team →
-            </a>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 12 }}>Free to start · you approve every move · cancel anytime</div>
-          </div>
+          {!captured
+            ? <EmailGate domain={started.domain} adsData={adsData} seoData={seoData} onDone={() => setCaptured(true)} />
+            : (
+              <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 18, padding: '30px 28px', textAlign: 'center' }}>
+                <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: '#fff', lineHeight: 1.1 }}>Your report is on its way ✉️</div>
+                <div style={{ fontSize: 14.5, color: SUB, marginTop: 12, lineHeight: 1.55 }}>
+                  We just emailed your full audit and the ads we made you. Create your free account to claim them — Selfmade&rsquo;s AI marketing team makes the moves, you approve each one.
+                </div>
+                <a href="/signup?ref=store-audit" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 34px', borderRadius: 3, textDecoration: 'none' }}>
+                  Claim my ads — hire the team →
+                </a>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 12 }}>Free to start · you approve every move · cancel anytime</div>
+              </div>
+            )}
         </div>
       )}
     </div>
@@ -210,3 +217,59 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
 }
 
 const linkBtn: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: '#fff', fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'underline', opacity: .92 }
+
+/* Email gate — unlocks the full report + emails it (and starts the nurture drip). Built from the two
+ * theaters' real result data so the email is personalised (revenue-at-stake, top leak, rival formula). */
+function EmailGate({ domain, adsData, seoData, onDone }: { domain: string; adsData: any; seoData: any; onDone: () => void }) {
+  const [email, setEmail] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState<string | null>(null)
+
+  const buildReport = () => {
+    const findings: any[] = Array.isArray(seoData?.sections) ? seoData.sections.flatMap((s: any) => s?.findings || []) : []
+    const topLeak = findings.find((f: any) => f?.severity === 'high')?.title || findings[0]?.title
+    const dist = adsData?.winners?.dist || {}
+    const hook = dist.hook_type?.[0]?.label, angle = dist.angle?.[0]?.label
+    const reads = seoData?.ai?.reads || []
+    return {
+      score: seoData?.score, category: seoData?.category, currency: seoData?.currency,
+      revenueLostPerYear: seoData?.revenueLostPerYear,
+      topLeak, leaks: findings.slice(0, 5).map((f: any) => f?.title).filter(Boolean),
+      rivalName: adsData?.rivalToRemake?.brand || adsData?.winners?.examples?.[0]?.brand,
+      rivalFormula: hook && angle ? `${hook} hook × ${angle} angle` : undefined,
+      aiMissing: reads.filter((r: any) => !r.mentioned).length, aiTotal: reads.length,
+    }
+  }
+
+  const submit = async () => {
+    const e = email.trim().toLowerCase()
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) { setErr('Enter a valid email.'); return }
+    setBusy(true); setErr(null)
+    try {
+      const r = await fetch('/api/audit/lead', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ email: e, domain, brandName: adsData?.brand?.name || seoData?.siteName, report: buildReport() }) })
+      if (!r.ok) { const j = await r.json().catch(() => ({})); setErr(j?.error === 'valid_email_required' ? 'Enter a valid email.' : 'Something went wrong — try again.'); setBusy(false); return }
+      onDone()
+    } catch { setErr('Network error — try again.'); setBusy(false) }
+  }
+
+  const lost = seoData?.revenueLostPerYear && seoData.revenueLostPerYear > 0
+    ? `${seoData.currency || '$'}${Math.round(seoData.revenueLostPerYear).toLocaleString()}/yr` : null
+
+  return (
+    <div style={{ maxWidth: 560, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}55`, borderRadius: 18, padding: '30px 28px', textAlign: 'center' }}>
+      <div style={{ fontSize: 13, fontStyle: 'italic', color: ORANGE, fontFamily: SERIF }}>your full report is ready</div>
+      <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: '#fff', lineHeight: 1.1, marginTop: 8 }}>See everything — and the ads we made you.</div>
+      <div style={{ fontSize: 14.5, color: SUB, marginTop: 12, lineHeight: 1.55 }}>
+        {lost ? <>You&rsquo;re leaving about <b style={{ color: '#fff' }}>{lost}</b> on the table. </> : null}
+        Enter your email and we&rsquo;ll send your full audit plus the ads we generated from your rivals&rsquo; winning DNA — free.
+      </div>
+      <div style={{ display: 'flex', gap: 8, marginTop: 20, flexWrap: 'wrap' }}>
+        <input value={email} onChange={(ev) => setEmail(ev.target.value)} onKeyDown={(ev) => ev.key === 'Enter' && submit()} placeholder="you@store.com" autoFocus
+          style={{ flex: 1, minWidth: 200, padding: '14px 16px', fontSize: 15.5, borderRadius: 8, border: '1.5px solid rgba(255,255,255,.25)', background: 'rgba(255,255,255,.08)', color: '#fff', outline: 'none', fontFamily: 'inherit' }} />
+        <button onClick={submit} disabled={busy} style={{ background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '14px 24px', borderRadius: 8, border: 'none', cursor: busy ? 'default' : 'pointer', fontFamily: 'inherit', opacity: busy ? 0.7 : 1, whiteSpace: 'nowrap' }}>{busy ? 'Sending…' : 'Send my report →'}</button>
+      </div>
+      {err && <div style={{ fontSize: 13, color: '#ffb37a', marginTop: 10 }}>{err}</div>}
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 12 }}>No spam · unsubscribe anytime · we never share your email.</div>
+    </div>
+  )
+}
