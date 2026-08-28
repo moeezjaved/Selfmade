@@ -43,9 +43,10 @@ async function brandDomains(admin: any, userId: string, brandId: string): Promis
  * Hydrate this brand's SEO + GEO surfaces from its stored theater scan, if they're empty. Safe to call on
  * every SEO/GEO load: it short-circuits the moment a real audit already exists.
  */
-export async function seedBrandFromScan(admin: SupabaseClient, userId: string, brandId: string | null): Promise<void> {
-  if (!brandId) return
+export async function seedBrandFromScan(admin: SupabaseClient, userId: string, brandId: string | null): Promise<any> {
+  if (!brandId) return { skipped: 'no_brand' }
   const db = admin as any
+  const dbg: any = {}
   try {
     // Already have both? Nothing to do. Scope the check the SAME way the loaders read (user_id + brand_id)
     // so we don't skip seeding a row THIS user can't actually see (e.g. a teammate ran the deep audit).
@@ -53,18 +54,21 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
       db.from('seo_audit').select('id').eq('user_id', userId).eq('brand_id', brandId).limit(1).maybeSingle(),
       db.from('geo_audit').select('id').eq('user_id', userId).eq('brand_id', brandId).limit(1).maybeSingle(),
     ])
-    if (seoRow && geoRow) return
+    dbg.hadSeo = !!seoRow; dbg.hadGeo = !!geoRow
+    if (seoRow && geoRow) { dbg.skipped = 'both_exist'; return dbg }
 
     // Try each candidate domain until we find the stored theater scan (founder may have audited the
     // website even if a different store is connected).
     const domains = await brandDomains(db, userId, brandId)
+    dbg.domains = domains
     let scan: ScanResult | null = null
     let domain = ''
     for (const d of domains) {
       const s = await loadScanForDomain(db, d) as ScanResult | null
       if (s) { scan = s; domain = d; break }
     }
-    if (!scan || !domain) return
+    dbg.foundDomain = domain || null
+    if (!scan || !domain) { dbg.skipped = 'no_scan'; return dbg }
 
     // ── SEO: theater section findings (everything except the AI-visibility section) → seo_audit issues ──
     if (!seoRow) {
@@ -75,13 +79,15 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
           issues.push({ severity: f.severity, title: f.title, detail: f.detail, pages: (f.sample || []).slice(0, 8) })
         }
       }
+      dbg.seoIssues = issues.length
       if (issues.length) {
         const readSec = (scan.sections || []).find((s) => s.read)
         const pagesCrawled = readSec?.read?.total || 0
         const score = Math.round(scan.websiteScore ?? scan.score ?? 0)
-        await db.from('seo_audit').insert({
+        const { error } = await db.from('seo_audit').insert({
           brand_id: brandId, user_id: userId, score, issues, pages_crawled: pagesCrawled, site: `https://${domain}`,
-        }).then(() => {}, () => {})
+        })
+        dbg.seoInsertError = error ? String(error.message || error).slice(0, 160) : null
       }
     }
 
@@ -89,6 +95,7 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
     if (!geoRow) {
       const aiSec = (scan.sections || []).find((s) => s.key === 'ai')
       const reads = aiSec?.ai?.reads || scan.ai?.reads || []
+      dbg.geoReads = reads.length
       if (reads.length) {
         const checkRows = reads.map((r) => ({
           brand_id: brandId, user_id: userId, prompt_text: r.question, engine: r.engine,
@@ -98,12 +105,14 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
         const sov = reads.length ? you / reads.length : 0
         const engines = Array.from(new Set(reads.map((r) => r.engine)))
         const gaps = reads.filter((r) => !r.mentioned).map((r) => ({ prompt: r.question, rivals: [] as string[] }))
-        await db.from('geo_checks').insert(checkRows).then(() => {}, () => {})
-        await db.from('geo_audit').insert({
+        const { error: cErr } = await db.from('geo_checks').insert(checkRows)
+        const { error: aErr } = await db.from('geo_audit').insert({
           brand_id: brandId, user_id: userId, score: Math.round(sov * 100), share_of_voice: sov,
           prompts_checked: reads.length, engines, gaps,
-        }).then(() => {}, () => {})
+        })
+        dbg.geoInsertError = (cErr || aErr) ? String((cErr || aErr)?.message || cErr || aErr).slice(0, 160) : null
       }
     }
-  } catch { /* carry-over is best-effort — never break the page */ }
+    return dbg
+  } catch (e) { dbg.threw = String((e as Error)?.message || e).slice(0, 160); return dbg }
 }
