@@ -119,10 +119,10 @@ export async function sendWelcomeEmail(to: string, fullName?: string): Promise<b
   const first = (fullName || '').trim().split(/\s+/)[0] || 'there'
   const html = emailShell({
     title: `Welcome to Selfmade, ${first} 👋`,
-    intro: `You just hired a marketing team that never sleeps — and you're starting with <b>600 free credits</b>. Tonight, Mello watches your competitors, decodes what's working, and has a fresh ad ready for you. Tomorrow morning you'll open your <b>daily brief</b> and approve the day's work in one tap. No agency, no freelancers, no software to run.`,
-    ctaText: 'See your morning brief', ctaUrl: `${APP_URL}/brief`,
+    intro: `You just hired a marketing team that never sleeps — and you're starting with <b>75 free credits</b>. Your free store audit is saved to your account: your ads, your search &amp; AI visibility, and the ads we made you. Open your dashboard and Mello starts on the highest-impact fixes — you approve every move. No agency, no freelancers, no software to run.`,
+    ctaText: 'Open your dashboard', ctaUrl: `${APP_URL}/hq`,
   })
-  return sendEmail(to, 'Welcome to Selfmade 👋 your marketing team starts tonight', html)
+  return sendEmail(to, 'Welcome to Selfmade 👋 your audit + marketing team are ready', html)
 }
 
 /** Admin ops alert — fired on generation failures (image + video) so systemic problems surface in
