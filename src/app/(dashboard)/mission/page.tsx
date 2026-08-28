@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatStream } from '@/components/mello/useChatStream'
+import SelectBrandNotice from '@/components/app/SelectBrandNotice'
 
 type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
 const CONNECT: Record<string, { label: string; href: string }> = {
@@ -49,6 +50,7 @@ const STAGE_CAP: Record<string, string> = { setup: 'Getting your company off the
 
 export default function MissionPage() {
   const [plan, setPlan] = useState<Plan | null>(null)
+  const [selectBrand, setSelectBrand] = useState(false)
   const [loading, setLoading] = useState(true)
   const [step, setStep] = useState(0)
   const [open, setOpen] = useState<string | null>(null)
@@ -170,12 +172,28 @@ export default function MissionPage() {
       // nothing Mello reasoned about is generated-then-hidden. Regenerate ("+ New moves") for a fresh set.
       const r = await fetch('/api/mello/strategist', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ persist: false, limit: 3 }) })
       const j = await r.json()
-      if (r.ok && Array.isArray(j?.tasks)) { setPlan(j as Plan); setVisible((j.tasks as Task[]).slice(0, 3)) }
+      if (r.ok && j?.selectBrand) { setSelectBrand(true); setPlan(null); setVisible([]) }
+      else if (r.ok && Array.isArray(j?.tasks)) { setSelectBrand(false); setPlan(j as Plan); setVisible((j.tasks as Task[]).slice(0, 3)) }
       else { setPlan({ stage: 'setup', headline: j?.error ? 'Mello couldn’t reach your data just now — try again.' : 'No plan yet.', tasks: [] }); setVisible([]) }
     } catch { setPlan({ stage: 'setup', headline: 'Something went wrong reaching Mello. Try again.', tasks: [] }); setVisible([]) }
     clearInterval(iv); setLoading(false)
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => { fetchPlan() }, [fetchPlan])
+
+  // On mount: load the CACHED plan (instant, no LLM). Only generate a fresh one if this brand has no
+  // cached plan yet. "+ New moves" (fetchPlan) regenerates on demand. This stops the mission desk from
+  // re-running the whole strategist on every single page view.
+  const loadPlan = useCallback(async () => {
+    setLoading(true)
+    try {
+      const r = await fetch('/api/mello/strategist')
+      const j = await r.json()
+      if (r.ok && j?.selectBrand) { setSelectBrand(true); setPlan(null); setVisible([]); setLoading(false); return }
+      if (r.ok && Array.isArray(j?.tasks)) { setSelectBrand(false); setPlan(j as Plan); setVisible((j.tasks as Task[]).slice(0, 3)); setLoading(false); return }
+      // No cached plan yet → generate one (and it gets cached for next time).
+      await fetchPlan(); return
+    } catch { await fetchPlan(); return }
+  }, [fetchPlan])
+  useEffect(() => { loadPlan() }, [loadPlan])
 
   // Approve & run → ask the agent router WHO runs it and what it costs (read-only), then confirm.
   const resolveTask = async (t: Task) => {
@@ -224,6 +242,13 @@ export default function MissionPage() {
   const goalM = rev != null ? (MILES.find((m) => m > rev) ?? MILES[MILES.length - 1]) : 100000
   const prevM = rev != null ? ([...MILES].reverse().find((m) => m <= rev) ?? 0) : 0
   const fillPct = rev != null && goalM > 0 ? Math.min(100, Math.round((rev / goalM) * 100)) : 0
+
+  if (selectBrand) return (
+    <div className="ms">
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <SelectBrandNotice feature="Your mission desk" />
+    </div>
+  )
 
   return (
     <div className="ms">
