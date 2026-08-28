@@ -478,7 +478,7 @@ export default function ScanTheater({ embedded = false, seed, onDone }: {
           the page (root goes overflow:visible), which Moeez approved. */}
       <main ref={mainRef} style={{ padding: isMobile ? 'clamp(18px,5vw,24px)' : 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: embedded ? '100dvh' : '100%', overflow: isMobile ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
         {phase === 'error' && (
-          <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { setPhase('idle'); setSteps(STEPS0); setPct(0); running.current = false }} style={btn}>Try again</button></div>
+          <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { autoStarted.current = false; running.current = false; setPhase('idle'); setSteps(STEPS0); setPct(0) }} style={btn}>Try again</button></div>
         )}
         {phase === 'running' && (slides.length
           ? <SlideFrame key={slides[slideIdx]?.key}>{slides[slideIdx]?.render()}</SlideFrame>
