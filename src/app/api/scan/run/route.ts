@@ -202,6 +202,30 @@ export async function POST(req: NextRequest) {
       } catch { /* on-demand pull failed → fall back to the crawl/building path below */ }
     }
 
+    // R2-purge / stale-fbcdn guard: a brand can be fully crawled (own.found) yet have NO surviving PERMANENT
+    // (R2) thumbnail — its stored fbcdn urls expire, so the "Reading your ads" grid comes up blank even though
+    // the ads exist. When none of the own examples carry an R2 thumb, pull the page's LIVE ads (fresh fbcdn,
+    // proxied so CSS backgrounds don't get referrer-blocked) and overlay those thumbnails onto the examples.
+    if (result.own.found && result.own.examples.length && !result.own.examples.some((e) => e.thumb && /r2\.dev|r2\.cloudflarestorage|\/api\/ads-studio\/media/i.test(e.thumb))) {
+      try {
+        const { fetchLiveAdsByPage } = await import('@/lib/ads-studio/adlibrary')
+        const live = await fetchLiveAdsByPage(pageId, 24)
+        const prox = (u?: string | null) => (u ? (/fbcdn|scontent/i.test(u) ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : u) : null)
+        const freshById = new Map<string, string>()
+        const freshPool: string[] = []
+        for (const a of live) { const t = prox(a.images?.[0] || a.videoPreviews?.[0] || null); if (t) { freshPool.push(t); if (a.adId) freshById.set(String(a.adId), t) } }
+        if (freshPool.length) {
+          let fi = 0
+          result.own.examples = result.own.examples.map((e) => {
+            const byId = freshById.get(String(e.adId))
+            if (byId) return { ...e, thumb: byId }
+            if (!e.thumb && fi < freshPool.length) return { ...e, thumb: freshPool[fi++] }   // fill blanks in order
+            return e
+          })
+        }
+      } catch { /* best-effort thumbnail refresh */ }
+    }
+
     // Payoff act inputs: concrete briefs the visitor can act on + a rival ad to remake. Pick a rival in the
     // SAME writing system as the brand — a Cyrillic/CJK store is not a believable "peer" for a Latin-script
     // brand even inside the same niche (country data is too sparse to rely on alone). Fall back to the
