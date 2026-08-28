@@ -21,7 +21,7 @@ async function guard(): Promise<boolean> {
 // A rich fake lead so the founder can preview every template's design (with revenue math, leaks, a rival
 // formula, AI-visibility numbers and a sample ad image) BEFORE any real lead exists.
 const SAMPLE_LEAD: AuditLead = {
-  id: 'sample', email: 'sarah@example.com', domain: 'yourstore.com', brand_name: 'Your Store',
+  id: 'sample', email: 'sarah@example.com', domain: 'bloomskincare.com', brand_name: 'Bloom Skincare',
   unsub_token: 'sample', ad_urls: [
     'https://placehold.co/520x320/ef4a1e/ffffff?text=Ad+1+%E2%80%94+your+product',
     'https://placehold.co/520x320/141d15/ffffff?text=Ad+2+%E2%80%94+rival+formula',
