@@ -64,7 +64,10 @@ export function useCredits(): CreditState & { refetch: () => void } {
     refetch()
     const h = () => refetch()
     window.addEventListener(REFRESH_EVENT, h)
-    return () => window.removeEventListener(REFRESH_EVENT, h)
+    // Re-sync when the tab regains focus — credits can be spent server-side (e.g. an audit) while the tab
+    // is away, and without this the pill would keep showing a stale cached number.
+    window.addEventListener('focus', h)
+    return () => { window.removeEventListener(REFRESH_EVENT, h); window.removeEventListener('focus', h) }
   }, [refetch])
   return { ...s, refetch }
 }

@@ -40,7 +40,13 @@ export function CreditModal() {
   const load = async () => {
     try {
       const r = await fetch('/api/credits/balance')
-      if (r.ok) setBal(await r.json())
+      if (r.ok) {
+        const j = await r.json()
+        setBal(j)
+        // Keep the sidebar pill in sync — it caches the last balance and can otherwise show a stale number
+        // (e.g. 75) after credits were spent server-side while the modal shows the true balance (e.g. 35).
+        try { localStorage.setItem('credits:lastBalance', String(j.balance ?? 0)); window.dispatchEvent(new Event('credits:refresh')) } catch { /* ignore */ }
+      }
     } catch { /* non-fatal */ }
   }
 
