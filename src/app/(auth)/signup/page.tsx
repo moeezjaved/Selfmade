@@ -23,6 +23,13 @@ export default function SignupPage() {
   useEffect(() => {
     const p = new URLSearchParams(window.location.search)
     if (p.get('error') === 'business_email') setBizModal(p.get('email') || '')
+    // Arriving from an audit-email CTA (?e=email &d=domain &ref=which-email): prefill their email, and drop
+    // the scan-domain cookie so onboarding seeds their site + the free-audit results carry into the account
+    // (so "See your full report" actually lands them on their report, not a blank onboarding).
+    const e = p.get('e'); if (e) setForm((f) => ({ ...f, email: e }))
+    const yr = 60 * 60 * 24 * 30
+    const d = p.get('d'); if (d) { try { document.cookie = `sf_scan_domain=${encodeURIComponent(d)}; path=/; max-age=${yr}; samesite=lax` } catch { /* ignore */ } }
+    const ref = p.get('ref'); if (ref) { try { document.cookie = `sf_audit_ref=${encodeURIComponent(ref)}; path=/; max-age=${yr}; samesite=lax` } catch { /* ignore */ } }
   }, [])
 
   const emailErr = form.email && !emailDomain(form.email) ? 'Enter a valid email'
