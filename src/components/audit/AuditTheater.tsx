@@ -744,7 +744,7 @@ function RevenueTally({ sec, live, isMobile }: { sec?: (Section & { _lost?: numb
   const money = (v: number) => `−${cur}${Math.round(v).toLocaleString()}/yr`
   const lines = [
     searches > 0 && { icon: '🔍', title: 'Searches where rivals take the click', sub: `${searches} buyer ${searches === 1 ? 'search' : 'searches'} where you’re not #1`, amt: target * 0.86 },
-    catalogGaps > 0 && { icon: '📦', title: 'Product pages under-optimised', sub: `${catalogGaps} products with catalog gaps`, amt: target * 0.05 },
+    catalogGaps > 0 && { icon: '📦', title: 'Product pages missing SEO', sub: `${catalogGaps} products missing alt text, descriptions or schema`, amt: target * 0.05 },
     aiMiss > 0 && { icon: '🤖', title: 'AI assistants recommending rivals', sub: `${aiMiss} of ${aiTotal} AI answers skip you`, amt: target * 0.09 },
   ].filter(Boolean) as { icon: string; title: string; sub: string; amt: number }[]
   return (
@@ -838,7 +838,7 @@ function Report({ result, open, setOpen, isMobile, onFix, embedded = false }: { 
           if (!m) return <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 16, fontSize: 14, color: SUB, lineHeight: 1.6 }}>A conservative estimate from the {result.problemCount} fixable problems above. Every one is something our agent fixes for you.</div>
           const lines = [
             m.fromSearch > 0 && { icon: '🔍', title: 'Searches where rivals take the click', sub: `${m.keywordLeaks.length} buyer ${m.keywordLeaks.length === 1 ? 'search' : 'searches'} where you’re not #1`, amt: m.fromSearch },
-            m.fromCatalog > 0 && { icon: '📦', title: 'Product pages under-optimised', sub: `${m.catalogGapProducts} products with catalog gaps`, amt: m.fromCatalog },
+            m.fromCatalog > 0 && { icon: '📦', title: 'Product pages missing SEO', sub: `${m.catalogGapProducts} products missing alt text, descriptions or schema`, amt: m.fromCatalog },
             m.fromAi > 0 && { icon: '🤖', title: 'AI assistants recommending rivals', sub: `${m.missReads} of ${m.missTotal} AI answers skip you`, amt: m.fromAi },
           ].filter(Boolean) as { icon: string; title: string; sub: string; amt: number }[]
           return (
