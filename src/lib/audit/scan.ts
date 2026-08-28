@@ -187,7 +187,7 @@ async function stepAi(ctx: Ctx): Promise<Section> {
   // Check a MEANINGFUL sample (up to 5 question×engine combos), not one per engine — so "X of 5" reflects
   // several real buyer questions across the assistants, not just how many engines are configured.
   const MAX_READS = 5
-  const pairs: { e: string; question: string }[] = []
+  const pairs: { e: (typeof engines)[number]; question: string }[] = []
   outer: for (const question of qList) {
     for (const e of engines) { pairs.push({ e, question }); if (pairs.length >= MAX_READS) break outer }
   }
