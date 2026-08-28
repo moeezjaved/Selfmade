@@ -13,7 +13,7 @@ export async function isFreePlan(): Promise<boolean> {
   try {
     const j = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json())
     const plan = String(j?.plan || '').toLowerCase()
-    cachedFree = !plan || plan === 'free' || plan === 'trial'
+    cachedFree = !plan || plan === 'free'   // only the FREE plan is gated; a paid trial passes through
   } catch { cachedFree = false }   // fail OPEN — never block a paying user on a hiccup
   return cachedFree
 }
