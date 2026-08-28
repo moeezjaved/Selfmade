@@ -15,13 +15,13 @@ export type LeadInput = {
   adUrls?: string[]
 }
 
-/** Is admin approval required before #2–#8 send? Default YES (founder previews each). A system flag can
- *  flip the whole drip to auto-send once the founder trusts the templates. */
+/** Auto-send the full #1–#8 sequence? Default YES — the founder wants the whole drip to go out on schedule.
+ *  Set system_flags.audit_email_autosend = 'false' to return to preview-each-first (manual approval) mode. */
 async function autoSend(admin: Admin): Promise<boolean> {
   try {
     const { data } = await admin.from('system_flags').select('value').eq('key', 'audit_email_autosend').maybeSingle()
-    return String(data?.value).toLowerCase() === 'true'
-  } catch { return false }
+    return String(data?.value).toLowerCase() !== 'false'   // default ON unless explicitly disabled
+  } catch { return true }
 }
 
 /** Capture (or refresh) a lead, queue the drip, and send email #1 now. Returns the lead row. Idempotent on
