@@ -120,7 +120,7 @@ function CardCheckout() {
           </div>
 
           <button onClick={pay} disabled={status !== 'ready'}
-            style={{ width: '100%', marginTop: 18, background: status === 'ready' ? INK : '#9ca3af', color: LIME, border: 'none', borderRadius: 100, padding: '14px', fontSize: 15, fontWeight: 800, cursor: status === 'ready' ? 'pointer' : 'default', fontFamily: 'inherit' }}>
+            style={{ width: '100%', marginTop: 18, background: status === 'ready' ? INK : '#9ca3af', color: '#fff', border: 'none', borderRadius: 100, padding: '14px', fontSize: 15, fontWeight: 800, cursor: status === 'ready' ? 'pointer' : 'default', fontFamily: 'inherit' }}>
             {status === 'paying' ? 'Processing…' : `Pay $${amount}`}
           </button>
         </div>

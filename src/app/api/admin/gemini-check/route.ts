@@ -18,13 +18,13 @@ async function ok(): Promise<boolean> {
   return isAdminToken()
 }
 
-export function _keyCount(): number {
+function keyCountOf(): number {
   return (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map((s) => s.trim()).filter(Boolean).length
 }
 
 export async function GET() {
   if (!(await ok())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const keyCount = _keyCount()
+  const keyCount = keyCountOf()
   const proModel = modelFor('pro')
   const defaultModel = modelFor('default')
   const t0 = Date.now()

@@ -131,7 +131,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
             <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && !planLoaded) || (variant === 'dashboard' && current === c.id && !canceledCurrent)} style={{
               margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
               background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#f2f6ee',
-              color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : DARK,
+              color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : c.popular ? '#fff' : DARK,
             }}>{label(c)}</button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#333' }}>
               {c.feats.map((f, i) => (
