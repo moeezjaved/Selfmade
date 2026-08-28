@@ -9,11 +9,13 @@ import { useCallback, useEffect, useState } from 'react'
 const INK = '#141d15', SUB = '#6b776b', LINE = '#e6ebe3', ORANGE = '#ef4a1e', GOOD = '#256029'
 type Email = { id: string; step: number; subject: string; status: string; send_after: string; sent_at: string | null }
 type Lead = { id: string; email: string; domain: string | null; brand_name: string | null; status: string; created_at: string; revenueLostPerYear: number | null; currency: string; adCount: number; emails: Email[] }
+type Template = { step: number; dayOffset: number; subject: string }
 
 const STATUS_COLOR: Record<string, string> = { sent: GOOD, approved: '#1e5f9a', pending: '#9a6a12', skipped: '#9aa' }
 
 export default function AuditEmailsAdmin() {
   const [leads, setLeads] = useState<Lead[]>([])
+  const [templates, setTemplates] = useState<Template[]>([])
   const [autosend, setAutosend] = useState(false)
   const [loading, setLoading] = useState(true)
   const [preview, setPreview] = useState<{ id: string; subject: string; html: string; editing: boolean } | null>(null)
@@ -22,9 +24,16 @@ export default function AuditEmailsAdmin() {
   const load = useCallback(async () => {
     setLoading(true)
     try { const r = await fetch('/api/admin/audit-emails'); const j = await r.json(); if (r.ok) { setLeads(j.leads || []); setAutosend(!!j.autosend) } } catch { /* noop */ }
+    try { const r = await fetch('/api/admin/audit-emails?samples=1'); const j = await r.json(); if (r.ok) setTemplates(j.samples || []) } catch { /* noop */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+
+  // Preview a template design (sample data) — read-only, no editing.
+  const openSample = async (step: number) => {
+    const r = await fetch(`/api/admin/audit-emails?sample=${step}`); const j = await r.json()
+    if (r.ok) setPreview({ id: `sample-${step}`, subject: j.subject, html: j.html, editing: false })
+  }
 
   const act = async (payload: any) => {
     setBusy(payload.id || payload.action)
@@ -53,6 +62,26 @@ export default function AuditEmailsAdmin() {
           Auto-send #2–#8 (skip approval)
         </label>
       </div>
+
+      {/* Template gallery — every design in the sequence, rendered from sample data. Preview anytime. */}
+      {templates.length > 0 && (
+        <div style={{ marginTop: 24 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, color: SUB, textTransform: 'uppercase', letterSpacing: '.04em' }}>The 8-email sequence · designs</div>
+          <div style={{ marginTop: 10, display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 10 }}>
+            {templates.map((t) => (
+              <button key={t.step} onClick={() => openSample(t.step)} style={{ textAlign: 'left', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 12, padding: 13, cursor: 'pointer', fontFamily: 'inherit' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 11, fontWeight: 800, color: '#fff', background: ORANGE, borderRadius: 100, padding: '2px 9px' }}>#{t.step}</span>
+                  <span style={{ fontSize: 11.5, color: SUB }}>{t.dayOffset === 0 ? 'instant' : `day ${t.dayOffset}`}</span>
+                </div>
+                <div style={{ fontSize: 13.5, fontWeight: 650, color: INK, marginTop: 8, lineHeight: 1.35 }}>{t.subject}</div>
+                <div style={{ fontSize: 12, color: ORANGE, fontWeight: 700, marginTop: 8 }}>Preview design →</div>
+              </button>
+            ))}
+          </div>
+          <div style={{ marginTop: 8, fontSize: 12, color: SUB }}>These are the templates. Below are real leads and their live queue.</div>
+        </div>
+      )}
 
       {loading ? <div style={{ marginTop: 30, color: SUB }}>Loading…</div> : !leads.length ? (
         <div style={{ marginTop: 30, border: `1px solid ${LINE}`, borderRadius: 14, padding: 40, textAlign: 'center', color: SUB }}>No audit leads yet.</div>
@@ -95,8 +124,8 @@ export default function AuditEmailsAdmin() {
             <div style={{ padding: '14px 18px', borderBottom: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', gap: 10 }}>
               {preview.editing
                 ? <input value={preview.subject} onChange={(e) => setPreview({ ...preview, subject: e.target.value })} style={{ flex: 1, padding: '8px 10px', border: `1px solid ${LINE}`, borderRadius: 8, fontSize: 13.5, fontFamily: 'inherit' }} />
-                : <div style={{ flex: 1, fontSize: 14, fontWeight: 700, minWidth: 0 }}>{preview.subject}</div>}
-              <button onClick={() => setPreview({ ...preview, editing: !preview.editing })} style={btn(false)}>{preview.editing ? 'Editing' : 'Edit'}</button>
+                : <div style={{ flex: 1, fontSize: 14, fontWeight: 700, minWidth: 0 }}>{preview.subject}{preview.id.startsWith('sample-') && <span style={{ fontSize: 11, fontWeight: 700, color: SUB, marginLeft: 8 }}>· template preview (sample data)</span>}</div>}
+              {!preview.id.startsWith('sample-') && <button onClick={() => setPreview({ ...preview, editing: !preview.editing })} style={btn(false)}>{preview.editing ? 'Editing' : 'Edit'}</button>}
               {preview.editing && <button onClick={saveEdit} style={btn(true)}>Save</button>}
               <button onClick={() => setPreview(null)} style={{ ...btn(false), border: 'none' }}>✕</button>
             </div>

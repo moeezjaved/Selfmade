@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { isAdminToken } from '@/lib/admin/auth'
 import { sendEmail } from '@/lib/email'
-import { buildAuditEmail, type AuditLead } from '@/lib/audit/emails'
+import { buildAuditEmail, AUDIT_SEQUENCE, type AuditLead } from '@/lib/audit/emails'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -18,9 +18,42 @@ async function guard(): Promise<boolean> {
   return isAdminToken()
 }
 
+// A rich fake lead so the founder can preview every template's design (with revenue math, leaks, a rival
+// formula, AI-visibility numbers and a sample ad image) BEFORE any real lead exists.
+const SAMPLE_LEAD: AuditLead = {
+  id: 'sample', email: 'sarah@example.com', domain: 'yourstore.com', brand_name: 'Your Store',
+  unsub_token: 'sample', ad_urls: [
+    'https://placehold.co/520x320/ef4a1e/ffffff?text=Ad+1+%E2%80%94+your+product',
+    'https://placehold.co/520x320/141d15/ffffff?text=Ad+2+%E2%80%94+rival+formula',
+  ],
+  report: {
+    score: 61, category: 'skincare store', currency: '$', revenueLostPerYear: 84000,
+    topLeak: 'Your product page buries the offer below the fold',
+    leaks: ['No urgency on PDP', 'Slow mobile load', 'Weak hero headline'],
+    rivalName: 'GlowLab', rivalFormula: 'Question hook × Curiosity angle × Trust proof',
+    aiMissing: 4, aiTotal: 5,
+  },
+}
+
 export async function GET(req: NextRequest) {
   if (!(await guard())) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient() as any
+
+  // Template gallery — all 8 designs rendered from a sample lead, no DB rows needed.
+  if (req.nextUrl.searchParams.get('samples')) {
+    return NextResponse.json({
+      samples: AUDIT_SEQUENCE.map((s) => {
+        const built = s.build(SAMPLE_LEAD)
+        return { step: s.step, dayOffset: s.dayOffset, subject: built.subject }
+      }),
+    })
+  }
+  const sampleStep = req.nextUrl.searchParams.get('sample')
+  if (sampleStep) {
+    const built = buildAuditEmail(Number(sampleStep), SAMPLE_LEAD)
+    if (!built) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    return NextResponse.json({ subject: built.subject, html: built.html })
+  }
 
   // Render one email for preview.
   const previewId = req.nextUrl.searchParams.get('preview')
