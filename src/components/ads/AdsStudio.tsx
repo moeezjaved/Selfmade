@@ -44,7 +44,11 @@ export default function AdsStudio({ embedded = false, section, domainOverride, a
   useEffect(() => { if (section) setActive(section) }, [section])
   useEffect(() => {
     const sp = new URLSearchParams(window.location.search)
-    if (!domainOverride) {   // embedded in the app shell → domain comes from the active brand
+    // Standalone /ads-studio (audit funnel) sources the domain from ?domain= / the sf_scan_domain cookie.
+    // EMBEDDED in the app shell, the domain must come ONLY from the active brand (domainOverride) — never
+    // the scan cookie, or a brand with no website would show whatever domain was last scanned (another
+    // brand's site). No domainOverride + embedded = that brand has no site yet → Brand Hub asks for one.
+    if (!domainOverride && !embedded) {
       const u = sp.get('domain')
       const c = document.cookie.match(/sf_scan_domain=([^;]+)/)?.[1]
       const d = (u || (c ? decodeURIComponent(c) : '') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
