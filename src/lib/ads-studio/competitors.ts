@@ -54,12 +54,13 @@ BRAND KNOWLEDGE (distilled from their real site):
 ${knowledge}
 
 Step 1 — list the DISTINCT product lines/forms this store sells (look at PRODUCTS above): e.g. ["testosterone support gummies","testosterone support tablets"]. Group near-identical variants (flavors/sizes) into ONE line. Return 1-5 lines — the real breadth of the catalog, not just the hero product.
+  EXCLUDE generic accessories, consumables and spare parts that are not the brand's core offering — replacement filters/cartridges/refills, cases, chargers, cables, brushes, straps. A store selling a "micro-infusion system" competes on the SYSTEM, not on its "water filter replacements". These pollute the search with unrelated brands, so leave them out of the lines.
 Step 2 — competitors must make the SAME KIND of product as one of these lines (same form, not merely the same goal).
 
 Return ONLY JSON:
 {
  "category":"the brand's overall niche at BRAND level — broad enough to span ALL the lines below (e.g. 'natural testosterone support supplements', NOT just 'gummies')",
- "market":"the primary country the store sells to (infer from signals; US/global if none)",
+ "market":"the primary country the store sells to. ONLY name a country when the signals give an EXPLICIT, unambiguous cue (currency symbol/code, a shipping-country statement, or a physical address). A single weak hint (one price, a stray mention) is NOT enough — when in doubt return 'global'. Never guess a country from the language alone.",
  "productForms":["each distinct product line/form from Step 1 — 1-5 short phrases"],
  "queries":["8 Google queries that surface COMPETING BRANDS. COVER EVERY product line above — include at least one exact-form query per line ('<line> brands', 'buy <line>') plus a couple brand-level 'alternatives to <brand/category>' queries. Do NOT over-index on a single line."],
  "adKeywords":["one SHORT keyword phrase (1-3 words EACH) PER product line above, naming the core product noun as it appears in ad copy — e.g. 'testosterone gummies', 'testosterone tablets', 'shilajit supplement'. Short and broad for a Meta Ad Library search — NOT 'brands'/'buy'/'best' queries. Max 5."]
