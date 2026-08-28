@@ -111,14 +111,18 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   const [ctx, kit] = await Promise.all([crawlStore(domain), buildBrandKit(domain).catch(() => null)])
   const facts = kit?.facts ?? []
   const { category, market, productForms, queries, adKeywords } = await seedQueries(ctx, facts)
-  if (!configured || !queries.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured }
+  // Only give up entirely when we have NOTHING to search with. The Meta Ad Library step below runs on the
+  // droplet independently of DataForSEO, so an unconfigured/empty SERP must NOT short-circuit it — that was
+  // silently returning zero rivals for brands whose competitors live in the Ad Library, not Google.
+  if (!queries.length && !adKeywords.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured }
 
   const loc = MARKET_LOCATION[market.trim().toLowerCase()] ?? 2840
   const self = domainRoot(domain)
 
   // Step 3–4: search every query in the store's market, pool candidate brand domains. Queries span ALL
   // the brand's product lines (gummies AND tablets, etc.) so a multi-product brand isn't reduced to one.
-  const serps = await Promise.all(queries.slice(0, 8).map((q) => serpDiscover(q, loc)))
+  // Skipped when DataForSEO isn't configured — the Ad Library breadth pass below still finds rivals.
+  const serps = configured ? await Promise.all(queries.slice(0, 8).map((q) => serpDiscover(q, loc))) : []
   const pool = new Map<string, { domain: string; title: string; snippet: string; positions: number; hits: number }>()
   serps.forEach((rows) => rows.forEach((r) => {
     const d = domainRoot(r.domain)

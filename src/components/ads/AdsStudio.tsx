@@ -953,13 +953,27 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   const [q, setQ] = useState('')
   const [step, setStep] = useState(0)
   const [refreshing, setRefreshing] = useState(false)
+  // Session-scoped memory so leaving this tab and coming back shows the SAME rivals instantly — no second
+  // discovery scan (which is slow and costs droplet/API work). Only a first-ever load or Refresh re-scans.
+  const cacheKey = domain ? `sf_comps_v1_${domain}` : ''
   useEffect(() => {
     let on = true
+    if (cacheKey) {
+      try {
+        const raw = sessionStorage.getItem(cacheKey)
+        if (raw) { const c = JSON.parse(raw); setComps(Array.isArray(c.competitors) ? c.competitors : []); setSeed(c.seed || null); return () => { on = false } }
+      } catch { /* storage blocked → fall through to fetch */ }
+    }
     setComps(null); setStep(0)
     const tick = setInterval(() => on && setStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1)), 11000)
-    fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => { if (!on) return; setComps(Array.isArray(d.competitors) ? d.competitors : []); setSeed(d.seed || null) }).catch(() => on && setComps([]))
+    fetch(`/api/ads-studio/competitors${domain ? `?domain=${encodeURIComponent(domain)}` : ''}`).then((r) => r.json()).then((d) => {
+      if (!on) return
+      const found = Array.isArray(d.competitors) ? d.competitors : []
+      setComps(found); setSeed(d.seed || null)
+      if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
+    }).catch(() => on && setComps([]))
     return () => { on = false; clearInterval(tick) }
-  }, [domain])
+  }, [domain, cacheKey])
 
   // Force a fresh discovery pass (bypasses the per-brand cache) — used after a brand adds products, so
   // the search re-runs across ALL current product lines instead of the cached single-line result.
@@ -970,6 +984,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
       const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}&force=1`).then((r) => r.json())
       const found = Array.isArray(d.competitors) ? d.competitors : []
       setComps(found); setSeed(d.seed || null)
+      if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
       if (found.length) celebrate(competitorsFound(found.length))
     } catch { setComps([]) }
     setRefreshing(false)
