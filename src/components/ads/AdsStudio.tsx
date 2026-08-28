@@ -31,7 +31,11 @@ const Icon = ({ d, size = 19 }: { d: string; size?: number }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>{d.split('|').map((p, i) => <path key={i} d={p} />)}</svg>
 )
 
-export default function AdsStudio({ embedded = false, section, domainOverride }: { embedded?: boolean; section?: Key; domainOverride?: string } = {}) {
+// Sections that read a single brand's site (identity, ads, products, audiences, competitors). In the
+// embedded shell these need a brand selected; Discover/Search are global (whole ad library).
+const BRAND_SCOPED = new Set<Key>(['home', 'ads', 'competitors', 'products', 'audiences', 'brand'])
+
+export default function AdsStudio({ embedded = false, section, domainOverride, allBrands = false }: { embedded?: boolean; section?: Key; domainOverride?: string; allBrands?: boolean } = {}) {
   const isMobile = useIsMobile()
   const [active, setActive] = useState<Key>(section || 'home')
   const [domain, setDomain] = useState((domainOverride || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim())
@@ -92,7 +96,10 @@ export default function AdsStudio({ embedded = false, section, domainOverride }:
       {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
-          {active === 'home' ? <Home isMobile={isMobile} domain={domain} tags={chatTags} setTags={setChatTags} />
+          {/* "All brands" selected → nothing is scoped to one brand. Every ADS section here reads a single
+              brand's site, so prompt to pick one instead of showing an empty "What's your website?". */}
+          {embedded && allBrands && BRAND_SCOPED.has(active) ? <SelectBrand isMobile={isMobile} />
+          : active === 'home' ? <Home isMobile={isMobile} domain={domain} tags={chatTags} setTags={setChatTags} />
             : active === 'ads' ? <YourAds isMobile={isMobile} domain={domain} />
               : active === 'competitors' ? <Competitors isMobile={isMobile} domain={domain} />
                 : active === 'discover' ? <Discover isMobile={isMobile} />
@@ -1157,6 +1164,22 @@ function Audiences({ isMobile, domain, hideHeader }: { isMobile: boolean; domain
               {data.signals.length > 0 && <div style={{ fontSize: 12.5, color: SUB, marginTop: 16 }}>Grounded on real signals from your site: {data.signals.join(' · ')}.</div>}
             </>
           )}
+    </div>
+  )
+}
+/** Shown across the embedded workspace when the switcher is on "All brands" — every ADS surface is
+ *  scoped to one brand, so we ask them to pick one (from the switcher, top-left) rather than show a
+ *  brand-less setup prompt. */
+function SelectBrand({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div style={{ border: `1px solid ${LINE}`, borderRadius: 18, background: '#fff', padding: isMobile ? '40px 24px' : '56px 40px', textAlign: 'center', maxWidth: 560, margin: '24px auto 0' }}>
+      <div style={{ width: 52, height: 52, borderRadius: 14, background: '#fdeee9', color: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+        <Icon d="M3 7h18M3 12h18M3 17h18" size={24} />
+      </div>
+      <div style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, marginBottom: 10 }}>Select a brand</div>
+      <div style={{ color: SUB, fontSize: 15, lineHeight: 1.55, maxWidth: 420, margin: '0 auto' }}>
+        You&rsquo;re viewing <b>All brands</b>. Pick a brand from the switcher at the <b>top-left</b> and this workspace &mdash; Brand Hub, ads, products, audiences and competitors &mdash; loads that brand&rsquo;s details automatically.
+      </div>
     </div>
   )
 }

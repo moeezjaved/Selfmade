@@ -29,6 +29,7 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
   let website = ''
   let warmed = false
   let needsAgreement = false
+  let brandId: string | null = null
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
@@ -49,7 +50,7 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
         signed = true
       }
       if (!signed && !isGrandfathered(user.created_at)) needsAgreement = true
-      const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+      brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
       if (brandId) {
         const { data } = await admin.from('brands').select('website, brand_kit').eq('id', brandId).maybeSingle()
         website = (data?.website || '').trim()
@@ -67,5 +68,7 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
   // (set when that screen finishes) renders straight through, so there's no redirect loop.
   if (website && !warmed && sp?.built !== '1') redirect('/studio-building')
 
-  return <AdsStudio embedded section={section} domainOverride={website || undefined} />
+  // No specific brand selected (switcher on "All brands") → the workspace can't show one brand's hub;
+  // tell the user to pick a brand instead of falling through to the "What's your website?" setup prompt.
+  return <AdsStudio embedded section={section} domainOverride={website || undefined} allBrands={!brandId} />
 }
