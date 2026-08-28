@@ -35,3 +35,6 @@ create table if not exists public.audit_emails (
   unique (lead_id, step)
 );
 create index if not exists idx_audit_emails_due on public.audit_emails (status, send_after);
+
+-- system_flags is key/until/updated_at only; the audit drip needs a string value (autosend on/off).
+alter table public.system_flags add column if not exists value text;

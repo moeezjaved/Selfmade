@@ -115,6 +115,10 @@
       "schedule": "0 7 * * *"
     },
     {
+      "path": "/api/cron/audit-emails",
+      "schedule": "0 9 * * *"
+    },
+    {
       "path": "/api/cron/proof-loop",
       "schedule": "0 8 * * 1"
     },
