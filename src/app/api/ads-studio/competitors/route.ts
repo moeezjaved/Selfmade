@@ -9,9 +9,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
-import { discoverCompetitors } from '@/lib/ads-studio/competitors'
+import { discoverCompetitors, type DiscoveryResult } from '@/lib/ads-studio/competitors'
 import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -68,6 +69,24 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
   } catch { return null }
 }
 
+/** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
+ * and the background job so both produce identical cards. */
+async function enrichDiscovered(admin: any, res: DiscoveryResult) {
+  return Promise.all(res.competitors.map(async (c) => {
+    const dna = await adDnaFor(admin, c.name, c.domain)
+    const liveAds = (!dna && c.liveAds?.length)
+      ? c.liveAds.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
+      : []
+    const ads = dna?.ads ?? liveAds
+    return {
+      source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
+      hasAdDna: !!dna, adsSource: dna ? 'corpus' : (liveAds.length ? 'live' : null),
+      spyable: ads.length === 0,
+      adCount: dna?.adCount ?? c.liveAds?.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
+    }
+  }))
+}
+
 export async function GET(req: NextRequest) {
   const domain = (req.nextUrl.searchParams.get('domain') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
   const force = req.nextUrl.searchParams.get('force') === '1'
@@ -85,33 +104,37 @@ export async function GET(req: NextRequest) {
     let seed: any = null
     let configured = true
     let discoveryDone = false
+    let discovering = false
     if (brandId && domain && !force) {
       const ads = await readAdsStudio(admin, brandId)
       const cached = readSection<{ discovered: any[]; seed: any; configured: boolean }>(ads, 'competitors', domain)
       if (cached) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
-      else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true }   // another run in-flight → serve spied-only for now
+      else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true; discovering = true }   // a background run is in-flight → serve spied-only, client polls
     }
     if (!discoveryDone && domain && domain.includes('.') && !isAppDomain(domain)) {
-      if (brandId) await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
-      const res = await discoverCompetitors(domain).catch(() => null)
-      if (res) {
-        seed = res.seed; configured = res.configured
-        discovered = await Promise.all(res.competitors.map(async (c) => {
-          // Richest source first: our ad-DNA corpus (hooks/personas), matched by the rival's DOMAIN. Else live ads.
-          const dna = await adDnaFor(admin, c.name, c.domain)
-          const liveAds = (!dna && c.liveAds?.length)
-            ? c.liveAds.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
-            : []
-          const ads = dna?.ads ?? liveAds
-          return {
-            source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
-            hasAdDna: !!dna, adsSource: dna ? 'corpus' : (liveAds.length ? 'live' : null),
-            spyable: ads.length === 0,
-            adCount: dna?.adCount ?? c.liveAds?.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
-          }
-        }))
+      if (brandId) {
+        // Run the expensive discovery in the BACKGROUND (waitUntil) so it ALWAYS finishes and caches, even if
+        // the user navigates away mid-scan. That aborted-request-never-caches path was the "re-scans the store
+        // every single visit" bug. Return the spied brands NOW with discovering:true; the client polls for the
+        // cached result and never sits through the full scan again.
+        discovering = true
+        await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
+        waitUntil((async () => {
+          try {
+            const res = await discoverCompetitors(domain).catch(() => null)
+            if (res) {
+              const d2 = await enrichDiscovered(admin, res)
+              await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, { discovered: d2, seed: res.seed, configured: res.configured }), competitorsBuilding: null })
+            } else {
+              await mergeAdsStudio(admin, brandId, { competitorsBuilding: null })
+            }
+          } catch { await mergeAdsStudio(admin, brandId, { competitorsBuilding: null }).catch(() => {}) }
+        })())
+      } else {
+        // No brand to cache against (anon) → run inline so they still get a result this request.
+        const res = await discoverCompetitors(domain).catch(() => null)
+        if (res) { seed = res.seed; configured = res.configured; discovered = await enrichDiscovered(admin, res) }
       }
-      if (brandId) await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, { discovered, seed, configured }), competitorsBuilding: null }).catch(() => {})
     }
 
     // ── 2. Merge in the logged-in user's manually-spied brands (always live — user can spy/unspy) ──
@@ -164,7 +187,7 @@ export async function GET(req: NextRequest) {
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
-    return NextResponse.json({ seed, configured, competitors: merged })
+    return NextResponse.json({ seed, configured, competitors: merged, discovering })
   } catch (e: any) {
     return NextResponse.json({ competitors: [], error: String(e?.message || e).slice(0, 160) })
   }
