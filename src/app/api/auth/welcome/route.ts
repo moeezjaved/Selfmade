@@ -26,8 +26,8 @@ export async function POST(_req: NextRequest) {
       description: 'Welcome email sent', performed_by: 'system',
     })
     await sendWelcomeEmail(user.email, (user.user_metadata?.full_name as string) || '')
-    // They signed up → stop any audit nurture drip tied to this email.
-    try { const { convertAuditLeads } = await import('@/lib/audit/leads'); await convertAuditLeads(admin, user.email || '', user.id) } catch { /* best-effort */ }
+    // NOTE: the audit nurture drip is NO LONGER stopped at signup — signup happens BEFORE the audit now,
+    // so the drip nurtures signed-up-but-not-paid users. It's converted when they go PAID (see paypal grant).
   } catch { /* best-effort */ }
   return NextResponse.json({ ok: true })
 }

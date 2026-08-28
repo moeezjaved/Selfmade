@@ -42,12 +42,14 @@ export default function SignupPage() {
     if (isFreeEmail(form.email)) { setBizModal(form.email); return }
     if (form.password.length < 8) { toast.error('Password must be at least 8 characters'); return }
     setLoading(true)
+    // Honor ?next (the audit funnel sends ?next=/store-audit so signup returns there to run the audit).
+    const next = new URLSearchParams(window.location.search).get('next') || '/onboarding'
     const { data, error } = await supabase.auth.signUp({
       email: form.email.trim(),
       password: form.password,
       options: {
         data: { full_name: `${form.firstName} ${form.lastName}`.trim() },
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=/onboarding`,
+        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
       },
     })
     if (error) { toast.error(error.message); setLoading(false); return }
@@ -59,10 +61,11 @@ export default function SignupPage() {
     }
     fetch('/api/auth/welcome', { method: 'POST' }).catch(() => {})
     if (!data.session) { setVerifySent(true); setLoading(false); return }
-    router.push('/onboarding')
+    router.push(next)
   }
   const handleGoogle = async () => {
-    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback` } })
+    const next = new URLSearchParams(window.location.search).get('next') || ''
+    await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: `${window.location.origin}/auth/callback${next ? `?next=${encodeURIComponent(next)}` : ''}` } })
   }
 
   return (

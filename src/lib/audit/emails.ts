@@ -34,7 +34,10 @@ const firstName = (email: string) => {
   const s = (email.split('@')[0] || 'there').replace(/[._-]+/g, ' ').trim()
   return s ? s.charAt(0).toUpperCase() + s.slice(1).split(' ')[0] : 'there'
 }
-const signupUrl = (lead: AuditLead, ref: string) => `${APP_URL}/signup?ref=${ref}&e=${encodeURIComponent(lead.email)}${lead.domain ? `&d=${encodeURIComponent(lead.domain)}` : ''}`
+// Signup-first funnel: the recipient already has an account, so every CTA DEEP-LINKS straight to the
+// feature the email is about (not a generic /signup). If their session has expired the app bounces them
+// through /login and back. `ref` is kept for attribution.
+const deep = (_lead: AuditLead, path: string, ref: string) => `${APP_URL}${path}${path.includes('?') ? '&' : '?'}ref=${ref}`
 const unsubFooterUrl = (lead: AuditLead) => `${APP_URL}/api/audit/unsub?t=${lead.unsub_token}`
 
 /** Wrap emailShell but swap the generic footer line for an unsubscribe link (these are cold-ish leads). */
@@ -62,7 +65,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
           title: `${firstName(lead.email)}, your store audit is ready`,
           intro: `We read your ads, your search &amp; AI visibility, and your catalog.${lost ? ` Best estimate: you're leaving <b>${lost}/year</b> on the table.` : ''}${r.topLeak ? ` Your #1 leak: <b>${r.topLeak}</b>.` : ''}<br/><br/>We also made you <b>${(lead.ad_urls || []).length || 5} real ads</b> from the winning DNA your rivals use. See the full report and claim them — free.`,
           imageUrl: ad || undefined,
-          ctaText: 'See your full report + ads', ctaUrl: signupUrl(lead, 'audit-email-1'),
+          ctaText: 'See your full report + ads', ctaUrl: deep(lead, '/hq', 'audit-email-1'),
         }),
       }
     },
@@ -77,7 +80,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
         html: shell(lead, {
           title: `Your biggest leak — and the fix`,
           intro: `${r.topLeak ? `<b>${r.topLeak}</b>` : `Your store has a clear, fixable conversion leak`}.${lost ? ` It's the main driver of the ~<b>${lost}/year</b> we found.` : ''} It's the kind of thing a $1M brand fixes in an afternoon — and most $100k brands never see. Want us to fix it for you?`,
-          ctaText: 'Fix this leak', ctaUrl: signupUrl(lead, 'audit-email-2'),
+          ctaText: 'Fix this leak', ctaUrl: deep(lead, '/mission/cro', 'audit-email-2'),
         }),
       }
     },
@@ -92,7 +95,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
           title: `Your rivals share one winning recipe`,
           intro: `${r.rivalName ? `<b>${r.rivalName}</b> and your top competitors` : 'Your top competitors'} keep running the same winning pattern${r.rivalFormula ? `: <b>${r.rivalFormula}</b>` : ''} — while your ads don't. We decoded their creative DNA in your audit and wrote ads that beat it. They're waiting in your report.`,
           imageUrl: (lead.ad_urls || [])[1] || (lead.ad_urls || [])[0] || undefined,
-          ctaText: 'See the winning formula', ctaUrl: signupUrl(lead, 'audit-email-3'),
+          ctaText: 'See the winning formula', ctaUrl: deep(lead, '/ads-workspace/competitors', 'audit-email-3'),
         }),
       }
     },
@@ -105,7 +108,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
         title: `Your ads are made. Want them running?`,
         intro: `Not a to-do list — <b>${(lead.ad_urls || []).length || 5} finished ads</b>, generated from the winning DNA your rivals use, featuring your real products. Claim them, tweak anything, and launch. Your first renders are on us.`,
         imageUrl: (lead.ad_urls || [])[0] || undefined,
-        ctaText: 'Claim my ads', ctaUrl: signupUrl(lead, 'audit-email-4'),
+        ctaText: 'Claim my ads', ctaUrl: deep(lead, '/creative-studio', 'audit-email-4'),
       }),
     }),
   },
@@ -119,7 +122,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
         html: shell(lead, {
           title: `Buyers ask AI before they ask Google`,
           intro: `When shoppers ask ChatGPT, Gemini or Perplexity to recommend a ${r.category || 'store like yours'}, <b>${miss} AI assistants don't mention you</b> — they name your rivals. That's tomorrow's traffic going to them. We publish the content that gets you cited.`,
-          ctaText: 'Get cited by AI', ctaUrl: signupUrl(lead, 'audit-email-5'),
+          ctaText: 'Get cited by AI', ctaUrl: deep(lead, '/mission/geo', 'audit-email-5'),
         }),
       }
     },
@@ -131,7 +134,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
       html: shell(lead, {
         title: `Same traffic, more sales`,
         intro: `The fastest revenue isn't more ad spend — it's plugging the leaks you already have and running ads built on what's proven to work. That's exactly what your audit mapped. One AI marketing team, working every night, you approve every move.`,
-        ctaText: 'Put the team to work', ctaUrl: signupUrl(lead, 'audit-email-6'),
+        ctaText: 'Put the team to work', ctaUrl: deep(lead, '/mission', 'audit-email-6'),
       }),
     }),
   },
@@ -143,7 +146,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
         title: `Don't lose your report + ads`,
         intro: `Your audit, the revenue math, and the ads we made you are saved — for now. Claim your free account to keep them and start fixing what's costing you sales. Takes about a minute.`,
         imageUrl: (lead.ad_urls || [])[0] || undefined,
-        ctaText: 'Save my report', ctaUrl: signupUrl(lead, 'audit-email-7'),
+        ctaText: 'Save my report', ctaUrl: deep(lead, '/mission/seo', 'audit-email-7'),
       }),
     }),
   },
@@ -154,7 +157,7 @@ export const AUDIT_SEQUENCE: AuditEmailStep[] = [
       html: shell(lead, {
         title: `Last one from us`,
         intro: `We won't keep emailing. But your store still has the leaks we found — and your rivals are still running the ads you're not. If you want the team that fixes it, now's the moment: founding members lock in the lowest price we'll ever offer. Otherwise, all the best — the audit's yours to keep.`,
-        ctaText: 'Start as a founding member', ctaUrl: signupUrl(lead, 'audit-email-8'),
+        ctaText: 'Start as a founding member', ctaUrl: deep(lead, '/pricing', 'audit-email-8'),
       }),
     }),
   },

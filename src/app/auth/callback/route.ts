@@ -46,8 +46,7 @@ export async function GET(request: NextRequest) {
         })
         await sendWelcomeEmail(email, (data?.user?.user_metadata?.full_name as string) || '')
       }
-      // They signed up → stop any audit nurture drip tied to this email (runs even if welcome already sent).
-      try { const { convertAuditLeads } = await import('@/lib/audit/leads'); await convertAuditLeads(admin, email, uid) } catch { /* best-effort */ }
+      // The audit drip is converted on PAID now (not signup) — signup precedes the audit. See paypal grant.
     }
   } catch { /* best-effort */ }
 
