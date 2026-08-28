@@ -6,6 +6,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveBrandForAction } from '@/lib/brand/active'
 import { loadGeoStatus } from '@/lib/geo/monitor'
+import { seedBrandFromScan } from '@/lib/audit/seed'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 20
@@ -17,6 +18,8 @@ export async function GET(_req: NextRequest) {
   const admin = createAdminClient()
   const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id)
   if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
+  // Carry the free-audit AI-visibility reads into the app the first time (no re-scan, no re-charge).
+  await seedBrandFromScan(admin as any, user.id, brandId).catch(() => {})
   try {
     const status = await loadGeoStatus(admin as any, user.id, brandId)
     return NextResponse.json(status, { status: 200 })
