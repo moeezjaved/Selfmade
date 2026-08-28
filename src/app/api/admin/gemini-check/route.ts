@@ -29,8 +29,22 @@ export async function GET() {
   const defaultModel = modelFor('default')
   const t0 = Date.now()
   const res = await generateImage('A simple flat vector illustration of a red circle centered on a plain white background.', [], 'pro', { imageSize: '1K' }).catch((e) => ({ ok: false as const, error: `threw: ${String((e as Error)?.message || e).slice(0, 200)}` }))
+
+  // RAW probe: hit the Pro model ONCE directly so we see the exact HTTP status + body Google returns
+  // (generateImage collapses 429/503/etc. into "pro_model_busy", which hides quota-vs-overload).
+  let raw: any = null
+  try {
+    const key = (process.env.GEMINI_API_KEYS || process.env.GEMINI_API_KEY || '').split(',').map((s) => s.trim()).filter(Boolean)[0]
+    const rr = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${proModel}:generateContent?key=${key}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contents: [{ parts: [{ text: 'a red circle on white' }] }], generationConfig: { responseModalities: ['IMAGE'] } }),
+    })
+    raw = { status: rr.status, body: (await rr.text().catch(() => '')).slice(0, 400) }
+  } catch (e: any) { raw = { status: 0, body: String(e?.message || e).slice(0, 200) } }
+
   return NextResponse.json({
     geminiEnabled, keyCount, proModel, defaultModel, ms: Date.now() - t0,
     result: res.ok ? { ok: true, model: (res as any).model, bytes: (res as any).dataB64?.length || 0 } : { ok: false, error: (res as any).error },
+    raw,
   })
 }
