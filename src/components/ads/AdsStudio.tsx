@@ -12,6 +12,7 @@ import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { celebrate, adReady, competitorsFound } from '@/lib/celebrate'
 import { openCredits } from '@/components/credits/CreditModal'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 type StudioTag = { label: string; image?: string | null; kind: 'product' | 'upload' | 'element' | 'discover' | 'template' }
 const StudioCtx = createContext<{ addToChat: (t: StudioTag) => void }>({ addToChat: () => {} })
@@ -178,7 +179,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     if (willRemake) {
       try {
         const b = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json())
-        if (typeof b?.balance === 'number' && b.balance < 15) { openCredits('buy', `Making an ad needs 15 credits — you have ${b.balance}. Top up to continue.`); return }
+        if (typeof b?.balance === 'number' && b.balance < 15) { if (!(await requireUpgrade())) openCredits('buy', `Making an ad needs 15 credits — you have ${b.balance}. Top up to continue.`); return }
       } catch { /* balance check failed — the server still gates before rendering */ }
     }
     setBusy(true); setInput('')
@@ -225,7 +226,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       } catch (e: any) {
         const msg = e?.message === 'no-product' ? 'Add a product first — tap + and pick one of your products.' : e?.message === 'credits' ? 'You’re out of credits — top up to remake ads.' : 'Couldn’t start the remake — try again.'
         setMsgs((m) => replaceLast(m, { role: 'assistant', error: msg, format: fmt }))
-        if (e?.message === 'credits') openCredits('buy', 'You’re out of credits — top up to remake ads.')   // Free → auto-shows Upgrade
+        if (e?.message === 'credits') { if (!(await requireUpgrade())) openCredits('buy', 'You’re out of credits — top up to remake ads.') }   // free → agreement + payment wall
       }
       setTags([]); setBusy(false)
       return

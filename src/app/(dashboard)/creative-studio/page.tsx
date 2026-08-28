@@ -10,6 +10,7 @@ import { Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import MelloAdsActions from '@/components/ads/MelloAdsActions'
 import { openCredits } from '@/components/credits/CreditModal'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { Sparkles, Store, Download, Trash2, Loader2, X, Pencil, Plus, Link2, Upload, Wand2, Film, Search } from 'lucide-react'
 import { creativeFilename } from '@/lib/filename'
@@ -392,7 +393,7 @@ function GenerationModal({ gen, onClose, onChanged }: { gen: Gen; onClose: () =>
       })
       const j = await r.json()
       if (!r.ok) {
-        if (r.status === 402 && j.error === 'insufficient_credits') openCredits('buy', 'Not enough credits for this edit — top up to keep editing.')   // Free → auto-shows Upgrade
+        if (r.status === 402 && j.error === 'insufficient_credits') { if (!(await requireUpgrade())) openCredits('buy', 'Not enough credits for this edit — top up to keep editing.') }   // free → agreement + payment wall
         setErr(j.error === 'insufficient_credits' ? 'Not enough credits for this edit.' : j.error || 'Edit failed.'); return
       }
       if (img) { const cur = img; setVersions((v) => [...v, { img: cur, genId }]) }   // keep the pre-edit version so it can be restored
