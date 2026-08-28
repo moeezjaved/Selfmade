@@ -179,7 +179,7 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
       {/* white placeholders so they read on the orange fields */}
       <style>{`input::placeholder{color:rgba(255,255,255,.72)}`}</style>
       <div style={{ width: '100%', maxWidth: 560 }}>
-        <div style={{ fontSize: 13, fontStyle: 'italic', color: '#fff', fontFamily: SERIF, opacity: .9 }}>free · one scan · no login</div>
+        <div style={{ fontSize: 13, fontStyle: 'italic', color: '#fff', fontFamily: SERIF, opacity: .9 }}>free · one scan · saved to your account</div>
         <h1 style={{ fontFamily: SERIF, fontSize: 46, fontWeight: 700, lineHeight: 1.02, margin: '10px 0 12px', letterSpacing: '-.02em' }}>Audit your whole store.</h1>
         <p style={{ fontSize: 15.5, color: SUB, lineHeight: 1.55, marginBottom: 26 }}>Your ads and your search &amp; AI visibility — one scan, one report. See where you stand on Facebook, Google, and ChatGPT/Gemini, and where rivals are winning.</p>
 
