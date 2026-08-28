@@ -9,6 +9,7 @@ import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
 import LlmsGuide from '@/components/geo/LlmsGuide'
 import SelectBrandNotice from '@/components/app/SelectBrandNotice'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 type EngineCell = { engine: string; label: string; cited: boolean; grounded: boolean; competitorsCited: string[]; excerpt: string }
 type PromptResult = { prompt: string; engines: EngineCell[]; youCited: boolean; rivalsCited: number }
@@ -50,6 +51,7 @@ export default function GeoPage() {
   useEffect(() => { if (status?.understanding?.uncertain) setShowFix(true) }, [status?.understanding?.uncertain])
 
   const writeAnswer = async (prompt: string, rivals: string[]) => {
+    if (await requireUpgrade()) return   // free → agreement + payment wall
     if (writing) return
     setWriting(prompt)
     try {
@@ -68,6 +70,7 @@ export default function GeoPage() {
   // invisible to AI engines; a published, crawlable page can be cited). Paid feature; free → upgrade.
   const [publishing, setPublishing] = useState<string | null>(null)
   const publish = async (a: Asset) => {
+    if (await requireUpgrade()) return   // free → agreement + payment wall
     if (!a.id || publishing) return
     setPublishing(a.id)
     try {
@@ -101,6 +104,7 @@ export default function GeoPage() {
 
   const [building, setBuilding] = useState<string | null>(null)
   const buildAsset = async (kind: string) => {
+    if (await requireUpgrade()) return   // free → agreement + payment wall
     if (building) return
     setBuilding(kind)
     try {

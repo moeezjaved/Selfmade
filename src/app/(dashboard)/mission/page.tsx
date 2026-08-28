@@ -16,6 +16,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useChatStream } from '@/components/mello/useChatStream'
 import SelectBrandNotice from '@/components/app/SelectBrandNotice'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 type Task = { title: string; lever: string; dept: string; why: string; steps: string[]; hypothesis: string; impact: string; runnable: boolean; needs?: 'meta' | 'shopify' | 'klaviyo' | null; suggested_key: string }
 const CONNECT: Record<string, { label: string; href: string }> = {
@@ -197,6 +198,7 @@ export default function MissionPage() {
 
   // Approve & run → ask the agent router WHO runs it and what it costs (read-only), then confirm.
   const resolveTask = async (t: Task) => {
+    if (await requireUpgrade()) return   // free → employment agreement + payment wall
     setRun(t.suggested_key, { phase: 'resolving' })
     try {
       const r = await fetch('/api/mello/agents', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ task: t }) })

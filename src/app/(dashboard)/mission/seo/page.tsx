@@ -11,6 +11,7 @@ import { celebrate, auditDone } from '@/lib/celebrate'
 import { useRouter } from 'next/navigation'
 import { openCredits } from '@/components/credits/CreditModal'
 import SelectBrandNotice from '@/components/app/SelectBrandNotice'
+import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 // Map a crawled SEO issue to the Catalog agent that fixes that gap on your products (one-click).
 const agentForIssue = (title: string): 'seo' | 'alt' | 'description' | null => {
@@ -46,6 +47,7 @@ export default function SeoPage() {
   // One-click: draft product fixes for this gap via the Catalog agent, then jump to review (Apply = paid).
   const fixIssue = async (agent: string) => {
     if (fixing) return
+    if (await requireUpgrade()) return   // free → employment agreement + payment wall
     setFixing(agent)
     try {
       const r = await fetch('/api/shopify/catalog', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'draft', agent, limit: 25 }) })
