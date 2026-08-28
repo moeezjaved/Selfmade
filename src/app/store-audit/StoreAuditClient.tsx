@@ -97,8 +97,10 @@ export default function StoreAuditClient() {
 
   return (
     <div style={{ background: FOREST, minHeight: '100dvh' }}>
-      {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then. */}
-      <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} />
+      {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then.
+          onError: if the ads pull blips out (after auto-retries), we STILL run the SEO/AI half + show the
+          rest — a transient ads hiccup never dead-ends the whole audit. */}
+      <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
 
       {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished. */}
       {adsDone && (

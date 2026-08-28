@@ -72,10 +72,11 @@ function Count({ n, dur = 900 }: { n: number; dur?: number }) {
   return <>{v.toLocaleString()}</>
 }
 
-export default function ScanTheater({ embedded = false, seed, onDone }: {
+export default function ScanTheater({ embedded = false, seed, onDone, onError }: {
   embedded?: boolean
   seed?: { pageId?: string; adLibraryUrl?: string; name?: string; competitors?: { pageId: string; name: string }[] }
   onDone?: (res: any) => void
+  onError?: () => void   // ads pull failed after retries — the combined audit continues with the SEO half
 } = {}) {
   const [q, setQ] = useState('')
   const [results, setResults] = useState<Brand[]>([])
@@ -102,6 +103,7 @@ export default function ScanTheater({ embedded = false, seed, onDone }: {
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
   const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
   const autoStarted = useRef(false)   // embedded mode: fire the seed-driven auto-run exactly once
+  const retryCount = useRef(0)         // auto-retry a transient ads-scan blip before ever showing an error
   const mainRef = useRef<HTMLElement>(null)
   const isMobile = useIsMobile()   // stack the theater to one column on phones (client-only; SSR-safe)
   // Each act is a full-viewport frame that SWAPS in place (Ryze-style) — reset the pane to the top when
@@ -303,12 +305,18 @@ export default function ScanTheater({ embedded = false, seed, onDone }: {
         await sleep(Math.max(1400, dwell - used))
       }
       stopProg(); setPct(100); await sleep(600)
-      setPhase('done'); running.current = false
+      setPhase('done'); running.current = false; retryCount.current = 0
       if (embedded) onDone?.(data)   // ONLY on true success — never on the building/timeout non-complete exits above
     } catch (e) {
-      stopProg(); setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error'); running.current = false
+      stopProg(); running.current = false
+      // A transient blip shouldn't dead-end the audit: auto-retry a couple of times before ever showing
+      // an error. If it STILL fails, embedded mode hands off (onError) so the SEO/AI half still runs.
+      if (retryCount.current < 2) { retryCount.current++; setTimeout(() => { run(lastPayload.current) }, 2500); return }
+      retryCount.current = 0
+      if (embedded) { setPhase('done'); onError?.(); return }   // combined audit → stop spinner, parent runs the SEO half
+      setErrMsg(String((e as Error).message || 'Scan failed')); setPhase('error')
     }
-  }, [setStep, addFinding, embedded, onDone])
+  }, [setStep, addFinding, embedded, onDone, onError])
 
   // EMBEDDED — auto-start from the seed once (Act 1 of the combined audit page). Placed after run() so it
   // sits in scope; a ref guards against re-firing. No effect at all in standalone mode.
@@ -478,7 +486,7 @@ export default function ScanTheater({ embedded = false, seed, onDone }: {
           the page (root goes overflow:visible), which Moeez approved. */}
       <main ref={mainRef} style={{ padding: isMobile ? 'clamp(18px,5vw,24px)' : 'clamp(28px,4vw,56px)', minWidth: 0, ...(phase === 'done' ? {} : { height: embedded ? '100dvh' : '100%', overflow: isMobile ? 'auto' : 'hidden', display: 'flex', flexDirection: 'column', minHeight: 0 }) }}>
         {phase === 'error' && (
-          <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { autoStarted.current = false; running.current = false; setPhase('idle'); setSteps(STEPS0); setPct(0) }} style={btn}>Try again</button></div>
+          <div><h2 style={h2}>{errMsg}</h2><button onClick={() => { autoStarted.current = false; running.current = false; retryCount.current = 0; setPhase('idle'); setSteps(STEPS0); setPct(0) }} style={btn}>Try again</button></div>
         )}
         {phase === 'running' && (slides.length
           ? <SlideFrame key={slides[slideIdx]?.key}>{slides[slideIdx]?.render()}</SlideFrame>
