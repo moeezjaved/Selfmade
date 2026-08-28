@@ -5,11 +5,9 @@
  * brand's website. The standalone /ads-studio?domain=… (audit-funnel landing) is unchanged.
  */
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import AdsStudio from '@/components/ads/AdsStudio'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
-import { isGrandfathered } from '@/lib/entitlements'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,28 +26,14 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
 
   let website = ''
   let warmed = false
-  let needsAgreement = false
   let brandId: string | null = null
   try {
     const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (user) {
-      // Signup → SIGN the agreement → workspace. Gate until signed. Three signals count as signed:
-      //   • user_metadata.hire_agreement_accepted_at (durable, once JWT refreshes)
-      //   • sf_hired cookie (/welcome just recorded it)
-      //   • sf_scan_signer cookie — they ALREADY signed the SAME Employment Agreement in the scan funnel
-      //     (AuditTheater "Fix all problems" screen). Without this, funnel signers were asked to sign a
-      //     SECOND time at /welcome after onboarding — the double-sign QA hit.
-      const jar = await cookies()
-      const scanSigner = jar.get('sf_scan_signer')?.value || ''
+      // NOTE: the employment agreement is NO LONGER a gate here — it only appears at the upgrade wall
+      // (/upgrade) when a free user takes a paid action. The app (Ad Studio, etc.) is freely viewable.
       const admin = createAdminClient() as any
-      let signed = !!(user.user_metadata as any)?.hire_agreement_accepted_at || jar.get('sf_hired')?.value === '1'
-      if (!signed && scanSigner) {
-        // Persist the funnel signature so it's durable and never re-prompts (best-effort).
-        try { await admin.auth.admin.updateUserById(user.id, { user_metadata: { ...(user.user_metadata || {}), hire_agreement_accepted_at: new Date().toISOString(), hire_agreement_name: decodeURIComponent(scanSigner).slice(0, 120) } }) } catch { /* best-effort */ }
-        signed = true
-      }
-      if (!signed && !isGrandfathered(user.created_at)) needsAgreement = true
       brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
       if (brandId) {
         const { data } = await admin.from('brands').select('website, brand_kit').eq('id', brandId).maybeSingle()
@@ -58,10 +42,6 @@ export default async function AdsWorkspacePage({ params, searchParams }: { param
       }
     }
   } catch { /* AdsStudio falls back to the sf_scan_domain cookie */ }
-
-  // Must sign Mello's employment agreement before entering the workspace (redirect outside try so
-  // Next's redirect signal isn't swallowed by the catch).
-  if (needsAgreement) redirect('/welcome')
 
   // First arrival with a known store but nothing built yet → run the "Building your studio" screen so the
   // whole workspace (brand kit, products, audiences, competitors, templates) is ready on reveal. `built=1`
