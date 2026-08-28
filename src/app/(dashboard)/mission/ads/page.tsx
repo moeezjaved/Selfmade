@@ -7,7 +7,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029', RED = '#c0392b'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029', RED = '#c0392b'
 
 type Issue = { kind: string; severity: 'high' | 'med'; title: string; body: string }
 type Health = { connected: boolean; issues: Issue[]; recent?: any; baseline?: any; account?: { id: string; currency?: string } }

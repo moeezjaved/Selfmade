@@ -6,7 +6,7 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 
-const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029', MUT = '#b8c4b8'
+const INK = '#1a1410', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.08)', PAPER = '#faf9f5', GOOD = '#256029', MUT = '#b8c4b8'
 
 type Task = { key: string; label: string; done: boolean; value?: string; href: string; locked?: boolean }
 type Stage = { key: string; name: string; tagline: string; status: 'done' | 'active' | 'locked'; tasks: Task[]; impact?: string }
