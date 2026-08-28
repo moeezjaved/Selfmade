@@ -154,10 +154,14 @@ export default function ScanTheater({ embedded = false, seed, onDone, onError }:
     let prog = 5
     let progIv: ReturnType<typeof setInterval> | null = setInterval(() => { prog = Math.min(96, prog + 1); setPct(prog) }, 560)
     const stopProg = () => { if (progIv) { clearInterval(progIv); progIv = null } }
-    const PER_SLIDE_MS = 6500          // dwell per slide — long enough to read each screen
+    const PER_SLIDE_MS = 2600          // dwell per slide — snappy; the data's already in the system, don't stall
     const F = (t: string, b?: boolean): [string, boolean?] => [t, b]
     try {
-      const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload) })
+      // Hard timeout: a hanging fetch (never resolves) used to freeze the whole audit. Abort at 30s so a
+      // hang becomes a normal error → auto-retry → (embedded) degrade to the SEO half. Never spins forever.
+      const ctrl = new AbortController()
+      const killT = setTimeout(() => ctrl.abort(), 30000)
+      const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal }).finally(() => clearTimeout(killT))
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
       let data: ScanResult = await r.json()
       setRes(data)
