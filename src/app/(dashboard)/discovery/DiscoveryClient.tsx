@@ -824,7 +824,7 @@ const cdnSrcSet = (url: string) =>
   url ? IMG_WIDTHS.map((w) => `${cdnAt(url, w)} ${w}w`).join(', ') : undefined
 
 // ── CarouselViewer ─ swipeable preview for multi-image ads ──
-function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: string; iframeVisible: boolean }) {
+function CarouselViewer({ ad, avatarBg, iframeVisible, onDead }: { ad: Ad; avatarBg: string; iframeVisible: boolean; onDead?: () => void }) {
   const router = useRouter()
   const [cloneOpen, setCloneOpen] = useState(false)
   const [videoCloneOpen, setVideoCloneOpen] = useState(false)
@@ -927,7 +927,9 @@ function CarouselViewer({ ad, avatarBg, iframeVisible }: { ad: Ad; avatarBg: str
               referrerPolicy="no-referrer"
               className="sf-thumb-img"
               onLoad={() => setImgLoaded(true)}
-              onError={() => setImgError(true)}
+              // Primary tile failed (purged R2 file) → tell the card to hide itself instead of showing a
+              // broken "image unavailable" box. A later carousel slide failing just shows the placeholder.
+              onError={() => { setImgError(true); if (idx === 0) onDead?.() }}
               style={{
                 position: 'absolute', inset: 0,
                 opacity: imgLoaded ? 1 : 0, transition: 'opacity 0.12s linear', zIndex: 2,
@@ -1076,6 +1078,10 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
   const [videoUrl] = useState<string | null>(ad.videoUrl ?? null)
   const [playing, setPlaying] = useState(false)
   const [iframeVisible, setIframeVisible] = useState(false)
+  // R2 purge left some corpus creatives pointing at deleted files → the card's image 404s and shows an
+  // "image unavailable" box that reads as broken. When the card's OWN media can't load, hide the whole
+  // card so the grid only shows ads whose creative actually survived (e.g. the spied brands).
+  const [dead, setDead] = useState(false)
   // "Why Winning?" popup uses fixed positioning (computed on hover) so it ESCAPES the card's
   // overflow:hidden — otherwise it gets clipped at the card edge.
   const [tipPos, setTipPos] = useState<{ top: number; left: number } | null>(null)
@@ -1110,6 +1116,8 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
   const bodyText = cleanCopy(ad.body, ad.onScreenText, ad.title)
   const isLong = bodyText.length > 220
   const displayBody = expanded || !isLong ? bodyText : bodyText.slice(0, 220) + '…'
+
+  if (dead) return null   // media failed to load → drop the card rather than show a broken tile
 
   return (
     <>
@@ -1236,7 +1244,7 @@ function AdCard({ ad, onBrandClick, onBrandHover, onBrandLeave }: { ad: Ad; onBr
         }}
         style={{ cursor: 'pointer' }}
       >
-        <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} />
+        <CarouselViewer ad={ad} avatarBg={avatarBg} iframeVisible={iframeVisible} onDead={() => setDead(true)} />
       </div>
 
       {/* ── Destination card (Atria-style, compact) ── */}

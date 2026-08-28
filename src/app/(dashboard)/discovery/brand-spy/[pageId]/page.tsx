@@ -21,7 +21,8 @@ import {
 } from 'recharts'
 import { Copy, Film } from 'lucide-react'
 
-const ACCENT = '#ff5a2c'
+const ACCENT = '#e02f06'          // the app's brand orange (was a lighter #ff5a2c)
+const ACCENT_WASH = '#fdeee9'     // light orange tint for active/selected backgrounds (matches the shell)
 const card: React.CSSProperties = { background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, padding: 18 }
 const label: React.CSSProperties = { fontSize: 12, fontWeight: 700, color: '#6b7280', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 12 }
 const FMT_COLORS: Record<string, string> = { Video: '#2075ff', Image: '#10b981', 'Carousel/DCO': '#f59e0b' }
@@ -246,7 +247,7 @@ function LandingPages({ d }: { d: Spy }) {
         {d.landingPages.map((p) => {
           const on = sel?.url === p.url
           return (
-            <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #cde87a' : '1px solid transparent', background: on ? 'rgba(255,90,44,0.25)' : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
+            <button key={p.url} onClick={() => setSel(p)} style={{ display: 'block', width: '100%', textAlign: 'left', padding: '10px 12px', border: on ? '1px solid #e02f06' : '1px solid transparent', background: on ? ACCENT_WASH : 'transparent', borderRadius: 10, cursor: 'pointer', marginBottom: 2 }}>
               <div style={{ fontSize: 13, color: '#2075ff', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>🔗 {p.url}</div>
               <div style={{ fontSize: 12, color: '#6b7280', marginTop: 3 }}><span style={{ color: '#ef4a1e', fontWeight: 700 }}>● {p.active} Active</span> · {p.inactive} Inactive</div>
             </button>
@@ -258,7 +259,7 @@ function LandingPages({ d }: { d: Spy }) {
           <div style={{ flex: 1, fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{sel?.fullUrl}</div>
           <button onClick={() => { if (sel) { navigator.clipboard.writeText(sel.fullUrl); setCopied(true); setTimeout(() => setCopied(false), 1200) } }} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: '#fff', cursor: 'pointer' }}>{copied ? 'Copied ✓' : 'Copy URL'}</button>
           {(['mobile', 'desktop'] as const).map((dv) => (
-            <button key={dv} onClick={() => setDevice(dv)} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: device === dv ? 'rgba(255,90,44,0.5)' : '#fff', cursor: 'pointer', textTransform: 'capitalize' }}>{dv}</button>
+            <button key={dv} onClick={() => setDevice(dv)} style={{ fontSize: 12, fontWeight: 700, padding: '6px 10px', borderRadius: 8, border: '1px solid #e6e6e6', background: device === dv ? ACCENT_WASH : '#fff', cursor: 'pointer', textTransform: 'capitalize' }}>{dv}</button>
           ))}
           <a href={sel?.fullUrl} target="_blank" rel="noreferrer" style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', textDecoration: 'none' }}>Open ↗</a>
         </div>
@@ -360,7 +361,7 @@ function AdCard({ a, onOpen, onClone }: { a: Card; onOpen: (a: Card) => void; on
         <span style={{ position: 'absolute', top: 8, left: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#fff', background: FMT_BADGE[a.format || ''] || '#6b7280', padding: '2px 7px', borderRadius: 6 }}>{a.format || 'Ad'}</span>
         {(a.daysRunning || 0) > 0 && <span style={{ position: 'absolute', bottom: 8, right: 8, zIndex: 10, fontSize: 10, fontWeight: 800, color: '#111', background: 'rgba(255,255,255,0.92)', padding: '2px 7px', borderRadius: 6 }}>{a.daysRunning}d</span>}
         {/* Remake pill — identical style to the Discovery grid (keep it the same everywhere). */}
-        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: '#ff5a2c', color: '#14281a', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}>{isVideo ? <Film size={14} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={2.4} />} Remake</button>}
+        {onClone && <button onClick={(e) => { e.stopPropagation(); onClone(a) }} style={{ position: 'absolute', bottom: 8, left: 8, zIndex: 10, display: 'inline-flex', alignItems: 'center', gap: 7, background: ACCENT, color: '#fff', border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 600, letterSpacing: '-0.01em', padding: '8px 14px', cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 14px rgba(0,0,0,0.45)' }}>{isVideo ? <Film size={14} strokeWidth={2.4} /> : <Copy size={14} strokeWidth={2.4} />} Remake</button>}
       </div>
     </div>
   )
@@ -491,7 +492,7 @@ function AdDetailsDrawer({ a, onClose }: { a: Card; onClose: () => void }) {
   )
 }
 
-const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? 'rgba(255,90,44,0.5)' : '#fff', cursor: 'pointer', color: '#111' })
+const FILTER_BTN = (on: boolean): React.CSSProperties => ({ fontSize: 13, fontWeight: 700, padding: '7px 12px', borderRadius: 8, border: '1px solid #e6e6e6', background: on ? ACCENT_WASH : '#fff', cursor: 'pointer', color: '#111' })
 
 function FilterBar({ days, setDays, format, setFormat, status, setStatus, sort, setSort, total }: any) {
   const Sel = (val: string, set: (v: string) => void, opts: [string, string][]) => (
@@ -717,7 +718,7 @@ function TimelineTab({ d, pageId, onOpen }: { d: Spy; pageId: string; onOpen: (a
       </div>
 
       <div style={{ marginTop: 12 }}><TimelineGantt pageId={pageId} onOpen={onOpen} /></div>
-      <div style={{ marginTop: 14, padding: 12, background: 'rgba(255,90,44,0.18)', border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#3f6212' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
+      <div style={{ marginTop: 14, padding: 12, background: ACCENT_WASH, border: `1px solid ${ACCENT}`, borderRadius: 10, fontSize: 12, color: '#6f665a' }}>◆ Trends reconstructed from every ad’s live window in our index — history from before you started watching, from real snapshots.</div>
     </div>
   )
 }
@@ -788,7 +789,7 @@ function SpyControls({ pageId, brandName }: { pageId: string; brandName?: string
       <button onClick={toggleSpy} disabled={busy}
         title={spied ? 'Stop tracking this brand' : 'Track this brand — re-crawls every 6h and alerts you to new ads'}
         style={{ display: 'inline-flex', alignItems: 'center', gap: 6, fontSize: 12.5, fontWeight: 800, padding: '6px 14px', borderRadius: 100, cursor: busy ? 'default' : 'pointer',
-          border: '1px solid', borderColor: spied ? '#d1d5db' : '#141d15', background: spied ? '#fff' : '#141d15', color: spied ? '#6b7280' : '#ff5a2c', opacity: busy ? 0.6 : 1 }}>
+          border: '1px solid', borderColor: spied ? '#d1d5db' : '#141d15', background: spied ? '#fff' : '#141d15', color: spied ? '#6b7280' : ACCENT, opacity: busy ? 0.6 : 1 }}>
         {spied ? 'Stop spying' : '＋ Spy this brand'}
       </button>
       {spied && (
@@ -899,7 +900,7 @@ export default function BrandSpyDetail() {
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
         <Link href="/discovery/brand-spy" style={{ fontSize: 13, color: '#2075ff', textDecoration: 'none' }}>← All spied brands</Link>
         <div style={{ display: 'flex', gap: 14, alignItems: 'center' }}>
-          <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: 'rgba(255,90,44,0.6)', border: '1px solid #cde87a', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
+          <button onClick={exportCsv} style={{ fontSize: 13, fontWeight: 700, color: '#111', background: ACCENT_WASH, border: '1px solid #f6d8cc', borderRadius: 8, padding: '6px 12px', cursor: 'pointer' }}>⬇ Export CSV</button>
           <button onClick={() => setTab('library')} style={{ fontSize: 13, fontWeight: 700, color: '#2075ff', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}>View all ads →</button>
         </div>
       </div>
@@ -923,7 +924,7 @@ export default function BrandSpyDetail() {
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 6, marginBottom: 16, overflowX: 'auto', paddingBottom: 4 }}>
         {TABS.map(([id, lbl]) => (
-          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', color: tab === id ? '#111' : '#6b7280', background: tab === id ? 'rgba(255,90,44,0.5)' : '#f3f4f6' }}>{lbl}</button>
+          <button key={id} onClick={() => setTab(id)} style={{ padding: '7px 14px', borderRadius: 8, fontSize: 13, fontWeight: 700, border: 'none', cursor: 'pointer', flexShrink: 0, whiteSpace: 'nowrap', color: tab === id ? '#111' : '#6b7280', background: tab === id ? ACCENT_WASH : '#f3f4f6' }}>{lbl}</button>
         ))}
       </div>
 
