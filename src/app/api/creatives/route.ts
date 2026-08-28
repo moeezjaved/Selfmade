@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { workspaceMemberIds } from '@/lib/org'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,8 +16,11 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
 
-  const brandId = req.nextUrl.searchParams.get('brandId')
   const type = req.nextUrl.searchParams.get('type')
+  // Scope to the ACTIVE brand: an explicit ?brandId= wins (deep links), else the sf_brand cookie. When a
+  // brand is selected we show ONLY its creatives; "All brands" (null) shows the whole library (aggregate).
+  const explicit = req.nextUrl.searchParams.get('brandId')
+  const brandId = explicit || await resolveActiveBrandId(admin as any, user.id).catch(() => null)
 
   // Shared workspace: a team member sees the whole team's creative library, not just their own (empty)
   // pool. Scoped to the ONE workspace org (workspaceMemberIds = self + the billing owner's org members),

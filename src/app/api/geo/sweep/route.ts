@@ -5,7 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { runGeoSweep } from '@/lib/geo/monitor'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
@@ -19,7 +19,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const body = await req.json().catch(() => ({} as any))
-  const brandId = await resolveActiveBrandId(admin as any, user.id, (body?.brandId as string) || null).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id, (body?.brandId as string) || null)
+  if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
   // Each sweep is several ChatGPT/Gemini calls per buyer question → charge credits (everyone). Out of
   // credits → 402 so the UI shows the upgrade/top-up modal. Refunded if the sweep throws.
   let txId: string | null = null

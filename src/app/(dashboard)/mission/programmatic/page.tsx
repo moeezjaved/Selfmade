@@ -12,7 +12,7 @@ const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.0
 
 type Plan = { total: number; byType: { guide: number; collection: number; comparison: number }; generated: number; remaining: number }
 type Draft = { id: string; title: string; target_prompt: string; status: string; published_url: string | null }
-type Data = { connected: boolean; store?: { shop_name?: string }; plan?: Plan; drafts?: Draft[]; counts?: { draft: number; published: number } }
+type Data = { connected: boolean; selectBrand?: boolean; brandName?: string; store?: { shop_name?: string }; plan?: Plan; drafts?: Draft[]; counts?: { draft: number; published: number } }
 
 export default function ProgrammaticPage() {
   const embedded = useEmbedded()
@@ -64,11 +64,19 @@ export default function ProgrammaticPage() {
   }
 
   if (loading) return <Shell><div style={{ color: SUB }}>Loading…</div></Shell>
+  if (data?.selectBrand) return (
+    <Shell>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: PAPER, padding: 30, textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>Select a brand</div>
+        <div style={{ color: SUB, fontSize: 14.5, margin: '8px auto 0', maxWidth: 420, lineHeight: 1.5 }}>Pages at scale builds pages for one brand&rsquo;s store. Pick a brand from the switcher at the <b>top-left</b> to continue.</div>
+      </div>
+    </Shell>
+  )
   if (!data?.connected) return (
     <Shell>
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: PAPER, padding: 26, textAlign: 'center' }}>
-        <div style={{ fontSize: 17, fontWeight: 800 }}>No Shopify store connected</div>
-        <div style={{ color: SUB, fontSize: 14, margin: '8px 0 16px' }}>Programmatic SEO builds pages from your real catalog.</div>
+        <div style={{ fontSize: 17, fontWeight: 800 }}>Connect {data?.brandName || 'this brand'}&rsquo;s Shopify store</div>
+        <div style={{ color: SUB, fontSize: 14, margin: '8px 0 16px' }}>Programmatic SEO builds pages from {data?.brandName || 'this brand'}&rsquo;s real catalog. Connect Shopify to this brand to continue.</div>
         <a href="/connect/shopify" style={{ background: LIME, color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Connect Shopify →</a>
       </div>
     </Shell>
