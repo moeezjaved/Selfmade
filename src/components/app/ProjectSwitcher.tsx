@@ -61,7 +61,7 @@ export default function ProjectSwitcher({ initialBrands = [], initialActive = ''
         openCredits('plan', `You’re on ${limit} brand${limit === 1 ? '' : 's'} — upgrade to add another.`)
         return
       }
-      router.push('/onboarding?new=1')
+      router.push('/store-audit?new=1')
     } finally { setNewBusy(false) }
   }
 

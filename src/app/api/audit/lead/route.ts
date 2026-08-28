@@ -14,8 +14,10 @@ export const runtime = 'nodejs'
 export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({} as any))
   // Signup-first: prefer the session user's email; a body email is a legacy/anonymous fallback.
-  let email = ''
-  try { const { data: { user } } = await (await createClient()).auth.getUser(); email = (user?.email || '').trim().toLowerCase() } catch { /* not logged in */ }
+  let email = '', userId = ''
+  try { const { data: { user } } = await (await createClient()).auth.getUser(); email = (user?.email || '').trim().toLowerCase(); userId = user?.id || '' } catch { /* not logged in */ }
+  // The audit IS the onboarding now — finishing it marks the founder onboarded (no /onboarding step).
+  if (userId) { try { const a = createAdminClient() as any; await a.from('user_profiles').update({ onboarding_completed: true }).eq('user_id', userId) } catch { /* best-effort */ } }
   if (!email) email = String(body?.email || '').trim().toLowerCase()
   if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
     return NextResponse.json({ error: 'valid_email_required' }, { status: 400 })

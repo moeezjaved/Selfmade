@@ -133,7 +133,9 @@ export async function middleware(request: NextRequest) {
     // majority of requests) pay ZERO extra latency. Exempt pages a mid-onboarding user still needs
     // (billing/settings/meta/payment) so the gate can never trap them; /onboarding itself isn't
     // protected, so there's no redirect loop. Fail open on any DB hiccup — never block on a timeout.
-    const ONBOARD_EXEMPT = ['/billing', '/settings', '/connect-meta', '/payment', '/business-email-required']
+    // The AUDIT is the onboarding now (/store-audit collects site + ads + competitor and creates the
+    // brand). A first-timer who hasn't completed it is sent there — never to the retired /onboarding.
+    const ONBOARD_EXEMPT = ['/billing', '/settings', '/connect-meta', '/payment', '/business-email-required', '/store-audit', '/onboarding']
     if (user && request.cookies.get('sm_onb')?.value !== '1'
         && PROTECTED.some(p => pathname.startsWith(p))
         && !ONBOARD_EXEMPT.some(p => pathname.startsWith(p))) {
@@ -145,7 +147,7 @@ export async function middleware(request: NextRequest) {
       )
       if (onbRes?.data) {
         if (!(onbRes.data as any).onboarding_completed) {
-          return NextResponse.redirect(new URL('/onboarding', request.url))
+          return NextResponse.redirect(new URL('/store-audit', request.url))
         }
         // Onboarded — remember it so we skip this read on every future request (30 days).
         response.cookies.set('sm_onb', '1', { path: '/', maxAge: 60 * 60 * 24 * 30, sameSite: 'lax' })
