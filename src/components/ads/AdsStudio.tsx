@@ -793,7 +793,7 @@ function YourAds({ isMobile, domain }: { isMobile: boolean; domain?: string }) {
     } finally { setSaving(false) }
   }
 
-  const connected = !!(data?.connected || data?.pageId)
+  const connected = !!data?.connected   // OAuth-connected only — a public page id is NOT "connected"
   return (
     <div>
       <Header title="Your Ads" isMobile={isMobile} />

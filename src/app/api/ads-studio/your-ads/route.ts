@@ -11,7 +11,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
-import { fetchLiveAdsByPage } from '@/lib/ads-studio/adlibrary'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,11 +20,6 @@ function extractPageId(s: string): string | null {
   if (/^\d{5,}$/.test(t)) return t
   const m = t.match(/(?:view_all_page_id|page_id|[?&]id)=(\d{5,})/i) || t.match(/\/(\d{7,})(?:[/?]|$)/)
   return m ? m[1] : null
-}
-
-const mediaUrl = (u: string | null | undefined) => {
-  if (!u) return null
-  return /fbcdn|xx\.fbcdn|scontent/i.test(u) ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : u
 }
 
 async function resolve(): Promise<{ admin: any; brandId: string; kit: any; userId: string } | null> {
@@ -57,17 +51,12 @@ export async function GET() {
   } catch { /* fall through */ }
 
   // Not connected → tell the UI so it shows "Connect your Facebook" (not the paste-a-link box).
+  // NOT OAuth-connected → return immediately so the UI shows "Connect Facebook". We deliberately do NOT do
+  // the slow public Ad-Library pull here: it was hanging "Your Ads" on an endless spinner for brands that
+  // have a page id from the audit but haven't actually connected Meta. This surface is for RUNNING ads,
+  // which requires the OAuth connection — the public ad preview lives in the audit, not here.
   const pageId = r.kit?.ownMetaPageId ? String(r.kit.ownMetaPageId) : null
-  if (!pageId) return NextResponse.json({ ads: [], pageId: null, connected: false })
-  try {
-    const live = await fetchLiveAdsByPage(pageId, 24)
-    const ads = live.map((a) => ({
-      adId: a.adId, title: a.title || a.pageName, body: a.body || '', isActive: a.isActive,
-      image: mediaUrl(a.images?.[0] || a.videoPreviews?.[0] || null), link: a.link || '',
-      isVideo: (a.videos?.length || 0) > 0 && !(a.images?.length || 0),
-    }))
-    return NextResponse.json({ ads, pageId })
-  } catch { return NextResponse.json({ ads: [], pageId }) }
+  return NextResponse.json({ ads: [], pageId, connected: false })
 }
 
 export async function POST(req: NextRequest) {
