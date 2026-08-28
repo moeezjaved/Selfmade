@@ -10,6 +10,7 @@ import { useEmbedded } from '@/lib/ui/embedded'
 import { celebrate, auditDone } from '@/lib/celebrate'
 import { useRouter } from 'next/navigation'
 import { openCredits } from '@/components/credits/CreditModal'
+import SelectBrandNotice from '@/components/app/SelectBrandNotice'
 
 // Map a crawled SEO issue to the Catalog agent that fixes that gap on your products (one-click).
 const agentForIssue = (title: string): 'seo' | 'alt' | 'description' | null => {
@@ -29,6 +30,7 @@ type Brief = { id: string | null; keyword: string; title: string; body_markdown:
 export default function SeoPage() {
   const embedded = useEmbedded()
   const [audit, setAudit] = useState<Audit | null>(null)
+  const [selectBrand, setSelectBrand] = useState(false)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
@@ -55,17 +57,18 @@ export default function SeoPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { const r = await fetch('/api/seo/audit'); const j = await r.json(); if (r.ok) setAudit(j as Audit) } catch { /* empty */ }
+    try { const r = await fetch('/api/seo/audit'); const j = await r.json(); if (r.ok) { if (j?.selectBrand) { setSelectBrand(true); setLoading(false); return } setSelectBrand(false); setAudit(j as Audit) } } catch { /* empty */ }
     try { const r = await fetch('/api/seo/keywords'); const j = await r.json(); if (r.ok) setKw(j as Kw) } catch { /* empty */ }
     try { const r = await fetch('/api/seo/brief'); const j = await r.json(); if (r.ok && Array.isArray(j?.briefs)) setBriefs(j.briefs) } catch { /* empty */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
+  useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
   const runAudit = async () => {
     if (running) return
     setRunning(true)
-    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) { setAudit(j as Audit); if ((j as Audit)?.hasData) celebrate(auditDone((j as Audit).score, ((j as Audit).issues || []).length)) } else if (r.status === 402) openCredits('buy', j.reason || 'An SEO audit costs credits — top up to run it.') } catch { /* keep */ }
+    try { const r = await fetch('/api/seo/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' }); const j = await r.json(); if (r.ok) { if (j?.selectBrand) { setSelectBrand(true); setRunning(false); return } setAudit(j as Audit); if ((j as Audit)?.hasData) celebrate(auditDone((j as Audit).score, ((j as Audit).issues || []).length)) } else if (r.status === 402) openCredits('buy', j.reason || 'An SEO audit costs credits — top up to run it.') } catch { /* keep */ }
     setRunning(false)
   }
   const findKeywords = async () => {
@@ -108,6 +111,14 @@ export default function SeoPage() {
 
   const issues = audit?.issues || []
   const counts = { high: issues.filter((i) => i.severity === 'high').length, medium: issues.filter((i) => i.severity === 'medium').length, low: issues.filter((i) => i.severity === 'low').length }
+
+  if (selectBrand) return (
+    <div className={`seo${embedded ? ' embedded' : ''}`}>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style>{`.seo.embedded .wrap{padding:6px 0 30px;max-width:100%}`}</style>
+      <div className="wrap"><SelectBrandNotice feature="A technical SEO audit" /></div>
+    </div>
+  )
 
   return (
     <div className={`seo${embedded ? ' embedded' : ''}`}>

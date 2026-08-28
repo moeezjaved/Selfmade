@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { runSeoAudit, loadSeoAudit } from '@/lib/seo/crawl-audit'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
@@ -18,7 +18,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const body = await req.json().catch(() => ({} as any))
-  const brandId = await resolveActiveBrandId(admin as any, user.id, (body?.brandId as string) || null).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id, (body?.brandId as string) || null)
+  if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
   // Crawl + LLM analysis → charge credits (everyone). Out of credits → 402 upsell. Refunded on failure.
   let txId: string | null = null
   try {
@@ -43,7 +44,8 @@ export async function GET(_req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
-  const brandId = await resolveActiveBrandId(admin as any, user.id).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id)
+  if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
   try {
     const audit = await loadSeoAudit(admin as any, user.id, brandId)
     return NextResponse.json(audit, { status: 200 })

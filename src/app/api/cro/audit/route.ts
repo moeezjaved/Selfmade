@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { runCroAudit } from '@/lib/cro/audit'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { isAppDomain, CONNECT_STORE_NOTE } from '@/lib/domain-guard'
@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient() as any
-  const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin, user.id)
+  if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true })
   const body = await req.json().catch(() => ({} as any))
   const domain = String(body?.domain || '').trim() || await brandDomain(admin, user.id, brandId)
   if (!domain || !domain.includes('.')) return NextResponse.json({ error: 'no_domain', note: 'Connect a store or add your website first.' }, { status: 400 })
@@ -72,7 +73,8 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient() as any
-  const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin, user.id)
+  if (needsSelection) return NextResponse.json({ selectBrand: true })
   if (!brandId) return NextResponse.json({ hasData: false })
   const { data } = await admin.from('brands').select('brand_kit').eq('id', brandId).maybeSingle()
   const kit = (data?.brand_kit && typeof data.brand_kit === 'object') ? data.brand_kit : {}

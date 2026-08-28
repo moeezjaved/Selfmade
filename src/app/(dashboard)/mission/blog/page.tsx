@@ -13,7 +13,7 @@ const INK = '#141d15', SUB = '#7a9a7a', LIME = '#ff5a2c', LINE = 'rgba(0,0,0,0.0
 
 type Seo = { keyword?: string; metaTitle?: string; metaDescription?: string; secondary?: string[] }
 type Draft = { id: string; title: string; target_prompt: string; body_markdown: string; status: string; published_url: string | null; created_at: string; seo?: Seo | null }
-type Data = { connected: boolean; store?: { shop_name?: string; shop_domain?: string }; drafts?: Draft[]; topics?: string[] }
+type Data = { connected: boolean; selectBrand?: boolean; brandName?: string; store?: { shop_name?: string; shop_domain?: string }; drafts?: Draft[]; topics?: string[] }
 
 export default function BlogPage() {
   const embedded = useEmbedded()
@@ -66,11 +66,19 @@ export default function BlogPage() {
   const openDraft = (d: Draft) => setPreview({ id: d.id, html: d.body_markdown, title: d.title })
 
   if (loading) return <Shell><div style={{ color: SUB }}>Loading…</div></Shell>
+  if (data?.selectBrand) return (
+    <Shell>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: PAPER, padding: 30, textAlign: 'center' }}>
+        <div style={{ fontSize: 18, fontWeight: 800 }}>Select a brand</div>
+        <div style={{ color: SUB, fontSize: 14.5, margin: '8px auto 0', maxWidth: 420, lineHeight: 1.5 }}>Content is written and published per brand. Pick a brand from the switcher at the <b>top-left</b> and the content agent works on that brand&rsquo;s catalog.</div>
+      </div>
+    </Shell>
+  )
   if (!data?.connected) return (
     <Shell>
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: PAPER, padding: 26, textAlign: 'center' }}>
-        <div style={{ fontSize: 17, fontWeight: 800 }}>No Shopify store connected</div>
-        <div style={{ color: SUB, fontSize: 14, margin: '8px 0 16px' }}>The blog agent writes from your real catalog and publishes to your store.</div>
+        <div style={{ fontSize: 17, fontWeight: 800 }}>Connect {data?.brandName || 'this brand'}&rsquo;s Shopify store</div>
+        <div style={{ color: SUB, fontSize: 14, margin: '8px 0 16px' }}>The blog agent writes from {data?.brandName || 'this brand'}&rsquo;s real catalog and publishes to its store. Connect Shopify to this brand to write &amp; publish.</div>
         <a href="/connect/shopify" style={{ background: LIME, color: '#fff', padding: '10px 20px', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>Connect Shopify →</a>
       </div>
     </Shell>

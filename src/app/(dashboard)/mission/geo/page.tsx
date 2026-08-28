@@ -8,6 +8,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useEmbedded } from '@/lib/ui/embedded'
 import { openCredits } from '@/components/credits/CreditModal'
 import LlmsGuide from '@/components/geo/LlmsGuide'
+import SelectBrandNotice from '@/components/app/SelectBrandNotice'
 
 type EngineCell = { engine: string; label: string; cited: boolean; grounded: boolean; competitorsCited: string[]; excerpt: string }
 type PromptResult = { prompt: string; engines: EngineCell[]; youCited: boolean; rivalsCited: number }
@@ -26,6 +27,7 @@ const CRAWL_KINDS = ['llms_txt', 'schema', 'fact_sheet']
 export default function GeoPage() {
   const embedded = useEmbedded()
   const [status, setStatus] = useState<Status | null>(null)
+  const [selectBrand, setSelectBrand] = useState(false)
   const [loading, setLoading] = useState(true)
   const [running, setRunning] = useState(false)
   const [open, setOpen] = useState<string | null>(null)
@@ -36,7 +38,7 @@ export default function GeoPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    try { const r = await fetch('/api/geo/status'); const j = await r.json(); if (r.ok) setStatus(j as Status) } catch { /* empty state */ }
+    try { const r = await fetch('/api/geo/status'); const j = await r.json(); if (r.ok) { if (j?.selectBrand) { setSelectBrand(true); setLoading(false); return } setSelectBrand(false); setStatus(j as Status) } } catch { /* empty state */ }
     try { const r = await fetch('/api/geo/answer'); const j = await r.json(); if (r.ok && Array.isArray(j?.assets)) setAssets(j.assets) } catch { /* ignore */ }
     setLoading(false)
   }, [])
@@ -188,6 +190,14 @@ export default function GeoPage() {
   // state, so we never flash "no data" while the status is still fetching.
   const booting = loading && !status
   const sov = status ? Math.round(status.shareOfVoice * 100) : 0
+
+  if (selectBrand) return (
+    <div className={`geo${embedded ? ' embedded' : ''}`}>
+      <style dangerouslySetInnerHTML={{ __html: CSS }} />
+      <style>{`.geo.embedded .wrap{padding:6px 0 30px;max-width:100%}`}</style>
+      <div className="wrap"><SelectBrandNotice feature="AI-visibility (GEO)" /></div>
+    </div>
+  )
 
   return (
     <div className={`geo${embedded ? ' embedded' : ''}`}>

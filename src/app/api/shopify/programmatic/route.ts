@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { planPages, existingKeys, generateBatch, publishBatch } from '@/lib/shopify/programmatic'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
@@ -21,23 +21,26 @@ async function ctx(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   const admin = createAdminClient() as any
-  const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin, user.id)
+  // "All brands" with 2+ brands → per-brand action; prompt to pick one instead of defaulting.
+  if (needsSelection || !brandId) return { error: NextResponse.json({ selectBrand: true }, { status: 200 }) }
   const store = await resolveStore(admin, user.id, brandId)
-  if (!store) return { error: NextResponse.json({ error: 'No Shopify store connected', connected: false }, { status: 400 }) }
-  return { admin, store, userId: user.id }
+  const { data: b } = await admin.from('brands').select('name').eq('id', brandId).maybeSingle()
+  if (!store) return { error: NextResponse.json({ error: 'connect_shopify', connected: false, brandName: b?.name || '' }, { status: 400 }) }
+  return { admin, store, brandId, userId: user.id }
 }
 
 export async function GET(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store, userId } = c
+  const { admin, store, brandId, userId } = c
   const plan = await planPages(admin, store, userId)
   const done = await existingKeys(admin, userId, store.brand_id)
   const byType = { guide: 0, collection: 0, comparison: 0 }
   for (const t of plan) byType[t.type]++
   const { data: drafts } = await admin.from('geo_assets')
     .select('id, title, target_prompt, status, published_url, created_at')
-    .eq('user_id', userId).eq('kind', 'pseo').order('created_at', { ascending: false }).limit(300)
+    .eq('user_id', userId).eq('brand_id', brandId).eq('kind', 'pseo').order('created_at', { ascending: false }).limit(300)
   const rows: any[] = drafts || []
   return NextResponse.json({
     connected: true,
@@ -51,7 +54,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store, userId } = c
+  const { admin, store, brandId, userId } = c
   const body = await req.json().catch(() => ({}))
   const action = body.action
 
@@ -99,7 +102,7 @@ export async function POST(req: NextRequest) {
   }
   if (action === 'discard') {
     const ids = Array.isArray(body.ids) ? body.ids.map(String).slice(0, 200) : []
-    await admin.from('geo_assets').delete().in('id', ids).eq('user_id', userId).eq('kind', 'pseo').eq('status', 'draft')
+    await admin.from('geo_assets').delete().in('id', ids).eq('user_id', userId).eq('brand_id', brandId).eq('kind', 'pseo').eq('status', 'draft')
     return NextResponse.json({ ok: true })
   }
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 })

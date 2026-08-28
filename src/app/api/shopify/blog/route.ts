@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { resolveStore } from '@/lib/shopify/client'
 import { writeArticle, generateHero, renderArticleHtml, publishToShopifyBlog, suggestTopics, type Article } from '@/lib/shopify/blog'
 import { getPlanId, isGrandfathered } from '@/lib/entitlements'
@@ -23,29 +23,50 @@ async function ctx(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { error: NextResponse.json({ error: 'Unauthorized' }, { status: 401 }) }
   const admin = createAdminClient() as any
-  const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin, user.id)
+  // "All brands" with 2+ brands → don't bind to any store; content is a per-brand action. Prompt to pick.
+  if (needsSelection || !brandId) return { selectBrand: true as const, admin, userId: user.id, userCreatedAt: user.created_at }
+  // Strict when a brand IS selected (resolveStore only returns THIS brand's store) — a brand with no
+  // Shopify connected returns null, and we NEVER fall back to another brand's store.
   const store = await resolveStore(admin, user.id, brandId)
-  if (!store) return { error: NextResponse.json({ error: 'No Shopify store connected', connected: false }, { status: 400 }) }
-  return { admin, store, userId: user.id, userCreatedAt: user.created_at }
+  const { data: b } = await admin.from('brands').select('name').eq('id', brandId).maybeSingle()
+  return { admin, store, brandId, brandName: (b?.name || '') as string, userId: user.id, userCreatedAt: user.created_at }
 }
 
 export async function GET(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store, userId } = c
+  if ('selectBrand' in c) return NextResponse.json({ selectBrand: true })
+  const { admin, store, brandId, brandName, userId } = c
+  // Drafts for THIS brand only (never another brand's articles).
   const { data: drafts } = await admin.from('geo_assets')
     .select('id, title, target_prompt, body_markdown, status, published_url, created_at, seo')
-    .eq('user_id', userId).eq('kind', 'blog').order('created_at', { ascending: false }).limit(50)
+    .eq('user_id', userId).eq('brand_id', brandId).eq('kind', 'blog').order('created_at', { ascending: false }).limit(50)
+  if (!store) return NextResponse.json({ connected: false, brandName, drafts: drafts || [], topics: [] })
   const topics = await suggestTopics(admin, store, userId).catch(() => [])
-  return NextResponse.json({ connected: true, store: { shop_name: store.shop_name, shop_domain: store.shop_domain }, drafts: drafts || [], topics })
+  return NextResponse.json({ connected: true, store: { shop_name: store.shop_name, shop_domain: store.shop_domain }, brandName, drafts: drafts || [], topics })
 }
 
 export async function POST(req: NextRequest) {
   const c = await ctx(req)
   if ('error' in c) return c.error
-  const { admin, store, userId, userCreatedAt } = c
+  if ('selectBrand' in c) return NextResponse.json({ error: 'select_brand', reason: 'Pick a brand from the switcher first — content is written and published per brand.' }, { status: 400 })
+  const { admin, store, brandId, brandName, userId, userCreatedAt } = c
   const body = await req.json().catch(() => ({}))
   const action = body.action
+
+  // Discard is a local delete — allowed without a store, scoped to THIS brand's own drafts.
+  if (action === 'discard') {
+    const id = String(body.id || '')
+    await admin.from('geo_assets').delete().eq('id', id).eq('user_id', userId).eq('brand_id', brandId).eq('kind', 'blog').eq('status', 'draft')
+    return NextResponse.json({ ok: true })
+  }
+
+  // Every write needs THIS brand's Shopify store. No store for the selected brand → ask to connect it
+  // (never fall back to another brand's store).
+  if (!store) {
+    return NextResponse.json({ error: 'connect_shopify', connected: false, brandName, reason: `Connect ${brandName || 'this brand'}’s Shopify store before writing or publishing content.` }, { status: 400 })
+  }
 
   if (action === 'draft') {
     // Drafting calls paid LLM APIs (article) + optionally an image model (hero) → charge credits up
@@ -87,7 +108,8 @@ export async function POST(req: NextRequest) {
     }
     const id = String(body.id || '')
     if (!id) return NextResponse.json({ error: 'Missing draft id' }, { status: 400 })
-    const { data: draft } = await admin.from('geo_assets').select('*').eq('id', id).eq('user_id', userId).eq('kind', 'blog').maybeSingle()
+    // Scope to THIS brand's draft — never publish another brand's article into this store.
+    const { data: draft } = await admin.from('geo_assets').select('*').eq('id', id).eq('user_id', userId).eq('brand_id', brandId).eq('kind', 'blog').maybeSingle()
     if (!draft) return NextResponse.json({ error: 'Draft not found' }, { status: 404 })
     // the hero url was stashed in published_url at draft time; body already includes it
     const heroUrl = draft.published_url && String(draft.published_url).startsWith('http') && !String(draft.published_url).includes('/blogs/') ? draft.published_url : null

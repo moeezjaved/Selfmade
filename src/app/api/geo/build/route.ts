@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveActiveBrandId } from '@/lib/brand/active'
+import { resolveBrandForAction } from '@/lib/brand/active'
 import { buildCrawlAsset, type CrawlKind } from '@/lib/geo/crawlability'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { resolveStore } from '@/lib/shopify/client'
@@ -25,7 +25,8 @@ export async function POST(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const admin = createAdminClient()
   const body = await req.json().catch(() => ({} as any))
-  const brandId = await resolveActiveBrandId(admin as any, user.id, (body?.brandId as string) || null).catch(() => null)
+  const { brandId, needsSelection } = await resolveBrandForAction(admin as any, user.id, (body?.brandId as string) || null)
+  if (needsSelection || !brandId) return NextResponse.json({ selectBrand: true }, { status: 200 })
 
   // ── APPLY: push a built crawlability/entity asset onto the connected Shopify store. Paid feature. ──
   //   fact_sheet → a live Shopify Page;  schema → JSON-LD in the theme <head>;  llms_txt → not applicable

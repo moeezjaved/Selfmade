@@ -6,6 +6,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { openCredits } from '@/components/credits/CreditModal'
+import SelectBrandNotice from '@/components/app/SelectBrandNotice'
 
 type Region = { x: number; y: number; w: number; h: number }
 type Severity = 'critical' | 'high' | 'medium'
@@ -109,7 +110,8 @@ export default function CroPage() {
   }
 
   const [booting, setBooting] = useState(true)   // first load / after brand switch → show skeleton, not "no audit yet"
-  const load = useCallback(async () => { setBooting(true); try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) setR(j as Report) } catch { /* empty */ } finally { setBooting(false) } }, [])
+  const [selectBrand, setSelectBrand] = useState(false)
+  const load = useCallback(async () => { setBooting(true); try { const res = await fetch('/api/cro/audit'); const j = await res.json(); if (res.ok) { if (j?.selectBrand) { setSelectBrand(true); return } setSelectBrand(false); setR(j as Report) } } catch { /* empty */ } finally { setBooting(false) } }, [])
   useEffect(() => { load() }, [load])
   useEffect(() => { const h = () => load(); window.addEventListener('sf:brandchange', h); return () => window.removeEventListener('sf:brandchange', h) }, [load])
 
@@ -119,6 +121,7 @@ export default function CroPage() {
     try {
       const res = await fetch('/api/cro/audit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: '{}' })
       const j = await res.json()
+      if (res.ok && j?.selectBrand) { setSelectBrand(true); setBusy(false); return }
       if (res.ok && j?.hasData) setR(j as Report)
       else if (res.status === 402) openCredits('buy', j.reason || 'A CRO audit costs credits — top up to run it.')
       else if (res.status === 400) setNote(j.note || 'Connect a store or add your website first.')
@@ -126,6 +129,12 @@ export default function CroPage() {
       else setNote(j.note || j.error || 'Couldn’t run the audit — try again.')
     } catch { setNote('Something went wrong — try again.') } finally { setBusy(false) }
   }
+
+  if (selectBrand) return (
+    <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px 90px', fontFamily: "'Inter',-apple-system,sans-serif", color: INK }}>
+      <SelectBrandNotice feature="A conversion (CRO) audit" />
+    </div>
+  )
 
   return (
     <div style={{ maxWidth: 900, margin: '0 auto', padding: '28px 24px 90px', fontFamily: "'Inter',-apple-system,sans-serif", color: INK }}>
