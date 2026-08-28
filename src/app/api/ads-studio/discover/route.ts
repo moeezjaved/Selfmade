@@ -13,21 +13,37 @@ export async function GET(req: NextRequest) {
   const limit = Math.min(parseInt(req.nextUrl.searchParams.get('limit') || '24', 10), 48)
   try {
     const admin = createAdminClient() as any
-    const { data } = await admin.from('discovery_ads_index')
-      .select('ad_id, page_id, page_name, thumbnail_url, raw_image_urls, body, title, format')
+    // Top performers first (need a wide-enough pool since many will have had their R2 image purged).
+    const { data: index } = await admin.from('discovery_ads_index')
+      .select('ad_id, page_name, body, title, format, performance_score')
       .eq('has_creative', true).eq('is_active', true)
-      .not('thumbnail_url', 'is', null)
       .order('performance_score', { ascending: false, nullsFirst: false })
-      .limit(limit * 2)
+      .limit(limit * 20)
+    const rows = (index || []) as any[]
+    if (!rows.length) return NextResponse.json({ ads: [] })
+
+    // The R2 purge deleted non-spied objects but KEPT discovery_creatives posters/images for spied brands,
+    // so the creatives table is the source of truth for what STILL EXISTS. Only show those (no dead thumbs).
+    const ids = rows.map((r) => r.ad_id)
+    const { data: cre } = await admin.from('discovery_creatives')
+      .select('ad_id, asset_type, r2_url, poster_url, position')
+      .in('ad_id', ids).order('position', { ascending: true })
+    const thumbByAd = new Map<string, string>()
+    for (const c of (cre || []) as any[]) {
+      if (thumbByAd.has(c.ad_id)) continue                                   // first (lowest-position) per ad
+      const t = c.poster_url || (c.asset_type !== 'video' ? c.r2_url : null)  // surviving R2 url only
+      if (t) thumbByAd.set(c.ad_id, t)
+    }
+
     const seen = new Set<string>()
-    const ads = (data || []).map((a: any) => ({
+    const ads = rows.map((a) => ({
       id: a.ad_id,
       brand: a.page_name || 'Brand',
-      thumb: a.thumbnail_url || (Array.isArray(a.raw_image_urls) ? a.raw_image_urls[0] : null) || null,
+      thumb: thumbByAd.get(a.ad_id) || null,
       copy: (a.body || a.title || '').slice(0, 120),
       format: a.format || 'image',
-    })).filter((a: any) => {
-      if (!a.thumb || seen.has(a.brand)) return false   // one per brand → a varied wall
+    })).filter((a) => {
+      if (!a.thumb || seen.has(a.brand)) return false   // one per brand → a varied wall of REAL, surviving images
       seen.add(a.brand); return true
     }).slice(0, limit)
     return NextResponse.json({ ads })
