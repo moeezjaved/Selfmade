@@ -90,7 +90,7 @@ export async function crawlSite(admin: SupabaseClient, userId: string, brandId: 
   const home = await fetchHtml(base.href)
   if (!home) return { site: base.href, note: `Couldn’t fetch ${base.hostname} — it may block bots or be down. I’ll retry next run.` }
   const urls = [base.origin + base.pathname, ...internalLinks(home, base, 12)]
-  const uniq = Array.from(new Set(urls)).slice(0, 10)
+  const uniq = Array.from(new Set(urls)).slice(0, 20)   // match the store-audit crawl depth (was 10, which contradicted the "Crawled 20" carried-over count)
   const checks: PageCheck[] = []
   for (const url of uniq) {
     const html = url === (base.origin + base.pathname) ? home : await fetchHtml(url)
@@ -107,7 +107,7 @@ export async function runSeoAudit(admin: SupabaseClient, userId: string, brandId
 
   // ── aggregate real findings ──
   const issues: Issue[] = []
-  const add = (severity: Severity, title: string, detail: string, pages: string[]) => { if (pages.length) issues.push({ severity, title, detail, pages: pages.slice(0, 8) }) }
+  const add = (severity: Severity, title: string, detail: string, pages: string[]) => { if (pages.length) issues.push({ severity, title, detail, pages: pages.slice(0, 50) }) }
   const P = (pred: (c: PageCheck) => boolean) => checks.filter(pred).map((c) => c.url)
 
   add('high', 'Missing title tag', 'Pages with no <title> — search engines have nothing to show in results.', P((c) => !c.title))

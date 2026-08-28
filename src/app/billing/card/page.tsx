@@ -10,7 +10,7 @@ import { Suspense, useEffect, useRef, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { PLANS, TOPUP_PACKS, type PlanId } from '@/lib/plans'
 
-const INK = '#0e1b12', GREEN = '#16a34a', LIME = '#ff5a2c'
+const INK = '#1a1410', GREEN = '#e02f06', LIME = '#ff5a2c'
 const CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || ''
 
 function CardCheckout() {
@@ -43,9 +43,9 @@ function CardCheckout() {
       const cardField = paypal.CardFields({
         // Slim PayPal's hosted inputs so each field iframe matches our 48px boxes (default is ~78px).
         style: {
-          input: { 'font-size': '15px', 'font-family': 'Inter, -apple-system, sans-serif', color: '#0e1b12', padding: '10px 12px' },
+          input: { 'font-size': '15px', 'font-family': 'Inter, -apple-system, sans-serif', color: '#1a1410', padding: '10px 12px' },
           '.invalid': { color: '#b91c1c' },
-          ':focus': { color: '#0e1b12' },
+          ':focus': { color: '#1a1410' },
         },
         createOrder: async () => {
           const r = await fetch('/api/billing/paypal/card/create-order', {
@@ -97,7 +97,7 @@ function CardCheckout() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter',-apple-system,sans-serif", background: 'radial-gradient(120% 100% at 50% -10%, #eef8dd, #ffffff)', padding: 24 }}>
+    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Inter',-apple-system,sans-serif", background: 'radial-gradient(120% 100% at 50% -10%, #fbf4e2, #ffffff)', padding: 24 }}>
       <div style={{ width: 'min(440px, 96vw)', background: '#fff', borderRadius: 18, boxShadow: '0 24px 70px rgba(0,0,0,0.12)', padding: 28 }}>
         <div style={{ fontSize: 13, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: GREEN }}>Secure checkout</div>
         <h1 style={{ fontSize: 22, fontWeight: 800, letterSpacing: '-.02em', color: INK, margin: '6px 0 2px' }}>{title}</h1>
@@ -129,7 +129,7 @@ function CardCheckout() {
 
         {/* Secondary: let customers who prefer it pay via their PayPal account (redirect flow). */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '16px 0 4px' }}>
-          <div style={{ flex: 1, height: 1, background: '#eef2ec' }} /><span style={{ fontSize: 11, color: '#9ca3af' }}>or</span><div style={{ flex: 1, height: 1, background: '#eef2ec' }} />
+          <div style={{ flex: 1, height: 1, background: '#f4f1ea' }} /><span style={{ fontSize: 11, color: '#9ca3af' }}>or</span><div style={{ flex: 1, height: 1, background: '#f4f1ea' }} />
         </div>
         <button onClick={async () => {
           const r = await fetch('/api/billing/paypal/checkout', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(kind === 'topup' ? { kind, pack } : { kind, plan, cycle }) }).then((x) => x.json()).catch(() => ({}))

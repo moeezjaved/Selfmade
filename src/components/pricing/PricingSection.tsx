@@ -11,7 +11,7 @@ import toast from 'react-hot-toast'
 import { ACTION_COSTS, normalizePlan, type PlanId } from '@/lib/plans'
 import { openCredits } from '@/components/credits/CreditModal'
 
-const DARK = '#16321a', LIME = '#ff5a2c', ACCENT = '#3a7000', MUTED = '#6b7a6b'
+const DARK = '#1a1410', LIME = '#ff5a2c', ACCENT = '#e02f06', MUTED = '#6f665a'
 const IMG_USD = (ACTION_COSTS.image_clone_pro / 100).toFixed(2)   // 1 credit = 1¢
 const VID_USD = String(Math.round(ACTION_COSTS.video_clone / 100))
 
@@ -106,7 +106,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
   }
 
   return (
-    <div style={{ maxWidth: 1080, margin: '0 auto', color: '#16261a' }}>
+    <div style={{ maxWidth: 1080, margin: '0 auto', color: '#1a1410' }}>
       {/* the one thing to remember */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginBottom: 30 }}>
         <div style={chip}><span style={{ fontSize: 19 }}>🖼️</span><span style={{ fontSize: 14, color: MUTED, fontWeight: 600 }}>Image ad</span><b style={{ fontSize: 21, letterSpacing: '-.02em' }}>${IMG_USD}</b></div>
@@ -130,7 +130,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
             <div style={{ fontSize: 12, color: MUTED, minHeight: 16, marginBottom: 4 }}>{c.note}</div>
             <button onClick={() => cta(c)} disabled={busy === c.id || (variant === 'dashboard' && !planLoaded) || (variant === 'dashboard' && current === c.id && !canceledCurrent)} style={{
               margin: '14px 0', padding: '11px', borderRadius: 100, border: 'none', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 800, fontSize: 13.5,
-              background: (variant === 'dashboard' && current === c.id) ? '#eef2ec' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#f2f6ee',
+              background: (variant === 'dashboard' && current === c.id) ? '#f4f1ea' : c.popular ? LIME : (c.id === 'business' || c.id === 'payg') ? DARK : '#fbf7ef',
               color: (variant === 'dashboard' && current === c.id) ? '#6b7280' : (c.id === 'business' || c.id === 'payg') ? LIME : c.popular ? '#fff' : DARK,
             }}>{label(c)}</button>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 9, fontSize: 13, color: '#333' }}>
@@ -146,7 +146,7 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
       </div>
 
       {/* agency anchor */}
-      <div style={{ marginTop: 28, padding: '18px 22px', borderRadius: 16, background: '#f2f8f0', border: '1px solid #d8e6d4', textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#16261a' }}>
+      <div style={{ marginTop: 28, padding: '18px 22px', borderRadius: 16, background: '#fbf7ef', border: '1px solid #efe7d9', textAlign: 'center', fontSize: 16, fontWeight: 700, color: '#1a1410' }}>
         A UGC video from a freelancer: <span style={{ color: MUTED, fontWeight: 500 }}>$200–300 and a week.</span> &nbsp;Here: ${VID_USD} and 2 minutes.
       </div>
       <p style={{ marginTop: 12, fontSize: 12.5, color: MUTED, textAlign: 'center' }}>1 video ad = a short-form ad up to ~30s; longer videos use a bit more. Prices in USD.</p>
@@ -173,4 +173,4 @@ export default function PricingSection({ variant = 'landing', subscriptionStatus
   )
 }
 
-const chip: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 10, background: '#fff', border: '1px solid #e2e8e0', borderRadius: 14, padding: '13px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }
+const chip: React.CSSProperties = { display: 'flex', alignItems: 'baseline', gap: 10, background: '#fff', border: '1px solid #eadfce', borderRadius: 14, padding: '13px 18px', boxShadow: '0 2px 12px rgba(0,0,0,0.04)' }

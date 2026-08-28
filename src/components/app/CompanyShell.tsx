@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Mark } from '@/components/brand/Mark'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Inbox, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
+import { Home, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { openCredits, CreditModal } from '@/components/credits/CreditModal'
@@ -33,7 +33,9 @@ type Item = { href: string; label: string; icon?: React.ElementType }
 type Group = { label?: string; stage?: boolean; items: Item[] }
 
 const NAV: Group[] = [
-  { items: [{ href: '/hq', label: 'Home', icon: Home }, { href: '/inbox', label: 'Inbox', icon: Inbox }] },
+  // Inbox hidden for now — the Unipile integration is too buggy to ship. Re-add once we move to a better
+  // provider: { href: '/inbox', label: 'Inbox', icon: Inbox }
+  { items: [{ href: '/hq', label: 'Home', icon: Home }] },
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
     { href: '/creative-studio', label: 'My Creatives', icon: Sparkles },

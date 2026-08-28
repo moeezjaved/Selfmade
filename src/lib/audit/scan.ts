@@ -144,9 +144,12 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
 function stepHealth(ctx: Ctx): Section {
   const f: Finding[] = []
   const noMeta = ctx.pages.filter((p) => !p.metaDesc)
-  if (noMeta.length) f.push({ id: 'meta', title: `${noMeta.length} sampled pages missing meta descriptions`, detail: 'Google writes its own snippet for these — usually worse than yours would be.', severity: noMeta.length > 3 ? 'high' : 'medium', sample: noMeta.map((p) => new URL(p.url).pathname), fixable: true })
-  const noAlt = ctx.pages.reduce((a, p) => a + p.imgsNoAlt, 0)
-  if (noAlt) f.push({ id: 'alt', title: `${noAlt} images missing alt text on sampled pages`, detail: 'Invisible in Google image search.', severity: noAlt > 20 ? 'high' : 'medium', fixable: true })
+  if (noMeta.length) f.push({ id: 'meta', title: `${noMeta.length} sampled page${noMeta.length === 1 ? '' : 's'} missing meta descriptions`, detail: 'Google writes its own snippet for these — usually worse than yours would be.', severity: noMeta.length > 3 ? 'high' : 'medium', sample: noMeta.map((p) => new URL(p.url).pathname), fixable: true })
+  const altPages = ctx.pages.filter((p) => p.imgsNoAlt > 0)
+  const noAlt = altPages.reduce((a, p) => a + p.imgsNoAlt, 0)
+  // Include the affected pages as the sample so the UI shows a real page count/list instead of "0 pages"
+  // (noAlt is an IMAGE count — without a sample the page chip read 0 even when many images were missing alt).
+  if (noAlt) f.push({ id: 'alt', title: `${noAlt} image${noAlt === 1 ? '' : 's'} missing alt text on sampled pages`, detail: 'Invisible in Google image search.', severity: noAlt > 20 ? 'high' : 'medium', sample: altPages.map((p) => new URL(p.url).pathname), fixable: true })
   const badH1 = ctx.pages.filter((p) => p.h1 !== 1)
   if (badH1.length) f.push({ id: 'h1', title: `${badH1.length} pages with a missing or duplicate H1`, detail: 'The H1 tells Google the page’s main topic.', severity: 'medium', sample: badH1.map((p) => new URL(p.url).pathname), fixable: true })
   const urls = ctx.pages.map((p) => { try { return new URL(p.url).pathname } catch { return p.url } })
