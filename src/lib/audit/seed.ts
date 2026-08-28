@@ -47,10 +47,11 @@ export async function seedBrandFromScan(admin: SupabaseClient, userId: string, b
   if (!brandId) return
   const db = admin as any
   try {
-    // Already have both? Nothing to do (the common steady-state path — one cheap indexed check each).
+    // Already have both? Nothing to do. Scope the check the SAME way the loaders read (user_id + brand_id)
+    // so we don't skip seeding a row THIS user can't actually see (e.g. a teammate ran the deep audit).
     const [{ data: seoRow }, { data: geoRow }] = await Promise.all([
-      db.from('seo_audit').select('id').eq('brand_id', brandId).limit(1).maybeSingle(),
-      db.from('geo_audit').select('id').eq('brand_id', brandId).limit(1).maybeSingle(),
+      db.from('seo_audit').select('id').eq('user_id', userId).eq('brand_id', brandId).limit(1).maybeSingle(),
+      db.from('geo_audit').select('id').eq('user_id', userId).eq('brand_id', brandId).limit(1).maybeSingle(),
     ])
     if (seoRow && geoRow) return
 
