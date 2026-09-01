@@ -44,7 +44,6 @@ export default function StoreAuditClient() {
   const [captured, setCaptured] = useState(false)
   const [brandId, setBrandId] = useState<string | null>(null)   // the brand we render the real ads under
   const [atCap, setAtCap] = useState(false)                     // at the plan's brand limit → can't add this store
-  const [focus, setFocus] = useState<string | null>(null)       // which capability the visitor came in for (nav → audit)
   const act2Ref = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLDivElement>(null)
 
@@ -156,6 +155,7 @@ function ActDivider({ n, label }: { n: number; label: string }) {
 /* ───────────────────────── Input screen ───────────────────────── */
 function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
   const [domain, setDomain] = useState('')
+  const [focus, setFocus] = useState<string | null>(null)       // which capability the visitor came in for (nav → audit)
   const [rival, setRival] = useState('')
   // "Your ads" — brand-pick from our DB, or paste a Meta Ad Library link.
   const [brandQ, setBrandQ] = useState('')
