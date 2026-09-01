@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { useChatStream } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
+import HqRunable from './HqRunable'
 
 const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.1)', ORANGE = '#e02f06', PAPER = '#fbf7ef'
 const SERIF = 'Fraunces, Georgia, serif'
@@ -32,6 +33,17 @@ const ACTIONS: { label: string; sub: string; href: string; icon: string }[] = [
 ]
 
 export default function HomePage() {
+  // Runable-style Home behind ?hq=v2 (sticky via the sf_hq cookie); ?hq=off reverts. Default = this page.
+  const [hqV2, setHqV2] = useState<boolean | null>(null)
+  useEffect(() => {
+    try {
+      const q = new URLSearchParams(window.location.search).get('hq')
+      if (q === 'v2') { document.cookie = 'sf_hq=v2; path=/; max-age=31536000'; setHqV2(true); return }
+      if (q === 'off' || q === 'v1') { document.cookie = 'sf_hq=; path=/; max-age=0'; setHqV2(false); return }
+      setHqV2(/(?:^|; )sf_hq=v2/.test(document.cookie))
+    } catch { setHqV2(false) }
+  }, [])
+
   const [convId, setConvId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [journey, setJourney] = useState<Journey | null>(null)
@@ -62,6 +74,9 @@ export default function HomePage() {
   const brand = journey?.brandName || 'your company'
   const cur = journey?.revenue?.currency || '$'
   const fmt = (n: number) => `${cur === 'USD' ? '$' : cur ? cur + ' ' : '$'}${Math.round(n).toLocaleString()}`
+
+  if (hqV2 === null) return null            // resolve the flag before first paint (no flash)
+  if (hqV2) return <HqRunable />            // ?hq=v2 → the Runable-style home
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
