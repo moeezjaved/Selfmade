@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useChatStream } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
@@ -120,6 +121,31 @@ export default function HqRunable() {
   const metaOn = !!connect.find((t: any) => t.key === 'meta')?.done
   const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
+  // ── task setup popup (Runable-style) ──────────────────────────────────────
+  const router = useRouter()
+  const [task, setTask] = useState<Tile | null>(null)
+  const [tInstr, setTInstr] = useState('')
+  const [tFmts, setTFmts] = useState<string[]>([])
+  const [tFreq, setTFreq] = useState('One-off')
+  const [tTime, setTTime] = useState('9:00 AM')
+  const [tPublish, setTPublish] = useState<'direct' | 'draft'>('draft')
+  const openTask = (t: Tile) => {
+    setTask(t)
+    setTInstr(t.seed || `Create ${t.label.toLowerCase()} for ${brand}. Learn from what has worked before, keep it on-brand, and bring it to me to approve before it ships.`)
+    setTFmts([]); setTFreq('One-off'); setTTime('9:00 AM'); setTPublish('draft')
+  }
+  const runTask = () => {
+    if (!task) return
+    const parts = [tInstr.trim()]
+    if (tFmts.length) parts.push(`Formats: ${tFmts.join(', ')}.`)
+    if (tFreq !== 'One-off') parts.push(`Cadence: ${tFreq} at ${tTime}.`)
+    parts.push(tPublish === 'direct' ? 'Publish once I approve.' : 'Draft it and notify me first.')
+    const idea = parts.filter(Boolean).join(' ')
+    const dest = task.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(idea.slice(0, 600))}` : task.href
+    setTask(null); router.push(dest)
+  }
+  const selStyle: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit' }
+
   return (
     <div style={{ display: 'flex', height: '100dvh', background: '#fff', color: INK }}>
       {/* ── centre ── */}
@@ -162,11 +188,11 @@ export default function HqRunable() {
                       {!off && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                           {cat.tiles.map((t) => (
-                            <Link key={t.label} href={t.href === '/ads-workspace' && (input.trim() || t.seed) ? `/ads-workspace?idea=${encodeURIComponent((input.trim() || t.seed || '').slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                            <button key={t.label} type="button" onClick={() => openTask(t)} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textAlign: 'left', width: '100%', cursor: 'pointer', font: 'inherit', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
                               <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
                               <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
                               <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
-                            </Link>
+                            </button>
                           ))}
                         </div>
                       )}
@@ -232,6 +258,50 @@ export default function HqRunable() {
           <div style={{ fontSize: 12.5, color: SUB, lineHeight: 1.55, marginTop: 9 }}>Open your mission to see what Mello shipped and what&rsquo;s waiting for your approval. <span style={{ color: ORANGE, fontWeight: 600 }}>Open →</span></div>
         </Link>
       </aside>
+
+      {/* ── task setup popup ── */}
+      {task && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setTask(null) }} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(20,18,15,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', borderRadius: 20, padding: 26, boxShadow: '0 40px 100px -30px rgba(0,0,0,.5)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
+                <span style={{ width: 34, height: 34, borderRadius: 9, background: INSET, display: 'grid', placeItems: 'center', color: '#111' }}>{task.icon}</span>
+                <div><div style={{ fontFamily: SERIF, fontSize: 22, letterSpacing: '-.01em' }}>{task.label}</div><div style={{ fontSize: 12.5, color: SUB }}>{task.sub}</div></div>
+              </div>
+              <button onClick={() => setTask(null)} aria-label="Close" style={{ background: 'none', border: 0, fontSize: 24, color: SUB, cursor: 'pointer', lineHeight: 1 }}>×</button>
+            </div>
+
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Instructions</div>
+            <textarea value={tInstr} onChange={(e) => setTInstr(e.target.value)} rows={4} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14.5, lineHeight: 1.5, color: INK, resize: 'vertical', outline: 'none', fontFamily: 'inherit' }} />
+
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>What to create</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {['Image', 'Video', 'Carousel', 'Story'].map((f) => {
+                const on = tFmts.includes(f)
+                return <button key={f} type="button" onClick={() => setTFmts((x) => on ? x.filter((y) => y !== f) : [...x, f])} style={{ display: 'flex', alignItems: 'center', gap: 9, border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}><span style={{ width: 15, height: 15, borderRadius: 4, border: `1.5px solid ${on ? '#fff' : LINE}`, display: 'grid', placeItems: 'center', fontSize: 10 }}>{on ? '✓' : ''}</span>{f}</button>
+              })}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+              <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Frequency</div><select value={tFreq} onChange={(e) => setTFreq(e.target.value)} style={selStyle}>{['One-off', 'Daily', 'Weekly', 'Monthly'].map((o) => <option key={o}>{o}</option>)}</select></div>
+              <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Time</div><select value={tTime} onChange={(e) => setTTime(e.target.value)} style={selStyle}>{['7:00 AM', '9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((o) => <option key={o}>{o}</option>)}</select></div>
+            </div>
+
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Publishing</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+              {([['direct', 'Publish once approved'], ['draft', 'Draft & notify me']] as const).map(([v, l]) => {
+                const on = tPublish === v
+                return <button key={v} type="button" onClick={() => setTPublish(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
+              })}
+            </div>
+
+            <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
+              <button onClick={() => setTask(null)} style={{ flex: 1, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 999, padding: 13, fontWeight: 600, fontSize: 14, color: INK, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Start this task →</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
