@@ -33,15 +33,16 @@ const ACTIONS: { label: string; sub: string; href: string; icon: string }[] = [
 ]
 
 export default function HomePage() {
-  // Runable-style Home behind ?hq=v2 (sticky via the sf_hq cookie); ?hq=off reverts. Default = this page.
-  const [hqV2, setHqV2] = useState<boolean | null>(null)
+  // Runable-style Home is now the DEFAULT. ?hq=v1 (or ?hq=off) reverts to this classic chat-first page and
+  // sticks via the sf_hq=v1 cookie; ?hq=v2 clears it. Starts true so the default renders with no blank flash.
+  const [hqV2, setHqV2] = useState(true)
   useEffect(() => {
     try {
       const q = new URLSearchParams(window.location.search).get('hq')
-      if (q === 'v2') { document.cookie = 'sf_hq=v2; path=/; max-age=31536000'; setHqV2(true); return }
-      if (q === 'off' || q === 'v1') { document.cookie = 'sf_hq=; path=/; max-age=0'; setHqV2(false); return }
-      setHqV2(/(?:^|; )sf_hq=v2/.test(document.cookie))
-    } catch { setHqV2(false) }
+      if (q === 'v1' || q === 'off') { document.cookie = 'sf_hq=v1; path=/; max-age=31536000'; setHqV2(false); return }
+      if (q === 'v2') { document.cookie = 'sf_hq=; path=/; max-age=0'; setHqV2(true); return }
+      if (/(?:^|; )sf_hq=v1/.test(document.cookie)) setHqV2(false)   // else stays default (v2)
+    } catch { /* keep default v2 */ }
   }, [])
 
   const [convId, setConvId] = useState<string | null>(null)
@@ -75,8 +76,7 @@ export default function HomePage() {
   const cur = journey?.revenue?.currency || '$'
   const fmt = (n: number) => `${cur === 'USD' ? '$' : cur ? cur + ' ' : '$'}${Math.round(n).toLocaleString()}`
 
-  if (hqV2 === null) return null            // resolve the flag before first paint (no flash)
-  if (hqV2) return <HqRunable />            // ?hq=v2 → the Runable-style home
+  if (hqV2) return <HqRunable />            // default; ?hq=v1 reverts to the classic page below
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
