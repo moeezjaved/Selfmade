@@ -16,12 +16,12 @@ const config: FeatureConfig = {
   galleryTitle: 'Page templates for every goal',
   cardCta: 'Use template →',
   cards: [
-    { t: 'Homepage', d: 'Hero, proof, products, CTA', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' },
-    { t: 'Product page', d: 'Gallery, benefits, reviews, buy', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' },
-    { t: 'Landing page', d: 'One offer, one action, high-convert', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' },
-    { t: 'Collection', d: 'Browse and filter that sells', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' },
-    { t: 'About', d: 'Story and trust, done right', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' },
-    { t: 'Bundle offer', d: 'Upsell and increase order value', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' },
+    { t: 'Homepage', d: 'Hero, proof, products, CTA', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' , ic: 'layout' },
+    { t: 'Product page', d: 'Gallery, benefits, reviews, buy', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' , ic: 'box' },
+    { t: 'Landing page', d: 'One offer, one action, high-convert', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' , ic: 'target' },
+    { t: 'Collection', d: 'Browse and filter that sells', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' , ic: 'grid' },
+    { t: 'About', d: 'Story and trust, done right', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' , ic: 'doc' },
+    { t: 'Bundle offer', d: 'Upsell and increase order value', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' , ic: 'cart' },
   ],
   featuresTitle: 'The best features, designed for growth',
   features: [

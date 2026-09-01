@@ -16,12 +16,12 @@ const config: FeatureConfig = {
   galleryTitle: 'Everything that moves rankings',
   cardCta: 'See how →',
   cards: [
-    { t: 'Technical audit', d: 'Crawl, index & Core Web Vitals', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' },
-    { t: 'Title & meta rewrites', d: 'Every page, keyword-optimised', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' },
-    { t: 'Internal links', d: 'Link equity where it counts', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' },
-    { t: 'Buyer-intent blogs', d: 'Content that ranks and converts', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' },
-    { t: 'Product SEO', d: 'Descriptions & schema that win', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' },
-    { t: 'Schema markup', d: 'Rich results, more clicks', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' },
+    { t: 'Technical audit', d: 'Crawl, index & Core Web Vitals', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' , ic: 'search' },
+    { t: 'Title & meta rewrites', d: 'Every page, keyword-optimised', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' , ic: 'tag' },
+    { t: 'Internal links', d: 'Link equity where it counts', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' , ic: 'link' },
+    { t: 'Buyer-intent blogs', d: 'Content that ranks and converts', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' , ic: 'doc' },
+    { t: 'Product SEO', d: 'Descriptions & schema that win', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' , ic: 'cart' },
+    { t: 'Schema markup', d: 'Rich results, more clicks', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' , ic: 'code' },
   ],
   featuresTitle: 'The best features, designed for growth',
   features: [
