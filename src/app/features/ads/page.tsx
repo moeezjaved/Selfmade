@@ -69,11 +69,12 @@ const CSS = `
   /* nav */
   .nav{position:absolute;top:0;left:0;right:0;z-index:20}
   .nav-in{max-width:1120px;margin:0 auto;padding:20px 26px;display:flex;align-items:center;justify-content:space-between}
-  .brand{font-family:var(--serif);font-weight:400;font-size:22px;letter-spacing:-.02em}
+  .brand{display:inline-flex;align-items:center}
+  .brand img{height:19px;width:auto;display:block;filter:brightness(0)}
   .nav-r{display:flex;align-items:center;gap:20px}
   .nav-r a{font-weight:500;font-size:15px}
-  .btn-dark{background:#141d15;color:#fff;padding:10px 18px;border-radius:100px;font-weight:600;font-size:14px}
-  .btn-dark:hover{opacity:.92}
+  .fa a.btn-dark{background:#141d15;color:#fff;padding:10px 18px;border-radius:100px;font-weight:600;font-size:14px}
+  .fa a.btn-dark:hover{opacity:.92}
   /* hero */
   .hero{position:relative;padding:150px 0 80px;background:radial-gradient(58% 60% at 50% 40%,rgba(255,255,255,.95) 0%,rgba(255,255,255,.5) 34%,rgba(255,255,255,0) 66%),linear-gradient(180deg,#e2f1ff 0%,#d0e8ff 55%,#bfe1fb 100%);text-align:center}
   .eyebrow{display:inline-block;font-weight:600;font-size:12.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:16px}
@@ -176,7 +177,10 @@ export default function AdsFeaturePage() {
       <div className="fa">
         {/* nav */}
         <nav className="nav"><div className="nav-in">
-          <Link href="/" className="brand">Selfmade</Link>
+          <Link href="/" className="brand">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/selfmade-wordmark.png" alt="Selfmade" />
+          </Link>
           <div className="nav-r">
             <Link href="/features/ads" className="hide">Paid Ads</Link>
             <Link href="/store-audit?focus=seo" className="hide">SEO</Link>
