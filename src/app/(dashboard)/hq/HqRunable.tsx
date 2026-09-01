@@ -23,25 +23,28 @@ const TikTok = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ di
 const Shopify = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><path fill="#95BF47" fillRule="evenodd" d="M7 7V6a5 5 0 0110 0v1h1.7l1 12.4a1 1 0 01-1 1.1H4.3a1 1 0 01-1-1.1L4.3 7H7zm2 0h6V6a3 3 0 00-6 0v1z" /></svg>
 const Insta = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><defs><linearGradient id="hqig" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#FEDA75" /><stop offset=".3" stopColor="#FA7E1E" /><stop offset=".6" stopColor="#D62976" /><stop offset="1" stopColor="#4F5BD5" /></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="5.2" fill="none" stroke="url(#hqig)" strokeWidth="2" /><circle cx="12" cy="12" r="4.2" fill="none" stroke="url(#hqig)" strokeWidth="2" /><circle cx="17.2" cy="6.8" r="1.25" fill="url(#hqig)" /></svg>
 
-type Tile = { label: string; sub: string; href: string; icon?: React.ReactNode; emoji?: string }
+// monoline icon wrapper (black stroke, matches Runable's non-brand icons)
+const Ic = ({ children }: { children: React.ReactNode }) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{children}</svg>
+
+type Tile = { label: string; sub: string; href: string; icon: React.ReactNode }
 const GROW: Tile[] = [
   { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
   { label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
   { label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
-  { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', emoji: '🔍' },
-  { label: 'AI Visibility', sub: 'Get cited by ChatGPT', href: '/mission/geo', emoji: '🤖' },
-  { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', emoji: '✍️' },
-  { label: 'Spy a Competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', emoji: '🕵️' },
-  { label: 'CRO Audit', sub: 'Fix storefront leaks', href: '/mission/cro', emoji: '🛠️' },
-  { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', emoji: '🚀' },
+  { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', icon: <Ic><circle cx="11" cy="11" r="7" /><path d="M20 20l-3-3" /></Ic> },
+  { label: 'AI Visibility', sub: 'Get cited by ChatGPT', href: '/mission/geo', icon: <Ic><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z" /><path d="M18 15l.7 1.8L20.5 17.5l-1.8.7L18 20l-.7-1.8L15.5 17.5l1.8-.7z" /></Ic> },
+  { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', icon: <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic> },
+  { label: 'Spy a Competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', icon: <Ic><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Ic> },
+  { label: 'CRO Audit', sub: 'Fix storefront leaks', href: '/mission/cro', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
+  { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
 ]
 const BUILD: Tile[] = [
-  { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', emoji: '🖼️' },
-  { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', emoji: '🎬' },
-  { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', emoji: '📱' },
-  { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', emoji: '✍️' },
-  { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', emoji: '🎠' },
-  { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', emoji: '🗂️' },
+  { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
+  { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
+  { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
+  { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', icon: <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic> },
+  { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
+  { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: <Ic><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></Ic> },
 ]
 
 export default function HqRunable() {
@@ -121,7 +124,7 @@ export default function HqRunable() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                   {tiles.map((t) => (
                     <Link key={t.label} href={input.trim() && t.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(input.trim().slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
-                      <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, fontSize: 15 }}>{t.icon || t.emoji}</span>
+                      <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: INK }}>{t.icon}</span>
                       <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
                       <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
                     </Link>
