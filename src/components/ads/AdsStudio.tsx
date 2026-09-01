@@ -154,6 +154,10 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   const [msgs, setMsgs] = useState<ChatMsg[]>([])
   const [busy, setBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  // Arriving from HQ's "Create an ad" with what the user already typed → open with the idea pre-filled.
+  useEffect(() => {
+    try { const idea = new URLSearchParams(window.location.search).get('idea'); if (idea) setInput(idea.slice(0, 400)) } catch { /* ignore */ }
+  }, [])
   const composerRef = useRef<HTMLDivElement>(null)
   const focusComposer = () => setTimeout(() => composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 60)
 

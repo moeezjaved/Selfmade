@@ -89,7 +89,7 @@ export default function HomePage() {
                 <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: '#a49a8a', marginBottom: 13 }}>Or start a task</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, maxWidth: 520, margin: '0 auto' }}>
                   {ACTIONS.map((a) => (
-                    <Link key={a.label} href={a.href} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '13px 15px', textDecoration: 'none', color: INK }}>
+                    <Link key={a.label} href={a.href === '/ads-workspace' && input.trim() ? `${a.href}?idea=${encodeURIComponent(input.trim().slice(0, 400))}` : a.href} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '13px 15px', textDecoration: 'none', color: INK }}>
                       <span style={{ width: 34, height: 34, borderRadius: 9, background: '#fbe9e2', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 16 }}>{a.icon}</span>
                       <span style={{ minWidth: 0 }}>
                         <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{a.label}</span>
