@@ -10,12 +10,16 @@ import StoreAuditClient from './StoreAuditClient'
 
 export const dynamic = 'force-dynamic'
 
-export default async function StoreAuditPage() {
+export default async function StoreAuditPage({ searchParams }: { searchParams: { focus?: string } }) {
+  // Carry the capability the visitor came in for (nav → audit) through the signup bounce, so a
+  // logged-out visitor who clicked "SEO"/"Paid Ads" still lands on the focused audit after signing up.
+  const focus = searchParams?.focus
+  const dest = focus ? `/store-audit?focus=${encodeURIComponent(focus)}` : '/store-audit'
   let signedIn = false
   try {
     const { data: { user } } = await (await createClient()).auth.getUser()
     signedIn = !!user
   } catch { signedIn = false }
-  if (!signedIn) redirect('/signup?next=/store-audit')   // outside try — redirect() throws by design
+  if (!signedIn) redirect(`/signup?next=${encodeURIComponent(dest)}`)   // outside try — redirect() throws by design
   return <StoreAuditClient />
 }
