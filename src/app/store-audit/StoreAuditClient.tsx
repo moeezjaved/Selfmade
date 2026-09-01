@@ -44,6 +44,7 @@ export default function StoreAuditClient() {
   const [captured, setCaptured] = useState(false)
   const [brandId, setBrandId] = useState<string | null>(null)   // the brand we render the real ads under
   const [atCap, setAtCap] = useState(false)                     // at the plan's brand limit → can't add this store
+  const [focus, setFocus] = useState<string | null>(null)       // which capability the visitor came in for (nav → audit)
   const act2Ref = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLDivElement>(null)
 
@@ -170,6 +171,7 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
 
   // Carry the domain the founder typed on the landing ("See your ads") through signup into this screen.
   useEffect(() => { try { const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/); if (m) setDomain((d) => d || decodeURIComponent(m[1])) } catch { /* ignore */ } }, [])
+  useEffect(() => { try { setFocus(new URLSearchParams(window.location.search).get('focus')) } catch { /* ignore */ } }, [])
 
   // Debounced brand search (public endpoint the /scan picker already uses).
   useEffect(() => {
@@ -222,12 +224,13 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
     </div>
   )
   const wlink: React.CSSProperties = { marginTop: 8, background: 'none', border: 'none', color: WORANGE, fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit', padding: 0, textDecoration: 'none' }
+  const focusLabel = focus ? ({ marketer: 'AI marketing', ads: 'Paid ads', seo: 'SEO', geo: 'AI visibility', shopify: 'Shopify autopilot' } as Record<string, string>)[focus] : null
 
   return (
     <div style={{ minHeight: '100dvh', background: '#fff', color: WINK, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 24px', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <style>{`input::placeholder{color:${WSUB};opacity:.7}`}</style>
       <div style={{ width: '100%', maxWidth: 540 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: WORANGE, marginBottom: 12, textAlign: 'center' }}>{domain ? `Auditing ${domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}` : 'Free · one scan · saved to your account'}</div>
+        <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.14em', textTransform: 'uppercase', color: WORANGE, marginBottom: 12, textAlign: 'center' }}>{domain ? `Auditing ${domain.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}` : `Free · ${focusLabel ? focusLabel + ' audit' : 'one scan'} · saved to your account`}</div>
         <h1 style={{ fontFamily: WSERIF, fontSize: 44, fontWeight: 500, lineHeight: 1.05, margin: '0 0 10px', letterSpacing: '-.02em', textAlign: 'center' }}>Audit your whole store.</h1>
         <p style={{ fontSize: 15.5, color: WSUB, lineHeight: 1.5, margin: '0 0 28px', textAlign: 'center' }}>Your ads and your search &amp; AI visibility — one scan, one report. See where you stand on Facebook, Google, and ChatGPT/Gemini, and where rivals are winning.</p>
 
