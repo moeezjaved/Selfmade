@@ -26,7 +26,7 @@ const Insta = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ dis
 // monoline icon wrapper (black stroke, matches Runable's non-brand icons)
 const Ic = ({ children }: { children: React.ReactNode }) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{children}</svg>
 
-type Tile = { label: string; sub: string; href: string; icon: React.ReactNode }
+type Tile = { label: string; sub: string; href: string; icon: React.ReactNode; seed?: string }
 const GROW: Tile[] = [
   { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
   { label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
@@ -39,11 +39,11 @@ const GROW: Tile[] = [
   { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
 ]
 const BUILD: Tile[] = [
-  { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
-  { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
-  { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
+  { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', seed: 'Make a scroll-stopping image ad for my bestseller', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
+  { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
+  { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', seed: 'Make a UGC testimonial-style ad for my product', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
   { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', icon: <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic> },
-  { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
+  { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
   { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: <Ic><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></Ic> },
 ]
 
@@ -123,7 +123,7 @@ export default function HqRunable() {
                 <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>{mode === 'grow' ? 'Your marketing team' : 'Make with the team'}</div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                   {tiles.map((t) => (
-                    <Link key={t.label} href={input.trim() && t.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(input.trim().slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                    <Link key={t.label} href={t.href === '/ads-workspace' && (input.trim() || t.seed) ? `/ads-workspace?idea=${encodeURIComponent((input.trim() || t.seed || '').slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
                       <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
                       <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
                       <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
