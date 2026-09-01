@@ -16,12 +16,12 @@ const config: FeatureConfig = {
   galleryTitle: 'A full growth team on autopilot',
   cardCta: 'See how →',
   cards: [
-    { t: 'Catalog SEO', d: 'Every product page, optimised', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' },
-    { t: 'Ad campaigns', d: 'Built from your best-sellers', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' },
-    { t: 'Blog engine', d: 'Buyer-intent content, published', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' },
-    { t: 'CRO fixes', d: 'Storefront tweaks that convert', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' },
-    { t: 'Email flows', d: 'Win-backs and nurtures, automated', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' },
-    { t: 'Competitor intel', d: 'Track and out-run your rivals', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' },
+    { t: 'Catalog SEO', d: 'Every product page, optimised', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' , ic: 'grid' },
+    { t: 'Ad campaigns', d: 'Built from your best-sellers', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' , ic: 'megaphone' },
+    { t: 'Blog engine', d: 'Buyer-intent content, published', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' , ic: 'doc' },
+    { t: 'CRO fixes', d: 'Storefront tweaks that convert', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' , ic: 'trend' },
+    { t: 'Email flows', d: 'Win-backs and nurtures, automated', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' , ic: 'mail' },
+    { t: 'Competitor intel', d: 'Track and out-run your rivals', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' , ic: 'eye' },
   ],
   featuresTitle: 'The best features, designed for growth',
   features: [

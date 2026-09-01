@@ -16,12 +16,12 @@ const config: FeatureConfig = {
   galleryTitle: 'Everything that gets you cited',
   cardCta: 'See how →',
   cards: [
-    { t: 'Answer-ready content', d: 'Pages written for AI to quote', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' },
-    { t: 'Comparison pages', d: '“Best X for Y” that AI loves', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' },
-    { t: 'FAQ schema', d: 'Structured Q&A models trust', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' },
-    { t: 'Brand entity', d: 'Be recognised as a real brand', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' },
-    { t: 'Citations', d: 'Earn links from sources AI reads', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' },
-    { t: 'Prompt coverage', d: 'Own the questions buyers ask', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' },
+    { t: 'Answer-ready content', d: 'Pages written for AI to quote', g: 'linear-gradient(135deg,#cfe8ff,#7db4f0)' , ic: 'doc' },
+    { t: 'Comparison pages', d: '“Best X for Y” that AI loves', g: 'linear-gradient(135deg,#ffd9c2,#ff8a5a)' , ic: 'compare' },
+    { t: 'FAQ schema', d: 'Structured Q&A models trust', g: 'linear-gradient(135deg,#ffe6a3,#ff9f43)' , ic: 'question' },
+    { t: 'Brand entity', d: 'Be recognised as a real brand', g: 'linear-gradient(135deg,#e2d5ff,#a487f0)' , ic: 'spark' },
+    { t: 'Citations', d: 'Earn links from sources AI reads', g: 'linear-gradient(135deg,#c8f0e0,#5bc9a0)' , ic: 'quote' },
+    { t: 'Prompt coverage', d: 'Own the questions buyers ask', g: 'linear-gradient(135deg,#ffd0d8,#f0879a)' , ic: 'chat' },
   ],
   featuresTitle: 'The best features, designed for growth',
   features: [
