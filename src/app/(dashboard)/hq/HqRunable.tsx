@@ -22,35 +22,66 @@ const Google = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ di
 const TikTok = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><path fill="#111" d="M16.7 5.8c-1-.7-1.6-1.7-1.8-2.9h-2.7v11.5c0 1.4-1.1 2.5-2.5 2.5s-2.5-1.1-2.5-2.5 1.1-2.5 2.5-2.5c.3 0 .5 0 .8.1V9.2c-.3 0-.5-.1-.8-.1C6.9 9.1 4.7 11.3 4.7 14s2.2 4.9 4.9 4.9 4.9-2.2 4.9-4.9V8.4c1 .8 2.2 1.2 3.5 1.2V6.9c-.5 0-1-.1-1.5-.4z" /></svg>
 const Shopify = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><path fill="#95BF47" fillRule="evenodd" d="M7 7V6a5 5 0 0110 0v1h1.7l1 12.4a1 1 0 01-1 1.1H4.3a1 1 0 01-1-1.1L4.3 7H7zm2 0h6V6a3 3 0 00-6 0v1z" /></svg>
 const Insta = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><defs><linearGradient id="hqig" x1="2" y1="22" x2="22" y2="2" gradientUnits="userSpaceOnUse"><stop offset="0" stopColor="#FEDA75" /><stop offset=".3" stopColor="#FA7E1E" /><stop offset=".6" stopColor="#D62976" /><stop offset="1" stopColor="#4F5BD5" /></linearGradient></defs><rect x="3" y="3" width="18" height="18" rx="5.2" fill="none" stroke="url(#hqig)" strokeWidth="2" /><circle cx="12" cy="12" r="4.2" fill="none" stroke="url(#hqig)" strokeWidth="2" /><circle cx="17.2" cy="6.8" r="1.25" fill="url(#hqig)" /></svg>
+const XLogo = () => <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#111" strokeWidth="2.2" strokeLinecap="round" style={{ display: 'block' }}><path d="M5 5l14 14M19 5L5 19" /></svg>
+const LinkedIn = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ display: 'block' }}><rect x="2.5" y="2.5" width="19" height="19" rx="3.5" fill="#0A66C2" /><path fill="#fff" d="M7 9.6h2.2V17H7zM8.1 6.2a1.3 1.3 0 100 2.6 1.3 1.3 0 000-2.6zM11 9.6h2.1v1c.3-.6 1.1-1.3 2.4-1.3 2 0 2.5 1.3 2.5 3.2V17h-2.2v-3.8c0-.9-.3-1.6-1.2-1.6s-1.4.6-1.4 1.6V17H11z" /></svg>
 
 // monoline icon wrapper (black stroke, matches Runable's non-brand icons)
 const Ic = ({ children }: { children: React.ReactNode }) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{children}</svg>
 
 type Tile = { label: string; sub: string; href: string; icon: React.ReactNode; seed?: string }
-const GROW: Tile[] = [
-  { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
-  { label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
-  { label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
-  { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', icon: <Ic><circle cx="11" cy="11" r="7" /><path d="M20 20l-3-3" /></Ic> },
-  { label: 'AI Visibility', sub: 'Get cited by ChatGPT', href: '/mission/geo', icon: <Ic><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z" /><path d="M18 15l.7 1.8L20.5 17.5l-1.8.7L18 20l-.7-1.8L15.5 17.5l1.8-.7z" /></Ic> },
-  { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', icon: <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic> },
-  { label: 'Spy a Competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', icon: <Ic><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Ic> },
-  { label: 'CRO Audit', sub: 'Fix storefront leaks', href: '/mission/cro', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
-  { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
+type Cat = { name: string; tiles: Tile[] }
+const spark = <Ic><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z" /><path d="M18 15l.7 1.8L20.5 17.5l-1.8.7L18 20l-.7-1.8L15.5 17.5l1.8-.7z" /></Ic>
+const lines = <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic>
+const pages = <Ic><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></Ic>
+const magnifier = <Ic><circle cx="11" cy="11" r="7" /><path d="M20 20l-3-3" /></Ic>
+
+const GROW_CATS: Cat[] = [
+  { name: 'Running Ads', tiles: [
+    { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
+    { label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
+    { label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
+  ] },
+  { name: 'Social Media', tiles: [
+    { label: 'Instagram', sub: 'Create a post', href: '/ads-workspace', seed: 'Make an Instagram post for my product', icon: <Insta /> },
+    { label: 'TikTok', sub: 'Create a post', href: '/ads-workspace', seed: 'Make a TikTok post for my product', icon: <TikTok /> },
+    { label: 'X / Twitter', sub: 'Write a post', href: '/ads-workspace', seed: 'Write an X post for my product', icon: <XLogo /> },
+    { label: 'LinkedIn', sub: 'Write a post', href: '/ads-workspace', seed: 'Write a LinkedIn post for my brand', icon: <LinkedIn /> },
+  ] },
+  { name: 'Intel & Listening', tiles: [
+    { label: 'Spy a Competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', icon: <Ic><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Ic> },
+    { label: 'Discover', sub: 'Winning ads to remake', href: '/discovery', icon: <Ic><circle cx="12" cy="12" r="9" /><path d="M14.5 9.5l-2 4.5-4.5 2 2-4.5z" /></Ic> },
+    { label: 'Reports', sub: 'Spend, ROAS & results', href: '/reports', icon: <Ic><path d="M5 19V9M12 19V5M19 19v-7" /></Ic> },
+  ] },
+  { name: 'Organic Growth', tiles: [
+    { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', icon: magnifier },
+    { label: 'AI Visibility · AEO', sub: 'Get cited by ChatGPT', href: '/mission/geo', icon: spark },
+    { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', icon: lines },
+    { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: pages },
+  ] },
+  { name: 'Storefront', tiles: [
+    { label: 'CRO Audit', sub: 'Fix conversion leaks', href: '/mission/cro', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
+    { label: 'Fix Catalog', sub: 'Product SEO & schema', href: '/mission/catalog', icon: <Ic><path d="M4 7h16v13H4z" /><path d="M9 7V4h6v3" /></Ic> },
+    { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
+  ] },
 ]
-const BUILD: Tile[] = [
-  { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', seed: 'Make a scroll-stopping image ad for my bestseller', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
-  { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
-  { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', seed: 'Make a UGC testimonial-style ad for my product', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
-  { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', icon: <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic> },
-  { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
-  { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: <Ic><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></Ic> },
+const BUILD_CATS: Cat[] = [
+  { name: 'Ads', tiles: [
+    { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', seed: 'Make a scroll-stopping image ad for my bestseller', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
+    { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
+    { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', seed: 'Make a UGC testimonial-style ad for my product', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
+    { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
+  ] },
+  { name: 'Content', tiles: [
+    { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', icon: lines },
+    { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: pages },
+  ] },
 ]
 
 export default function HqRunable() {
   const [convId, setConvId] = useState<string | null>(null)
   const [input, setInput] = useState('')
   const [mode, setMode] = useState<'grow' | 'build'>('grow')
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [journey, setJourney] = useState<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const credits = useCredits()
@@ -87,7 +118,7 @@ export default function HqRunable() {
   const connect = (journey?.stages || []).find((s: any) => s.key === 'connect')?.tasks || []
   const shopifyOn = !!connect.find((t: any) => t.key === 'shopify')?.done || !!journey?.revenue
   const metaOn = !!connect.find((t: any) => t.key === 'meta')?.done
-  const tiles = mode === 'grow' ? GROW : BUILD
+  const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
   return (
     <div style={{ display: 'flex', height: '100dvh', background: '#fff', color: INK }}>
@@ -118,18 +149,30 @@ export default function HqRunable() {
                   <button onClick={() => submit(input)} disabled={streaming || !input.trim()} aria-label="Send" style={{ width: 36, height: 36, borderRadius: 10, border: 0, background: ORANGE, color: '#fff', cursor: input.trim() ? 'pointer' : 'default', opacity: input.trim() ? 1 : .5, fontSize: 17, display: 'grid', placeItems: 'center' }}>→</button>
                 </div>
               </div>
-              {/* task launcher */}
-              <div style={{ marginTop: 26 }}>
-                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>{mode === 'grow' ? 'Your marketing team' : 'Make with the team'}</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
-                  {tiles.map((t) => (
-                    <Link key={t.label} href={t.href === '/ads-workspace' && (input.trim() || t.seed) ? `/ads-workspace?idea=${encodeURIComponent((input.trim() || t.seed || '').slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
-                      <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
-                      <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
-                      <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
-                    </Link>
-                  ))}
-                </div>
+              {/* task launcher — categorised, collapsible (Runable-style) */}
+              <div style={{ marginTop: 20 }}>
+                {cats.map((cat) => {
+                  const off = !!collapsed[cat.name]
+                  return (
+                    <div key={cat.name} style={{ marginTop: 20 }}>
+                      <button onClick={() => setCollapsed((c) => ({ ...c, [cat.name]: !c[cat.name] }))} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', background: 'none', border: 0, padding: '2px 2px 12px', cursor: 'pointer' }}>
+                        <span style={{ fontSize: 13.5, fontWeight: 700, color: INK }}>{cat.name}</span>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={FAINT} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: off ? 'rotate(-90deg)' : 'none', transition: 'transform .15s' }}><path d="M6 9l6 6 6-6" /></svg>
+                      </button>
+                      {!off && (
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
+                          {cat.tiles.map((t) => (
+                            <Link key={t.label} href={t.href === '/ads-workspace' && (input.trim() || t.seed) ? `/ads-workspace?idea=${encodeURIComponent((input.trim() || t.seed || '').slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                              <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
+                              <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
+                              <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             </div>
           ) : (
