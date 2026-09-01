@@ -18,6 +18,15 @@ type Journey = { brandName?: string; stageLabel?: string; revenue?: { total: num
 
 const CHIPS = ['What should I do today?', 'Make an Instagram ad for my bestseller', 'Fix my product SEO', 'Who are my competitors?']
 
+// "Start a task" launcher — these OPEN the real tool (not the chat). Create an ad lands in Ad Studio, where
+// Discover / templates / elements already live; the rest jump straight into their existing pages.
+const ACTIONS: { label: string; sub: string; href: string; icon: string }[] = [
+  { label: 'Create an ad', sub: 'Discover, templates & elements', href: '/ads-workspace', icon: '🎨' },
+  { label: 'Fix my SEO', sub: 'Crawl & fix every page', href: '/mission/seo', icon: '🔍' },
+  { label: 'Spy a competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', icon: '🕵️' },
+  { label: 'Browse Discover', sub: 'Winning ads to remake', href: '/discovery', icon: '✨' },
+]
+
 export default function HomePage() {
   const [convId, setConvId] = useState<string | null>(null)
   const [input, setInput] = useState('')
@@ -73,6 +82,22 @@ export default function HomePage() {
               <p style={{ color: SUB, fontSize: 16, margin: '0 0 26px' }}>Ask Mello anything — it runs your marketing company and reports back.</p>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
                 {CHIPS.map((c) => <button key={c} onClick={() => submit(c)} style={{ border: `1px solid ${LINE}`, background: '#fff', borderRadius: 100, padding: '10px 16px', fontSize: 13.5, color: '#43403a', cursor: 'pointer', fontFamily: SANS }}>{c}</button>)}
+              </div>
+
+              {/* Start a task — opens the real tool (Create an ad → Ad Studio, with Discover/templates/elements) */}
+              <div style={{ marginTop: 36 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 700, letterSpacing: '.12em', textTransform: 'uppercase', color: '#a49a8a', marginBottom: 13 }}>Or start a task</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0,1fr))', gap: 10, maxWidth: 520, margin: '0 auto' }}>
+                  {ACTIONS.map((a) => (
+                    <Link key={a.label} href={a.href} style={{ display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', border: `1px solid ${LINE}`, background: '#fff', borderRadius: 14, padding: '13px 15px', textDecoration: 'none', color: INK }}>
+                      <span style={{ width: 34, height: 34, borderRadius: 9, background: '#fbe9e2', display: 'grid', placeItems: 'center', flex: 'none', fontSize: 16 }}>{a.icon}</span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: 'block', fontSize: 14, fontWeight: 700 }}>{a.label}</span>
+                        <span style={{ display: 'block', fontSize: 12, color: SUB, marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{a.sub}</span>
+                      </span>
+                    </Link>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (
