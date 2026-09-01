@@ -124,7 +124,7 @@ export default function HqRunable() {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                   {tiles.map((t) => (
                     <Link key={t.label} href={input.trim() && t.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(input.trim().slice(0, 400))}` : t.href} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textDecoration: 'none', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
-                      <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: INK }}>{t.icon}</span>
+                      <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
                       <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
                       <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
                     </Link>
