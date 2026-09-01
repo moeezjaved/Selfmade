@@ -183,7 +183,7 @@ export default function AdsFeaturePage() {
           </Link>
           <div className="nav-r">
             <Link href="/features/ads" className="hide">Paid Ads</Link>
-            <Link href="/store-audit?focus=seo" className="hide">SEO</Link>
+            <Link href="/features/seo" className="hide">SEO</Link>
             <Link href="/login">Log in</Link>
             <Link href={CTA} className="btn-dark">Get started</Link>
           </div>
