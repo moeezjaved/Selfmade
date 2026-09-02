@@ -211,7 +211,7 @@ export const TOOLS = [
     type: 'function' as const,
     function: {
       name: 'remember',
-      description: "Persist a DURABLE fact about this user so you recall it in future chats — their niche/vertical, target CPA/ROAS goals, brand voice, main competitors, offers, or preferences. Only for things worth carrying forward, not one-off requests.",
+      description: "Persist a DURABLE fact about this user so you recall it in future chats — their niche/vertical, target CPA/ROAS goals, brand voice, main competitors, offers, or standing preferences. NEVER use this for a command to DO something right now (e.g. 'call X tool', 'run/apply/revert/undo/publish Y', 'fix my Z', 'do this now') — those are actions to EXECUTE with the matching tool, not facts to store. If the message is an instruction to act, call the action tool instead; only use remember for a durable fact/preference the user states about themselves or their business.",
       parameters: {
         type: 'object',
         required: ['content'],
