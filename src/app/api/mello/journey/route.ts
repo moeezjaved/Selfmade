@@ -165,7 +165,7 @@ export async function GET(_req: NextRequest) {
 
   return NextResponse.json({
     brandName, stageLabel,
-    store: store ? { name: store.shop_name || store.shop_domain } : null,
+    store: store ? { name: store.shop_name || store.shop_domain, domain: store.shop_domain || null } : null,
     momentum, wins, banked, activeDays, nextAction, revenue,
     milestones, nextMilestone, threat,
     stages, ladder,

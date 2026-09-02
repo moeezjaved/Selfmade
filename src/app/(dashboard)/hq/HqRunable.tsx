@@ -124,7 +124,7 @@ export default function HqRunable() {
   const lastIndex = messages.length - 1
   const brand = (journey?.brandName || 'your store') as string
   const connect = (journey?.stages || []).find((s: any) => s.key === 'connect')?.tasks || []
-  const shopifyOn = !!connect.find((t: any) => t.key === 'shopify')?.done || !!journey?.revenue
+  const shopifyOn = !!journey?.store   // brand-scoped: connected only if THIS brand has a store (not any store on the account)
   const metaOn = !!connect.find((t: any) => t.key === 'meta')?.done
   const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
@@ -294,7 +294,11 @@ export default function HqRunable() {
       <aside style={{ width: 312, flex: 'none', borderLeft: `1px solid ${LINE}`, padding: '18px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Your store</div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 500, textTransform: 'capitalize' }}>🔗 {brand}</div>
+          {journey?.store ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 500 }}>🔗 {journey.store.name || journey.store.domain}{journey.store.name && journey.store.domain ? <span style={{ color: SUB, fontWeight: 400, fontSize: 12 }}>· {journey.store.domain}</span> : null}</div>
+          ) : (
+            <div style={{ marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 12.5, color: SUB }}>No Shopify store connected for <b style={{ color: INK, textTransform: 'capitalize' }}>{brand}</b>. <Link href="/connect/shopify" style={{ color: ORANGE, fontWeight: 700 }}>Connect →</Link></div>
+          )}
         </div>
 
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
