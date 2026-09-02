@@ -17,6 +17,9 @@ import { runSeoAudit } from '@/lib/seo/crawl-audit'
 import { resolveStore } from '@/lib/shopify/client'
 import { generateDrafts, applyDrafts } from '@/lib/shopify/catalog'
 import { resolveActiveBrandId } from '@/lib/brand/active'
+import { runCroAudit } from '@/lib/cro/audit'
+import { generatePdpRewrite, applyPdpRewrite } from '@/lib/cro/apply'
+import { writeArticle, generateHero, renderArticleHtml, publishToShopifyBlog } from '@/lib/shopify/blog'
 
 export const TOOLS = [
   {
@@ -300,6 +303,38 @@ export const TOOLS = [
       parameters: { type: 'object', properties: { apply: { type: 'boolean', description: 'false = draft the fixes, no writes (default); true = write the approved drafts to Shopify.' } } },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'run_cro_audit',
+      description: "Run a REAL conversion-rate (CRO) audit of the user's store — scores it /100 and returns the biggest conversion leaks (home + product pages) with the exact fix for each. Use when the user asks to audit/improve conversion or CRO, or 'why isn't my store converting'. Then offer to rewrite the product page with fix_cro.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'fix_cro',
+      description: "Rewrite the product-page copy for higher conversion on the user's Shopify store. APPROVE-GATED: apply=false previews the rewrite (no writes); after the user approves, apply=true writes the new product description to Shopify. Requires a connected Shopify store.",
+      parameters: { type: 'object', properties: { apply: { type: 'boolean', description: 'false = preview (default); true = write to Shopify.' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'fix_catalog',
+      description: "Auto-fix product catalog content on the user's Shopify store. `kind` selects what to fix: 'description' (product descriptions), 'alt' (image alt text), 'title' (product titles), 'tags' (product tags). APPROVE-GATED: apply=false drafts the fixes (no writes); after the user approves, apply=true writes them to Shopify. Requires a connected Shopify store.",
+      parameters: { type: 'object', required: ['kind'], properties: { kind: { type: 'string', enum: ['description', 'alt', 'title', 'tags'] }, apply: { type: 'boolean', description: 'false = draft (default); true = write the approved drafts to Shopify.' } } },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'write_blog',
+      description: "Write a buyer-intent, SEO-optimised, on-brand blog article for the user's store. APPROVE-GATED: publish=false drafts it and returns the title + angle (nothing is published); after the user approves, publish=true publishes it live to their Shopify blog. Requires a connected Shopify store. Pass `topic` if the user named one; otherwise it picks the highest-intent buyer question.",
+      parameters: { type: 'object', properties: { topic: { type: 'string' }, publish: { type: 'boolean', description: 'false = draft/preview (default); true = publish live to Shopify.' } } },
+    },
+  },
 ]
 
 // Human labels shown as the live "thinking" step in the UI.
@@ -326,6 +361,10 @@ export const TOOL_LABELS: Record<string, string> = {
   author_competitor_report: 'Writing the intelligence report…',
   run_seo_audit: 'Crawling your site for SEO…',
   fix_seo: 'Preparing SEO fixes…',
+  run_cro_audit: 'Auditing your store for conversion…',
+  fix_cro: 'Rewriting your product page…',
+  fix_catalog: 'Preparing catalog fixes…',
+  write_blog: 'Writing your blog post…',
 }
 
 export interface ToolCtx { userId: string }
@@ -461,6 +500,59 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       }
       const res = await generateDrafts(admin, store, 'seo', 25)
       return { drafted: res.created, scanned: res.scanned, note: res.created ? `Drafted ${res.created} product SEO fixes (better titles + meta descriptions) from ${res.scanned} products — nothing is written yet. Summarise for the user and ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${res.scanned} products and found nothing to improve — their product SEO already looks good.` }
+    }
+    case 'run_cro_audit': {
+      const admin = createAdminClient()
+      const { data: b } = await admin.from('brands').select('website').eq('user_id', ctx.userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+      const url = ((b as any)?.website || '').trim()
+      if (!url) return { ran: false, note: 'No store URL on file — ask the user for their store website (or connect Shopify), then run again.' }
+      const rep = await runCroAudit(url)
+      const leaks = (rep.leaks || []).slice(0, 5).map((l: any) => ({ title: l.title, fix: l.fix }))
+      return { ran: true, score: rep.score, verdict: rep.verdict, top_leaks: leaks, note: 'Present the score /100 and the biggest conversion leaks with their fixes (most impactful first). Offer to rewrite the product page for conversion with fix_cro (preview → apply after approval).' }
+    }
+    case 'fix_cro': {
+      const admin = createAdminClient()
+      const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
+      const store = await resolveStore(admin, ctx.userId, brandId)
+      if (!store) return { done: false, note: 'No Shopify store connected — rewriting the product page needs Shopify. Tell the user to connect it.' }
+      const rw = await generatePdpRewrite(admin, store, null)
+      if (!rw) return { done: false, note: 'Could not generate a product-page rewrite — the store may have no products yet.' }
+      if (args?.apply === true) {
+        const res = await applyPdpRewrite(admin, store, brandId, rw.gid, rw.after)
+        return { applied: true, product: rw.title, url: res.url, note: `Rewrote and published the product description for "${rw.title}". Confirm to the user and share the link.` }
+      }
+      return { drafted: true, product: rw.title, note: `Drafted a higher-converting rewrite of the product description for "${rw.title}" — not published yet. Give the user a 1-2 line sense of the improvement and ask them to approve; on yes, call fix_cro with apply=true.` }
+    }
+    case 'fix_catalog': {
+      const admin = createAdminClient()
+      const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
+      const store = await resolveStore(admin, ctx.userId, brandId)
+      if (!store) return { done: false, note: 'No Shopify store connected — catalog fixes need Shopify. Tell the user to connect it.' }
+      const kind = (['description', 'alt', 'title', 'tags'].includes(String(args?.kind)) ? args.kind : 'description') as 'description' | 'alt' | 'title' | 'tags'
+      if (args?.apply === true) {
+        const { data: drafts } = await admin.from('shopify_catalog_drafts').select('id').eq('store_id', store.id).eq('agent', kind).eq('status', 'draft').limit(500)
+        const ids = (drafts || []).map((d: any) => d.id)
+        if (!ids.length) return { applied: 0, note: `No drafted ${kind} fixes to apply — call fix_catalog with apply=false first.` }
+        const res = await applyDrafts(admin, store, ids)
+        return { applied: res.applied, failed: res.failed, kind, note: `Wrote ${res.applied} product ${kind} fixes to Shopify. Confirm to the user.` }
+      }
+      const res = await generateDrafts(admin, store, kind, 25)
+      return { drafted: res.created, scanned: res.scanned, kind, note: res.created ? `Drafted ${res.created} product ${kind} fixes from ${res.scanned} products — nothing is written. Summarise and ask the user to approve; on yes, call fix_catalog with the same kind and apply=true.` : `Scanned ${res.scanned} products — their ${kind} already looks good.` }
+    }
+    case 'write_blog': {
+      const admin = createAdminClient()
+      const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
+      const store = await resolveStore(admin, ctx.userId, brandId)
+      if (!store) return { done: false, note: 'No Shopify store connected — publishing a blog needs Shopify. Tell the user to connect it.' }
+      const art = await writeArticle(admin, store, ctx.userId, args?.topic ? String(args.topic) : undefined)
+      if (!art) return { done: false, note: 'Could not draft an article right now — try again in a moment.' }
+      if (args?.publish === true) {
+        const hero = await generateHero(art).catch(() => null)
+        const html = renderArticleHtml(art, hero)
+        const pub = await publishToShopifyBlog(store, { title: art.title, bodyHtml: html, tags: art.tags, imageUrl: hero })
+        return { published: true, title: art.title, url: pub.url, note: `Published "${art.title}" live to the user's Shopify blog. Share the link.` }
+      }
+      return { drafted: true, title: art.title, dek: art.dek, note: `Drafted a blog post titled "${art.title}" (${art.dek}) — not published yet. Give the user the title + angle and ask them to approve; on yes, call write_blog with the same topic and publish=true.` }
     }
     case 'remember':
       await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')

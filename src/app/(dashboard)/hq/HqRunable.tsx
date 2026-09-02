@@ -127,7 +127,7 @@ export default function HqRunable() {
   // teardowns (author_competitor_report) + performance reads (get_ad_performance). Everything
   // else's engine lives on its own page — SEO crawl/fix, CRO, catalog, blog, launch, studio —
   // so those still open the tool that does the work, rather than a chat that can only talk.
-  const CHAT_TASKS = new Set(['Spy a Competitor', 'Reports', 'SEO Audit'])
+  const CHAT_TASKS = new Set(['Spy a Competitor', 'Reports', 'SEO Audit', 'CRO Audit', 'Fix Catalog', 'Blog Content', 'Blog Post'])
   const [task, setTask] = useState<Tile | null>(null)
   const [tInstr, setTInstr] = useState('')
   const [tFmts, setTFmts] = useState<string[]>([])
