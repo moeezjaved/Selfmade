@@ -30,7 +30,7 @@ import { supabase } from './db.js'
 const EXECUTE = process.argv.includes('--execute')
 const DRY = !EXECUTE
 const RECENT_DAYS = Number(process.env.RECENT_DAYS || 30)
-const READ_PAGE = Number(process.env.PURGE_READ_PAGE || 5000)   // rows scanned per page (keyset)
+const READ_PAGE = Number(process.env.PURGE_READ_PAGE || 1000)   // PostgREST caps responses at 1000
 const DEL_CHUNK = Number(process.env.PURGE_DEL_CHUNK || 500)     // ad_ids per delete call
 const THROTTLE_MS = Number(process.env.PURGE_THROTTLE_MS || 60)  // pause between delete calls
 
@@ -127,7 +127,8 @@ async function main() {
     if (scanned % 100000 < READ_PAGE) {
       process.stdout.write(`\r   scanned ${scanned.toLocaleString()} · keep ${kept.toLocaleString()} · delete ${(DRY ? toDelete : deleted).toLocaleString()}   `)
     }
-    if (rows.length < READ_PAGE) break
+    // Do NOT break on rows.length < READ_PAGE — PostgREST caps pages below READ_PAGE.
+    // The empty-fetch check at the top of the loop is the real terminator (keyset by ad_id).
   }
   await flush()
 
