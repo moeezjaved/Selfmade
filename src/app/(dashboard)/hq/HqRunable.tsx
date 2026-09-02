@@ -132,6 +132,7 @@ export default function HqRunable() {
   const [tBudget, setTBudget] = useState('20')
   const [tCount, setTCount] = useState('3')
   const [tDeliver, setTDeliver] = useState<'in_app' | 'email'>('in_app')
+  const [tUrl, setTUrl] = useState('')
   const [toast, setToast] = useState<string | null>(null)
   type Kind = 'social' | 'ads' | 'adcreative' | 'content' | 'analysis'
   const kindOf = (t: Tile): Kind => {
@@ -154,6 +155,9 @@ export default function HqRunable() {
     setTask(t)
     setTInstr(t.seed || `Create ${t.label.toLowerCase()} for ${brand}. Learn from what has worked before, keep it on-brand, and bring it to me to approve before it ships.`)
     setTFmts([]); setTFreq('One-off'); setTTime('9:00 AM'); setTPublish('draft'); setTBudget('20'); setTCount('3'); setTDeliver('in_app')
+    let url = ''
+    try { const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/); if (m) url = `https://${decodeURIComponent(m[1]).replace(/^https?:\/\//, '')}` } catch { /* ignore */ }
+    setTUrl(url)
   }
   const toCron = (freq: string, timeLabel: string): string => {
     const m = timeLabel.match(/(\d+):(\d+)\s*(AM|PM)/i)
@@ -175,6 +179,7 @@ export default function HqRunable() {
     if ((kind === 'social' || kind === 'adcreative') && tFmts.length) parts.push(`Formats: ${tFmts.join(', ')}.`)
     if (kind === 'ads' && tBudget) parts.push(`Daily budget: $${tBudget}.`)
     if (kind === 'content') parts.push(`Produce ${tCount} this run.`)
+    if ((kind === 'social' || kind === 'ads' || kind === 'content') && tUrl.trim()) parts.push(`Send visitors to ${tUrl.trim()}.`)
     if (kind === 'analysis') parts.push(tDeliver === 'email' ? 'Email me the results.' : 'Post the results to my Mello feed.')
     else parts.push(tPublish === 'direct' ? (kind === 'ads' ? 'Launch it once I approve.' : 'Publish it once I approve.') : 'Draft it and notify me first.')
     const prompt = parts.filter(Boolean).join(' ')
@@ -328,6 +333,11 @@ export default function HqRunable() {
               <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Instructions</div>
               <textarea value={tInstr} onChange={(e) => setTInstr(e.target.value)} rows={4} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14.5, lineHeight: 1.5, color: INK, resize: 'vertical', outline: 'none', fontFamily: 'inherit' }} />
 
+              {(kind === 'social' || kind === 'ads' || kind === 'content') && (<>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Send visitors to</div>
+                <input value={tUrl} onChange={(e) => setTUrl(e.target.value)} placeholder="https://yourstore.com" style={{ ...selStyle, padding: '11px 14px' }} />
+              </>)}
+
               {(kind === 'social' || kind === 'adcreative') && (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>What to create</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
@@ -339,12 +349,12 @@ export default function HqRunable() {
               </>)}
 
               {kind === 'ads' && (<>
-                <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Daily budget</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 10, padding: '0 14px' }}>
-                  <span style={{ color: SUB, fontSize: 15 }}>$</span>
-                  <input value={tBudget} onChange={(e) => setTBudget(e.target.value.replace(/[^0-9]/g, ''))} inputMode="numeric" style={{ flex: 1, border: 0, outline: 0, padding: '11px 0', fontSize: 14, color: INK, background: 'transparent', fontFamily: 'inherit' }} />
-                  <span style={{ color: SUB, fontSize: 13 }}>/ day</span>
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', margin: '16px 0 8px' }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>Daily budget</span>
+                  <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>${tBudget}<span style={{ color: SUB, fontWeight: 500, fontSize: 12.5 }}> / day</span></span>
                 </div>
+                <input type="range" min={10} max={1000} step={5} value={tBudget} onChange={(e) => setTBudget(e.target.value)} style={{ width: '100%', accentColor: ORANGE }} />
+                <div style={{ fontSize: 12, color: FAINT, marginTop: 5 }}>${tBudget} to ads · $0 platform fee</div>
               </>)}
 
               {kind === 'content' && (<>
@@ -352,10 +362,10 @@ export default function HqRunable() {
                 <select value={tCount} onChange={(e) => setTCount(e.target.value)} style={selStyle}>{['1', '3', '5', '10'].map((o) => <option key={o} value={o}>{o} {task.label.toLowerCase().includes('page') ? 'pages' : 'posts'}</option>)}</select>
               </>)}
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
+              {kind !== 'ads' && (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
                 <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Frequency</div><select value={tFreq} onChange={(e) => setTFreq(e.target.value)} style={selStyle}>{['One-off', 'Daily', 'Weekly', 'Monthly'].map((o) => <option key={o}>{o}</option>)}</select></div>
                 <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Time</div><select value={tTime} onChange={(e) => setTTime(e.target.value)} disabled={tFreq === 'One-off'} style={{ ...selStyle, opacity: tFreq === 'One-off' ? .5 : 1 }}>{['7:00 AM', '9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((o) => <option key={o}>{o}</option>)}</select></div>
-              </div>
+              </div>)}
 
               {kind === 'analysis' ? (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Deliver results to</div>
@@ -365,10 +375,10 @@ export default function HqRunable() {
                     return <button key={v} type="button" onClick={() => setTDeliver(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
                   })}
                 </div>
-              </>) : (<>
+              </>) : kind === 'ads' ? null : (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Publishing</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {([['direct', kind === 'ads' ? 'Launch once approved' : 'Publish once approved'], ['draft', 'Draft & notify me']] as const).map(([v, l]) => {
+                  {([['direct', 'Publish once approved'], ['draft', 'Draft & notify me']] as const).map(([v, l]) => {
                     const on = tPublish === v
                     return <button key={v} type="button" onClick={() => setTPublish(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
                   })}
@@ -377,7 +387,7 @@ export default function HqRunable() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
                 <button onClick={() => setTask(null)} style={{ flex: 1, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 999, padding: 13, fontWeight: 600, fontSize: 14, color: INK, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
+                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{kind === 'ads' ? `Run Ads · $${tBudget}/day` : tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
               </div>
             </div>
           </div>
