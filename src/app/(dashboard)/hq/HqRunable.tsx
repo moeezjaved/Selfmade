@@ -7,6 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useChatStream } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
@@ -121,6 +122,12 @@ export default function HqRunable() {
   const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
   // ── task setup popup (Runable-style) ──────────────────────────────────────
+  const router = useRouter()
+  // Tasks Mello can actually EXECUTE in chat today (it has the real tools): competitor
+  // teardowns (author_competitor_report) + performance reads (get_ad_performance). Everything
+  // else's engine lives on its own page — SEO crawl/fix, CRO, catalog, blog, launch, studio —
+  // so those still open the tool that does the work, rather than a chat that can only talk.
+  const CHAT_TASKS = new Set(['Spy a Competitor', 'Reports'])
   const [task, setTask] = useState<Tile | null>(null)
   const [tInstr, setTInstr] = useState('')
   const [tFmts, setTFmts] = useState<string[]>([])
@@ -188,9 +195,12 @@ export default function HqRunable() {
       } catch { setToast('Could not schedule — try again'); setTimeout(() => setToast(null), 4200) }
       setTask(null); return
     }
-    // One-off: run it right here in the chat — Mello picks up the brief in this conversation
-    // (Runable-style), rather than bouncing the user out to the tool's page.
-    setTask(null); submit(prompt)
+    setTask(null)
+    // One-off: run in chat only when Mello has a real tool for it; otherwise open the tool whose
+    // engine does the actual work (SEO crawl/fix, CRO, catalog, blog, launch, ad studio).
+    if (CHAT_TASKS.has(task.label)) { submit(prompt); return }
+    const dest = task.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(prompt.slice(0, 600))}` : task.href
+    router.push(dest)
   }
   const selStyle: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit' }
 
