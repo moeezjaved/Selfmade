@@ -325,7 +325,7 @@ export default function HqRunable() {
 
               {(kind === 'social' || kind === 'ads') && (
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: INSET, border: `1px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', marginBottom: 16, fontSize: 13, color: SUB }}>
-                  <span>Connect {plat} so Mello can {kind === 'ads' ? 'launch' : 'post'} as you</span>
+                  <span>Connect {plat} so Mello can {kind === 'ads' ? 'run ads in your own ad account' : 'post as you'}</span>
                   <Link href={connectHref(task)} style={{ border: `1px solid ${INK}`, color: INK, borderRadius: 999, padding: '7px 15px', fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap' }}>Connect</Link>
                 </div>
               )}
@@ -354,7 +354,7 @@ export default function HqRunable() {
                   <span style={{ fontSize: 15, fontWeight: 700, color: INK }}>${tBudget}<span style={{ color: SUB, fontWeight: 500, fontSize: 12.5 }}> / day</span></span>
                 </div>
                 <input type="range" min={10} max={1000} step={5} value={tBudget} onChange={(e) => setTBudget(e.target.value)} style={{ width: '100%', accentColor: ORANGE }} />
-                <div style={{ fontSize: 12, color: FAINT, marginTop: 5 }}>${tBudget} to ads · $0 platform fee</div>
+                <div style={{ fontSize: 12, color: FAINT, marginTop: 5 }}>Spends in your connected ad account · you approve before it goes live</div>
               </>)}
 
               {kind === 'content' && (<>
@@ -387,7 +387,7 @@ export default function HqRunable() {
 
               <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
                 <button onClick={() => setTask(null)} style={{ flex: 1, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 999, padding: 13, fontWeight: 600, fontSize: 14, color: INK, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{kind === 'ads' ? `Run Ads · $${tBudget}/day` : tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
+                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{kind === 'ads' ? `Launch ads · $${tBudget}/day →` : tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
               </div>
             </div>
           </div>
