@@ -481,8 +481,12 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
     case 'run_seo_audit': {
       const admin = createAdminClient()
       const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
-      const audit = await runSeoAudit(admin, ctx.userId, brandId)
-      if (!audit.hasData) return { ran: false, note: audit.note || "Couldn't read the store — the site may be unreachable, or no store is connected. Tell the user to check their store URL or connect Shopify." }
+      let txId = ''
+      try { txId = (await reserveCredits(admin, ctx.userId, 'seo_audit')).id }
+      catch (e) { if (e instanceof InsufficientCreditsError) return { ran: false, note: 'Out of credits — an SEO audit costs credits. Tell the user to top up or upgrade to run it.' }; throw e }
+      const audit = await runSeoAudit(admin, ctx.userId, brandId).catch(async (e) => { await refundCredits(admin, txId).catch(() => {}); throw e })
+      if (!audit.hasData) { await refundCredits(admin, txId).catch(() => {}); return { ran: false, note: audit.note || "Couldn't read the store — the site may be unreachable, or no store is connected. Tell the user to check their store URL or connect Shopify." } }
+      await commitCredits(admin, txId, { kind: 'seo_audit', score: audit.score }).catch(() => {})
       const top = (audit.issues || []).slice(0, 8).map((i) => ({ severity: i.severity, title: i.title, pages_affected: i.pages?.length || 0 }))
       return { ran: true, site: audit.site, score: audit.score, pages_crawled: audit.pagesCrawled, total_issues: (audit.issues || []).length, top_issues: top, note: 'Present the score out of 100 and the top issues plainly (most severe first). Then offer to auto-fix the product-page issues (titles + meta) with fix_seo — draft first, then apply after the user approves.' }
     }
@@ -506,7 +510,11 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       const { data: b } = await admin.from('brands').select('website').eq('user_id', ctx.userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
       const url = ((b as any)?.website || '').trim()
       if (!url) return { ran: false, note: 'No store URL on file — ask the user for their store website (or connect Shopify), then run again.' }
-      const rep = await runCroAudit(url)
+      let txId = ''
+      try { txId = (await reserveCredits(admin, ctx.userId, 'cro_audit')).id }
+      catch (e) { if (e instanceof InsufficientCreditsError) return { ran: false, note: 'Out of credits — a CRO audit costs credits. Tell the user to top up or upgrade to run it.' }; throw e }
+      const rep = await runCroAudit(url).catch(async (e) => { await refundCredits(admin, txId).catch(() => {}); throw e })
+      await commitCredits(admin, txId, { kind: 'cro_audit', score: rep.score }).catch(() => {})
       const leaks = (rep.leaks || []).slice(0, 5).map((l: any) => ({ title: l.title, fix: l.fix }))
       return { ran: true, score: rep.score, verdict: rep.verdict, top_leaks: leaks, note: 'Present the score /100 and the biggest conversion leaks with their fixes (most impactful first). Offer to rewrite the product page for conversion with fix_cro (preview → apply after approval).' }
     }
@@ -515,13 +523,17 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
       const store = await resolveStore(admin, ctx.userId, brandId)
       if (!store) return { done: false, note: 'No Shopify store connected — rewriting the product page needs Shopify. Tell the user to connect it.' }
+      if (args?.apply === true) {
+        const { data: d } = await admin.from('geo_assets').select('id, title, target_prompt, body_markdown').eq('user_id', ctx.userId).eq('kind', 'cro_rewrite').eq('status', 'draft').order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (!d) return { done: false, note: 'No drafted product-page rewrite to apply — call fix_cro with apply=false first.' }
+        const res = await applyPdpRewrite(admin, store, brandId, String(d.target_prompt || ''), String(d.body_markdown || ''))
+        await admin.from('geo_assets').update({ status: 'published', published_url: res.url }).eq('id', d.id)
+        return { applied: true, product: d.title, url: res.url, note: `Published the higher-converting rewrite for "${d.title}". Confirm to the user and share the link.` }
+      }
       const rw = await generatePdpRewrite(admin, store, null)
       if (!rw) return { done: false, note: 'Could not generate a product-page rewrite — the store may have no products yet.' }
-      if (args?.apply === true) {
-        const res = await applyPdpRewrite(admin, store, brandId, rw.gid, rw.after)
-        return { applied: true, product: rw.title, url: res.url, note: `Rewrote and published the product description for "${rw.title}". Confirm to the user and share the link.` }
-      }
-      return { drafted: true, product: rw.title, note: `Drafted a higher-converting rewrite of the product description for "${rw.title}" — not published yet. Give the user a 1-2 line sense of the improvement and ask them to approve; on yes, call fix_cro with apply=true.` }
+      await admin.from('geo_assets').insert({ brand_id: store.brand_id, user_id: ctx.userId, kind: 'cro_rewrite', title: rw.title, target_prompt: rw.gid, body_markdown: rw.after, status: 'draft' })
+      return { drafted: true, product: rw.title, note: `Drafted and saved a higher-converting rewrite of the product description for "${rw.title}" — not published yet. Give the user a 1-2 line sense of the improvement and ask them to approve; on yes, call fix_cro with apply=true to publish THIS exact rewrite.` }
     }
     case 'fix_catalog': {
       const admin = createAdminClient()
@@ -543,16 +555,25 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       const admin = createAdminClient()
       const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
       const store = await resolveStore(admin, ctx.userId, brandId)
-      if (!store) return { done: false, note: 'No Shopify store connected — publishing a blog needs Shopify. Tell the user to connect it.' }
-      const art = await writeArticle(admin, store, ctx.userId, args?.topic ? String(args.topic) : undefined)
-      if (!art) return { done: false, note: 'Could not draft an article right now — try again in a moment.' }
+      if (!store) return { done: false, note: 'No Shopify store connected — writing/publishing a blog needs Shopify. Tell the user to connect it.' }
       if (args?.publish === true) {
-        const hero = await generateHero(art).catch(() => null)
-        const html = renderArticleHtml(art, hero)
-        const pub = await publishToShopifyBlog(store, { title: art.title, bodyHtml: html, tags: art.tags, imageUrl: hero })
-        return { published: true, title: art.title, url: pub.url, note: `Published "${art.title}" live to the user's Shopify blog. Share the link.` }
+        const { data: d } = await admin.from('geo_assets').select('id, title, body_markdown, published_url').eq('user_id', ctx.userId).eq('brand_id', store.brand_id).eq('kind', 'blog').eq('status', 'draft').order('created_at', { ascending: false }).limit(1).maybeSingle()
+        if (!d) return { done: false, note: 'No drafted blog post to publish — call write_blog with publish=false first to draft one.' }
+        const hero = d.published_url && String(d.published_url).startsWith('http') && !String(d.published_url).includes('/blogs/') ? String(d.published_url) : null
+        const pub = await publishToShopifyBlog(store, { title: d.title, bodyHtml: d.body_markdown || '', imageUrl: hero, author: store.shop_name || undefined })
+        await admin.from('geo_assets').update({ status: 'published', published_url: pub.url, shopify_article_id: String(pub.articleId) }).eq('id', d.id)
+        return { published: true, title: d.title, url: pub.url, note: `Published "${d.title}" live to the user's Shopify blog. Share the link.` }
       }
-      return { drafted: true, title: art.title, dek: art.dek, note: `Drafted a blog post titled "${art.title}" (${art.dek}) — not published yet. Give the user the title + angle and ask them to approve; on yes, call write_blog with the same topic and publish=true.` }
+      let txId = ''
+      try { txId = (await reserveCredits(admin, ctx.userId, 'blog_draft')).id }
+      catch (e) { if (e instanceof InsufficientCreditsError) return { done: false, note: 'Out of credits — writing a blog costs credits. Tell the user to top up or upgrade.' }; throw e }
+      const art = await writeArticle(admin, store, ctx.userId, args?.topic ? String(args.topic) : undefined).catch(() => null)
+      if (!art) { await refundCredits(admin, txId).catch(() => {}); return { done: false, note: 'Could not draft an article right now — try again with a more specific topic.' } }
+      const hero = await generateHero(art, store.shop_name || undefined).catch(() => null)
+      const html = renderArticleHtml(art, hero)
+      await admin.from('geo_assets').insert({ brand_id: store.brand_id, user_id: ctx.userId, kind: 'blog', title: art.title, target_prompt: args?.topic ? String(args.topic) : art.dek, body_markdown: html, status: 'draft', published_url: hero })
+      await commitCredits(admin, txId, { kind: 'blog_draft', title: art.title }).catch(() => {})
+      return { drafted: true, title: art.title, dek: art.dek, note: `Drafted and saved a blog post titled "${art.title}" (${art.dek}) — not published yet. Give the user the title + angle and ask them to approve; on yes, call write_blog with publish=true to publish THIS exact draft.` }
     }
     case 'remember':
       await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')
