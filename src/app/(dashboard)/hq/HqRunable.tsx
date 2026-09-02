@@ -324,10 +324,16 @@ export default function HqRunable() {
               </div>
 
               {(kind === 'social' || kind === 'ads') && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: INSET, border: `1px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', marginBottom: 16, fontSize: 13, color: SUB }}>
-                  <span>Connect {plat} so Mello can {kind === 'ads' ? 'run ads in your own ad account' : 'post as you'}</span>
-                  <Link href={connectHref(task)} style={{ border: `1px solid ${INK}`, color: INK, borderRadius: 999, padding: '7px 15px', fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap' }}>Connect</Link>
-                </div>
+                (kind === 'ads' && plat.toLowerCase() === 'meta' && metaOn) ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#eef8f0', border: '1px solid #cdefd6', borderRadius: 12, padding: '11px 14px', marginBottom: 16, fontSize: 13, fontWeight: 600, color: '#1a7f3c' }}>
+                    <span>✓</span> {plat} account connected — ads run in your account
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: INSET, border: `1px solid ${LINE}`, borderRadius: 12, padding: '11px 14px', marginBottom: 16, fontSize: 13, color: SUB }}>
+                    <span>Connect {plat} so Mello can {kind === 'ads' ? 'run ads in your own ad account' : 'post as you'}</span>
+                    <Link href={`${connectHref(task)}?next=/hq`} style={{ border: `1px solid ${INK}`, color: INK, borderRadius: 999, padding: '7px 15px', fontWeight: 600, fontSize: 12.5, textDecoration: 'none', whiteSpace: 'nowrap' }}>Connect {plat}</Link>
+                  </div>
+                )
               )}
 
               <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Instructions</div>
