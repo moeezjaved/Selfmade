@@ -98,10 +98,12 @@ export default function WorkersPage() {
     }
   }, [])
 
-  // Poll every 5s for live updates
+  // Poll every 60s for live updates. Was 5s, but each poll fires several
+  // count(*) scans over the multi-million-row discovery_ads_index; at 5s they
+  // overlap and pegged DB CPU (a single "remaining" anti-join count ran ~71s).
   useEffect(() => {
     load()
-    const t = setInterval(load, 5_000)
+    const t = setInterval(load, 60_000)
     return () => clearInterval(t)
   }, [load])
 
