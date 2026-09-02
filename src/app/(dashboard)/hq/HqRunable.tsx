@@ -145,13 +145,15 @@ export default function HqRunable() {
   const [tCount, setTCount] = useState('3')
   const [tDeliver, setTDeliver] = useState<'in_app' | 'email'>('in_app')
   const [tUrl, setTUrl] = useState('')
+  const [tCatKind, setTCatKind] = useState<'description' | 'title' | 'alt' | 'tags'>('description')
   const [toast, setToast] = useState<string | null>(null)
-  type Kind = 'social' | 'ads' | 'adcreative' | 'content' | 'analysis'
+  type Kind = 'social' | 'ads' | 'adcreative' | 'content' | 'catalog' | 'analysis'
   const kindOf = (t: Tile): Kind => {
     const l = t.label.toLowerCase()
     if (['instagram', 'tiktok', 'x / twitter', 'linkedin'].includes(l)) return 'social'
     if (['meta ads', 'google ads', 'tiktok ads', 'launch ads'].includes(l)) return 'ads'
     if (['ad image', 'ad video', 'ugc ad', 'carousel'].includes(l)) return 'adcreative'
+    if (l === 'fix catalog') return 'catalog'
     if (l.includes('blog') || l.includes('pages at scale')) return 'content'
     return 'analysis'
   }
@@ -166,7 +168,7 @@ export default function HqRunable() {
   const openTask = (t: Tile) => {
     setTask(t)
     setTInstr(t.seed || `Create ${t.label.toLowerCase()} for ${brand}. Learn from what has worked before, keep it on-brand, and bring it to me to approve before it ships.`)
-    setTFmts([]); setTFreq('One-off'); setTTime('9:00 AM'); setTPublish('draft'); setTBudget('20'); setTCount('3'); setTDeliver('in_app')
+    setTFmts([]); setTFreq('One-off'); setTTime('9:00 AM'); setTPublish('draft'); setTBudget('20'); setTCount('3'); setTDeliver('in_app'); setTCatKind('description')
     let url = ''
     try { const m = document.cookie.match(/(?:^|; )sf_scan_domain=([^;]+)/); if (m) url = `https://${decodeURIComponent(m[1]).replace(/^https?:\/\//, '')}` } catch { /* ignore */ }
     setTUrl(url)
@@ -191,9 +193,10 @@ export default function HqRunable() {
     if ((kind === 'social' || kind === 'adcreative') && tFmts.length) parts.push(`Formats: ${tFmts.join(', ')}.`)
     if (kind === 'ads' && tBudget) parts.push(`Daily budget: $${tBudget}.`)
     if (kind === 'content') parts.push(`Produce ${tCount} this run.`)
+    if (kind === 'catalog') parts.push(`Use the fix_catalog tool with kind="${tCatKind}" — draft first, then apply after I approve.`)
     if ((kind === 'social' || kind === 'ads' || kind === 'content') && tUrl.trim()) parts.push(`Send visitors to ${tUrl.trim()}.`)
     if (kind === 'analysis') parts.push(tDeliver === 'email' ? 'Email me the results.' : 'Post the results to my Mello feed.')
-    else parts.push(tPublish === 'direct' ? (kind === 'ads' ? 'Launch it once I approve.' : 'Publish it once I approve.') : 'Draft it and notify me first.')
+    else if (kind !== 'catalog') parts.push(tPublish === 'direct' ? (kind === 'ads' ? 'Launch it once I approve.' : 'Publish it once I approve.') : 'Draft it and notify me first.')
     const prompt = parts.filter(Boolean).join(' ')
     if (tFreq !== 'One-off') {
       try {
@@ -384,6 +387,17 @@ export default function HqRunable() {
                 <select value={tCount} onChange={(e) => setTCount(e.target.value)} style={selStyle}>{['1', '3', '5', '10'].map((o) => <option key={o} value={o}>{o} {task.label.toLowerCase().includes('page') ? 'pages' : 'posts'}</option>)}</select>
               </>)}
 
+              {kind === 'catalog' && (<>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>What to fix</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                  {([['description', 'Descriptions'], ['title', 'Titles'], ['alt', 'Image alt text'], ['tags', 'Tags']] as const).map(([v, l]) => {
+                    const on = tCatKind === v
+                    return <button key={v} type="button" onClick={() => setTCatKind(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', textAlign: 'left' }}>{l}</button>
+                  })}
+                </div>
+                <div style={{ fontSize: 12, color: FAINT, marginTop: 7 }}>Selfmade drafts the fixes and brings them to you to approve before writing to Shopify.</div>
+              </>)}
+
               {kind !== 'ads' && (<div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 16 }}>
                 <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Frequency</div><select value={tFreq} onChange={(e) => setTFreq(e.target.value)} style={selStyle}>{['One-off', 'Daily', 'Weekly', 'Monthly'].map((o) => <option key={o}>{o}</option>)}</select></div>
                 <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Time</div><select value={tTime} onChange={(e) => setTTime(e.target.value)} disabled={tFreq === 'One-off'} style={{ ...selStyle, opacity: tFreq === 'One-off' ? .5 : 1 }}>{['7:00 AM', '9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((o) => <option key={o}>{o}</option>)}</select></div>
@@ -397,7 +411,7 @@ export default function HqRunable() {
                     return <button key={v} type="button" onClick={() => setTDeliver(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
                   })}
                 </div>
-              </>) : kind === 'ads' ? null : (<>
+              </>) : (kind === 'ads' || kind === 'catalog') ? null : (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Publishing</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {([['direct', 'Publish once approved'], ['draft', 'Draft & notify me']] as const).map(([v, l]) => {
