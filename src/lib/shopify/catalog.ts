@@ -264,6 +264,38 @@ export async function generateDrafts(admin: any, store: StoreRow, agent: Agent, 
   return { created, scanned: targets.length }
 }
 
+const PRODUCT_IMAGES_QUERY = /* GraphQL */ `
+  query($ids: [ID!]!) { nodes(ids: $ids) { ... on Product { id featuredImage { url } } } }
+`
+
+/**
+ * The REAL products just drafted for (store, agent), each with its live featured image and a
+ * before → after summary — so Mello can present grounded, image-rich changes in chat (never
+ * inventing products). Images are best-effort; a missing image just omits the thumbnail.
+ */
+export async function listDraftedProducts(
+  admin: any, store: StoreRow, agent: Agent, limit = 8,
+): Promise<{ title: string; image: string | null; before: string | null; after: string | null }[]> {
+  const { data } = await admin.from('shopify_catalog_drafts')
+    .select('product_gid, product_title, proposal')
+    .eq('store_id', store.id).eq('agent', agent).eq('status', 'draft')
+    .order('created_at', { ascending: false }).limit(limit)
+  const rows: any[] = data || []
+  if (!rows.length) return []
+  const images: Record<string, string> = {}
+  try {
+    const ids = rows.map((r) => r.product_gid).filter(Boolean)
+    const d: any = await shopifyGraphql(store.shop_domain, tokenFor(store), PRODUCT_IMAGES_QUERY, { ids })
+    for (const n of (d?.nodes || [])) if (n?.id && n?.featuredImage?.url) images[n.id] = n.featuredImage.url
+  } catch { /* images optional */ }
+  const ba = (p: any): { before: string | null; after: string | null } => {
+    if (!p) return { before: null, after: null }
+    if (p.title && p.description) return { before: stripHtml(p.title.current, 80) || null, after: stripHtml(p.title.proposed, 80) }  // seo → show the title change
+    return { before: stripHtml(p.current, 120) || null, after: stripHtml(p.proposed, 120) || null }
+  }
+  return rows.map((r) => ({ title: r.product_title, image: images[r.product_gid] || null, ...ba(r.proposal) }))
+}
+
 /* ── Write-back (only after approval) ─────────────────────────────────────────────────────────── */
 
 const PRODUCT_UPDATE = /* GraphQL */ `

@@ -15,7 +15,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { runSeoAudit } from '@/lib/seo/crawl-audit'
 import { resolveStore } from '@/lib/shopify/client'
-import { generateDrafts, applyDrafts } from '@/lib/shopify/catalog'
+import { generateDrafts, applyDrafts, listDraftedProducts } from '@/lib/shopify/catalog'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { runCroAudit } from '@/lib/cro/audit'
 import { generatePdpRewrite, applyPdpRewrite } from '@/lib/cro/apply'
@@ -503,7 +503,8 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
         return { applied: res.applied, failed: res.failed, note: `Wrote ${res.applied} product SEO fixes to Shopify${res.failed ? ` (${res.failed} failed)` : ''}. Confirm to the user, and suggest re-running run_seo_audit to see the improved score.` }
       }
       const res = await generateDrafts(admin, store, 'seo', 25)
-      return { drafted: res.created, scanned: res.scanned, note: res.created ? `Drafted ${res.created} product SEO fixes (better titles + meta descriptions) from ${res.scanned} products — nothing is written yet. Summarise for the user and ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${res.scanned} products and found nothing to improve — their product SEO already looks good.` }
+      const products = res.created ? await listDraftedProducts(admin, store, 'seo', 8).catch(() => []) : []
+      return { drafted: res.created, scanned: res.scanned, products, note: res.created ? `Drafted ${res.created} product SEO fixes from ${res.scanned} products (nothing is written yet). The "products" list is the user's REAL catalog — present each as a markdown line with its thumbnail and the before → after title: "![](image) **Title** — before → after". Do NOT mention any product that isn't in this list. Then ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${res.scanned} products and found nothing to improve — their product SEO already looks good.` }
     }
     case 'run_cro_audit': {
       const admin = createAdminClient()
@@ -549,7 +550,8 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
         return { applied: res.applied, failed: res.failed, kind, note: `Wrote ${res.applied} product ${kind} fixes to Shopify. Confirm to the user.` }
       }
       const res = await generateDrafts(admin, store, kind, 25)
-      return { drafted: res.created, scanned: res.scanned, kind, note: res.created ? `Drafted ${res.created} product ${kind} fixes from ${res.scanned} products — nothing is written. Summarise and ask the user to approve; on yes, call fix_catalog with the same kind and apply=true.` : `Scanned ${res.scanned} products — their ${kind} already looks good.` }
+      const products = res.created ? await listDraftedProducts(admin, store, kind, 8).catch(() => []) : []
+      return { drafted: res.created, scanned: res.scanned, kind, products, note: res.created ? `Drafted ${res.created} product ${kind} fixes from ${res.scanned} products (nothing is written yet). The "products" list is the user's REAL catalog — present each as a markdown line with its thumbnail and the before → after change: "![](image) **Title** — before → after". Do NOT mention any product that isn't in this list. Then ask the user to approve; on yes, call fix_catalog with the same kind and apply=true.` : `Scanned ${res.scanned} products — their ${kind} already looks good.` }
     }
     case 'write_blog': {
       const admin = createAdminClient()
