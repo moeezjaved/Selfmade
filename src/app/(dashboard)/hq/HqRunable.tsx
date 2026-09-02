@@ -97,6 +97,13 @@ export default function HqRunable() {
   }, [])
   useEffect(() => { (async () => { try { const r = await fetch('/api/mello/journey'); const j = await r.json(); if (r.ok) setJourney(j) } catch { /* optional */ } })() }, [])
   useEffect(() => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight }, [messages])
+  // After each Mello turn, refresh the credits counter — metered tools (SEO/CRO audits, blog draft)
+  // deduct credits server-side, so this ticks the sidebar number down when the turn finishes.
+  const wasStreaming = useRef(false)
+  useEffect(() => {
+    if (wasStreaming.current && !streaming) { try { window.dispatchEvent(new Event('credits:refresh')) } catch { /* ignore */ } }
+    wasStreaming.current = streaming
+  }, [streaming])
 
   const ensureConv = useCallback(async (): Promise<string | null> => {
     if (convId) return convId
