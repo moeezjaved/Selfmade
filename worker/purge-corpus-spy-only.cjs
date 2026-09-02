@@ -71,21 +71,25 @@ async function main() {
   let delBatch = []
   const sampleDeletes = []
 
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
   const flush = async () => {
     if (!delBatch.length) return
     const ids = delBatch
     delBatch = []
     if (DRY) return
-    await supabase.from('discovery_creatives').delete().in('ad_id', ids)
-    const { error } = await supabase.from('discovery_ads_index').delete().in('ad_id', ids)
-    if (error) {
-      delFailed += ids.length
-      console.error(`\n  ⚠️  delete chunk failed (${ids.length}): ${error.message}`)
-      await new Promise((r) => setTimeout(r, 1000))
-      return
+    // Retry each chunk on lock timeout (the worker daemon + live app briefly lock
+    // some rows). Backoff grows per attempt; only give up after 4 tries.
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      await supabase.from('discovery_creatives').delete().in('ad_id', ids)
+      const { error } = await supabase.from('discovery_ads_index').delete().in('ad_id', ids)
+      if (!error) { deleted += ids.length; await sleep(THROTTLE_MS); return }
+      if (attempt === 4) {
+        delFailed += ids.length
+        console.error(`\n  ⚠️  delete chunk gave up after 4 tries (${ids.length}): ${error.message}`)
+        return
+      }
+      await sleep(500 * attempt) // 0.5s, 1s, 1.5s backoff before retry
     }
-    deleted += ids.length
-    await new Promise((r) => setTimeout(r, THROTTLE_MS))
   }
 
   for (;;) {

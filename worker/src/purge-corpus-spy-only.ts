@@ -75,22 +75,25 @@ async function main() {
   let delBatch: string[] = []
   const sampleDeletes: string[] = []
 
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
   const flush = async () => {
     if (!delBatch.length) return
     const ids = delBatch
     delBatch = []
     if (DRY) return
-    // FK: delete children (discovery_creatives) first, then the index row.
-    await (supabase as any).from('discovery_creatives').delete().in('ad_id', ids)
-    const { error } = await (supabase as any).from('discovery_ads_index').delete().in('ad_id', ids)
-    if (error) {
-      delFailed += ids.length
-      console.error(`\n  ⚠️  delete chunk failed (${ids.length}): ${error.message}`)
-      await new Promise((r) => setTimeout(r, 1000))
-      return
+    // FK: delete children (discovery_creatives) first, then the index row. Retry on
+    // lock timeout (worker daemon + live app briefly lock rows); give up after 4 tries.
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      await (supabase as any).from('discovery_creatives').delete().in('ad_id', ids)
+      const { error } = await (supabase as any).from('discovery_ads_index').delete().in('ad_id', ids)
+      if (!error) { deleted += ids.length; await sleep(THROTTLE_MS); return }
+      if (attempt === 4) {
+        delFailed += ids.length
+        console.error(`\n  ⚠️  delete chunk gave up after 4 tries (${ids.length}): ${error.message}`)
+        return
+      }
+      await sleep(500 * attempt)
     }
-    deleted += ids.length
-    await new Promise((r) => setTimeout(r, THROTTLE_MS))
   }
 
   for (;;) {
