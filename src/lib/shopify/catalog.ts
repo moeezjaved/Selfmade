@@ -403,3 +403,37 @@ export async function applyDrafts(admin: any, store: StoreRow, draftIds: string[
   }
   return { applied, failed }
 }
+
+/**
+ * Undo applied catalog fixes: for every draft (user, agent) still marked 'applied', write the ORIGINAL
+ * value (proposal.current) back to Shopify. Works from the drafts' own store_id — NOT the active brand
+ * — so an undo always targets the exact store the change landed on, even if brand resolution is off.
+ */
+export async function revertAppliedDrafts(admin: any, userId: string, agent: Agent): Promise<{ reverted: number; failed: number; stores: { name: string; domain: string }[] }> {
+  const { data } = await admin.from('shopify_catalog_drafts').select('*').eq('user_id', userId).eq('agent', agent).eq('status', 'applied')
+  const rows: any[] = data || []
+  if (!rows.length) return { reverted: 0, failed: 0, stores: [] }
+  const byStore = new Map<string, any[]>()
+  for (const r of rows) { if (!byStore.has(r.store_id)) byStore.set(r.store_id, []); byStore.get(r.store_id)!.push(r) }
+  let reverted = 0, failed = 0
+  const stores: { name: string; domain: string }[] = []
+  for (const [storeId, group] of Array.from(byStore.entries())) {
+    const { data: st } = await admin.from('shopify_stores').select('*').eq('id', storeId).maybeSingle()
+    if (!st) { failed += group.length; continue }
+    const token = tokenFor(st)
+    stores.push({ name: st.shop_name || st.shop_domain, domain: st.shop_domain })
+    for (const row of group) {
+      try {
+        const pr = row.proposal || {}
+        if (agent === 'description') await productUpdate(st.shop_domain, token, { id: row.product_gid, descriptionHtml: pr.current || '' })
+        else if (agent === 'title') await productUpdate(st.shop_domain, token, { id: row.product_gid, title: pr.current || '' })
+        else if (agent === 'tags') await productUpdate(st.shop_domain, token, { id: row.product_gid, tags: String(pr.current || '').split(',').map((t: string) => t.trim()).filter(Boolean) })
+        else if (agent === 'seo') await productUpdate(st.shop_domain, token, { id: row.product_gid, seo: { title: pr.title?.current || null, description: pr.description?.current || null } })
+        else continue
+        await admin.from('shopify_catalog_drafts').update({ status: 'reverted' }).eq('id', row.id)
+        reverted++
+      } catch { failed++ }
+    }
+  }
+  return { reverted, failed, stores }
+}
