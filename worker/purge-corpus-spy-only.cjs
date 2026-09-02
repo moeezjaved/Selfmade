@@ -79,8 +79,9 @@ async function main() {
     if (DRY) return
     // Retry each chunk on lock timeout (the worker daemon + live app briefly lock
     // some rows). Backoff grows per attempt; only give up after 4 tries.
+    // discovery_creatives.ad_id is ON DELETE CASCADE, so deleting the parent alone
+    // removes the children — one round-trip per batch instead of two (~2x faster).
     for (let attempt = 1; attempt <= 4; attempt++) {
-      await supabase.from('discovery_creatives').delete().in('ad_id', ids)
       const { error } = await supabase.from('discovery_ads_index').delete().in('ad_id', ids)
       if (!error) { deleted += ids.length; await sleep(THROTTLE_MS); return }
       if (attempt === 4) {

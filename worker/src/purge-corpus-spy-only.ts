@@ -81,10 +81,10 @@ async function main() {
     const ids = delBatch
     delBatch = []
     if (DRY) return
-    // FK: delete children (discovery_creatives) first, then the index row. Retry on
-    // lock timeout (worker daemon + live app briefly lock rows); give up after 4 tries.
+    // discovery_creatives.ad_id is ON DELETE CASCADE, so deleting the parent row
+    // removes its children automatically — one round-trip per batch (~2x faster).
+    // Retry on lock timeout (worker daemon + live app briefly lock rows); give up after 4.
     for (let attempt = 1; attempt <= 4; attempt++) {
-      await (supabase as any).from('discovery_creatives').delete().in('ad_id', ids)
       const { error } = await (supabase as any).from('discovery_ads_index').delete().in('ad_id', ids)
       if (!error) { deleted += ids.length; await sleep(THROTTLE_MS); return }
       if (attempt === 4) {
