@@ -142,7 +142,10 @@ export default function HealthDashboard() {
   useEffect(() => { load() }, [load])
   useEffect(() => {
     if (!autoRefresh) return
-    const id = setInterval(load, 30_000)
+    // 120s (was 30s): the backlog counts scan discovery_ads_index and keep
+    // running server-side up to the statement timeout even after the client
+    // abandons them, so frequent polling stacked heavy scans on the DB.
+    const id = setInterval(load, 120_000)
     return () => clearInterval(id)
   }, [autoRefresh, load])
 
