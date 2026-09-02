@@ -7,7 +7,6 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useChatStream } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
@@ -122,7 +121,6 @@ export default function HqRunable() {
   const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
   // ── task setup popup (Runable-style) ──────────────────────────────────────
-  const router = useRouter()
   const [task, setTask] = useState<Tile | null>(null)
   const [tInstr, setTInstr] = useState('')
   const [tFmts, setTFmts] = useState<string[]>([])
@@ -190,8 +188,9 @@ export default function HqRunable() {
       } catch { setToast('Could not schedule — try again'); setTimeout(() => setToast(null), 4200) }
       setTask(null); return
     }
-    const dest = task.href === '/ads-workspace' ? `/ads-workspace?idea=${encodeURIComponent(prompt.slice(0, 600))}` : task.href
-    setTask(null); router.push(dest)
+    // One-off: run it right here in the chat — Mello picks up the brief in this conversation
+    // (Runable-style), rather than bouncing the user out to the tool's page.
+    setTask(null); submit(prompt)
   }
   const selStyle: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit' }
 
