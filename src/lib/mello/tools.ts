@@ -13,6 +13,10 @@ import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, wa
 import { generateCompetitorReport } from './reports/competitor-report'
 import { createAdminClient } from '@/lib/supabase/server'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
+import { runSeoAudit } from '@/lib/seo/crawl-audit'
+import { resolveStore } from '@/lib/shopify/client'
+import { generateDrafts, applyDrafts } from '@/lib/shopify/catalog'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const TOOLS = [
   {
@@ -280,6 +284,22 @@ export const TOOLS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'run_seo_audit',
+      description: "Run a REAL technical SEO audit: crawl the user's live store, score it out of 100, and list the concrete on-page/technical issues (missing/short titles, meta descriptions, H1s, image alt text, canonicals, indexability) ranked by severity. Use whenever the user asks to audit / check / improve their SEO or says 'fix my SEO'. Returns real crawl data — present the score and the top issues plainly, then offer to auto-fix the product-page issues with fix_seo.",
+      parameters: { type: 'object', properties: {} },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'fix_seo',
+      description: "Auto-fix product-page SEO (titles + meta descriptions) on the user's Shopify store. APPROVE-GATED, two-step: call with apply=false FIRST to DRAFT the fixes (no writes) and report how many were prepared; only AFTER the user explicitly approves, call again with apply=true to WRITE them to Shopify. Requires a connected Shopify store — if none, say so. Use after run_seo_audit when the user wants the fixes applied.",
+      parameters: { type: 'object', properties: { apply: { type: 'boolean', description: 'false = draft the fixes, no writes (default); true = write the approved drafts to Shopify.' } } },
+    },
+  },
 ]
 
 // Human labels shown as the live "thinking" step in the UI.
@@ -304,6 +324,8 @@ export const TOOL_LABELS: Record<string, string> = {
   request_clarification: 'Asking for clarification…',
   create_ad: 'Creating on the canvas…',
   author_competitor_report: 'Writing the intelligence report…',
+  run_seo_audit: 'Crawling your site for SEO…',
+  fix_seo: 'Preparing SEO fixes…',
 }
 
 export interface ToolCtx { userId: string }
@@ -417,6 +439,29 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await requestCompetitorCrawl(ctx.userId, String(args.page_id || ''), args.brand_name)
     case 'search_my_assets':
       return await searchMyAssets(ctx.userId, String(args.query || ''), args.limit)
+    case 'run_seo_audit': {
+      const admin = createAdminClient()
+      const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
+      const audit = await runSeoAudit(admin, ctx.userId, brandId)
+      if (!audit.hasData) return { ran: false, note: audit.note || "Couldn't read the store — the site may be unreachable, or no store is connected. Tell the user to check their store URL or connect Shopify." }
+      const top = (audit.issues || []).slice(0, 8).map((i) => ({ severity: i.severity, title: i.title, pages_affected: i.pages?.length || 0 }))
+      return { ran: true, site: audit.site, score: audit.score, pages_crawled: audit.pagesCrawled, total_issues: (audit.issues || []).length, top_issues: top, note: 'Present the score out of 100 and the top issues plainly (most severe first). Then offer to auto-fix the product-page issues (titles + meta) with fix_seo — draft first, then apply after the user approves.' }
+    }
+    case 'fix_seo': {
+      const admin = createAdminClient()
+      const brandId = await resolveActiveBrandId(admin, ctx.userId).catch(() => null)
+      const store = await resolveStore(admin, ctx.userId, brandId)
+      if (!store) return { done: false, note: 'No Shopify store connected — auto-applying SEO fixes needs Shopify. Tell the user to connect it first (Connect Shopify), then run this again.' }
+      if (args?.apply === true) {
+        const { data: drafts } = await admin.from('shopify_catalog_drafts').select('id').eq('store_id', store.id).eq('agent', 'seo').eq('status', 'draft').limit(500)
+        const ids = (drafts || []).map((d: any) => d.id)
+        if (!ids.length) return { applied: 0, note: 'No drafted SEO fixes to apply yet — call fix_seo with apply=false first to draft them.' }
+        const res = await applyDrafts(admin, store, ids)
+        return { applied: res.applied, failed: res.failed, note: `Wrote ${res.applied} product SEO fixes to Shopify${res.failed ? ` (${res.failed} failed)` : ''}. Confirm to the user, and suggest re-running run_seo_audit to see the improved score.` }
+      }
+      const res = await generateDrafts(admin, store, 'seo', 25)
+      return { drafted: res.created, scanned: res.scanned, note: res.created ? `Drafted ${res.created} product SEO fixes (better titles + meta descriptions) from ${res.scanned} products — nothing is written yet. Summarise for the user and ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${res.scanned} products and found nothing to improve — their product SEO already looks good.` }
+    }
     case 'remember':
       await addMemory(ctx.userId, String(args.content || ''), args.kind || 'fact')
       return { remembered: String(args.content || '').slice(0, 400) }
