@@ -64,12 +64,24 @@ export async function searchMyAssets(userId: string, query: string, limit = 12) 
   const admin = createAdminClient() as any
   const org = await getUserOrg(admin, userId)
   const emb = await embedText(query)
+  let assets: any[] = []
+  let semantic = false
   if (emb) {
+    semantic = true
     const { data } = await admin.rpc('search_assets', { p_org: org.orgId, p_query: emb as any, p_limit: Math.min(24, limit) })
-    return { assets: (data || []).map((a: any) => ({ id: a.id, name: a.file_name, type: a.file_type, scene: a.scene, tags: a.tags })) }
+    assets = (data || []).map((a: any) => ({ id: a.id, name: a.file_name, type: a.file_type, scene: a.scene, tags: a.tags }))
+  } else {
+    const { data } = await admin.from('assets').select('id, file_name, file_type, scene, tags').eq('org_id', org.orgId).ilike('file_name', `%${query}%`).limit(limit)
+    assets = (data || []).map((a: any) => ({ id: a.id, name: a.file_name, type: a.file_type, scene: a.scene, tags: a.tags }))
   }
-  const { data } = await admin.from('assets').select('id, file_name, file_type, scene, tags').eq('org_id', org.orgId).ilike('file_name', `%${query}%`).limit(limit)
-  return { assets: (data || []).map((a: any) => ({ id: a.id, name: a.file_name, type: a.file_type, scene: a.scene, tags: a.tags })) }
+  // Semantic search returns the CLOSEST assets even when nothing truly matches, so guard against
+  // Mello force-attributing an unrelated asset to a product/person the user named.
+  const note = !assets.length
+    ? `No assets match "${query}" in the user's library. Tell them plainly you couldn't find one — do NOT substitute an unrelated asset.`
+    : semantic
+      ? `These are the CLOSEST assets by similarity, NOT verified matches. NEVER say an asset is "for" or "the" specific product/person the user named unless that exact name literally appears in the asset's name or tags. If the user asked for a specific named thing (e.g. "${query}") and it does not appear in these names/tags, tell them you couldn't find an asset for it — never invent an association.`
+      : `Assets whose file name contains "${query}".`
+  return { assets, note }
 }
 
 /** Watch a competitor brand — Mello follows + spies it so its new ads land in the brief. Needs the
