@@ -54,14 +54,14 @@ const GROW_CATS: Cat[] = [
     { label: 'Reports', sub: 'Spend, ROAS & results', href: '/reports', icon: <Ic><path d="M5 19V9M12 19V5M19 19v-7" /></Ic> },
   ] },
   { name: 'Organic Growth', tiles: [
-    { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', icon: magnifier },
+    { label: 'SEO Audit', sub: 'Crawl & fix every page', href: '/mission/seo', seed: 'Run a full SEO audit of my store — crawl the site, score it, and list the issues. Then offer to fix the product-page issues.', icon: magnifier },
     { label: 'AI Visibility · AEO', sub: 'Get cited by ChatGPT', href: '/mission/geo', icon: spark },
-    { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', icon: lines },
+    { label: 'Blog Content', sub: 'Buyer-intent, auto-published', href: '/mission/blog', seed: 'Write a buyer-intent blog post for my store, then bring it to me to approve before publishing. Do not analyse competitors — just write the article.', icon: lines },
     { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: pages },
   ] },
   { name: 'Storefront', tiles: [
-    { label: 'CRO Audit', sub: 'Fix conversion leaks', href: '/mission/cro', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
-    { label: 'Fix Catalog', sub: 'Product SEO & schema', href: '/mission/catalog', icon: <Ic><path d="M4 7h16v13H4z" /><path d="M9 7V4h6v3" /></Ic> },
+    { label: 'CRO Audit', sub: 'Fix conversion leaks', href: '/mission/cro', seed: 'Run a CRO audit of my store — score my conversion and list the biggest leaks with their fixes. Then offer to rewrite my product page.', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
+    { label: 'Fix Catalog', sub: 'Product SEO & schema', href: '/mission/catalog', seed: 'Fix my Shopify product catalog — draft better product descriptions, then bring them to me to approve before applying. Do not analyse competitors — use the fix_catalog tool.', icon: <Ic><path d="M4 7h16v13H4z" /><path d="M9 7V4h6v3" /></Ic> },
     { label: 'Launch Ads', sub: 'Audience, budget & go live', href: '/m4', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
   ] },
 ]
@@ -73,7 +73,7 @@ const BUILD_CATS: Cat[] = [
     { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
   ] },
   { name: 'Content', tiles: [
-    { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', icon: lines },
+    { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', seed: 'Write a buyer-intent blog post for my store, then bring it to me to approve before publishing. Do not analyse competitors — just write the article.', icon: lines },
     { label: 'Pages at Scale', sub: 'Programmatic SEO', href: '/mission/programmatic', icon: pages },
   ] },
 ]
