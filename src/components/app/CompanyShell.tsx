@@ -13,6 +13,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { Home, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles, LayoutTemplate } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
+import { PLANS, normalizePlan } from '@/lib/plans'
 import { openCredits, CreditModal } from '@/components/credits/CreditModal'
 import ConfirmHost from '@/components/ConfirmDialog'
 import UpsellModalHost from '@/components/UpsellModal'
@@ -98,7 +99,7 @@ export default function CompanyShell({ brands, activeBrand, children }: { brands
   const initials = (user?.user_metadata?.full_name as string)?.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2)
     || user?.email?.[0]?.toUpperCase() || 'A'
   const displayName = (user?.user_metadata?.full_name as string) || user?.email || 'Your account'
-  const planLabel = isPaid ? `${(plan || '').replace(/^\w/, (c) => c.toUpperCase())} plan` : 'Free plan'
+  const planLabel = `${PLANS[normalizePlan(plan)]?.label || 'Free'} plan`
 
   // Most-specific match wins, so /ads-workspace/competitors lights "My Competitors", not "Ad Studio".
   // Brand Spy lives under /discovery/brand-spy but is entered from "My Competitors" (+ Spy new brand), so
