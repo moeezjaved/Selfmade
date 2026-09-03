@@ -28,6 +28,7 @@ export async function POST(req: NextRequest) {
   const persona = b?.persona ?? null
   const angle = b?.angle ?? null
   const research = b?.research ? String(b.research) : undefined
+  const language = b?.language ? String(b.language).slice(0, 40) : undefined
   if (!templateId || !productId) return NextResponse.json({ error: 'templateId and productId are required' }, { status: 400 })
   const tpl = getTemplate(templateId)
   if (!tpl) return NextResponse.json({ error: 'unknown template' }, { status: 400 })
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
 
   let gen
   try {
-    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research })
+    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: e?.message || 'Generation failed' }, { status: 502 })
