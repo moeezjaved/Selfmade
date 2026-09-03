@@ -27,7 +27,48 @@ function ToolIcon({ tool }: { tool: string }) {
   return <BarChart2 size={13} />
 }
 
+/** A finished tool result that carries an href renders as a clickable TILE that opens the full page
+ *  (e.g. the Ads report → /reports, a strategy doc → /documents/<id>). Keeps chat light; the rich
+ *  sidebar page does the deep work. */
+function ReportTile({ sub, tool }: { sub: any; tool: string }) {
+  const stats: { k: string; v: string }[] = Array.isArray(sub.stats) ? sub.stats : []
+  return (
+    <a
+      href={sub.href}
+      style={{
+        display: 'block', marginLeft: 22, marginTop: 6, marginBottom: 2, textDecoration: 'none',
+        border: '1px solid #e6e9e2', borderRadius: 12, padding: '12px 14px',
+        background: '#fff', boxShadow: '0 1px 2px rgba(20,29,21,.05)', maxWidth: 460, transition: 'box-shadow .15s, transform .15s',
+      }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 6px 20px -8px rgba(20,29,21,.22)'; e.currentTarget.style.transform = 'translateY(-1px)' }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 2px rgba(20,29,21,.05)'; e.currentTarget.style.transform = 'none' }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 13.5, fontWeight: 700, color: '#26331f' }}>
+        <ToolIcon tool={tool} />
+        <span>{sub.label}</span>
+      </div>
+      {sub.note && <div style={{ fontSize: 11.5, color: '#8a9583', marginTop: 2 }}>{sub.note}</div>}
+      {stats.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 18, marginTop: 10 }}>
+          {stats.map((s, i) => (
+            <div key={i}>
+              <div style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.05em', textTransform: 'uppercase', color: '#9aa79a' }}>{s.k}</div>
+              <div style={{ fontSize: 17, fontWeight: 700, color: '#1f2a1c', fontVariantNumeric: 'tabular-nums', letterSpacing: '-.01em' }}>{s.v}</div>
+            </div>
+          ))}
+        </div>
+      )}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 12, fontSize: 13, fontWeight: 700, color: '#c0502c' }}>
+        <span>{sub.cta || 'Open'}</span>
+        <ChevronRight size={15} />
+      </div>
+    </a>
+  )
+}
+
 function ToolStep({ call }: { call: NonNullable<MelloMessage['tool_calls']>[number] }) {
+  const sub = call.sub_item
+  const isTile = call.status === 'complete' && sub?.href
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2, margin: '2px 0' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: '#56655080' }}>
@@ -38,10 +79,12 @@ function ToolStep({ call }: { call: NonNullable<MelloMessage['tool_calls']>[numb
             : <CheckCircle2 size={14} color="#5b8a3c" />}
         <span style={{ color: '#566550' }}>{call.label}</span>
       </div>
-      {call.sub_item?.label && (
+      {isTile ? (
+        <ReportTile sub={sub} tool={call.tool} />
+      ) : sub?.label && (
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginLeft: 22, fontSize: 12.5, color: '#41513c' }}>
           <ToolIcon tool={call.tool} />
-          <span>{call.sub_item.label}</span>
+          <span>{sub.label}</span>
         </div>
       )}
       {call.status === 'error' && call.message && (
