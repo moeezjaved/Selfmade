@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Mark } from '@/components/brand/Mark'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles } from 'lucide-react'
+import { Home, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles, LayoutTemplate } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { openCredits, CreditModal } from '@/components/credits/CreditModal'
@@ -51,6 +51,7 @@ const NAV: Group[] = [
     { href: '/mission/seo', label: 'SEO', icon: Radar },
     { href: '/mission/geo', label: 'GEO', icon: Brain },
     { href: '/mission/catalog', label: 'Store', icon: Store },
+    { href: '/builder', label: 'Page Builder', icon: LayoutTemplate },
     { href: '/mission/cro', label: 'CRO', icon: Wand2 },
     { href: '/mission/blog', label: 'Content', icon: FileText },
     { href: '/mission/programmatic', label: 'Pages at scale', icon: FileText },

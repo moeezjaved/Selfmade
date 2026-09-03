@@ -135,6 +135,7 @@ export const ACTION_COSTS: Record<string, number> = {
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
   brand_spy: 50,            // spy a competitor — start tracking + thorough ad-library crawl ($0.50)
+  page_build: 150,          // Page Builder — AI copy for one landing page ($1.50). Images billed per image.
 }
 
 // Retired 2026-07-29: no free images on any plan — every image ad is charged its credit_pricing price
