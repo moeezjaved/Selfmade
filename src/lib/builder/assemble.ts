@@ -5,7 +5,7 @@
  */
 import type { PageTemplate, FilledContent, RenderOpts } from './types'
 
-const FONT = '<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
+const FONT = '<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">'
 const escTitle = (s: string) => String(s || 'Landing page').replace(/[<>&"]/g, '')
 
 export function assembleDocument(tpl: PageTemplate, content: FilledContent, opts: RenderOpts): string {

@@ -41,8 +41,9 @@ const PAYICONS = `
 
 const CSS = `
 /* Every rule scoped under .pgbld so nothing leaks into the merchant's theme (header/footer). */
-.pgbld{--ink:#17151a;--body:#514e57;--muted:#8b8792;--line:#ece9ef;--paper:#f8f6fb;--accent:#d6248f;--accent2:#7b2ff7;--grad:linear-gradient(100deg,#d6248f,#7b2ff7);--dark:#1a1720;--good:#22a06b;--sans:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;width:100%;color:var(--body);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:78px}
+.pgbld{--ink:#17151a;--body:#514e57;--muted:#8b8792;--line:#ece9ef;--paper:#f8f6fb;--accent:#d6248f;--accent2:#7b2ff7;--grad:linear-gradient(100deg,#d6248f,#7b2ff7);--dark:#1a1720;--good:#22a06b;--sans:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--head:'Hanken Grotesk','Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;width:100%;color:var(--body);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:78px}
 .pgbld *{box-sizing:border-box}
+.pgbld h1,.pgbld h2,.pgbld h3,.pgbld .sec,.pgbld h1.ptitle{font-family:var(--head)}
 .pgbld img{max-width:100%;display:block}
 .pgbld b,.pgbld strong{color:var(--ink);font-weight:700}
 .pgbld .wrap{max-width:1160px;margin:0 auto;padding:0 22px}
