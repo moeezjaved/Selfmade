@@ -6,7 +6,7 @@
  * Every CTA runs the signup→audit flow. Pass a FeatureConfig; see the per-capability page files.
  */
 import Link from 'next/link'
-import { V3Mark } from '@/app/v3/V3Mark'
+import { V3Logo } from '@/app/v3/V3Mark'
 
 const CTA = '/signup?next=/store-audit'
 
@@ -148,8 +148,7 @@ export default function FeaturePage({ config: c }: { config: FeatureConfig }) {
       <div className="fa">
         <nav className="nav"><div className="nav-in">
           <Link href="/" className="brand">
-            <span className="fmark"><V3Mark size={22} /></span>
-            <span className="fbrand-t">Selfmade</span>
+            <V3Logo markSize={22} wordHeight={17} />
           </Link>
           <div className="nav-r">
             <Link href="/features/ads" className="hide">Paid Ads</Link>
