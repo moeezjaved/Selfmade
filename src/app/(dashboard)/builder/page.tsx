@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 /* ── theme tokens (shared with HqRunable / Reports) ── */
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
@@ -78,6 +79,7 @@ function Thumb({ src, seed, label, height = 132 }: { src?: string; seed: number;
 }
 
 export default function BuilderPage() {
+  const isMobile = useIsMobile()
   const [step, setStep] = useState<Step>('list')
 
   /* ── landing: the user's already-generated pages ── */
@@ -415,7 +417,7 @@ export default function BuilderPage() {
       </div>
 
       {/* main: content + right-rail summary */}
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (step === 'list' || step === 'preview' || step === 'published' || step === 'building' || step === 'edit') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (isMobile || step === 'list' || step === 'preview' || step === 'published' || step === 'building' || step === 'edit') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
         <section style={{ minWidth: 0 }}>
           {/* ── LANDING · YOUR PAGES ── */}
           {step === 'list' && (
@@ -821,8 +823,8 @@ export default function BuilderPage() {
           )}
         </section>
 
-        {/* ── right-rail summary (steps 1-4) ── */}
-        {typeof step === 'number' && (
+        {/* ── right-rail summary (steps 1-4; hidden on mobile to avoid the cramped 2-column overlap) ── */}
+        {typeof step === 'number' && !isMobile && (
           <aside style={{ ...CARD, padding: 16, position: 'sticky', top: 26 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>Summary</div>
             <SummaryRow label="Template" value={selectedTemplate?.name} />

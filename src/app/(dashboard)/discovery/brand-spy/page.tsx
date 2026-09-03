@@ -10,6 +10,7 @@ import { useRouter } from 'next/navigation'
 import { refreshCredits } from '@/components/credits/CreditCounter'
 import { showUpsell } from '@/components/UpsellModal'
 import { BRAND_COOKIE } from '@/lib/brand/cookie'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // Read a cookie client-side — same as ProjectSwitcher, to default the "link to your brand" picker
 // to the active project (?brand / sf_brand cookie) so a new spy attaches to the right brand.
@@ -27,6 +28,7 @@ function tab(active: boolean): React.CSSProperties {
 
 export default function BrandSpyList() {
   const router = useRouter()
+  const isMobile = useIsMobile()
   const [brands, setBrands] = useState<Brand[]>([])
   const [q, setQ] = useState('')
   const [loading, setLoading] = useState(true)
@@ -130,10 +132,10 @@ export default function BrandSpyList() {
       <div style={{ fontSize: 13, color: '#6b7280', marginBottom: 16 }}>Track any competitor’s Meta ads over time — format mix, launch cadence, active-ad trends, creative tests, and the hooks they run.</div>
 
       <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Filter your brands…"
-        style={{ width: 360, padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none' }} />
+        style={{ width: isMobile ? '100%' : 360, maxWidth: '100%', padding: '9px 12px', border: '1px solid #d1d5db', borderRadius: 8, fontSize: 14, marginBottom: 14, outline: 'none', boxSizing: 'border-box' }} />
 
-      <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflowX: 'auto' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+      <div style={{ background: '#fff', border: '1px solid #e6e6e6', borderRadius: 12, overflowX: isMobile ? 'visible' : 'auto' }}>
+        <div style={{ display: isMobile ? 'none' : 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, padding: '10px 16px', borderBottom: '1px solid #eee', fontSize: 12, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
           <div>Brand</div><div>Ads (active · inactive)</div><div>Type</div><div style={{ textAlign: 'right' }}>Tracking</div>
         </div>
         {loading && <div style={{ padding: 24, color: '#9ca3af', fontSize: 14 }}>Loading your brands…</div>}
@@ -147,8 +149,10 @@ export default function BrandSpyList() {
         )}
         {brands.map((b) => (
           <div key={b.pageId} className="bs-row" onClick={() => busy ? null : router.push(`/discovery/brand-spy/${b.pageId}`)}
-            style={{ display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
-            <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{b.name || b.pageId}</div>
+            style={isMobile
+              ? { display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'stretch', minWidth: 0, padding: '12px 14px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }
+              : { display: 'grid', gridTemplateColumns: '1fr 200px 150px 150px', minWidth: 660, alignItems: 'center', padding: '12px 16px', borderBottom: '1px solid #f3f4f6', cursor: busy ? 'wait' : 'pointer' }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: '#111', textTransform: 'capitalize', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: isMobile ? 'normal' : 'nowrap' }}>{b.name || b.pageId}</div>
             <div style={{ fontSize: 13, color: '#374151' }}>
               {b.active != null
                 ? <span><span style={{ color: '#ef4a1e', fontWeight: 700 }}>{b.active.toLocaleString()}</span> active · <span style={{ color: '#9ca3af' }}>{(b.inactive ?? 0).toLocaleString()} inactive</span></span>
@@ -160,7 +164,7 @@ export default function BrandSpyList() {
               {b.carousel != null && b.carousel > 0 && <span title="Carousel/DCO">▦ {b.carousel}</span>}
               {b.active == null && <span>—</span>}
             </div>
-            <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: 'flex-end', alignItems: 'center' }}>
+            <div style={{ textAlign: 'right', display: 'flex', gap: 8, justifyContent: isMobile ? 'flex-start' : 'flex-end', alignItems: 'center', marginTop: isMobile ? 2 : 0 }}>
               <span style={{ fontSize: 12, fontWeight: 700, color: '#2075ff', background: 'rgba(32,117,255,0.08)', padding: '5px 12px', borderRadius: 999 }}>Open →</span>
               <button onClick={(e) => { e.stopPropagation(); if (!busy) setConfirmUnspy(b) }} disabled={!!busy}
                 title="Stop spying — remove from your tracked brands"
