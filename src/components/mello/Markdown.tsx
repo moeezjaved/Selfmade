@@ -11,7 +11,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
   const nodes: React.ReactNode[] = []
   // Tokenize ![alt](url) image, **bold**, *italic*, `code`. Image FIRST so ad thumbnails render
   // (used in Mello's "running ads" table — first cell is the creative).
-  const re = /(!\[([^\]]*)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`)/g
+  const re = /(!\[([^\]]*)\]\(([^)\s]+)\)|\*\*([^*]+)\*\*|\*([^*]+)\*|`([^`]+)`|\[([^\]]+)\]\(([^)\s]+)\))/g
   let last = 0
   let m: RegExpExecArray | null
   let i = 0
@@ -24,6 +24,7 @@ function inline(text: string, keyBase: string): React.ReactNode[] {
     else if (m[4] !== undefined) nodes.push(<strong key={`${keyBase}-b${i}`}>{m[4]}</strong>)
     else if (m[5] !== undefined) nodes.push(<em key={`${keyBase}-i${i}`}>{m[5]}</em>)
     else if (m[6] !== undefined) nodes.push(<code key={`${keyBase}-c${i}`} style={{ background: 'rgba(0,0,0,0.06)', padding: '1px 5px', borderRadius: 4, fontSize: '0.88em' }}>{m[6]}</code>)
+    else if (m[7] !== undefined) nodes.push(<a key={`${keyBase}-a${i}`} href={m[8]} style={{ color: '#c0502c', textDecoration: 'underline', textUnderlineOffset: 2, fontWeight: 600 }}>{m[7]}</a>)
     last = m.index + m[0].length
     i++
   }

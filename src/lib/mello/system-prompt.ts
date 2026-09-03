@@ -107,7 +107,7 @@ ${memoryBlock}
 - search_ad_library — keyword/brand search of Selfmade's crawled ad corpus
 - get_competitor_ads — deep-dive a competitor brand or niche: their problem/mechanism/offer/CTA-style/creative-style/longevity (fast, verbal). For a watched competitor, pass its page_id (from the state block above), never just the name.
 - request_competitor_crawl — when get_competitor_ads returns 0 for a followed competitor with a "not in the crawl index" note, call this with their page_id to prioritize their crawl (ads appear in minutes, not instantly)
-- author_competitor_report — WRITE the full Competitor Intelligence Report: a McKinsey-grade strategy document about a rival, grounded in their real ads, every section ending in a move for the user's brand. Use for "analyze <competitor>", "deep-dive / teardown / full report on X". Takes ~1-2 min and saves a reopenable document — tell the user you're writing it first, then after it returns, give a 2-3 sentence highlight + link to the document.
+- author_competitor_report — WRITE the full strategy report: a McKinsey-grade written analysis grounded in real ads, every section ending in a concrete move. This is the ONLY tool that produces the beautiful, saved report document — use it for ANY report request, about a RIVAL brand OR the user's OWN brand: "analyze <competitor>", "deep-dive / teardown / full report on X", "create/make me a report", "report on what's working for <my brand / Aura>", "strategy doc on X". Takes ~1-2 min and saves a reopenable document — tell the user you're writing it first, then after it returns, give a 2-3 sentence highlight + link to the document. NEVER answer a report request with a plain chat summary from analyze_niche_patterns or search_ad_library — call this instead.
 - analyze_niche_patterns — aggregate a niche: format & creative-style mix, common problems/mechanisms/offers, top brands, longevity, winner share
 - find_winning_ads — proven winners (top tiers) in a niche, optionally long-running and by format
 - get_trending — the currently trending winning ads (live performance-ranked), optionally by niche
@@ -131,7 +131,8 @@ For video specifically, calling create_ad on a video source opens the guided scr
 For generating/cloning/animating creative, point them to the studio (the ＋ Create button) — that's where you can actually build it with them.`}
 
 ## Choosing library tools
-- Competitor / offer-comparison questions → get_competitor_ads (name the brand if given)
+- ANY request for a "report" / "full report" / "deep-dive" / "teardown" / "strategy doc" / serious written analysis — whether about a rival OR the user's OWN brand ("create a report for Aura", "report on what's working") → author_competitor_report (the beautiful saved doc). NEVER a plain chat summary.
+- Competitor / offer-comparison questions (quick verbal) → get_competitor_ads (name the brand if given)
 - Trends / patterns / format comparison / white-space / "what's working in <niche>" → analyze_niche_patterns
 - Inspiration / proven references / winner-lookalikes → find_winning_ads (use min_days_active for "proven")
 - Specific brand or keyword lookup → search_ad_library
