@@ -6,11 +6,17 @@
  * prefers-reduced-motion. Pure/presentational — safe in server or client components.
  */
 const R = 30, C = 50
+// Flat-top hexagon: two nodes at the top (240°,300°), two on the sides (0°,180°), two at the bottom
+// (60°,120°). Ordered around the ring so consecutive nodes are neighbours.
 const NODES = [0, 60, 120, 180, 240, 300].map((d) => {
   const r = (d * Math.PI) / 180
   return [C + R * Math.cos(r), C + R * Math.sin(r)] as [number, number]
 })
-const EDGES = NODES.map((p, i) => [p, NODES[(i + 1) % NODES.length]] as const)
+// OPEN ring — connect every neighbour EXCEPT the top edge (between the two top nodes), so the mark has
+// a gap at the top, matching the supplied logo (it's not a fully-closed ring).
+const EDGES = NODES
+  .map((p, i) => [p, NODES[(i + 1) % NODES.length]] as const)
+  .filter((_, i) => i !== 4) // index 4 = 240°→300°, the top edge
 
 export function V3Mark({ size = 26 }: { size?: number }) {
   return (

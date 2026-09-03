@@ -6,6 +6,7 @@
  * Every CTA runs the signup→audit flow. Pass a FeatureConfig; see the per-capability page files.
  */
 import Link from 'next/link'
+import { V3Mark } from '@/app/v3/V3Mark'
 
 const CTA = '/signup?next=/store-audit'
 
@@ -70,8 +71,9 @@ const CSS = `
   .serif{font-family:var(--serif);font-weight:400;letter-spacing:-.015em;line-height:1.08}
   .nav{position:absolute;top:0;left:0;right:0;z-index:20}
   .nav-in{max-width:1120px;margin:0 auto;padding:20px 26px;display:flex;align-items:center;justify-content:space-between}
-  .brand{display:inline-flex;align-items:center}
-  .brand img{height:19px;width:auto;display:block;filter:brightness(0)}
+  .brand{display:inline-flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.02em;color:#0d0d0d}
+  .fmark{color:#ff5a2c;display:inline-flex}
+  .fbrand-t{line-height:1}
   .nav-r{display:flex;align-items:center;gap:20px}
   .nav-r a{font-weight:500;font-size:15px}
   .fa a.btn-dark{background:#141d15;color:#fff;padding:10px 18px;border-radius:100px;font-weight:600;font-size:14px}
@@ -146,8 +148,8 @@ export default function FeaturePage({ config: c }: { config: FeatureConfig }) {
       <div className="fa">
         <nav className="nav"><div className="nav-in">
           <Link href="/" className="brand">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/selfmade-wordmark.png" alt="Selfmade" />
+            <span className="fmark"><V3Mark size={22} /></span>
+            <span className="fbrand-t">Selfmade</span>
           </Link>
           <div className="nav-r">
             <Link href="/features/ads" className="hide">Paid Ads</Link>
