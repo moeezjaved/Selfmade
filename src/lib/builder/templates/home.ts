@@ -8,6 +8,8 @@
 import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../types'
 
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+// esc + strip stray **markdown** the copy model sometimes leaves in short labels.
+const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
 function rt(s: any): string {
   const safe = esc(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   return safe.split(/\n\s*\n/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
@@ -104,13 +106,13 @@ const CSS = `
 
 function render(c: FilledContent, o: RenderOpts): string {
   const stars = '★★★★★'
-  const fbul = arr(c.feature_bullets).map((b) => `<li><strong>${esc(b.label)}</strong>${b.body ? ' — ' + esc(b.body) : ''}</li>`).join('')
-  const blurbs = arr(c.benefit_blurbs).map((b) => `<div class="blurb"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${esc(b.label)}</div><p>${esc(b.body)}</p></div>`).join('')
+  const fbul = arr(c.feature_bullets).map((b) => `<li><strong>${escp(b.label)}</strong>${b.body ? ' — ' + escp(b.body) : ''}</li>`).join('')
+  const blurbs = arr(c.benefit_blurbs).map((b) => `<div class="blurb"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${escp(b.label)}</div><p>${esc(b.body)}</p></div>`).join('')
   const trio = arr(c.transform_items).map((t, i) => `<div class="tcard"><div class="lab">${esc(['First','Second','Third'][i] || 'Benefit')} benefit</div><h3>${esc(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
   const revs = arr(c.testimonials).map((t) => `<div class="rev"><div class="st">${stars}</div><div class="rt">${esc((t as any).title || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}${t.city ? ' · ' + esc(t.city) : ''}</div></div>`).join('')
-  const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${esc(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
+  const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
   const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
-  const svc = arr(c.services).map((s) => `<div class="si">✓ ${esc(s.label)}</div>`).join('')
+  const svc = arr(c.services).map((s) => `<div class="si">✓ ${escp(s.label)}</div>`).join('')
 
   return `
   <div class="pgbld">

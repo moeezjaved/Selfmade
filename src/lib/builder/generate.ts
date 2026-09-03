@@ -258,10 +258,12 @@ async function resolveImages(
 
     if (HARD_AI_ROLES.has(role)) {
       url = await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: role === 'before_after' ? '16:9' : '1:1' })
+      if (!url) url = ctx.productImage   // AI gen failed → use the product photo, never an empty placeholder
     } else if (SOFT_AI_ROLES.has(role)) {
       // Prefer an as-yet-unused real product photo; only generate when the store has none to spare.
       url = nextPhoto()
       if (!url) url = await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: '1:1' })
+      if (!url) url = ctx.productImage   // fall back to the product photo rather than a blank block
     } else {
       // 'product' / default → a real product photo.
       url = nextPhoto() || ctx.productImage
