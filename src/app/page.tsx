@@ -6,8 +6,7 @@
  * for rollback, not deleted; /story renders the same HireStory as a noindex preview.
  */
 import type { Metadata } from 'next'
-import LandingV2 from './LandingV2'
-import AmbientAudio from './AmbientAudio'
+import LandingV3 from './v3/LandingV3'
 
 const SITE = (process.env.NEXT_PUBLIC_APP_URL || 'https://tryselfmade.ai').replace(/\/$/, '')
 const TITLE = 'Selfmade — Ecommerce, version two'
@@ -41,8 +40,7 @@ export default function Page() {
   return (
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
-      <LandingV2 />
-      <AmbientAudio />
+      <LandingV3 />
     </>
   )
 }
