@@ -131,11 +131,11 @@ function render(c: FilledContent, o: RenderOpts): string {
   <div class="pgbld">
   <div class="promo"><span class="brand">${esc(o.productName).toUpperCase()}</span><span class="save">${esc(c.promo_save || 'Save Today')}</span><span class="pill count"><b class="cd-h">${hours}</b>:<b class="cd-m">00</b>:<b class="cd-s">00</b></span></div>
   <div class="wrap">
-    <div class="trust-pill"><span class="stars">★★★★★</span> <span>${esc(c.trust_label || 'Trusted by 50,000+ Customers')}</span></div>
+    <div class="trust-pill"><span class="stars">★★★★★</span> <span>${esc(String(c.trust_label || 'Trusted by 50,000+ Customers').replace(/[★☆]+/g, '').trim())}</span></div>
     <p class="author">By ${esc(c.author_name)} | ${esc(c.date_label)}</p>
     <h1 class="head">${rt(c.headline).replace(/^<p>|<\/p>$/g, '')}</h1>
     <div class="summary-lab">Product Summary:</div>
-    <div class="lead">${rt(c.summary)}</div>
+    <div class="lead">${rt(String(c.summary || '').replace(/^\s*product\s*summary\s*:?\s*/i, ''))}</div>
 
     <div class="reasons">${firstReasons}</div>
 
