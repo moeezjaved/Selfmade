@@ -74,11 +74,16 @@ export async function generatePage(
     keyPrefix: `${slugify(voice.name || productName, 'store')}/${args.templateId}`,
   })
 
-  // timeline thumbnails all use the main product image (the template renders each row's .thumb).
+  // timeline thumbnails all use the main product image; listicle reason items cycle the product photos
+  // (each reason gets a real product shot, so a store with several images shows variety).
   if (productImage) {
+    const gallery = productImages.length ? productImages : [productImage]
     for (const slot of template.schema) {
       if (slot.type === 'timeline' && Array.isArray(content[slot.key])) {
         content[slot.key] = (content[slot.key] as any[]).map((it) => ({ ...it, thumb: productImage }))
+      }
+      if (slot.type === 'reasons' && Array.isArray(content[slot.key])) {
+        content[slot.key] = (content[slot.key] as any[]).map((it, i) => ({ ...it, image: gallery[i % gallery.length] }))
       }
     }
   }
@@ -113,6 +118,7 @@ const VALUE_FORMATS = `Value format by slot type:
 - richtext: a string; use **bold** for emphasis and blank lines to separate paragraphs.
 - list / costs: an array of {"label": string, "body": string}.
 - timeline: an array of {"label": string, "body": string}.
+- reasons: an array of {"label": string (a 1-3 word category, e.g. "Natural Ingredients"), "title": string (the numbered reason heading, WITHOUT the number — e.g. "Nourish with natural botanicals"), "body": string (2-3 sentences)}.
 - testimonials: an array of {"name": string, "city": string, "quote": string}.
 - faq: an array of {"q": string, "a": string}.
 - number: an integer.
@@ -191,6 +197,10 @@ function coerce(slot: SlotDef, v: any): SlotValue {
     case 'costs':
     case 'timeline': {
       const items = takeArr(v).map((i: any) => ({ label: str(i?.label), body: str(i?.body) }))
+      return capItems(items, n)
+    }
+    case 'reasons': {
+      const items = takeArr(v).map((i: any) => ({ label: str(i?.label), title: str(i?.title), body: str(i?.body) }))
       return capItems(items, n)
     }
     case 'testimonials': {

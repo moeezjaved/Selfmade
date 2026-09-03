@@ -17,6 +17,7 @@ export type SlotType =
   | 'list'        // an array of { label, body } (❌/✅ rows, benefit/ingredient lists)
   | 'costs'       // an array of { label, body } rendered as "At work: …" cost rows
   | 'timeline'    // an array of { label, body } (Week 1 / Month 2-4 rows, each with a thumb)
+  | 'reasons'     // an array of { label (category pill), title (numbered heading), body } + an image the pipeline fills — the listicle's N items
   | 'testimonials'// an array of { name, city, quote }
   | 'faq'         // an array of { q, a }
   | 'number'      // an integer (countdown hours, etc.)
@@ -38,7 +39,7 @@ export interface SlotDef {
 export type SlotValue =
   | string
   | number
-  | Array<{ label?: string; body?: string; name?: string; city?: string; quote?: string; q?: string; a?: string }>
+  | Array<{ label?: string; title?: string; body?: string; image?: string; thumb?: string; name?: string; city?: string; quote?: string; q?: string; a?: string }>
 
 /** slot key → value. The single source of truth a page renders from (persisted on builder_pages). */
 export type FilledContent = Record<string, SlotValue>
