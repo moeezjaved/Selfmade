@@ -637,7 +637,23 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
   }
   if (name === 'get_ads_report') {
     const cur = result?.currency || ''
-    return { icon: 'chart', sub_item: { label: result?.spend != null ? `${cur} ${result.spend} → ${cur} ${result.revenue} · ${result.roas}x` : 'Report ready' } }
+    if (result?.spend == null) return { icon: 'chart', sub_item: { label: 'Report ready' } }
+    // A clickable TILE: the headline stats in chat, click → the full /reports page. Keeps chat light,
+    // the rich page does the deep work (health ring, quadrant, audience heat).
+    return {
+      icon: 'chart',
+      sub_item: {
+        label: 'Ad account report',
+        href: result.report_url || '/reports',
+        cta: 'Open full report',
+        stats: [
+          { k: 'Spend', v: `${cur} ${result.spend}` },
+          { k: 'Revenue', v: `${cur} ${result.revenue}` },
+          { k: 'ROAS', v: `${result.roas}x` },
+          { k: 'Purchases', v: String(result.purchases ?? 0) },
+        ],
+      },
+    }
   }
   if (name === 'search_ad_library' || name === 'find_winning_ads') {
     return { icon: 'search', sub_item: { label: `Found ${result?.count ?? 0} ad(s)` } }
@@ -656,7 +672,17 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
     return { icon: 'chart', sub_item: { label: `Analyzed ${result?.sampled ?? 0} ad(s) in the niche` } }
   }
   if (name === 'author_competitor_report') {
-    return { icon: 'chart', sub_item: result?.saved ? { label: `Report written · ${result?.model || 'ai'}` } : { label: 'Could not write report' } }
+    if (!result?.saved) return { icon: 'chart', sub_item: { label: 'Could not write report' } }
+    // Clickable tile → the saved document (/documents/<id>).
+    return {
+      icon: 'chart',
+      sub_item: {
+        label: result?.title || 'Strategy report',
+        href: result?.url || (result?.document_id ? `/documents/${result.document_id}` : null),
+        cta: 'Open the report',
+        note: result?.model ? `Written · ${result.model}` : undefined,
+      },
+    }
   }
   return {}
 }
