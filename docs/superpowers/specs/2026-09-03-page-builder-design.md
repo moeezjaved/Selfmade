@@ -190,3 +190,55 @@ are proven. The slot model maps cleanly onto section `settings`/`blocks`, so v1 
 - Which persona/angle infra path exactly (DNA engine vs strategist) gives the best angles for a single
   product — resolve while writing the plan by reading both.
 - Handle-collision + republish behavior (new page vs update existing).
+
+## 10. Advertorial template — captured reference (the "same-to-same" target)
+
+Studied a real published Atlas advertorial end-to-end (hair-oil store, product "G&T Pre-Wash Oil").
+Our `advertorial_v1` template must reproduce this section order + design system, with slots the AI fills.
+
+**Layout:** two columns on desktop — editorial content ~65% left, a **sticky offer card** ~35% right;
+stacks to one column on mobile. Inherits the store theme's fonts when published as a theme page.
+
+**Design system:**
+- Countdown bar: full-width dark navy/near-black, centered `LIMITED TIME : HH : MM : SS` (numbers emphasized). Appears at top and again near the closing offer.
+- Headlines: large bold; some section headings in the brand accent (green here), most in ink.
+- Author byline: round avatar + **By {Name}** + small grey "Verified Customer".
+- ❌ pain list: red-✗ + **bold label** + " – " + description (plain rows).
+- ✅ benefit/ingredient list: green-✓ rows inside a **light-green tinted box**.
+- "Total wasted" callout: light-pink box, **red bold** total.
+- Images: full-width editorial product shots; **before/after** split images with pill labels ("BEFORE" cream pill, "AFTER" yellow pill).
+- Timeline: small product thumbnail (left) + **dark pill label** ("Week 1", "Week 2-3", "Month 2-4") + text.
+- Testimonials: **Name** + city + quote (3 across).
+- Offer card (sticky, repeated 2-3× inline): white bordered card → product image → pink footer band with ★★★★★ + "[4.8] Rated by 10,000+ Customers" + **product name** → big **red CTA** ("👉 Check Availability") → "🔒 100% Secure Checkout" + "💰 90-Day Money-Back Guarantee".
+- Final CTA: full-width red button ("👉 CHECK OUT {PRODUCT} →") + "⭐ 4.8/5 from 10,000+ verified users".
+
+**Section order (each = a template section; bracketed = slots the AI fills):**
+1. Countdown bar `[hours]`
+2. Headline `[headline]`
+3. Author byline `[author_name]`, `[author_tag]`, `[avatar?]`
+4. Lead hook `[lead]`
+5. Two product images `[image_product_a]`, `[image_product_b]`
+6. Story opening `[story_intro]` (3-4 paras, some phrases bolded)
+7. Sub-story "When … Took Over My Confidence" `[subhead]` + `[body]`
+8. Before/after image `[image_before_after]`
+9. "What I Was Facing Every Day" ❌ list `[pain_items[]]`
+10. "What {problem} Really Costs You" — At work / At home / In relationships `[cost_items[]]`
+11. "The Day I Decided Enough" + failed-solutions ❌ list with prices + "Total wasted: {sum}" `[failed_items[]]`, `[total_wasted]`
+12. "Running Out of Options" `[body]`
+13. "Then I Found {Product}" discovery + ✅ benefit box `[discovery]`, `[benefit_items[]]`
+14. "How {Product} Changed Everything" + "What's in it" ✅ ingredient box `[ingredient_items[]]`
+15. Inline offer card
+16. Timeline — Week 1 / Week 2-3 / Month 2-4 `[timeline_items[] {label, thumb, text}]`
+17. "The Little Moments" `[body]`
+18. Testimonials `[testimonials[] {name, city, quote}]`
+19. "Why {Product} Works When Others Don't" + ✅ list `[why_items[]]`
+20. "How Everything Changed After {Product}" — 💼🏠💖✨ list + wish-line + date `[after_items[]]`, `[date]`
+21. Countdown bar + "Try for 30 Days … 100% Refund" offer `[guarantee_headline]`
+22. FAQ "Common Questions" `[faqs[] {q, a}]`
+23. "That's My Story" closing `[closing]` + full-width red CTA
+24. Final offer card
+
+**Listicle_v1** is the same DNA, Top-N ranked: headline → hero + ★ rating → numbered items each with
+image + mini-CTA → offer. (Capture its reference the same way before building it.)
+
+Full copy of the reference page is preserved in the session transcript for wording/tone calibration.
