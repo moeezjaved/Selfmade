@@ -198,7 +198,7 @@ export default function HqRunable() {
     if (kind === 'catalog') parts.push(`Use the fix_catalog tool with kind="${tCatKind}" — draft first, then apply after I approve.`)
     if (kind === 'audit' && tThenFix) parts.push('After the audit, draft the fixes for me to approve.')
     if ((kind === 'social' || kind === 'ads' || kind === 'content') && tUrl.trim()) parts.push(`Send visitors to ${tUrl.trim()}.`)
-    if (kind === 'analysis' || kind === 'audit') parts.push(tDeliver === 'email' ? 'Email me the results.' : 'Post the results to my Mello feed.')
+    if (kind === 'analysis' || kind === 'audit') parts.push(tDeliver === 'email' ? 'Email me the results.' : 'Show me the results here in the chat.')
     else if (kind !== 'catalog') parts.push(tPublish === 'direct' ? (kind === 'ads' ? 'Launch it once I approve.' : 'Publish it once I approve.') : 'Draft it and notify me first.')
     const prompt = parts.filter(Boolean).join(' ')
     if (tFreq !== 'One-off') {
@@ -338,6 +338,13 @@ export default function HqRunable() {
       {task && (() => {
         const kind = kindOf(task)
         const plat = task.label.replace(/ Ads$/, '')
+        // A "shortcut" tile just opens its tool page (Discover, AI Visibility) — the task fields
+        // (instructions, schedule, delivery) don't apply, so we show a minimal confirm instead.
+        const isChatTask = CHAT_TASKS.has(task.label)
+        const isShortcut = kind === 'analysis' && !isChatTask
+        // "Deliver results to" only matters when Mello actually runs the task and reports back:
+        // a chat analysis/audit, or anything scheduled (which delivers to Mello/email on its own).
+        const showDeliver = (kind === 'analysis' || kind === 'audit') && (isChatTask || tFreq !== 'One-off')
         return (
           <div onClick={(e) => { if (e.target === e.currentTarget) setTask(null) }} style={{ position: 'fixed', inset: 0, zIndex: 100, background: 'rgba(20,18,15,.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
             <div style={{ background: '#fff', width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', borderRadius: 20, padding: 26, boxShadow: '0 40px 100px -30px rgba(0,0,0,.5)' }}>
@@ -362,6 +369,11 @@ export default function HqRunable() {
                 )
               )}
 
+              {isShortcut ? (
+                <div style={{ fontSize: 14, color: SUB, lineHeight: 1.55, background: INSET, border: `1px solid ${LINE}`, borderRadius: 12, padding: '14px 16px' }}>
+                  Opens the <b style={{ color: INK }}>{task.label}</b> tool{task.sub ? ` — ${task.sub.toLowerCase()}` : ''}. You browse and pick there; nothing runs until you choose.
+                </div>
+              ) : (<>
               <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Instructions</div>
               <textarea value={tInstr} onChange={(e) => setTInstr(e.target.value)} rows={4} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14.5, lineHeight: 1.5, color: INK, resize: 'vertical', outline: 'none', fontFamily: 'inherit' }} />
 
@@ -420,7 +432,7 @@ export default function HqRunable() {
                 <div><div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, marginBottom: 7 }}>Time</div><select value={tTime} onChange={(e) => setTTime(e.target.value)} disabled={tFreq === 'One-off'} style={{ ...selStyle, opacity: tFreq === 'One-off' ? .5 : 1 }}>{['7:00 AM', '9:00 AM', '12:00 PM', '3:00 PM', '6:00 PM'].map((o) => <option key={o}>{o}</option>)}</select></div>
               </div>)}
 
-              {(kind === 'analysis' || kind === 'audit') ? (<>
+              {showDeliver ? (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Deliver results to</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {([['in_app', 'Show in Mello'], ['email', 'Email me']] as const).map(([v, l]) => {
@@ -428,7 +440,7 @@ export default function HqRunable() {
                     return <button key={v} type="button" onClick={() => setTDeliver(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
                   })}
                 </div>
-              </>) : (kind === 'ads' || kind === 'catalog') ? null : (<>
+              </>) : (kind === 'social' || kind === 'adcreative' || kind === 'content') ? (<>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: SUB, margin: '16px 0 7px' }}>Publishing</div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                   {([['direct', 'Publish once approved'], ['draft', 'Draft & notify me']] as const).map(([v, l]) => {
@@ -436,11 +448,12 @@ export default function HqRunable() {
                     return <button key={v} type="button" onClick={() => setTPublish(v)} style={{ border: `1px solid ${on ? INK : LINE}`, background: on ? INK : '#fff', color: on ? '#fff' : INK, borderRadius: 10, padding: '11px 13px', fontSize: 13.5, fontWeight: 600, cursor: 'pointer' }}>{l}</button>
                   })}
                 </div>
+              </>) : null}
               </>)}
 
               <div style={{ display: 'flex', gap: 10, marginTop: 22 }}>
                 <button onClick={() => setTask(null)} style={{ flex: 1, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 999, padding: 13, fontWeight: 600, fontSize: 14, color: INK, cursor: 'pointer' }}>Cancel</button>
-                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{kind === 'ads' ? `Launch ads · $${tBudget}/day →` : tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
+                <button onClick={runTask} style={{ flex: 2, background: ORANGE, color: '#fff', border: 0, borderRadius: 999, padding: 13, fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>{isShortcut ? `Open ${task.label} →` : kind === 'ads' ? `Launch ads · $${tBudget}/day →` : tFreq === 'One-off' ? 'Start this task →' : `Schedule · ${tFreq} →`}</button>
               </div>
             </div>
           </div>
