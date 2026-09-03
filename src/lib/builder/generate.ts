@@ -29,7 +29,7 @@ const SOFT_AI_ROLES = new Set(['editorial', 'lifestyle'])
 
 export async function generatePage(
   userId: string,
-  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string },
+  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string },
 ): Promise<GenerateResult> {
   const template = getTemplate(args.templateId)
   if (!template) throw new Error(`Unknown template: ${args.templateId}`)
@@ -61,6 +61,7 @@ export async function generatePage(
     voiceBrief: voiceBrief(voice),
     personaName, personaDesc, angleTitle, anglePromise,
     research: (args.research || '').trim().slice(0, 4000),
+    language: (args.language || '').trim(),
   })
 
   // ── c. IMAGES — resolve a URL for every image slot ──
@@ -128,7 +129,7 @@ async function generateCopy(
   schema: SlotDef[],
   ctx: {
     productName: string; productBlock: string; voiceBrief: string
-    personaName: string; personaDesc: string; angleTitle: string; anglePromise: string; research: string
+    personaName: string; personaDesc: string; angleTitle: string; anglePromise: string; research: string; language?: string
   },
 ): Promise<FilledContent> {
   const copySlots = schema.filter((s) => s.type !== 'image')
@@ -139,7 +140,12 @@ async function generateCopy(
     return `- ${bits.join(' — ')}`
   }).join('\n')
 
-  const sys = `You are a world-class direct-response copywriter filling a high-converting landing page that sells ONE specific product. Write copy that is specific, credible and emotionally resonant — built ENTIRELY around the real PRODUCT below, for the target persona and chosen angle.
+  const lang = (ctx.language || '').trim()
+  const langLine = lang && !/^english$/i.test(lang)
+    ? `\n\nWRITE EVERY SLOT VALUE IN ${lang.toUpperCase()}. All copy the shopper reads — headlines, body, bullets, testimonials, FAQ, labels — must be natural, native-quality ${lang} (not a literal translation). Keep the product/brand name as-is. JSON keys stay in English.`
+    : ''
+
+  const sys = `You are a world-class direct-response copywriter filling a high-converting landing page that sells ONE specific product. Write copy that is specific, credible and emotionally resonant — built ENTIRELY around the real PRODUCT below, for the target persona and chosen angle.${langLine}
 
 THE PRODUCT IS THE SUBJECT OF THE PAGE — every headline, story, benefit, testimonial and FAQ is about THIS product:
 ${ctx.productBlock}

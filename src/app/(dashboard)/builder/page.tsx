@@ -37,6 +37,7 @@ const ITEM_FIELDS: Record<string, { field: string; label: string; area?: boolean
 }
 
 const STEP_LABELS = ['Template', 'Product', 'Research', 'Persona & angle']
+const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese (Brazil)', 'Portuguese (Portugal)', 'Dutch', 'Polish', 'Swedish', 'Danish', 'Norwegian', 'Finnish', 'Turkish', 'Japanese', 'Korean', 'Chinese (Simplified)', 'Arabic', 'Hindi', 'Urdu']
 
 const CARD: React.CSSProperties = {
   background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16,
@@ -102,6 +103,7 @@ export default function BuilderPage() {
   const [templates, setTemplates] = useState<Template[] | null>(null)
   const [tplErr, setTplErr] = useState('')
   const [tplId, setTplId] = useState<string | null>(null)
+  const [language, setLanguage] = useState('English')
   const loadTemplates = useCallback(async () => {
     setTplErr(''); setTemplates(null)
     try {
@@ -228,6 +230,7 @@ export default function BuilderPage() {
           templateId: tplId, productId,
           persona: selectedPersona, angle: selectedAngle,
           research: researchPayload(),
+          language,
         }),
       })
       const j = await r.json()
@@ -490,6 +493,17 @@ export default function BuilderPage() {
                     </button>
                   )
                 })}
+              </div>
+
+              {/* language — the page copy is generated in this language */}
+              <div style={{ ...CARD, marginTop: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>Language</div>
+                  <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>The page copy is written in this language.</div>
+                </div>
+                <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit', minWidth: 180 }}>
+                  {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
+                </select>
               </div>
             </div>
           )}
