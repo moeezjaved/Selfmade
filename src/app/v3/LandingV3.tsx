@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, type FormEvent } from 'react'
+import PricingSection from '@/components/pricing/PricingSection'
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -185,6 +186,8 @@ const CSS = `
 .v3-ascii{position:absolute;inset:0;z-index:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
 .v3-ascii pre{font-family:var(--mono);font-size:11px;line-height:1.3;color:var(--orange);opacity:.12;white-space:pre;margin:0;animation:asciimove 6s ease-in-out infinite;letter-spacing:2px}
 @keyframes asciimove{0%,100%{opacity:.07;transform:translateY(5px)}50%{opacity:.16;transform:translateY(-5px)}}
+.v3-price{padding:96px 0;background:var(--bg2);border-top:1px solid var(--hair);border-bottom:1px solid var(--hair);scroll-margin-top:80px}
+.v3-price .v3-sec-head{margin-bottom:40px}
 .v3-cta{position:relative;overflow:hidden}
 .v3-cta .v3-shell{position:relative;z-index:1}
 @media(max-width:760px){.v3-run-grid{grid-template-columns:1fr}}
@@ -369,7 +372,7 @@ export default function LandingV3() {
               <a href="/features/ai-visibility"><b>Get found by AI</b><span>Show up when buyers ask ChatGPT</span></a>
             </div>
           </div>
-          <a href="/pricing">Pricing</a>
+          <a href="#pricing">Pricing</a>
           <a href="/features/websites">Examples</a>
         </div>
         <div className="v3-navr"><a className="v3-login" href="/login">Log in</a><a className="v3-btn" href="/signup">Get started</a></div>
@@ -489,6 +492,12 @@ export default function LandingV3() {
             </div>
           ))}
         </div>
+      </div></section>
+
+      {/* PRICING — on the landing itself, visible with no login/signup */}
+      <section id="pricing" className="v3-price v3-sec"><div className="v3-shell">
+        <div className="v3-sec-head rev"><div className="v3-eye">✦ Pricing</div><h2 className="v3-sec-h">Start free. Go full-time when you&apos;re ready.</h2><p className="v3-sec-p">One flat plan runs your ads, SEO, website &amp; store — you only pay for the media you make.</p></div>
+        <div className="rev"><PricingSection variant="landing" /></div>
       </div></section>
 
       {/* STATEMENT */}
