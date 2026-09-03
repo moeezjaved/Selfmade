@@ -57,10 +57,10 @@ const CSS = `
 .pgbld .priceRow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}
 .pgbld .priceRow .now{font-size:30px;font-weight:800;color:var(--ink)}
 .pgbld .priceRow .was{font-size:18px;color:var(--muted);text-decoration:line-through}
-.pgbld .priceRow .save{background:#ffe1f1;color:var(--accent);font-weight:800;font-size:12.5px;padding:4px 10px;border-radius:7px}
+.pgbld .priceRow .save{background:var(--grad);color:#fff;font-weight:800;font-size:12.5px;padding:5px 12px;border-radius:8px}
 .pgbld .pills{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 20px}
-.pgbld .pill{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:14px;font-weight:600;color:var(--ink)}
-.pgbld .pill::before{content:"\\2713";width:18px;height:18px;border-radius:50%;background:#eafaf2;color:var(--good);font-size:11px;font-weight:800;display:grid;place-items:center;flex:none}
+.pgbld .pill{display:flex;align-items:center;gap:8px;border:1.5px dashed #e2b7d5;border-radius:100px;padding:9px 14px;font-size:14px;font-weight:600;color:var(--ink)}
+.pgbld .pill::before{content:"\\2713";width:18px;height:18px;border-radius:50%;background:linear-gradient(100deg,#fbeaf5,#efe6ff);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex:none}
 .pgbld .buyopt{border:1.5px solid var(--line);border-radius:16px;overflow:hidden;margin:0 0 12px}
 .pgbld .buyopt .opt{padding:16px 18px;border-bottom:1px solid var(--line)}
 .pgbld .buyopt .opt:last-child{border-bottom:0}
