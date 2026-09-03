@@ -153,7 +153,18 @@ export default function GeoPage() {
     </div>
   )
   const answerAssets = assets.filter((a) => !a.kind || a.kind === 'answer_page')
-  const crawlAssets = assets.filter((a) => a.kind && CRAWL_KINDS.includes(a.kind))
+  // Singleton crawl kinds (llms.txt / schema / fact sheet): show ONE per kind even if older
+  // duplicate rows still exist — prefer a published copy, else the newest. (assets are newest-first.)
+  const crawlAssets = (() => {
+    const byKind = new Map<string, any>()
+    for (const a of assets) {
+      if (!a.kind || !CRAWL_KINDS.includes(a.kind)) continue
+      const cur = byKind.get(a.kind)
+      if (!cur) { byKind.set(a.kind, a); continue }
+      if (cur.status !== 'published' && a.status === 'published') byKind.set(a.kind, a)
+    }
+    return CRAWL_KINDS.map((k) => byKind.get(k)).filter(Boolean)
+  })()
   const offsiteAssets = assets.filter((a) => a.kind === 'offsite')
 
   const [reaching, setReaching] = useState(false)
