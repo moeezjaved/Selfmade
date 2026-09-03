@@ -61,22 +61,28 @@ export default function StoreAuditClient() {
     if (!seoDone || captured || !started) return
     setCaptured(true)
     const dom = started.domain
+    // Resolve a REAL brand name — never a stray/generic token (that's how "Brand saved: new" happened).
+    // Prefer the detected brand/site name; if it's blank or a junk word, Title-Case the domain root.
+    const norm = (s: string) => (s || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase()
+    const titleCase = (s: string) => s.replace(/[-_.]+/g, ' ').trim().replace(/\b\w/g, (c) => c.toUpperCase())
+    const JUNK_NAME = /^(new|home|shop|store|the|page|untitled|brand|website|default|index|main)$/i
+    const rawName = String(adsData?.brand?.name || seoData?.siteName || '').trim()
+    const brandName = (rawName.length >= 2 && !JUNK_NAME.test(rawName)) ? rawName.slice(0, 80) : titleCase(norm(dom).replace(/\.[a-z.]+$/, ''))
     try { document.cookie = `sf_scan_domain=${encodeURIComponent(dom)}; path=/; max-age=${60 * 60 * 24 * 30}; samesite=lax` } catch { /* ignore */ }
     fetch('/api/audit/lead', {
       method: 'POST', headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ domain: dom, brandName: adsData?.brand?.name || seoData?.siteName, report: buildReport(adsData, seoData), adUrls: [] }),
+      body: JSON.stringify({ domain: dom, brandName, report: buildReport(adsData, seoData), adUrls: [] }),
     }).catch(() => {})
     // Ensure a brand exists for THIS store so we can render the real ads (and the audit carries over).
     // This REPLACES onboarding: stamp their Meta Ad Library page (own-ads audit) + follow the competitor
     // they picked, and mark them onboarded (the /api/audit/lead call above sets onboarding_completed).
     ;(async () => {
-      const norm = (s: string) => (s || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toLowerCase()
       const seed = started.seed || {}
       try {
         const list = await fetch('/api/brands', { cache: 'no-store' }).then((r) => r.json()).catch(() => ({ brands: [] }))
         let bid: string | null = ((list.brands || []).find((b: any) => norm(b.website) === norm(dom)) || null)?.id || null
         if (!bid) {
-          const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: adsData?.brand?.name || seoData?.siteName || norm(dom), website: dom, brand_kit: seed.pageId ? { ownMetaPageId: seed.pageId } : {} }) })
+          const r = await fetch('/api/brands', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ name: brandName, website: dom, brand_kit: seed.pageId ? { ownMetaPageId: seed.pageId } : {} }) })
           const j = await r.json().catch(() => ({}))
           if (r.ok && j.brand?.id) bid = j.brand.id
           else if (r.status === 402) setAtCap(true)
