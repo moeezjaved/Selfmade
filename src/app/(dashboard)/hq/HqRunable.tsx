@@ -12,6 +12,7 @@ import { useChatStream } from '@/components/mello/useChatStream'
 import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
 import { useCredits } from '@/components/credits/CreditCounter'
+import { PLANS, normalizePlan } from '@/lib/plans'
 
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.10)', LINE2 = 'rgba(20,18,15,.05)'
 const ORANGE = '#e02f06', WASH = '#fdeee9', INSET = '#f7f6f4', GOOD = '#12a150'
@@ -229,7 +230,9 @@ export default function HqRunable() {
               <button key={m} onClick={() => setMode(m)} style={{ border: 0, background: mode === m ? '#fff' : 'transparent', color: mode === m ? INK : SUB, fontWeight: mode === m ? 700 : 600, fontSize: 15, padding: '9px 30px', borderRadius: 999, cursor: 'pointer', boxShadow: mode === m ? `0 1px 3px rgba(20,18,15,.16), 0 0 0 1px ${LINE}` : 'none', textTransform: 'capitalize' }}>{m}</button>
             ))}
           </div>
-          <Link href="/upgrade" style={{ border: `1px solid ${ORANGE}`, color: ORANGE, fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 999, textDecoration: 'none' }}>⚡ Upgrade</Link>
+          {normalizePlan(credits.plan) === 'free'
+            ? <Link href="/upgrade" style={{ border: `1px solid ${ORANGE}`, color: ORANGE, fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 999, textDecoration: 'none' }}>⚡ Upgrade</Link>
+            : <span />}
         </div>
 
         <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
@@ -325,7 +328,7 @@ export default function HqRunable() {
 
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>Plan <Link href="/billing" style={{ fontSize: 12, color: ORANGE, textDecoration: 'none', fontWeight: 600 }}>Manage</Link></div>
-          <div style={{ fontSize: 12.5, color: SUB, marginTop: 8 }}><b style={{ color: INK, textTransform: 'capitalize' }}>{credits.plan || 'Free'}</b> · <b style={{ color: INK }}>{credits.loading ? '…' : credits.balance.toLocaleString()}</b> credits</div>
+          <div style={{ fontSize: 12.5, color: SUB, marginTop: 8 }}><b style={{ color: INK }}>{PLANS[normalizePlan(credits.plan)]?.label || 'Free'}</b> · <b style={{ color: INK }}>{credits.loading ? '…' : credits.balance.toLocaleString()}</b> credits</div>
         </div>
 
         <Link href="/mission" style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15, textDecoration: 'none', color: INK }}>
