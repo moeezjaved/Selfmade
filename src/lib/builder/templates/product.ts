@@ -9,6 +9,8 @@
 import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../types'
 
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
+// esc + strip stray **markdown** / leading bullet chars the copy model sometimes leaves in short labels.
+const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
 function rt(s: any): string {
   const safe = esc(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
   return safe.split(/\n\s*\n/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
@@ -18,6 +20,14 @@ function img(url: any, alt: string, cls: string, label?: string): string {
   if (url && typeof url === 'string') return `<img class="${cls}" src="${esc(url)}" alt="${esc(alt)}">`
   return `<div class="${cls} ph">${esc(label || 'Image')}</div>`
 }
+
+// Compact, self-contained payment badges (no external images — Shopify CSP safe).
+const PAYICONS = `
+<svg viewBox="0 0 48 30"><text x="24" y="20" text-anchor="middle" font-family="Arial" font-weight="bold" font-style="italic" font-size="13" fill="#1a1f71">VISA</text></svg>
+<svg viewBox="0 0 48 30"><circle cx="21" cy="15" r="8" fill="#eb001b"/><circle cx="28" cy="15" r="8" fill="#f79e1b" fill-opacity=".85"/></svg>
+<svg viewBox="0 0 48 30"><rect width="48" height="30" fill="#1f72cd"/><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">AMEX</text></svg>
+<svg viewBox="0 0 48 30"><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9.5" fill="#003087">PayPal</text></svg>
+<svg viewBox="0 0 48 30"><rect width="48" height="30" rx="4" fill="#5a31f4"/><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">Pay</text></svg>`
 
 const CSS = `
 /* Every rule scoped under .pgbld so nothing leaks into the merchant's theme (header/footer). */
@@ -58,6 +68,27 @@ const CSS = `
 .pgbld a.buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
 .pgbld a.buy.big{max-width:520px;margin:8px auto 0}
 .pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
+/* payment icons */
+.pgbld .pay{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+.pgbld .pay svg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff}
+/* product-info accordions (native details/summary) */
+.pgbld .acc{margin:14px 0 0;border-top:1px solid var(--line)}
+.pgbld .acc details{border-bottom:1px solid var(--line)}
+.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:15px 2px;font-weight:800;color:var(--ink);font-size:15px}
+.pgbld .acc summary::-webkit-details-marker{display:none}
+.pgbld .acc summary::after{content:"+";font-size:20px;font-weight:700;color:var(--muted)}
+.pgbld .acc details[open] summary::after{content:"\\2013"}
+.pgbld .acc .body{padding:0 2px 16px;font-size:14px;color:var(--body)}
+/* UGC video wall */
+.pgbld .ugc{padding:44px 0 8px}
+.pgbld .ugc .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.pgbld .ugc .top h2{font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0;text-align:left}
+.pgbld .ugc .socials{display:flex;gap:12px;font-size:20px}
+.pgbld .ugc .wall{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.pgbld .ugc .vc{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:9/16;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .ugc .vc img,.pgbld .ugc .vc video{width:100%;height:100%;object-fit:cover;display:block}
+.pgbld .ugc .vc .play{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.pgbld .ugc .vc .play span{width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;font-size:18px;backdrop-filter:blur(2px)}
 /* trust row */
 .pgbld .trust{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 44px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 22px;background:var(--paper)}
 .pgbld .trust .ti{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink)}
@@ -124,21 +155,21 @@ const CSS = `
 .pgbld .fc-thumb{width:44px;height:44px;border-radius:9px;flex:none;object-fit:cover}
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
 .pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
-@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat:nth-of-type(even) .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}}
+@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat:nth-of-type(even) .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
 `
 
 function render(c: FilledContent, o: RenderOpts): string {
   const stars = '★★★★★'
-  const pills = arr(c.benefit_pills).slice(0, 4).map((p) => `<div class="pill">${esc(p.label)}</div>`).join('')
-  const subBul = arr(c.subscribe_perks).map((p) => `<li>${esc(p.label)}</li>`).join('')
-  const trust = arr(c.trust_row).map((t) => `<div class="ti">✓ ${esc(t.label)}</div>`).join('')
-  const marqOne = `<span>${arr(c.marquee_items).map((m) => esc(m.label)).join('</span><span>')}</span>`
-  const f1bul = arr(c.feature_1_bullets).map((b) => `<li><strong>${esc(b.label)}</strong>${b.body ? ' — ' + esc(b.body) : ''}</li>`).join('')
-  const f2bul = arr(c.feature_2_bullets).map((b) => `<li><strong>${esc(b.label)}</strong>${b.body ? ' — ' + esc(b.body) : ''}</li>`).join('')
+  const pills = arr(c.benefit_pills).slice(0, 4).map((p) => `<div class="pill">${escp(p.label)}</div>`).join('')
+  const subBul = arr(c.subscribe_perks).map((p) => `<li>${escp(p.label)}</li>`).join('')
+  const trust = arr(c.trust_row).map((t) => `<div class="ti">✓ ${escp(t.label)}</div>`).join('')
+  const marqOne = `<span>${arr(c.marquee_items).map((m) => escp(m.label)).join('</span><span>')}</span>`
+  const f1bul = arr(c.feature_1_bullets).map((b) => `<li><strong>${escp(b.label)}</strong>${b.body ? ' — ' + escp(b.body) : ''}</li>`).join('')
+  const f2bul = arr(c.feature_2_bullets).map((b) => `<li><strong>${escp(b.label)}</strong>${b.body ? ' — ' + escp(b.body) : ''}</li>`).join('')
   const stats = arr(c.stats).map((s) => `<div class="stat"><div class="n">${esc(s.label)}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.body)}</div></div>`).join('')
-  const bene = arr(c.benefit_items).map((b) => `<div class="bcard"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${esc(b.label)}</div></div>`).join('')
-  const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${esc(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
+  const bene = arr(c.benefit_items).map((b) => `<div class="bcard"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${escp(b.label)}</div></div>`).join('')
+  const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
   const revs = arr(c.testimonials).map((t) => `<div class="rev"><div class="st">${stars}</div><div class="rt">${esc((t as any).title || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}${t.city ? ' · ' + esc(t.city) : ''}</div></div>`).join('')
   const trio = arr(c.transform_items).map((t, i) => `<div class="tcard"><div class="lab">${esc((t as any).lab || ['First','Second','Third'][i] || 'Benefit')} benefit</div><h3>${esc(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
   const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
@@ -169,13 +200,26 @@ function render(c: FilledContent, o: RenderOpts): string {
           </div>
         </div>
         <a class="buy grad" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Add to cart')}</a>
+        <div class="pay">${PAYICONS}</div>
         <div class="social">${esc(c.social_line || 'Loved by thousands of happy customers')}</div>
+        <div class="acc">
+          <details open><summary>How to use</summary><div class="body">${esc(c.howto_body)}</div></details>
+          <details><summary>Shipping &amp; delivery</summary><div class="body">${esc(c.shipping_body)}</div></details>
+          <details><summary>Returns &amp; refunds</summary><div class="body">${esc(c.returns_body)}</div></details>
+        </div>
       </div>
     </div>
   </div>
 
   <div class="trust">${trust}</div>
   <div class="marq"><div class="marq-track">${marqOne}${marqOne}</div></div>
+
+  <div class="wrap"><div class="ugc">
+    <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
+    <div class="wall">
+      ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${img(u || o.productImage, o.productName, '')}<div class="play"><span>▶</span></div></div>`).join('')}
+    </div>
+  </div></div>
 
   <div class="wrap">
     <section class="feat">
@@ -257,6 +301,15 @@ export const productV1: PageTemplate = {
     { key: 'onetime_label', type: 'text', label: 'One-time option title' },
     { key: 'onetime_sub', type: 'text', label: 'One-time subtitle' },
     { key: 'social_line', type: 'text', label: 'Social proof line', hint: 'e.g. "Sarah and 400+ people purchased today".' },
+    { key: 'howto_body', type: 'text', label: 'How to use', hint: '1-2 sentences on how to use the product.' },
+    { key: 'shipping_body', type: 'text', label: 'Shipping & delivery', hint: '1-2 sentences on shipping times/tracking.' },
+    { key: 'returns_body', type: 'text', label: 'Returns & refunds', hint: '1-2 sentences on the returns policy.' },
+    { key: 'ugc_head', type: 'text', label: 'Video wall heading', hint: 'e.g. "What our customers think".' },
+    { key: 'image_ugc1', type: 'image', role: 'lifestyle', label: 'Video/photo 1' },
+    { key: 'image_ugc2', type: 'image', role: 'lifestyle', label: 'Video/photo 2' },
+    { key: 'image_ugc3', type: 'image', role: 'product', label: 'Video/photo 3' },
+    { key: 'image_ugc4', type: 'image', role: 'lifestyle', label: 'Video/photo 4' },
+    { key: 'image_ugc5', type: 'image', role: 'product', label: 'Video/photo 5' },
     { key: 'image_main', type: 'image', role: 'product', label: 'Main product image' },
     { key: 'image_g2', type: 'image', role: 'product', label: 'Gallery image 2' },
     { key: 'image_g3', type: 'image', role: 'product', label: 'Gallery image 3' },
