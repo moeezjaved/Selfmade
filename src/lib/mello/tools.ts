@@ -247,12 +247,12 @@ export const TOOLS = [
     type: 'function' as const,
     function: {
       name: 'author_competitor_report',
-      description: "Write the flagship Competitor Intelligence Report — a McKinsey/Sequoia-grade strategy document about a rival brand, grounded in their real crawled ads, ending every section with a concrete move for the user's own brand. Use when the user says 'analyze <competitor>', 'do a deep-dive / teardown / full report on <brand>', 'give me the strategy doc on X', or wants a serious written analysis (NOT a quick chat answer — for a fast verbal read use get_competitor_ads instead). Takes ~1-2 minutes; it saves a document the user can reopen and returns a link. Tell the user you're writing it before you call this.",
+      description: "Write the flagship strategy report — a McKinsey/Sequoia-grade written analysis grounded in real crawled ads, ending every section with a concrete move. Works for a RIVAL brand OR the user's OWN brand. This is the ONLY way to produce the beautiful, saved report doc — ALWAYS use it whenever the user wants a report or written analysis: 'analyze <brand>', 'deep-dive / teardown / full report on <brand>', 'create/make me a report', 'report on what's working for <my brand/Aura>', 'strategy doc on X'. Do NOT answer a report request with a plain chat summary from search_ad_library or analyze_niche_patterns — call this instead. Takes ~1-2 minutes; it saves a document the user can reopen and returns a link — after it finishes, give a 2-3 sentence highlight then link them to the full document. Tell the user you're writing it before you call this.",
       parameters: {
         type: 'object',
         required: ['competitor'],
         properties: {
-          competitor: { type: 'string', description: 'The rival brand/company name to analyze' },
+          competitor: { type: 'string', description: "The brand to analyze — a rival brand, OR the user's OWN brand (e.g. 'Aura') when they ask for a report on their own store or what's working for them." },
           brand_name: { type: 'string', description: "Which of the user's OWN brands the report is for, if they named one (else their primary brand is used)" },
         },
       },
