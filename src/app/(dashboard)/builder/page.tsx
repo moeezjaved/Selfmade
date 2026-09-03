@@ -754,6 +754,8 @@ export default function BuilderPage() {
                         <input type="number" value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value === '' ? '' : Number(e.target.value))} style={{ ...editInput, marginTop: 10, maxWidth: 160 }} />
                       ) : s.type === 'image' ? (
                         <ImageEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} />
+                      ) : s.type === 'video' ? (
+                        <MediaEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} />
                       ) : (
                         <input value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} style={{ ...editInput, marginTop: 10 }} />
                       )}
@@ -942,6 +944,57 @@ function ImageEditor({ value, onChange }: { value?: string; onChange: (url: stri
             <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe an image to generate…" onKeyDown={(e) => { if (e.key === 'Enter') generate() }} style={{ ...editInput, flex: 1 }} />
             <button onClick={generate} disabled={!!busy} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{busy === 'gen' ? 'Generating…' : '✨ AI'}</button>
           </div>
+          {err && <div style={{ fontSize: 12, color: '#9a2b2b', marginTop: 6 }}>{err}</div>}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── video/media slot editor: upload a customer video (or image) straight to storage (presigned) ── */
+function MediaEditor({ value, onChange }: { value?: string; onChange: (url: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [err, setErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const isVideo = !!value && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(value)
+
+  const onFile = async (f: File | null) => {
+    if (!f) return
+    if (!/^(video|image)\//.test(f.type)) { setErr('Pick a video or image file.'); return }
+    if (f.size > 120 * 1024 * 1024) { setErr('File must be under 120MB.'); return }
+    setBusy(true); setErr(''); setPct(0)
+    try {
+      const r = await fetch('/api/builder/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contentType: f.type, size: f.size }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Upload failed')
+      await new Promise<void>((res, rej) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('PUT', j.uploadUrl)
+        xhr.setRequestHeader('Content-Type', f.type)
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100)) }
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? res() : rej(new Error('Upload failed')))
+        xhr.onerror = () => rej(new Error('Upload failed'))
+        xhr.send(f)
+      })
+      onChange(j.publicUrl)
+    } catch (e: any) { setErr(e?.message || 'Upload failed') }
+    finally { setBusy(false); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 14px', fontWeight: 650, fontSize: 13, cursor: 'pointer' }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <input ref={fileRef} type="file" accept="video/*,image/*" onChange={(e) => onFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ width: 72, height: 110, borderRadius: 10, overflow: 'hidden', flex: 'none', background: INSET, border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center' }}>
+          {value ? (isVideo ? <video src={value} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />) : <span style={{ fontSize: 18, opacity: 0.4 }}>▶</span>}
+        </div>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>{busy ? `Uploading… ${pct}%` : '⬆ Upload video'}</button>
+            {value && <button onClick={() => onChange('')} disabled={busy} style={btn}>Remove</button>}
+          </div>
+          <div style={{ fontSize: 11.5, color: FAINT, marginTop: 6 }}>MP4 / WebM / MOV (or an image). Up to 120MB.</div>
           {err && <div style={{ fontSize: 12, color: '#9a2b2b', marginTop: 6 }}>{err}</div>}
         </div>
       </div>

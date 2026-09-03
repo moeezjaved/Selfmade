@@ -21,6 +21,13 @@ function img(url: any, alt: string, cls: string, label?: string): string {
   return `<div class="${cls} ph">${esc(label || 'Image')}</div>`
 }
 
+// A UGC card: a real uploaded <video>, else a poster image with a play badge.
+function mediaCard(u: any, poster: any, name: string): string {
+  const isVid = typeof u === 'string' && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u)
+  if (isVid) return `<video src="${esc(u)}" muted loop playsinline controls preload="metadata"></video>`
+  return `${img(u || poster, name, '')}<div class="play"><span>▶</span></div>`
+}
+
 // Compact, self-contained payment badges (no external images — Shopify CSP safe).
 const PAYICONS = `
 <svg viewBox="0 0 48 30"><text x="24" y="20" text-anchor="middle" font-family="Arial" font-weight="bold" font-style="italic" font-size="13" fill="#1a1f71">VISA</text></svg>
@@ -217,7 +224,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   <div class="wrap"><div class="ugc">
     <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
     <div class="wall">
-      ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${img(u || o.productImage, o.productName, '')}<div class="play"><span>▶</span></div></div>`).join('')}
+      ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${mediaCard(u, o.productImage, o.productName)}</div>`).join('')}
     </div>
   </div></div>
 
@@ -305,11 +312,11 @@ export const productV1: PageTemplate = {
     { key: 'shipping_body', type: 'text', label: 'Shipping & delivery', hint: '1-2 sentences on shipping times/tracking.' },
     { key: 'returns_body', type: 'text', label: 'Returns & refunds', hint: '1-2 sentences on the returns policy.' },
     { key: 'ugc_head', type: 'text', label: 'Video wall heading', hint: 'e.g. "What our customers think".' },
-    { key: 'image_ugc1', type: 'image', role: 'lifestyle', label: 'Video/photo 1' },
-    { key: 'image_ugc2', type: 'image', role: 'lifestyle', label: 'Video/photo 2' },
-    { key: 'image_ugc3', type: 'image', role: 'product', label: 'Video/photo 3' },
-    { key: 'image_ugc4', type: 'image', role: 'lifestyle', label: 'Video/photo 4' },
-    { key: 'image_ugc5', type: 'image', role: 'product', label: 'Video/photo 5' },
+    { key: 'image_ugc1', type: 'video', label: 'Customer video 1' },
+    { key: 'image_ugc2', type: 'video', label: 'Customer video 2' },
+    { key: 'image_ugc3', type: 'video', label: 'Customer video 3' },
+    { key: 'image_ugc4', type: 'video', label: 'Customer video 4' },
+    { key: 'image_ugc5', type: 'video', label: 'Customer video 5' },
     { key: 'image_main', type: 'image', role: 'product', label: 'Main product image' },
     { key: 'image_g2', type: 'image', role: 'product', label: 'Gallery image 2' },
     { key: 'image_g3', type: 'image', role: 'product', label: 'Gallery image 3' },
