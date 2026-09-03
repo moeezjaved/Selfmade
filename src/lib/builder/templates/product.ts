@@ -315,7 +315,7 @@ function render(c: FilledContent, o: RenderOpts): string {
         <div class="social">${esc(c.social_line || 'Loved by thousands of happy customers')}</div>
         <div class="trust">${trust}</div>
         <div class="ugc">
-          <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
+          <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">${esc(c.ugc_socials || '📷 🎵 ▶️ 📌')}</div></div>
           <div class="wall">
             ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${mediaCard(u, o.productImage, o.productName)}</div>`).join('')}
           </div>
@@ -345,7 +345,7 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <div class="seenband"><div class="wrap">
     <h2>${esc(c.as_seen_on || 'As seen on')}</h2>
-    <div class="logos"><span>Forbes</span><span>Vogue</span><span>Elle</span><span>Allure</span><span>Bazaar</span></div>
+    <div class="logos">${(arr(c.seen_logos).length ? arr(c.seen_logos).map((l) => `<span>${escp(l.label)}</span>`) : ['Forbes', 'Vogue', 'Elle', 'Allure', 'Bazaar'].map((n) => `<span>${n}</span>`)).join('')}</div>
   </div></div>
 
   <div class="wrap"><section class="feat rev">
@@ -453,6 +453,7 @@ export const productV1: PageTemplate = {
     { key: 'shipping_body', type: 'text', label: 'Shipping & delivery', hint: '1-2 sentences on shipping times/tracking.' },
     { key: 'returns_body', type: 'text', label: 'Returns & refunds', hint: '1-2 sentences on the returns policy.' },
     { key: 'ugc_head', type: 'text', label: 'Video wall heading', hint: 'e.g. "What our customers think".' },
+    { key: 'ugc_socials', type: 'text', label: 'Video wall social icons', hint: 'A short row of emoji/icons, e.g. "📷 🎵 ▶️ 📌".' },
     { key: 'image_ugc1', type: 'video', label: 'Customer video 1' },
     { key: 'image_ugc2', type: 'video', label: 'Customer video 2' },
     { key: 'image_ugc3', type: 'video', label: 'Customer video 3' },
@@ -467,7 +468,8 @@ export const productV1: PageTemplate = {
     { key: 'feature_1_head', type: 'text', label: 'Feature 1 heading' },
     { key: 'feature_1_body', type: 'richtext', role: 'body', label: 'Feature 1 body' },
     { key: 'feature_1_bullets', type: 'list', label: 'Feature 1 bullets', count: 3, hint: 'Each: bold benefit + short line.' },
-    { key: 'as_seen_on', type: 'text', label: '"As seen on" label' },
+    { key: 'as_seen_on', type: 'text', label: '"As seen on" heading' },
+    { key: 'seen_logos', type: 'list', label: '"As seen on" logos', count: 5, hint: 'Each label only: a press/publication name shown as a wordmark.' },
     { key: 'image_feature_1', type: 'image', role: 'editorial', label: 'Feature 1 image' },
     { key: 'feature_2_head', type: 'text', label: 'Feature 2 heading' },
     { key: 'feature_2_body', type: 'richtext', role: 'body', label: 'Feature 2 body' },
