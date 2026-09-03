@@ -29,6 +29,9 @@ b,strong{color:var(--ink);font-weight:700}
 .pgbld *{box-sizing:border-box}
 .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
 .count .lbl{opacity:.85;margin-right:8px}
+.count b{color:#fff}
+/* Hide the theme's auto page-title (Dawn/most themes) so it doesn't duplicate our headline. */
+.main-page-title,.shopify-page-title,.template-page .page-title{display:none!important}
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:44px;padding:40px 0 70px}
 .main>*{margin:0 0 20px}
 h1.head{font-size:40px;line-height:1.12;font-weight:800;color:var(--ink);letter-spacing:-.02em;margin:6px 0 14px}
@@ -93,7 +96,7 @@ h2.sec.brand{color:var(--green)}
 .fc-name{font-weight:700;color:var(--ink);font-size:15px;line-height:1.25;min-width:0}
 .fc-name b{color:var(--red)}
 .fc-btn{background:var(--red);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 26px;border-radius:9px;white-space:nowrap;flex:none}
-@media(max-width:900px){.grid{grid-template-columns:1fr;gap:0}h1.head{font-size:30px}.aside{order:-1}.offer{position:static;margin:18px 0}.tests{grid-template-columns:1fr}.tl .row{grid-template-columns:84px 1fr}}
+@media(max-width:900px){.grid{grid-template-columns:1fr;gap:0}h1.head{font-size:28px;line-height:1.15}.offer{position:static;margin:18px 0}.tests{grid-template-columns:1fr}.tl .row{grid-template-columns:84px 1fr}}
 @media(max-width:600px){.fc-btn{padding:13px 18px;font-size:15px}.fc-name{font-size:13.5px}}
 `
 
