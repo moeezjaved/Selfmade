@@ -389,6 +389,7 @@ export default function BuilderPage() {
         .bld-radio:checked::after { content:''; width:9px; height:9px; border-radius:50%; background:${ORANGE}; }
         .bld-card-btn { transition: box-shadow .12s, border-color .12s, transform .12s; }
         .bld-card-btn:hover { box-shadow: 0 2px 4px rgba(20,18,15,.06), 0 16px 40px -24px rgba(20,18,15,.4); }
+        @keyframes bldspin { to { transform: rotate(360deg); } }
       `}</style>
 
       {/* header + stepper */}
@@ -755,7 +756,7 @@ export default function BuilderPage() {
                       ) : s.type === 'image' ? (
                         <ImageEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} />
                       ) : s.type === 'video' ? (
-                        <MediaEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} />
+                        <MediaEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} pageId={pageId} />
                       ) : (
                         <input value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} style={{ ...editInput, marginTop: 10 }} />
                       )}
@@ -952,12 +953,50 @@ function ImageEditor({ value, onChange }: { value?: string; onChange: (url: stri
 }
 
 /* ── video/media slot editor: upload a customer video (or image) straight to storage (presigned) ── */
-function MediaEditor({ value, onChange }: { value?: string; onChange: (url: string) => void }) {
+const UGC_LANGS: [string, string][] = [['en', 'English'], ['es', 'Spanish'], ['fr', 'French'], ['de', 'German'], ['ar', 'Arabic'], ['ur', 'Urdu'], ['hi', 'Hindi'], ['pt', 'Portuguese']]
+
+function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (url: string) => void; pageId?: string }) {
   const [busy, setBusy] = useState(false)
   const [pct, setPct] = useState(0)
   const [err, setErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
   const isVideo = !!value && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(value)
+
+  // ── AI UGC video generation (studio Seedance pipeline) ──
+  const [gen, setGen] = useState<'idle' | 'form' | 'working'>('idle')
+  const [ugcCost, setUgcCost] = useState<number | null>(null)
+  const [dur, setDur] = useState(15)
+  const [look, setLook] = useState('')
+  const [lang, setLang] = useState('en')
+  const [prog, setProg] = useState('Starting…')
+  const pollRef = useRef<any>(null)
+  useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
+
+  const openGen = async () => {
+    setGen('form'); setErr('')
+    try { const r = await fetch('/api/builder/ugc-video?cost=1'); const j = await r.json(); if (r.ok) setUgcCost(j.cost ?? null) } catch { /* ignore */ }
+  }
+  const poll = (jobId: string) => {
+    pollRef.current = setTimeout(async () => {
+      try {
+        const r = await fetch(`/api/builder/ugc-video?jobId=${encodeURIComponent(jobId)}`)
+        const j = await r.json()
+        if (j.status === 'done' && j.url) { onChange(j.url); setGen('idle'); return }
+        if (j.status === 'failed') { setErr(j.error || 'Generation failed — you were not charged.'); setGen('idle'); return }
+        setProg(j.progress?.label ? `${j.progress.label}${j.progress.pct ? ` · ${j.progress.pct}%` : ''}` : 'Rendering your video…')
+      } catch { /* keep polling */ }
+      poll(jobId)
+    }, 5000)
+  }
+  const generate = async () => {
+    if (!pageId) { setErr('Save the page first, then generate.'); return }
+    setGen('working'); setErr(''); setProg('Analyzing your product…')
+    try {
+      const r = await fetch('/api/builder/ugc-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, duration: dur, characterLook: look.trim(), language: lang }) })
+      const j = await r.json(); if (!r.ok || !j.jobId) throw new Error(j?.error || 'Could not start generation')
+      poll(j.jobId)
+    } catch (e: any) { setErr(e?.message || 'Could not start generation'); setGen('idle') }
+  }
 
   const onFile = async (f: File | null) => {
     if (!f) return
@@ -991,10 +1030,45 @@ function MediaEditor({ value, onChange }: { value?: string; onChange: (url: stri
         </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>{busy ? `Uploading… ${pct}%` : '⬆ Upload video'}</button>
-            {value && <button onClick={() => onChange('')} disabled={busy} style={btn}>Remove</button>}
+            <button onClick={() => fileRef.current?.click()} disabled={busy || gen === 'working'} style={{ ...btn, opacity: (busy || gen === 'working') ? 0.6 : 1 }}>{busy ? `Uploading… ${pct}%` : '⬆ Upload video'}</button>
+            {gen === 'idle' && <button onClick={openGen} disabled={busy} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>✨ Generate UGC</button>}
+            {value && gen === 'idle' && <button onClick={() => onChange('')} disabled={busy} style={btn}>Remove</button>}
           </div>
-          <div style={{ fontSize: 11.5, color: FAINT, marginTop: 6 }}>MP4 / WebM / MOV (or an image). Up to 120MB.</div>
+
+          {gen === 'form' && (
+            <div style={{ marginTop: 10, border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, background: INSET }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Generate a UGC video from this product</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                <label style={{ fontSize: 12, color: SUB }}>Duration
+                  <select value={dur} onChange={(e) => setDur(Number(e.target.value))} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 8px', fontSize: 13, marginTop: 3, background: '#fff' }}>
+                    {[8, 10, 15, 20, 30].map((d) => <option key={d} value={d}>{d} seconds</option>)}
+                  </select>
+                </label>
+                <label style={{ fontSize: 12, color: SUB }}>Language
+                  <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 8px', fontSize: 13, marginTop: 3, background: '#fff' }}>
+                    {UGC_LANGS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                  </select>
+                </label>
+              </div>
+              <label style={{ fontSize: 12, color: SUB, display: 'block', marginTop: 8 }}>Creator look
+                <input value={look} onChange={(e) => setLook(e.target.value)} placeholder="e.g. Pakistani woman, 25–30, warm and friendly" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, marginTop: 3, fontFamily: 'inherit' }} />
+              </label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                <button onClick={generate} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Generate{ugcCost != null ? ` — uses ${ugcCost.toLocaleString()} credits` : ''}</button>
+                <button onClick={() => setGen('idle')} style={btn}>Cancel</button>
+                <span style={{ fontSize: 11.5, color: FAINT }}>Features your real product · a few minutes · refunded if it fails</span>
+              </div>
+            </div>
+          )}
+
+          {gen === 'working' && (
+            <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', background: INSET }}>
+              <span className="bld-spin" style={{ width: 18, height: 18, borderRadius: '50%', border: `2px solid ${WASH}`, borderTopColor: ORANGE, animation: 'bldspin 1s linear infinite', flex: 'none' }} />
+              <span style={{ fontSize: 13, color: INK, fontWeight: 600 }}>{prog}</span>
+            </div>
+          )}
+
+          {gen === 'idle' && <div style={{ fontSize: 11.5, color: FAINT, marginTop: 6 }}>Upload MP4 / WebM / MOV (up to 120MB), or ✨ generate a UGC clip from your product.</div>}
           {err && <div style={{ fontSize: 12, color: '#9a2b2b', marginTop: 6 }}>{err}</div>}
         </div>
       </div>
