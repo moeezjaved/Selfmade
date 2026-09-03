@@ -86,6 +86,80 @@ export interface AdPerfParams {
   status?: 'ACTIVE' | 'ALL'
 }
 
+export interface ReportSummaryParams { accountId?: string; date_preset?: string }
+
+/**
+ * Account-level REPORT summary — the SAME headline numbers the /reports page shows (spend, revenue,
+ * ROAS, purchases over the window) plus the single ad that's carrying the account and the one burning
+ * budget. Mirrors /api/reports' `overview` field-for-field (account-level insights + pickPurchase) so
+ * chat and the Reports page never disagree. Mello calls this for "show me my report / how are my ads
+ * doing", presents a short debrief, and links the user to the full report at /reports.
+ */
+export async function getReportSummary(userId: string, params: ReportSummaryParams = {}) {
+  const acc = await resolveAccount(userId, params.accountId)
+  const token = decryptToken(acc.access_token)
+  const preset = params.date_preset && VALID_PRESETS.has(params.date_preset) ? params.date_preset : 'last_14d'
+  const days = Number(String(preset).replace(/[^0-9]/g, '')) || 14
+
+  // Live currency from Meta (the stored column can be stale on a reconnected account) — same self-heal
+  // the /reports route does, so the report never shows the wrong currency.
+  let currency = acc.currency || 'USD'
+  try {
+    const accJson = await (await fetch(`https://graph.facebook.com/${V}/act_${acc.account_id}?fields=currency&access_token=${encodeURIComponent(token)}`)).json()
+    if (accJson?.currency) currency = accJson.currency
+  } catch { /* keep stored currency on any Graph hiccup */ }
+
+  // 1) Account-level overview — one row, identical fields to /api/reports.
+  const ovUrl = `https://graph.facebook.com/${V}/act_${acc.account_id}/insights?` + new URLSearchParams({
+    date_preset: preset,
+    fields: 'spend,action_values,actions,clicks,impressions,ctr,cpc',
+    access_token: token,
+  })
+  const ovJson = await (await fetch(ovUrl)).json()
+  if (ovJson.error) throw new Error(`Meta API: ${ovJson.error.message}`)
+  const ov = (ovJson.data || [])[0] || {}
+  const spend = Math.round(Number(ov.spend || 0) * 100) / 100
+  const revenue = Math.round(pickPurchase(ov.action_values) * 100) / 100
+  const purchases = Math.round(pickPurchase(ov.actions))
+  const roas = spend > 0 ? Math.round((revenue / spend) * 100) / 100 : 0
+
+  // 2) Per-ad rows (top spenders) to name the carrying + burning ad — best-effort, the report still
+  // stands without them.
+  type ReportAd = { name: string; spend: number; revenue: number; roas: number }
+  let winner: ReportAd | null = null
+  let burner: ReportAd | null = null
+  try {
+    const adUrl = `https://graph.facebook.com/${V}/act_${acc.account_id}/insights?` + new URLSearchParams({
+      level: 'ad',
+      fields: 'ad_name,spend,action_values',
+      limit: '40',
+      sort: 'spend_descending',
+      date_preset: preset,
+      access_token: token,
+    })
+    const adJson = await (await fetch(adUrl)).json()
+    const ads: ReportAd[] = (adJson.data || []).map((r: any) => {
+      const s = Number(r.spend || 0), rev = pickPurchase(r.action_values)
+      return { name: r.ad_name || '(unnamed)', spend: Math.round(s * 100) / 100, revenue: Math.round(rev * 100) / 100, roas: s > 0 ? Math.round((rev / s) * 100) / 100 : 0 }
+    }).filter((a: ReportAd) => a.spend > 0)
+    if (ads.length) {
+      winner = [...ads].sort((a, b) => b.revenue - a.revenue || b.roas - a.roas)[0]
+      burner = [...ads].sort((a, b) => a.roas - b.roas || b.spend - a.spend)[0]
+      if (burner && winner && burner.name === winner.name) burner = null // one ad only → don't name it twice
+    }
+  } catch { /* winner/burner are optional garnish */ }
+
+  return {
+    account: acc.account_name,
+    currency, days,
+    spend, revenue, roas, purchases,
+    profit: Math.round((revenue - spend) * 100) / 100,
+    winner, burner,
+    report_url: '/reports',
+    note: 'This IS the real account report — the same numbers as the /reports page. Present a short WHAT-HAPPENED debrief (spend → revenue, ROAS, purchases, profit; name the carrying and burning ad), then link the user to the full report at /reports for the health score, winners/losers and audience breakdown.',
+  }
+}
+
 /** Pull live ad-level performance from Meta's Insights API. */
 export async function getAdPerformance(userId: string, params: AdPerfParams) {
   const acc = await resolveAccount(userId, params.accountId)
