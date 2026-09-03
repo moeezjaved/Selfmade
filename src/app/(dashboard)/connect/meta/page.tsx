@@ -26,6 +26,8 @@ export default function ConnectMetaByo() {
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const [learned, setLearned] = useState<any>(null)
+  // Is Meta ALREADY connected for the active brand? (brand-scoped — /api/meta/accounts filters by active brand)
+  const [already, setAlready] = useState<{ connected: boolean; count: number } | null>(null)
 
   // partner door
   const [bizId, setBizId] = useState<string | null>(null)
@@ -71,6 +73,17 @@ export default function ConnectMetaByo() {
     fetch('/api/meta/connect-partner').then((r) => r.json())
       .then((j) => { if (j.businessId) setBizId(j.businessId); else setTab('token') })   // not configured → token door
       .catch(() => setTab('token'))
+  }, [])
+
+  // If this brand already has a Meta account linked, greet them with "already connected" instead of the
+  // connect CTA (the 'Aura says Connect even though I already connected' case). Re-checks on brand switch.
+  useEffect(() => {
+    const check = () => fetch('/api/meta/accounts').then((r) => r.ok ? r.json() : null)
+      .then((j) => { if (j && Array.isArray(j.accounts)) setAlready({ connected: j.accounts.length > 0, count: j.accounts.length }) })
+      .catch(() => {})
+    check()
+    window.addEventListener('sf:brandchange', check)
+    return () => window.removeEventListener('sf:brandchange', check)
   }, [])
 
   const copyBiz = () => { if (bizId) { navigator.clipboard?.writeText(bizId).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 1600) } }
@@ -146,7 +159,18 @@ export default function ConnectMetaByo() {
         </div>
       )}
 
-      {learned ? (
+      {already?.connected && !learned ? (
+        <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '22px 24px' }}>
+          <div style={{ fontSize: 17, fontWeight: 800 }}>Meta already connected ✓</div>
+          <p style={{ fontSize: 14, color: MUTED, lineHeight: 1.65, margin: '10px 0 0' }}>
+            This brand is linked to <b>{already.count}</b> Meta ad account{already.count === 1 ? '' : 's'}. Mello is already reading your campaigns — your audit lands in the Morning Brief.
+          </p>
+          <div style={{ display: 'flex', gap: 10, marginTop: 16, flexWrap: 'wrap' }}>
+            <button onClick={() => router.push('/hq')} style={{ ...btnS, padding: '12px 24px', fontSize: 14 }}>Open my brief →</button>
+            <button onClick={() => router.push('/settings?tab=connections')} style={{ ...btnS, background: 'transparent', color: INK, border: `1px solid ${LINE}`, padding: '12px 24px', fontSize: 14 }}>Manage connections</button>
+          </div>
+        </div>
+      ) : learned ? (
         <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '22px 24px' }}>
           <div style={{ fontSize: 17, fontWeight: 800 }}>Connected — {learned.connected} account{learned.connected === 1 ? '' : 's'}. ✓</div>
           {learned.learned ? (
