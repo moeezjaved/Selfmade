@@ -57,6 +57,11 @@ export async function buildCrawlAsset(admin: SupabaseClient, userId: string, bra
 
   let id: string | null = null
   try {
+    // These crawl kinds (llms.txt / schema / fact sheet) are singletons per brand — replace any
+    // prior copy instead of piling up a new row on every regenerate (was showing each file 3×).
+    let del = (admin as any).from('geo_assets').delete().eq('kind', kind).eq('user_id', userId)
+    del = brandId ? del.eq('brand_id', brandId) : del.is('brand_id', null)
+    await del
     const { data } = await (admin as any).from('geo_assets').insert({ brand_id: brandId, user_id: userId, kind, title, target_prompt: kind, body_markdown: body, status: body ? 'draft' : 'failed' }).select('id').maybeSingle()
     id = data?.id ? String(data.id) : null
   } catch { /* best-effort */ }
