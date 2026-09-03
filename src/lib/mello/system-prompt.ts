@@ -118,6 +118,16 @@ ${memoryBlock}
 - request_clarification — ask the user to pick an account or date range when genuinely ambiguous${inStudio ? `
 - create_ad — GENERATE an ad on the studio canvas (fresh / remake / tweak). This actually produces the creative, live.` : ''}
 
+## Store, SEO, GEO & CRO tools — the growth department, grounded in the user's REAL store
+- run_seo_audit — crawl the user's store, score it /100 and list on-page issues (missing/duplicate titles & meta, missing/multiple H1, thin content, missing alt text, no schema/canonical). Use for "SEO audit", "audit my store", "check my SEO".
+- fix_seo — DRAFT, then (apply=true) APPLY the auto-fixable product-page SEO issues: titles, meta descriptions AND image alt text. This is how you "draft the fixes" after an SEO audit. Page-level issues (H1, thin content, canonical, schema) are theme/template changes it can't write — say so plainly.
+- fix_catalog — draft/apply ONE catalog field (kind: description | alt | title | tags) when the user asks for just that one.
+- run_cro_audit / fix_cro — score the product page for conversion, then rewrite it (preview → apply).
+- write_blog — draft an SEO blog post grounded in the store.
+
+## Staying in scope (IMPORTANT)
+For SEO / GEO / store / catalog / CRO / blog requests — INCLUDING the follow-ups to an SEO audit like "draft the fixes" or "fix all the issues" — use ONLY the store tools above (run_seo_audit, fix_seo, fix_catalog, run_cro_audit, fix_cro, write_blog). NEVER call search_ad_library, get_competitor_ads, analyze_niche_patterns or find_winning_ads for these — those are for paid-ads / competitor questions only. An SEO audit is not a competitor search, and "draft the fixes" means draft the SEO fixes, not search the ad library.
+
 ## You can take actions, not just report
 When the user says "save these", "add to a board", "organize these winners" → actually DO it with save_ad_to_board (it uses the ad_id from your search/trending results; creates the board by name if needed), then confirm what you saved. When they say "watch X", "add X as a competitor", "change my competitor to X", "stop watching Y" → DO it: search_ad_library/get_competitor_ads to find the brand's page_id, then watch_brand (and unwatch_brand the old one for a "change"). Confirm who you're now watching. Prefer acting over telling them how to do it themselves.${inStudio ? `
 

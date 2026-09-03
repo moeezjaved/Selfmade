@@ -514,7 +514,7 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       if (!audit.hasData) { await refundCredits(admin, txId).catch(() => {}); return { ran: false, note: audit.note || "Couldn't read the store — the site may be unreachable, or no store is connected. Tell the user to check their store URL or connect Shopify." } }
       await commitCredits(admin, txId, { kind: 'seo_audit', score: audit.score }).catch(() => {})
       const top = (audit.issues || []).slice(0, 8).map((i) => ({ severity: i.severity, title: i.title, pages_affected: i.pages?.length || 0 }))
-      return { ran: true, site: audit.site, score: audit.score, pages_crawled: audit.pagesCrawled, total_issues: (audit.issues || []).length, top_issues: top, note: 'Present the score out of 100 and the top issues plainly (most severe first). Then offer to auto-fix the product-page issues (titles + meta) with fix_seo — draft first, then apply after the user approves.' }
+      return { ran: true, site: audit.site, score: audit.score, pages_crawled: audit.pagesCrawled, total_issues: (audit.issues || []).length, top_issues: top, note: 'Present the score out of 100 and the top issues plainly (most severe first). Then offer to auto-fix the product-page issues (titles, meta descriptions AND image alt text) with fix_seo — draft first, then apply after the user approves. Be honest that page-level issues (H1, thin content, canonical, schema) are theme/template changes that can\'t be auto-written and need a manual/theme edit. This is an SEO audit — do NOT call search_ad_library, get_competitor_ads or any competitor/ad tool here.' }
     }
     case 'fix_seo': {
       const admin = createAdminClient()
@@ -523,15 +523,21 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       if (!store) return { done: false, note: 'The active brand has NO connected Shopify store — auto-applying SEO fixes needs one. Tell the user to connect this brand\'s store, or switch to the brand that has a connected store. Do NOT apply to any other store.' }
       const shop = { name: store.shop_name || store.shop_domain, domain: store.shop_domain }
       if (args?.apply === true) {
-        const { data: drafts } = await admin.from('shopify_catalog_drafts').select('id').eq('store_id', store.id).eq('agent', 'seo').eq('status', 'draft').limit(500)
+        // Apply both the title/meta (seo) and alt-text drafts that fix_seo produced.
+        const { data: drafts } = await admin.from('shopify_catalog_drafts').select('id').eq('store_id', store.id).in('agent', ['seo', 'alt']).eq('status', 'draft').limit(500)
         const ids = (drafts || []).map((d: any) => d.id)
         if (!ids.length) return { applied: 0, store: shop, note: 'No drafted SEO fixes to apply yet — call fix_seo with apply=false first to draft them.' }
         const res = await applyDrafts(admin, store, ids)
-        return { applied: res.applied, failed: res.failed, store: shop, note: `Wrote ${res.applied} product SEO fixes to the store ${shop.name} (${shop.domain})${res.failed ? ` (${res.failed} failed)` : ''}. Tell the user EXACTLY which store was changed — ${shop.name} (${shop.domain}) — and suggest re-running run_seo_audit to see the improved score.` }
+        return { applied: res.applied, failed: res.failed, store: shop, note: `Wrote ${res.applied} product SEO fixes (titles, meta descriptions and image alt text) to the store ${shop.name} (${shop.domain})${res.failed ? ` (${res.failed} failed)` : ''}. Tell the user EXACTLY which store was changed — ${shop.name} (${shop.domain}) — and suggest re-running run_seo_audit to see the improved score.` }
       }
-      const res = await generateDrafts(admin, store, 'seo', 25)
-      const products = res.created ? await listDraftedProducts(admin, store, 'seo', 8).catch(() => []) : []
-      return { drafted: res.created, scanned: res.scanned, store: shop, products, note: res.created ? `Drafted ${res.created} product SEO fixes for the store ${shop.name} (${shop.domain}), from ${res.scanned} products (nothing is written yet). FIRST tell the user which store this is for — ${shop.name} (${shop.domain}). The "products" list is that store's REAL catalog — present each as a markdown line with its thumbnail and the before → after title: "![](image) **Title** — before → after". Do NOT mention any product that isn't in this list. Then ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${res.scanned} products on ${shop.name} and found nothing to improve — their product SEO already looks good.` }
+      // "Draft the fixes" for an SEO audit = every product-page issue we can auto-write:
+      // title + meta description (seo agent) AND image alt text (alt agent). Page-level issues
+      // (H1, thin content, canonical, schema) are theme/template changes we can't auto-write.
+      const seoRes = await generateDrafts(admin, store, 'seo', 25)
+      const altRes = await generateDrafts(admin, store, 'alt', 25).catch(() => ({ created: 0, scanned: 0 }))
+      const created = seoRes.created + altRes.created
+      const products = created ? await listDraftedProducts(admin, store, 'seo', 8).catch(() => []) : []
+      return { drafted: created, seo_drafted: seoRes.created, alt_drafted: altRes.created, scanned: seoRes.scanned, store: shop, products, note: created ? `Drafted ${seoRes.created} title + meta-description fixes and ${altRes.created} image alt-text fixes for the store ${shop.name} (${shop.domain}) — nothing is written yet. FIRST tell the user which store this is for — ${shop.name} (${shop.domain}). The "products" list is that store's REAL catalog — present each as a markdown line with its thumbnail and the before → after: "![](image) **Title** — before → after". Do NOT mention any product that isn't in this list. Also tell the user that page-level issues (H1, thin content, canonical, schema) are theme/template changes that can't be auto-written here and need a manual/theme edit. Then ask them to approve; when they say yes, call fix_seo with apply=true.` : `Scanned ${seoRes.scanned} products on ${shop.name} and found nothing to improve — their product SEO already looks good.` }
     }
     case 'run_cro_audit': {
       const admin = createAdminClient()

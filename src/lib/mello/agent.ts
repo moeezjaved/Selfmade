@@ -78,7 +78,20 @@ export async function runAgent(opts: {
   const system = await buildSystemPrompt(userId, userMessage, surface, { intent, brandId })
   // create_ad drives the studio canvas — only expose it there, so Mello never claims to
   // generate on a surface that can't render it.
-  const activeTools = surface === 'studio' ? TOOLS : TOOLS.filter(t => t.function.name !== 'create_ad')
+  let activeTools = surface === 'studio' ? TOOLS : TOOLS.filter(t => t.function.name !== 'create_ad')
+
+  // SEO/GEO/store scope guard: when the conversation is about SEO/catalog/GEO/CRO, DON'T let the
+  // model wander into the ad-library / competitor tools (that's how an "SEO audit → draft the fixes"
+  // turn ended up "Searching the ad library…" and timing out). Only lift the guard if THIS message
+  // explicitly asks about competitors/ads. Detection looks at the recent turns too, because the
+  // follow-up ("draft the fixes") often doesn't repeat the word "SEO".
+  const LIBRARY_TOOLS = new Set(['search_ad_library', 'get_competitor_ads', 'analyze_niche_patterns', 'find_winning_ads'])
+  const recentText = [userMessage, ...history.slice(-5).map(h => h.content || '')].join('\n')
+  const seoScoped = /\b(seo|geo|aeo|meta descriptions?|alt text|missing alt|h1\b|json-?ld|schema|llms\.txt|canonical|thin content|sitemap|catalog|product page|pdp|cro|conversion audit|blog post)\b/i.test(recentText)
+  const wantsCompetitor = /\b(competitors?|rivals?|their ads?|ad library|meta ads?|spy|winning ads?|swipe)\b/i.test(userMessage)
+  if (seoScoped && !wantsCompetitor) {
+    activeTools = activeTools.filter(t => !LIBRARY_TOOLS.has(t.function.name))
+  }
 
   const messages: any[] = [
     { role: 'system', content: system },
