@@ -170,6 +170,17 @@ const CSS = `
 /* stats */
 .pgbld .stats{background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:48px 0}
 .pgbld .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;max-width:900px;margin:22px auto 0}
+.pgbld .stats .sin{display:grid;grid-template-columns:.9fr 1.05fr .9fr;gap:34px;align-items:center;padding-top:8px}
+.pgbld .stats .scard{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--grad);color:#fff;border-radius:16px;padding:16px}
+.pgbld .stats .scard .simg,.pgbld .stats .scard .simg.ph{width:56px;height:56px;border-radius:10px;object-fit:cover}
+.pgbld .stats .scard .sct{font-weight:800;font-size:16px}
+.pgbld .stats .scard .scs{font-size:13px;color:rgba(255,255,255,.85)}
+.pgbld .stats .smid .simg2,.pgbld .stats .smid .simg2.ph{border-radius:20px;aspect-ratio:4/5;object-fit:cover;width:100%}
+.pgbld .stats .srow{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding:18px 0;border-top:1px solid var(--line)}
+.pgbld .stats .srow:first-child{border-top:0}
+.pgbld .stats .srow .n{font-size:38px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.pgbld .stats .srow .t{font-weight:800;color:var(--ink);font-size:17px}
+.pgbld .stats .srow .s{font-size:13px;color:var(--muted)}
 .pgbld .stat{text-align:center}
 .pgbld .stat .n{font-size:44px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
 .pgbld .stat .t{font-weight:800;color:var(--ink);margin:8px 0 3px;font-size:16px}
@@ -241,7 +252,7 @@ const CSS = `
 .pgbld .fc-thumb{width:44px;height:44px;border-radius:9px;flex:none;object-fit:cover}
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
 .pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
-@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}}
+@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}.pgbld .stats .sin{grid-template-columns:1fr;gap:26px}}
 @media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
 `
 
@@ -344,11 +355,17 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="pcards">${arr(c.pink_items).map((i) => `<div class="pcard">${escp(i.label)}</div>`).join('')}</div>
   </div></div>
 
-  <div class="stats"><div class="wrap">
-    <h2 class="sec">${hl(c.stats_head || 'The reason customers choose us **again and again**')}</h2>
-    <p class="seclead">${esc(c.stats_sub)}</p>
-    <div class="statgrid">${stats}</div>
-  </div></div>
+  <div class="stats"><div class="wrap"><div class="sin">
+    <div class="scol">
+      <h2 class="sec" style="text-align:left;margin-bottom:12px">${hl(c.stats_head || 'The reason customers choose us **again and again**')}</h2>
+      <p style="color:var(--muted);font-size:16px;margin:0 0 18px">${esc(c.stats_sub)}</p>
+      <div class="scard">${img(o.productImage, o.productName, 'simg')}<div><div class="sct">${escp(c.stats_card_label || o.productName)}</div><div class="scs">${esc(c.stats_card_sub || '')}</div></div></div>
+    </div>
+    <div class="smid">${img(c.image_stats || o.productImage, o.productName, 'simg2', 'Lifestyle')}</div>
+    <div class="scol srows">
+      ${arr(c.stats).map((s) => `<div class="srow"><div class="n">${escp(s.label)}</div><div><div class="t">${escp(s.title)}</div><div class="s">${esc(s.body)}</div></div></div>`).join('')}
+    </div>
+  </div></div></div>
 
   <div class="wrap">
     <h2 class="sec" style="margin-top:48px">${esc(c.benefits_head || 'Benefits you\'ll love')}</h2>
@@ -370,7 +387,11 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <div class="wrap">
     <h2 class="sec" style="margin-top:20px">${hl(c.reviews_head || 'Join 10,000+ **happy customers**')}</h2>
-    <div class="gcar">${revs}</div>
+    <div class="gwrap">
+      <div class="gcar" id="rcar">${revs}</div>
+      <button class="garr gprev" id="rprev" aria-label="Previous">‹</button>
+      <button class="garr gnext" id="rnext" aria-label="Next">›</button>
+    </div>
   </div>
 
   <div class="transband"><div class="wrap"><div class="in">
@@ -398,6 +419,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div>
   <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<560)}window.addEventListener('scroll',t,{passive:true});t();
   var tr=document.getElementById('gtrack');if(tr){var dots=[].slice.call(document.querySelectorAll('#gdots .gdot')),ths=[].slice.call(document.querySelectorAll('#gthumbs .gthumb'));function u(){var i=Math.round(tr.scrollLeft/tr.clientWidth);dots.forEach(function(d,j){d.classList.toggle('on',j===i)});ths.forEach(function(x,j){x.classList.toggle('on',j===i)})}tr.addEventListener('scroll',function(){window.requestAnimationFrame(u)},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'})})});var pv=document.getElementById('gprev'),nx=document.getElementById('gnext');function go(d){var n=tr.children.length,i=((Math.round(tr.scrollLeft/tr.clientWidth)+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'})}if(pv)pv.addEventListener('click',function(){go(-1)});if(nx)nx.addEventListener('click',function(){go(1)})}
+  var rc=document.getElementById('rcar');if(rc){var rp=document.getElementById('rprev'),rn=document.getElementById('rnext');function rgo(d){var w=(rc.firstElementChild?rc.firstElementChild.offsetWidth:320)+16;rc.scrollBy({left:d*w,behavior:'smooth'})}if(rp)rp.addEventListener('click',function(){rgo(-1)});if(rn)rn.addEventListener('click',function(){rgo(1)})}
   })();</script>`
 }
 
@@ -449,6 +471,9 @@ export const productV1: PageTemplate = {
     { key: 'stats_head', type: 'text', label: 'Stats heading' },
     { key: 'stats_sub', type: 'text', label: 'Stats subheading' },
     { key: 'stats', type: 'reasons', label: 'Stats', count: 3, hint: 'label = a percentage like "92%"; title = what improved; body = timeframe/context.' },
+    { key: 'stats_card_label', type: 'text', label: 'Stats product-card title', hint: 'Short product/benefit name for the little card, e.g. "Bloat relief".' },
+    { key: 'stats_card_sub', type: 'text', label: 'Stats product-card subtext' },
+    { key: 'image_stats', type: 'image', role: 'lifestyle', label: 'Stats section image (center)' },
     { key: 'benefits_head', type: 'text', label: 'Benefits heading' },
     { key: 'benefit_items', type: 'list', label: 'Benefits grid', count: 4, hint: 'Each label only: e.g. "Worldwide shipping", "24/7 support".' },
     { key: 'compare_head', type: 'text', label: 'Comparison heading' },
