@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
   if (!store) return NextResponse.json({ error: 'no_store', message: 'Connect a Shopify store for this brand first.' }, { status: 400 })
 
   const opts: RenderOpts = row.render_opts || { productName: row.product_name || 'Product', ctaHref: row.cta_href || '#' }
-  const title = String((row.content && row.content.headline) || row.product_name || 'Landing page').slice(0, 250)
+  const title = String((row.content && row.content.headline) || row.product_name || 'Landing page').replace(/\*+/g, '').trim().slice(0, 250)
   const body = assembleShopifyBody(tpl, row.content || {}, opts)
 
   let pub
