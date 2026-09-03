@@ -25,12 +25,12 @@ type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published' | 'edi
 type SavedPage = { id: string; type: string; template_id: string; product_name: string; status: string; shopify_url?: string; created_at: string }
 type StoreTheme = { id: number; name: string; role: string; live: boolean }
 type EditSlot = { key: string; type: string; label: string; hint?: string }
-// which string fields are editable inside each array-slot item
-const ITEM_FIELDS: Record<string, { field: string; label: string; area?: boolean }[]> = {
+// which fields are editable inside each array-slot item (image:true → upload / AI-generate control)
+const ITEM_FIELDS: Record<string, { field: string; label: string; area?: boolean; image?: boolean }[]> = {
   list: [{ field: 'label', label: 'Label' }, { field: 'body', label: 'Detail' }],
   costs: [{ field: 'label', label: 'Where' }, { field: 'body', label: 'Cost' }],
-  timeline: [{ field: 'label', label: 'When' }, { field: 'body', label: 'What changed', area: true }],
-  reasons: [{ field: 'label', label: 'Tag' }, { field: 'title', label: 'Heading' }, { field: 'body', label: 'Body', area: true }],
+  timeline: [{ field: 'label', label: 'When' }, { field: 'body', label: 'What changed', area: true }, { field: 'thumb', label: 'Image', image: true }],
+  reasons: [{ field: 'label', label: 'Tag' }, { field: 'title', label: 'Heading' }, { field: 'body', label: 'Body', area: true }, { field: 'image', label: 'Image', image: true }],
   testimonials: [{ field: 'name', label: 'Name' }, { field: 'city', label: 'City' }, { field: 'quote', label: 'Quote', area: true }],
   faq: [{ field: 'q', label: 'Question' }, { field: 'a', label: 'Answer', area: true }],
 }
@@ -717,7 +717,12 @@ export default function BuilderPage() {
                               <div style={{ fontSize: 11, fontWeight: 800, color: FAINT, marginBottom: 8 }}>#{idx + 1}</div>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                                 {itemFields.map((f) => (
-                                  f.area ? (
+                                  f.image ? (
+                                    <div key={f.field}>
+                                      <div style={{ fontSize: 11.5, fontWeight: 700, color: FAINT, marginBottom: 2 }}>{f.label}</div>
+                                      <ImageEditor value={typeof item?.[f.field] === 'string' ? item[f.field] : ''} onChange={(url) => setItemField(s.key, idx, f.field, url)} />
+                                    </div>
+                                  ) : f.area ? (
                                     <textarea key={f.field} value={String(item?.[f.field] ?? '')} onChange={(e) => setItemField(s.key, idx, f.field, e.target.value)} placeholder={f.label} rows={2} style={editArea} />
                                   ) : (
                                     <input key={f.field} value={String(item?.[f.field] ?? '')} onChange={(e) => setItemField(s.key, idx, f.field, e.target.value)} placeholder={f.label} style={editInput} />
