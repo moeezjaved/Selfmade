@@ -26,14 +26,14 @@ export function V3Mark({ size = 26 }: { size?: number }) {
         @media(prefers-reduced-motion:reduce){.v3mark .v3mark-g,.v3mark circle{animation:none}}
       `}</style>
       <g className="v3mark-g">
-        <g fill="none" stroke="currentColor" strokeWidth={8} strokeLinecap="round">
+        <g fill="none" stroke="currentColor" strokeWidth={12} strokeLinecap="round">
           {ARCS.map(([a, b], i) => {
             const [x1, y1] = P(a), [x2, y2] = P(b)
-            return <path key={i} d={`M ${x1.toFixed(2)} ${y1.toFixed(2)} A ${R} ${R} 0 0 1 ${x2.toFixed(2)} ${y2.toFixed(2)}`} />
+            return <line key={i} x1={x1.toFixed(2)} y1={y1.toFixed(2)} x2={x2.toFixed(2)} y2={y2.toFixed(2)} />
           })}
         </g>
         <g fill="currentColor">
-          {NODES.map((p, i) => <circle key={i} cx={p[0].toFixed(2)} cy={p[1].toFixed(2)} r={10} style={{ animationDelay: `${i * 0.3}s` }} />)}
+          {NODES.map((p, i) => <circle key={i} cx={p[0].toFixed(2)} cy={p[1].toFixed(2)} r={12} style={{ animationDelay: `${i * 0.3}s` }} />)}
         </g>
       </g>
     </svg>
@@ -58,11 +58,11 @@ export function V3Wordmark({ height = 19, color = '#0d0d0d' }: { height?: number
 }
 
 /** Full logo lockup — the mark + the wordmark. One component so the logo is identical on every page. */
-export function V3Logo({ markSize = 24, wordHeight = 18, markColor = '#ff5a2c', wordColor = '#0d0d0d' }: {
+export function V3Logo({ markSize = 32, wordHeight = 23, markColor = '#ff5a2c', wordColor = '#0d0d0d' }: {
   markSize?: number; wordHeight?: number; markColor?: string; wordColor?: string
 }) {
   return (
-    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}>
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
       <span style={{ color: markColor, display: 'inline-flex' }}><V3Mark size={markSize} /></span>
       <V3Wordmark height={wordHeight} color={wordColor} />
     </span>
