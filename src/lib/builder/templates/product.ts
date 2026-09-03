@@ -138,6 +138,14 @@ const CSS = `
 .pgbld .cmp .yes{color:var(--good);font-weight:800}
 .pgbld .cmp .no{color:#c9c5cf;font-weight:800}
 .pgbld .cmp .us{background:linear-gradient(180deg,rgba(214,36,143,.06),rgba(123,47,247,.06))}
+/* gradient testimonial carousel */
+.pgbld .gcar{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 4px 20px;-webkit-overflow-scrolling:touch}
+.pgbld .gcard{scroll-snap-align:start;flex:0 0 360px;max-width:86%;background:var(--grad);color:#fff;border-radius:18px;padding:22px;display:flex;gap:14px;align-items:flex-start}
+.pgbld .gcard .av{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.22);flex:none;display:grid;place-items:center;font-weight:800;font-size:17px}
+.pgbld .gcard .st{color:#ffe08a;font-size:13px}
+.pgbld .gcard .rt{font-weight:800;margin:2px 0 6px;font-size:16px}
+.pgbld .gcard p{margin:0;font-size:14px;color:rgba(255,255,255,.92);line-height:1.55}
+.pgbld .gcard .who{font-weight:800;margin-top:10px;font-size:13px;color:rgba(255,255,255,.85)}
 /* reviews grid */
 .pgbld .revs{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px 0}
 .pgbld .rev{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
@@ -177,7 +185,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   const stats = arr(c.stats).map((s) => `<div class="stat"><div class="n">${esc(s.label)}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.body)}</div></div>`).join('')
   const bene = arr(c.benefit_items).map((b) => `<div class="bcard"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${escp(b.label)}</div></div>`).join('')
   const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
-  const revs = arr(c.testimonials).map((t) => `<div class="rev"><div class="st">${stars}</div><div class="rt">${esc((t as any).title || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}${t.city ? ' · ' + esc(t.city) : ''}</div></div>`).join('')
+  const revs = arr(c.testimonials).map((t) => `<div class="gcard"><div class="av">${esc(String(t.name || 'A').trim().charAt(0).toUpperCase() || 'A')}</div><div><div class="st">${stars}</div><div class="rt">${esc((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}</div></div></div>`).join('')
   const trio = arr(c.transform_items).map((t, i) => `<div class="tcard"><div class="lab">${esc((t as any).lab || ['First','Second','Third'][i] || 'Benefit')} benefit</div><h3>${esc(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
   const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
 
@@ -267,7 +275,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     </div>
 
     <h2 class="sec" style="margin-top:52px">${esc(c.reviews_head || 'Join 10,000+ happy customers')}</h2>
-    <div class="revs">${revs}</div>
+    <div class="gcar">${revs}</div>
 
     <h2 class="sec" style="margin-top:44px">${esc(c.transform_head || 'How this will transform your day')}</h2>
     <div class="trio">${trio}</div>
