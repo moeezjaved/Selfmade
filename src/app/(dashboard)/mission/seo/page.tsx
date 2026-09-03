@@ -42,7 +42,16 @@ export default function SeoPage() {
   const [openBrief, setOpenBrief] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
   const [fixing, setFixing] = useState<string | null>(null)
+  const [health, setHealth] = useState<{ imagesMissingAlt?: number; missingSeoTitle?: number } | null>(null)
   const router = useRouter()
+
+  // Live remaining gap for the Catalog agent behind a finding (0 = already fixed). null = no signal.
+  const gapForAgent = (agent: string | null): number | null => {
+    if (!health) return null
+    if (agent === 'alt') return health.imagesMissingAlt ?? null
+    if (agent === 'seo') return health.missingSeoTitle ?? null
+    return null
+  }
 
   // One-click: draft product fixes for this gap via the Catalog agent, then jump to review (Apply = paid).
   const fixIssue = async (agent: string) => {
@@ -62,6 +71,8 @@ export default function SeoPage() {
     try { const r = await fetch('/api/seo/audit'); const j = await r.json(); if (r.ok) { if (j?.selectBrand) { setSelectBrand(true); setLoading(false); return } setSelectBrand(false); setAudit(j as Audit) } } catch { /* empty */ }
     try { const r = await fetch('/api/seo/keywords'); const j = await r.json(); if (r.ok) setKw(j as Kw) } catch { /* empty */ }
     try { const r = await fetch('/api/seo/brief'); const j = await r.json(); if (r.ok && Array.isArray(j?.briefs)) setBriefs(j.briefs) } catch { /* empty */ }
+    // Live catalog health — lets us hide "Fix →" on findings that are already resolved on the store.
+    try { const r = await fetch('/api/shopify/catalog'); const j = await r.json(); if (r.ok && j?.health) setHealth(j.health) } catch { /* empty */ }
     setLoading(false)
   }, [])
   useEffect(() => { load() }, [load])
@@ -162,9 +173,11 @@ export default function SeoPage() {
                   <span className="it">{iss.title}</span>
                   <span className="ic">{iss.pages.length} page{iss.pages.length === 1 ? '' : 's'}</span>
                   {agentForIssue(iss.title) && (
-                    <button className="fixbtn" onClick={(e) => { e.stopPropagation(); fixIssue(agentForIssue(iss.title)!) }} disabled={!!fixing}>
-                      {fixing === agentForIssue(iss.title) ? 'Drafting…' : 'Fix →'}
-                    </button>
+                    gapForAgent(agentForIssue(iss.title)) === 0
+                      ? <span className="fixdone">Fixed ✓</span>
+                      : <button className="fixbtn" onClick={(e) => { e.stopPropagation(); fixIssue(agentForIssue(iss.title)!) }} disabled={!!fixing}>
+                          {fixing === agentForIssue(iss.title) ? 'Drafting…' : 'Fix →'}
+                        </button>
                   )}
                 </div>
                 <div className="idetail">{iss.detail}</div>
@@ -306,6 +319,7 @@ h1{font-family:var(--serif);font-weight:400;font-size:clamp(30px,5vw,44px);line-
 .ic{font-family:var(--mono);font-size:10.5px;color:var(--mut);flex:none}
 .fixbtn{flex:none;font-family:var(--ui);font-size:12px;font-weight:700;border:none;border-radius:100px;padding:6px 13px;background:var(--flame);color:#fff;cursor:pointer}
 .fixbtn:disabled{opacity:.6;cursor:default}
+.fixdone{flex:none;font-family:var(--ui);font-size:12px;font-weight:800;border-radius:100px;padding:6px 13px;background:#e9f7ee;color:#2e7d46;white-space:nowrap}
 .idetail{font-size:13px;color:var(--sub);line-height:1.5;margin-top:6px}
 .ipages{margin-top:10px;border-top:1px solid var(--hair);padding-top:10px;display:flex;flex-direction:column;gap:4px}
 .pg{font-family:var(--mono);font-size:11.5px;color:var(--flame);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
