@@ -148,7 +148,7 @@ export default function FeaturePage({ config: c }: { config: FeatureConfig }) {
       <div className="fa">
         <nav className="nav"><div className="nav-in">
           <Link href="/" className="brand">
-            <V3Logo markSize={22} wordHeight={17} />
+            <V3Logo markSize={30} wordHeight={21} />
           </Link>
           <div className="nav-r">
             <Link href="/features/ads" className="hide">Paid Ads</Link>
