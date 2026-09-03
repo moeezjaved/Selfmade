@@ -50,9 +50,21 @@ const CSS = `
 /* hero */
 .pgbld .hero{display:grid;grid-template-columns:1fr 1fr;gap:46px;padding:34px 0 40px;align-items:start}
 .pgbld .gallery{position:sticky;top:18px;display:flex;flex-direction:column;gap:12px}
-.pgbld .gmain,.pgbld .gmain.ph{border-radius:20px;aspect-ratio:1/1;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff);display:grid;place-items:center;color:#b06;font-weight:700}
+.pgbld .gtrack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .gtrack::-webkit-scrollbar{display:none}
+.pgbld .gslide{flex:0 0 100%;scroll-snap-align:start;aspect-ratio:1/1;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .gslide .gimg,.pgbld .gslide .gimg.ph{width:100%;height:100%;object-fit:cover;border-radius:20px;display:grid;place-items:center;color:#b06;font-weight:700}
+.pgbld .gdots{display:flex;gap:7px;justify-content:center;margin-top:2px}
+.pgbld .gdot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:width .2s,background .2s}
+.pgbld .gdot.on{background:var(--accent);width:22px;border-radius:5px}
+.pgbld .gwrap{position:relative}
+.pgbld .garr{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.92);border:1px solid var(--line);display:grid;place-items:center;font-size:22px;color:var(--ink);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.14);z-index:2;line-height:1;padding:0}
+.pgbld .gprev{left:12px}
+.pgbld .gnext{right:12px}
 .pgbld .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.pgbld .thumbs img,.pgbld .thumbs .ph{border-radius:12px;aspect-ratio:1/1;object-fit:cover;width:100%;border:1px solid var(--line)}
+.pgbld .gthumb{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;padding:0;background:none;cursor:pointer;aspect-ratio:1/1}
+.pgbld .gthumb.on{border-color:var(--accent)}
+.pgbld .gthumb img,.pgbld .gthumb .ph{width:100%;height:100%;object-fit:cover}
 .pgbld .rpill{display:inline-flex;align-items:center;gap:8px;background:var(--grad);color:#fff;border-radius:100px;padding:5px 12px;font-size:13px;font-weight:700}
 .pgbld .rpill .st{letter-spacing:1px}
 .pgbld h1.ptitle{font-size:clamp(28px,3.6vw,40px);font-weight:800;line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:14px 0 6px}
@@ -99,6 +111,15 @@ const CSS = `
 .pgbld .ugc .vc img,.pgbld .ugc .vc video{width:100%;height:100%;object-fit:cover;display:block}
 .pgbld .ugc .vc .play{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
 .pgbld .ugc .vc .play span{width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;font-size:18px;backdrop-filter:blur(2px)}
+.pgbld .frev{margin-top:20px;background:var(--grad);color:#fff;border-radius:18px;padding:22px 24px;display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:center}
+.pgbld .frev .who{display:flex;align-items:center;gap:14px}
+.pgbld .frev .av{width:56px;height:56px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.5);flex:none}
+.pgbld .frev .av img,.pgbld .frev .av .ph{width:100%;height:100%;object-fit:cover}
+.pgbld .frev .nm{font-weight:800;font-size:16px;display:flex;align-items:center;gap:6px}
+.pgbld .frev .chk{width:16px;height:16px;border-radius:50%;background:#fff;color:var(--accent);font-size:10px;font-weight:800;display:inline-grid;place-items:center}
+.pgbld .frev .loc{font-size:13px;color:rgba(255,255,255,.85)}
+.pgbld .frev .st{color:#ffd24a;font-size:14px;margin-top:2px}
+.pgbld .frev .q{font-size:15px;line-height:1.55;color:rgba(255,255,255,.95)}
 /* trust row */
 .pgbld .trust{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 44px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 22px;background:var(--paper)}
 .pgbld .trust .ti{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink)}
@@ -110,7 +131,7 @@ const CSS = `
 /* section shells */
 .pgbld h2.sec{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--ink);text-align:center;margin:0 0 8px}
 .pgbld .seclead{text-align:center;color:var(--muted);font-size:16px;max-width:640px;margin:0 auto 26px}
-.pgbld .feat{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;padding:48px 0}
+.pgbld .feat{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding:66px 0}
 .pgbld .feat.rev .fimg{order:2}
 /* as seen on band */
 .pgbld .seenband{padding:46px 0 34px;text-align:center}
@@ -139,8 +160,8 @@ const CSS = `
 .pgbld .ctab .cr2 .lab::before{content:"\\2713";width:22px;height:22px;border-radius:50%;background:#fff;color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;flex:none}
 .pgbld .ctab .cr2 .yes,.pgbld .ctab .cr2 .no{text-align:center;font-size:16px;font-weight:800}
 .pgbld .ctab .usbox{position:absolute;top:0;bottom:0;right:96px;width:96px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:16px;pointer-events:none}
-.pgbld .fimg,.pgbld .fimg.ph{border-radius:20px;aspect-ratio:4/3;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
-.pgbld .feat h2{font-size:clamp(22px,2.8vw,32px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 12px;text-align:left;line-height:1.1}
+.pgbld .fimg,.pgbld .fimg.ph{border-radius:24px;aspect-ratio:1/1;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .feat h2{font-size:clamp(28px,3.8vw,46px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 16px;text-align:left;line-height:1.05}
 .pgbld .feat h2 .hl{color:var(--accent2)}
 .pgbld .fbul{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:14px}
 .pgbld .fbul li{position:relative;padding-left:32px;font-size:15.5px}
@@ -169,14 +190,16 @@ const CSS = `
 .pgbld .cmp .yes{color:var(--good);font-weight:800}
 .pgbld .cmp .no{color:#c9c5cf;font-weight:800}
 .pgbld .cmp .us{background:linear-gradient(180deg,rgba(214,36,143,.06),rgba(123,47,247,.06))}
-/* gradient testimonial carousel */
-.pgbld .gcar{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 4px 20px;-webkit-overflow-scrolling:touch}
-.pgbld .gcard{scroll-snap-align:start;flex:0 0 360px;max-width:86%;background:var(--grad);color:#fff;border-radius:18px;padding:22px;display:flex;gap:14px;align-items:flex-start}
-.pgbld .gcard .av{width:46px;height:46px;border-radius:50%;background:rgba(255,255,255,.22);flex:none;display:grid;place-items:center;font-weight:800;font-size:17px}
-.pgbld .gcard .st{color:#ffe08a;font-size:13px}
-.pgbld .gcard .rt{font-weight:800;margin:2px 0 6px;font-size:16px}
-.pgbld .gcard p{margin:0;font-size:14px;color:rgba(255,255,255,.92);line-height:1.55}
-.pgbld .gcard .who{font-weight:800;margin-top:10px;font-size:13px;color:rgba(255,255,255,.85)}
+/* photo testimonial carousel */
+.pgbld .gcar{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 4px 20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .gcar::-webkit-scrollbar{display:none}
+.pgbld .rcard{scroll-snap-align:start;flex:0 0 320px;max-width:82%;position:relative;border-radius:18px;overflow:hidden;aspect-ratio:3/4;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .rcard .rimg,.pgbld .rcard .rimg.ph{width:100%;height:100%;object-fit:cover}
+.pgbld .rcard .rov{position:absolute;left:0;right:0;bottom:0;padding:22px 18px 18px;background:linear-gradient(to top,rgba(24,23,32,.94),rgba(24,23,32,.55) 55%,transparent);color:#fff}
+.pgbld .rcard .st{color:#ffd24a;font-size:14px;margin-bottom:6px}
+.pgbld .rcard .rtt{font-weight:800;font-size:16px;margin-bottom:6px}
+.pgbld .rcard p{margin:0 0 8px;font-size:13.5px;color:rgba(255,255,255,.94);line-height:1.5}
+.pgbld .rcard .rwho{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.82)}
 /* reviews grid */
 .pgbld .revs{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px 0}
 .pgbld .rev{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
@@ -233,7 +256,8 @@ function render(c: FilledContent, o: RenderOpts): string {
   const stats = arr(c.stats).map((s) => `<div class="stat"><div class="n">${esc(s.label)}</div><div class="t">${esc(s.title)}</div><div class="s">${esc(s.body)}</div></div>`).join('')
   const bene = arr(c.benefit_items).map((b) => `<div class="bcard"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${escp(b.label)}</div></div>`).join('')
   const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
-  const revs = arr(c.testimonials).map((t) => `<div class="gcard"><div class="av">${esc(String(t.name || 'A').trim().charAt(0).toUpperCase() || 'A')}</div><div><div class="st">${stars}</div><div class="rt">${esc((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}</div></div></div>`).join('')
+  const revPhotos = [c.image_rev1, c.image_rev2, c.image_rev3, c.image_rev4]
+  const revs = arr(c.testimonials).map((t, i) => `<div class="rcard">${img(revPhotos[i] || o.productImage, o.productName, 'rimg')}<div class="rov"><div class="st">${stars}</div><div class="rtt">${escp((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="rwho">${esc(t.name)}</div></div></div>`).join('')
   const trio = arr(c.transform_items).map((t, i) => `<div class="tcard"><div class="lab">${esc((t as any).lab || ['First','Second','Third'][i] || 'Benefit')} benefit</div><h3>${esc(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
   const faqs = arr(c.faqs).map((f, i) => `<details class="fq"><summary><span class="fn">${i + 1}</span><span class="fqq">${esc(f.q)}</span></summary><div class="fqa">${esc(f.a)}</div></details>`).join('')
 
@@ -242,8 +266,15 @@ function render(c: FilledContent, o: RenderOpts): string {
   <div class="wrap">
     <div class="hero">
       <div class="gallery">
-        ${img(c.image_main || o.productImage, o.productName, 'gmain', 'Product')}
-        <div class="thumbs">${img(c.image_main || o.productImage, o.productName, '')}${img(c.image_g2 || o.productImage, o.productName, '')}${img(c.image_g3 || o.productImage, o.productName, '')}${img(c.image_g4 || o.productImage, o.productName, '')}</div>
+        <div class="gwrap">
+          <div class="gtrack" id="gtrack">
+            ${[c.image_main, c.image_g2, c.image_g3, c.image_g4].map((u) => `<div class="gslide">${img(u || o.productImage, o.productName, 'gimg', 'Product')}</div>`).join('')}
+          </div>
+          <button class="garr gprev" id="gprev" aria-label="Previous">‹</button>
+          <button class="garr gnext" id="gnext" aria-label="Next">›</button>
+        </div>
+        <div class="gdots" id="gdots">${[0, 1, 2, 3].map((i) => `<span class="gdot${i === 0 ? ' on' : ''}"></span>`).join('')}</div>
+        <div class="thumbs" id="gthumbs">${[c.image_main, c.image_g2, c.image_g3, c.image_g4].map((u, i) => `<button class="gthumb${i === 0 ? ' on' : ''}" data-i="${i}">${img(u || o.productImage, o.productName, '')}</button>`).join('')}</div>
       </div>
       <div class="buybox">
         <div class="rpill"><span class="st">${stars}</span> ${esc(o.rating?.countLabel || '4.8 | 12,000+ Customers')}</div>
@@ -282,6 +313,13 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="wall">
       ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${mediaCard(u, o.productImage, o.productName)}</div>`).join('')}
     </div>
+    ${(() => { const t0 = arr(c.testimonials)[0] || {}; return t0.quote ? `<div class="frev">
+      <div class="who">
+        <div class="av">${img((c.image_rev1 as any) || o.productImage, esc(t0.name), '')}</div>
+        <div><div class="nm">${esc(t0.name)} <span class="chk">✓</span></div><div class="loc">${esc(t0.city)}</div><div class="st">${stars}</div></div>
+      </div>
+      <div class="q">${esc(t0.quote)}</div>
+    </div>` : '' })()}
   </div></div>
 
   <div class="wrap"><section class="feat">
@@ -358,7 +396,9 @@ function render(c: FilledContent, o: RenderOpts): string {
     <a class="fc-btn" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Add to cart')}</a>
   </div>
   </div>
-  <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<560)}window.addEventListener('scroll',t,{passive:true});t();})();</script>`
+  <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<560)}window.addEventListener('scroll',t,{passive:true});t();
+  var tr=document.getElementById('gtrack');if(tr){var dots=[].slice.call(document.querySelectorAll('#gdots .gdot')),ths=[].slice.call(document.querySelectorAll('#gthumbs .gthumb'));function u(){var i=Math.round(tr.scrollLeft/tr.clientWidth);dots.forEach(function(d,j){d.classList.toggle('on',j===i)});ths.forEach(function(x,j){x.classList.toggle('on',j===i)})}tr.addEventListener('scroll',function(){window.requestAnimationFrame(u)},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'})})});var pv=document.getElementById('gprev'),nx=document.getElementById('gnext');function go(d){var n=tr.children.length,i=((Math.round(tr.scrollLeft/tr.clientWidth)+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'})}if(pv)pv.addEventListener('click',function(){go(-1)});if(nx)nx.addEventListener('click',function(){go(1)})}
+  })();</script>`
 }
 
 export const productV1: PageTemplate = {
@@ -416,6 +456,10 @@ export const productV1: PageTemplate = {
     { key: 'compare_rows', type: 'list', label: 'Comparison rows', count: 5, hint: 'Each label only: a feature the product has and rivals don\'t (e.g. "Probiotic", "Non-GMO", "Vegan").' },
     { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
     { key: 'testimonials', type: 'testimonials', label: 'Reviews', count: 4, hint: 'name, city, quote. Use the "city" field as a SHORT review title.' },
+    { key: 'image_rev1', type: 'image', role: 'lifestyle', label: 'Review photo 1' },
+    { key: 'image_rev2', type: 'image', role: 'lifestyle', label: 'Review photo 2' },
+    { key: 'image_rev3', type: 'image', role: 'lifestyle', label: 'Review photo 3' },
+    { key: 'image_rev4', type: 'image', role: 'lifestyle', label: 'Review photo 4' },
     { key: 'transform_head', type: 'text', label: 'Transform heading' },
     { key: 'pink_head', type: 'text', label: 'Highlight band heading', hint: 'A punchy benefit headline; wrap the strongest word(s) in **…** to highlight them.' },
     { key: 'pink_sub', type: 'text', label: 'Highlight band subtext' },
