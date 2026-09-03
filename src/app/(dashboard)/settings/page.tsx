@@ -6,6 +6,7 @@ import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
 import { ChannelLogo } from '@/components/brand/logos'
 import { BRAND_COOKIE } from '@/lib/brand/cookie'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 // Chrome Web Store listing (approved 2026-07-08).
 const CHROME_STORE_URL = 'https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi'
@@ -77,6 +78,7 @@ const NAV = [
 ] as const
 
 export default function SettingsPage() {
+  const isMobile = useIsMobile()
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -280,8 +282,11 @@ export default function SettingsPage() {
       <p style={{fontSize:13.5,color:SUB,marginBottom:26}}>Manage your account, alerts, and connected tools.</p>
 
       <div style={{display:'flex',gap:26,alignItems:'flex-start',flexWrap:'wrap'}}>
-        {/* Left category nav — sticky on desktop, wraps above content on mobile */}
-        <nav style={{position:'sticky',top:24,flex:'0 0 212px',display:'flex',flexDirection:'column',gap:3}}>
+        {/* Left category nav — sticky 212px rail on desktop; a static, full-width horizontal strip on mobile
+            (a pinned wrapped rail was overlapping the panels below it). */}
+        <nav style={isMobile
+          ? {position:'static',flex:'1 1 100%',width:'100%',display:'flex',flexDirection:'row',flexWrap:'wrap',gap:6,marginBottom:6}
+          : {position:'sticky',top:24,flex:'0 0 212px',display:'flex',flexDirection:'column',gap:3}}>
           {NAV.map((n) => {
             const on = tab === n.key
             return (

@@ -1934,10 +1934,12 @@ export default function DiscoveryPage() {
       })()}
 
       {/* ── Header ── */}
-      <div style={{ borderBottom: '1px solid #efece2', position: 'sticky', top: 0, zIndex: 40,
+      {/* On mobile the header is NOT sticky — the filter bar wraps into many rows and, pinned, it would
+          eat most of the viewport so only a sliver of the first ad showed. Let it scroll away instead. */}
+      <div style={{ borderBottom: '1px solid #efece2', position: isMobile ? 'static' : 'sticky', top: 0, zIndex: 40,
         // White header band (matches the app's light workspace theme).
         background: '#fff',
-        padding: '14px 24px' }}>
+        padding: isMobile ? '12px 14px' : '14px 24px' }}>
 
         {/* Row 1: title + nav + search + refresh */}
         <div style={{ display: 'flex', flexWrap: isMobile ? 'wrap' : 'nowrap', alignItems: 'center', gap: 12, marginBottom: 10 }}>

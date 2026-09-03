@@ -13,6 +13,7 @@ import { ChatMessage } from '@/components/mello/ChatMessage'
 import { ChatInput } from '@/components/mello/ChatInput'
 import { useCredits } from '@/components/credits/CreditCounter'
 import { PLANS, normalizePlan } from '@/lib/plans'
+import { useIsMobile } from '@/lib/useIsMobile'
 
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.10)', LINE2 = 'rgba(20,18,15,.05)'
 const ORANGE = '#e02f06', WASH = '#fdeee9', INSET = '#f7f6f4', GOOD = '#12a150'
@@ -217,9 +218,10 @@ export default function HqRunable() {
     router.push(dest)
   }
   const selStyle: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit' }
+  const isMobile = useIsMobile()
 
   return (
-    <div style={{ display: 'flex', height: '100dvh', background: '#fff', color: INK }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: isMobile ? 'auto' : '100dvh', minHeight: isMobile ? '100dvh' : undefined, background: '#fff', color: INK }}>
       {/* ── centre ── */}
       <section style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
         {/* top bar */}
@@ -235,7 +237,7 @@ export default function HqRunable() {
             : <span />}
         </div>
 
-        <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
+        <div ref={scrollRef} style={{ flex: 1, minHeight: isMobile ? '62vh' : 0, overflowY: isMobile ? 'visible' : 'auto' }}>
           {!started ? (
             <div style={{ maxWidth: 720, margin: '0 auto', padding: '52px 24px 40px' }}>
               <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 'clamp(31px,3.6vw,43px)', textAlign: 'center', letterSpacing: '-.015em', margin: 0 }}>
@@ -293,8 +295,8 @@ export default function HqRunable() {
         )}
       </section>
 
-      {/* ── right rail ── */}
-      <aside style={{ width: 312, flex: 'none', borderLeft: `1px solid ${LINE}`, padding: '18px 16px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
+      {/* ── right rail (below the chat on mobile) ── */}
+      <aside style={{ width: isMobile ? '100%' : 312, flex: 'none', borderLeft: isMobile ? 'none' : `1px solid ${LINE}`, borderTop: isMobile ? `1px solid ${LINE}` : 'none', padding: '18px 16px', overflowY: isMobile ? 'visible' : 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Your store</div>
           {journey?.store ? (
