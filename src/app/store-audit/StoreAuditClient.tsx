@@ -47,6 +47,9 @@ export default function StoreAuditClient() {
   const act2Ref = useRef<HTMLDivElement>(null)
   const ctaRef = useRef<HTMLDivElement>(null)
 
+  // Website-only scan (no brand/ad-library picked): skip the ads act and go straight to the SEO/AI audit.
+  useEffect(() => { if (started && !(started.seed?.pageId || started.seed?.adLibraryUrl)) setAdsDone(true) }, [started])
+
   // Gently bring the next act / final CTA into view as each finishes, so the single scroll reads as one report.
   useEffect(() => { if (adsDone) setTimeout(() => act2Ref.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300) }, [adsDone])
   useEffect(() => { if (seoDone) setTimeout(() => ctaRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300) }, [seoDone])
@@ -100,12 +103,15 @@ export default function StoreAuditClient() {
       {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then.
           onError: if the ads pull blips out (after auto-retries), we STILL run the SEO/AI half + show the
           rest — a transient ads hiccup never dead-ends the whole audit. */}
-      <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
+      {(started.seed.pageId || started.seed.adLibraryUrl) && (
+        <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
+      )}
 
-      {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished. */}
+      {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished (or was
+          skipped for a website-only scan). */}
       {adsDone && (
         <div ref={act2Ref}>
-          <ActDivider n={2} label="Your search & AI visibility" />
+          <ActDivider n={(started.seed.pageId || started.seed.adLibraryUrl) ? 2 : 1} label="Your search & AI visibility" />
           <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
         </div>
       )}
@@ -196,7 +202,9 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
       const pid = extractPageId(adLink)
       if (!pid) { setError('That doesn’t look like a Facebook Ad Library link.'); return }
       seed = { pageId: pid, name: d }
-    } else { setError('Add your ads — search your brand or paste your Facebook Ad Library link.'); return }
+    }
+    // No ads is fine — a store owner with only a website still gets the full search & AI-visibility audit.
+    // seed stays {} and the ads act is skipped downstream.
     if (comp?.pageId) seed.competitors = [{ pageId: comp.pageId, name: comp.name }]
     onStart({ seed, domain: d, rival: rival.trim() })
   }
@@ -238,7 +246,7 @@ function InputScreen({ onStart }: { onStart: (s: Started) => void }) {
         <input value={domain} onChange={e => setDomain(e.target.value)} onKeyDown={e => e.key === 'Enter' && submit()} placeholder="yourstore.com" autoFocus style={field} />
 
         <div style={{ height: 18 }} />
-        <label style={label}>Your ads</label>
+        <label style={label}>Your ads <span style={{ fontWeight: 500, color: WSUB }}>· optional</span></label>
         {brand ? <Chip name={brand.name} onClear={() => { setBrand(null); setBrandQ('') }} /> : showLink ? (
           <div>
             <input value={adLink} onChange={e => setAdLink(e.target.value)} placeholder="Paste your Facebook Ad Library link" style={field} />
