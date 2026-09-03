@@ -15,8 +15,21 @@ const CSS = `
 .v3-nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
 .v3-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
 .v3-spark{color:var(--orange)}
-.v3-links{display:flex;gap:28px;font-size:14.5px;font-weight:600;color:var(--soft)}
-.v3-links a:hover{color:var(--ink)}
+.v3-links{display:flex;align-items:center;gap:28px;font-size:14.5px;font-weight:600;color:var(--soft)}
+.v3-links>a:hover{color:var(--ink)}
+.v3-drop{position:relative}
+.v3-dropbtn{font:inherit;font-weight:600;color:var(--soft);background:none;border:0;padding:0;cursor:pointer;display:inline-flex;align-items:center;gap:5px}
+.v3-drop:hover .v3-dropbtn,.v3-drop:focus-within .v3-dropbtn{color:var(--ink)}
+.v3-caret{font-size:10px;transition:transform .15s}
+.v3-drop:hover .v3-caret,.v3-drop:focus-within .v3-caret{transform:rotate(180deg)}
+.v3-menu{position:absolute;top:calc(100% + 12px);left:-16px;width:320px;background:#fff;border:1px solid var(--hair);border-radius:14px;box-shadow:0 12px 40px -12px rgba(20,29,21,.22);padding:8px;opacity:0;visibility:hidden;transform:translateY(-6px);transition:.16s;z-index:50}
+.v3-menu::before{content:"";position:absolute;top:-12px;left:0;right:0;height:12px}
+.v3-drop:hover .v3-menu,.v3-drop:focus-within .v3-menu{opacity:1;visibility:visible;transform:translateY(0)}
+.v3-menu a{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border-radius:9px;color:var(--ink);transition:background .12s}
+.v3-menu a:hover{background:var(--sky,#f3f6fb)}
+.v3-menu a b{font-size:14px;font-weight:700}
+.v3-menu a span{font-size:12.5px;font-weight:500;color:var(--soft);line-height:1.35}
+@media(max-width:860px){.v3-links{display:none}}
 .v3-navr{display:flex;align-items:center;gap:14px}
 .v3-login{font-size:14.5px;font-weight:600;color:var(--soft)}
 .v3-btn{background:var(--orange);color:#fff;font-weight:700;font-size:14.5px;padding:10px 18px;border-radius:9px;border:1px solid var(--orange2);transition:.15s;display:inline-flex;align-items:center;gap:7px;cursor:pointer}
@@ -336,7 +349,29 @@ export default function LandingV3() {
 
       <nav className="v3-nav"><div className="v3-shell v3-nav-in">
         <a className="v3-brand" href="/"><span className="v3-spark">✦</span> Selfmade</a>
-        <div className="v3-links"><a href="/features/ads">Product</a><a href="/features/shopify">Solutions</a><a href="/signup">Pricing</a><a href="/features/websites">Examples</a></div>
+        <div className="v3-links">
+          <div className="v3-drop">
+            <button type="button" className="v3-dropbtn">Product <span className="v3-caret">▾</span></button>
+            <div className="v3-menu" role="menu">
+              <a href="/features/ads"><b>Ad Studio</b><span>Generate, remake &amp; launch ads across Meta, Google &amp; TikTok</span></a>
+              <a href="/features/seo"><b>SEO Engine</b><span>Rank on Google with on-brand, AI-written content</span></a>
+              <a href="/features/websites"><b>Website Design</b><span>AI builds &amp; restyles your storefront</span></a>
+              <a href="/features/ai-visibility"><b>AI Visibility</b><span>Get cited by ChatGPT, Perplexity &amp; Google AI</span></a>
+              <a href="/features/shopify"><b>Shopify Autopilot</b><span>50 AI agents run your store, end to end</span></a>
+            </div>
+          </div>
+          <div className="v3-drop">
+            <button type="button" className="v3-dropbtn">Solutions <span className="v3-caret">▾</span></button>
+            <div className="v3-menu" role="menu">
+              <a href="/features/shopify"><b>For Shopify stores</b><span>A full AI growth team for your store</span></a>
+              <a href="/features/ads"><b>More sales from ads</b><span>Winning creative, launched &amp; optimized daily</span></a>
+              <a href="/features/seo"><b>Rank on Google</b><span>Organic traffic that compounds, hands-off</span></a>
+              <a href="/features/ai-visibility"><b>Get found by AI</b><span>Show up when buyers ask ChatGPT</span></a>
+            </div>
+          </div>
+          <a href="/pricing">Pricing</a>
+          <a href="/features/websites">Examples</a>
+        </div>
         <div className="v3-navr"><a className="v3-login" href="/login">Log in</a><a className="v3-btn" href="/signup">Get started</a></div>
       </div></nav>
 
