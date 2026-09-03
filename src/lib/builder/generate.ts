@@ -12,7 +12,7 @@ import { llm } from '@/lib/llm'
 import { getTemplate } from './templates'
 import type { FilledContent, RenderOpts, SlotDef, SlotValue } from './types'
 import { getBuilderProduct } from './products'
-import { loadBrandVoice, voiceBrief, fetchImageInput, generateAndHost, slugify, parseJsonObject } from './context'
+import { loadBrandVoice, voiceBrief, productVision, fetchImageInput, generateAndHost, slugify, parseJsonObject } from './context'
 import type { ImageInput } from '@/lib/gemini/image'
 
 export interface GenerateResult {
@@ -50,10 +50,14 @@ export async function generatePage(
   const productImages = product?.images || (product?.image ? [product.image] : [])
   const productImage = productImages[0] || product?.image || null
 
+  // What the product ACTUALLY is (from its photo) — the primary grounding signal so copy tracks the
+  // product, not the brand's category.
+  const vision = await productVision(productImage)
+
   // ── b. COPY — one grounded LLM call fills every non-image slot ──
   const content = await generateCopy(template.schema, {
     productName,
-    productBlock: productBlock(product),
+    productBlock: productBlock(product, vision),
     voiceBrief: voiceBrief(voice),
     personaName, personaDesc, angleTitle, anglePromise,
     research: (args.research || '').trim().slice(0, 4000),
@@ -63,8 +67,10 @@ export async function generatePage(
   await resolveImages(template.schema, content, {
     productImages, productImage,
     productName,
-    productDesc: product?.description || voice.description || voice.category || '',
-    category: voice.category || voice.industry || '',
+    // Vision (what the product really is) leads, so AI-generated shots match the product — not the
+    // brand's category. Only fall back to the brand category when we couldn't read the product.
+    productDesc: vision || product?.description || '',
+    category: vision ? '' : (voice.category || voice.industry || ''),
     keyPrefix: `${slugify(voice.name || productName, 'store')}/${args.templateId}`,
   })
 
@@ -91,10 +97,11 @@ export async function generatePage(
 
 // ── copy ─────────────────────────────────────────────────────────────────────
 
-function productBlock(product: Awaited<ReturnType<typeof getBuilderProduct>>): string {
+function productBlock(product: Awaited<ReturnType<typeof getBuilderProduct>>, vision?: string | null): string {
   if (!product) return 'No product data available — keep copy generic and make NO specific product claims.'
   return [
     `Title: ${product.title}`,
+    vision && `What it actually is (read from its photo): ${vision}`,
     product.price && `Price: ${product.price}`,
     product.sku && `SKU: ${product.sku}`,
     product.description && `Description: ${product.description}`,
@@ -126,21 +133,23 @@ async function generateCopy(
     return `- ${bits.join(' — ')}`
   }).join('\n')
 
-  const sys = `You are a world-class direct-response copywriter filling a high-converting landing page for a real product. Write copy that is specific, credible and emotionally resonant — grounded ENTIRELY in the real product, the target persona, the chosen angle, and the brand voice below.
+  const sys = `You are a world-class direct-response copywriter filling a high-converting landing page that sells ONE specific product. Write copy that is specific, credible and emotionally resonant — built ENTIRELY around the real PRODUCT below, for the target persona and chosen angle.
 
-${ctx.voiceBrief}
+THE PRODUCT IS THE SUBJECT OF THE PAGE — every headline, story, benefit, testimonial and FAQ is about THIS product:
+${ctx.productBlock}
+${ctx.research ? `\nADDITIONAL RESEARCH the founder pasted (use where honest):\n${ctx.research}` : ''}
 
 TARGET PERSONA: ${ctx.personaName || 'the product\'s core buyer'}${ctx.personaDesc ? ` — ${ctx.personaDesc}` : ''}
 CHOSEN ANGLE: ${ctx.angleTitle || '(pick the strongest honest angle)'}${ctx.anglePromise ? ` — ${ctx.anglePromise}` : ''}
 
-PRODUCT (ground everything in this):
-${ctx.productBlock}
-${ctx.research ? `\nADDITIONAL RESEARCH the founder pasted (use where honest):\n${ctx.research}` : ''}
+Brand voice (use ONLY for tone/style — NOT for what the product is; if the brand's category differs from the product, WRITE ABOUT THE PRODUCT, not the brand's category):
+${ctx.voiceBrief}
 
 HARD RULES:
-- Ground all copy in the REAL product + persona + angle + brand voice. Speak to this persona in first person as a believable narrator.
-- Do NOT invent ingredients, clinical results, statistics, prices, or claims the product data doesn't support. Where a specific fact isn't available, write honestly around it (benefits/experience) rather than fabricating.
-- Fill EVERY slot listed. Keep the brand voice consistent throughout.
+- The page is about the PRODUCT above. Do NOT write about a different category (e.g. if the product is a t-shirt, never write about vaping/supplements just because the brand is in that space). Match the product.
+- Speak to this persona in first person as a believable narrator who bought and loves THIS product.
+- Do NOT invent ingredients, clinical results, statistics, prices, or claims the product data doesn't support. Where a specific fact isn't available, write honestly around it (the design, the feel, the experience, the vibe) rather than fabricating.
+- Fill EVERY slot listed. Keep one consistent voice throughout.
 
 ${VALUE_FORMATS}
 

@@ -27,6 +27,8 @@ body{margin:0;background:#fff;color:var(--body);font-family:var(--sans);font-siz
 img{max-width:100%;display:block}
 b,strong{color:var(--ink);font-weight:700}
 .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+.pgbld{width:100vw;margin-left:calc(50% - 50vw)}
+.pgbld *{box-sizing:border-box}
 .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
 .count .lbl{opacity:.85;margin-right:8px}
 .grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:44px;padding:40px 0 70px}
@@ -109,7 +111,8 @@ function render(c: FilledContent, o: RenderOpts): string {
   const faqs = arr(c.faqs).map((f) => `<q>${esc(f.q)}</q><p>${esc(f.a)}</p>`).join('')
 
   return `
-  <div class="count"><span class="lbl">LIMITED TIME :</span> <b>${hours} HRS</b> : <b>13 MINS</b> : <b>18 SECS</b></div>
+  <div class="pgbld">
+  <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
   <div class="wrap"><div class="grid">
     <div class="main">
       <h1 class="head">${esc(c.headline)}</h1>
@@ -127,7 +130,9 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="aside">${offerCard(o)}</div>
   </div></div>
   <div class="floatcta" id="floatcta"><div class="fc-info">${img(o.productImage, o.productName, 'fc-thumb')}<span class="fc-name">${esc(o.productName)}${o.priceLabel ? ' · <b>' + esc(o.priceLabel) + '</b>' : ''}</span></div><a class="fc-btn" href="${esc(o.ctaHref)}">👉 Check Availability</a></div>
-  <script>var fc=document.getElementById('floatcta');function t(){fc.classList.toggle('hide',window.scrollY<480)}window.addEventListener('scroll',t,{passive:true});t();</script>`
+  </div>
+  <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<480)}window.addEventListener('scroll',t,{passive:true});t();
+  var end=Date.now()+(${hours}*3600+33*60+7)*1000;function p(n){return(n<10?'0':'')+n}function cd(){var d=Math.max(0,end-Date.now()),h=Math.floor(d/3600000),m=Math.floor(d%3600000/60000),s=Math.floor(d%60000/1000);document.querySelectorAll('.count').forEach(function(el){var H=el.querySelector('.cd-h'),M=el.querySelector('.cd-m'),S=el.querySelector('.cd-s');if(H)H.textContent=p(h)+' HRS';if(M)M.textContent=p(m)+' MINS';if(S)S.textContent=p(s)+' SECS'})}cd();setInterval(cd,1000);})();</script>`
 }
 
 export const listicleV1: PageTemplate = {
