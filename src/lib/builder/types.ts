@@ -14,6 +14,7 @@ export type SlotType =
   | 'text'        // a single string (headline, subhead, paragraph, label)
   | 'richtext'    // a paragraph that may contain **bold** spans (rendered to <strong>)
   | 'image'       // an image URL (resolved from product photos or AI-generated)
+  | 'video'       // a URL to a video (or a poster image) the merchant uploads — NOT AI-filled
   | 'list'        // an array of { label, body } (❌/✅ rows, benefit/ingredient lists)
   | 'costs'       // an array of { label, body } rendered as "At work: …" cost rows
   | 'timeline'    // an array of { label, body } (Week 1 / Month 2-4 rows, each with a thumb)

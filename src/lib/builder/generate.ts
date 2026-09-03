@@ -132,7 +132,7 @@ async function generateCopy(
     personaName: string; personaDesc: string; angleTitle: string; anglePromise: string; research: string; language?: string
   },
 ): Promise<FilledContent> {
-  const copySlots = schema.filter((s) => s.type !== 'image')
+  const copySlots = schema.filter((s) => s.type !== 'image' && s.type !== 'video')
   const slotLines = copySlots.map((s) => {
     const bits = [`"${s.key}" (${s.type}${s.count ? `, ${s.count} items` : ''})`, s.label]
     if (s.role) bits.push(`role=${s.role}`)
