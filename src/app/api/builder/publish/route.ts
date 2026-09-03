@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const pageId = String(b?.pageId || '')
   if (!pageId) return NextResponse.json({ error: 'pageId is required' }, { status: 400 })
+  const themeId = b?.themeId != null ? Number(b.themeId) : null
+  const themeLive = b?.themeLive === true
 
   const admin = createAdminClient()
   const { data: row } = await admin.from('builder_pages').select('*').eq('id', pageId).eq('user_id', user.id).maybeSingle()
@@ -39,7 +41,7 @@ export async function POST(req: NextRequest) {
 
   let pub
   try {
-    pub = await publishBuilderPage(store, { title, bodyHtml: body, published: true })
+    pub = await publishBuilderPage(store, { title, bodyHtml: body, published: true, themeId, themeLive })
   } catch (e: any) {
     await admin.from('builder_pages').update({ status: 'failed', updated_at: new Date().toISOString() }).eq('id', pageId)
     return NextResponse.json({ error: e?.message || 'publish_failed' }, { status: 502 })
@@ -49,5 +51,5 @@ export async function POST(req: NextRequest) {
     status: 'published', shopify_page_id: String(pub.pageId), shopify_url: pub.url, updated_at: new Date().toISOString(),
   }).eq('id', pageId)
 
-  return NextResponse.json({ url: pub.url, handle: pub.handle })
+  return NextResponse.json({ url: pub.url, handle: pub.handle, previewUrl: pub.previewUrl })
 }

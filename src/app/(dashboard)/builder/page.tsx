@@ -21,8 +21,19 @@ type Product = { id: string; title: string; handle?: string; price?: string; ima
 type Angle = { id: string; title: string; promise: string }
 type Persona = { id: string; name: string; description: string; angles: Angle[]; custom?: boolean }
 
-type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published'
+type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published' | 'edit'
 type SavedPage = { id: string; type: string; template_id: string; product_name: string; status: string; shopify_url?: string; created_at: string }
+type StoreTheme = { id: number; name: string; role: string; live: boolean }
+type EditSlot = { key: string; type: string; label: string; hint?: string }
+// which string fields are editable inside each array-slot item
+const ITEM_FIELDS: Record<string, { field: string; label: string; area?: boolean }[]> = {
+  list: [{ field: 'label', label: 'Label' }, { field: 'body', label: 'Detail' }],
+  costs: [{ field: 'label', label: 'Where' }, { field: 'body', label: 'Cost' }],
+  timeline: [{ field: 'label', label: 'When' }, { field: 'body', label: 'What changed', area: true }],
+  reasons: [{ field: 'label', label: 'Tag' }, { field: 'title', label: 'Heading' }, { field: 'body', label: 'Body', area: true }],
+  testimonials: [{ field: 'name', label: 'Name' }, { field: 'city', label: 'City' }, { field: 'quote', label: 'Quote', area: true }],
+  faq: [{ field: 'q', label: 'Question' }, { field: 'a', label: 'Answer', area: true }],
+}
 
 const STEP_LABELS = ['Template', 'Product', 'Research', 'Persona & angle']
 
@@ -33,6 +44,8 @@ const CARD: React.CSSProperties = {
 
 const cardTitle: React.CSSProperties = { fontFamily: SERIF, fontWeight: 400, fontSize: 27, letterSpacing: '-.015em', margin: 0, color: INK }
 const eyebrow: React.CSSProperties = { fontSize: 11, fontWeight: 800, letterSpacing: '.09em', textTransform: 'uppercase', color: ORANGE }
+const editInput: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit', background: '#fff' }
+const editArea: React.CSSProperties = { ...editInput, resize: 'vertical', lineHeight: 1.5 }
 
 /* ── small inline error + retry strip ── */
 function ErrorStrip({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
@@ -231,8 +244,28 @@ export default function BuilderPage() {
   const [publishing, setPublishing] = useState(false)
   const [publishErr, setPublishErr] = useState('')
   const [publishedUrl, setPublishedUrl] = useState('')
+  const [previewUrl, setPreviewUrl] = useState('')       // ?preview_theme_id link when a draft theme is chosen
   const [toast, setToast] = useState('')
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 3200) }
+
+  /* ── theme picker (detected live from the connected store, Atlas-style) ── */
+  const [themes, setThemes] = useState<StoreTheme[] | null>(null)
+  const [themesLoading, setThemesLoading] = useState(false)
+  const [pickerOpen, setPickerOpen] = useState(false)
+  const [chosenTheme, setChosenTheme] = useState<number | null>(null)
+  const openThemePicker = useCallback(async () => {
+    setPickerOpen(true); setPublishErr('')
+    if (themes) return
+    setThemesLoading(true)
+    try {
+      const r = await fetch('/api/builder/themes'); const j = await r.json()
+      const list: StoreTheme[] = j.themes || []
+      setThemes(list)
+      const live = list.find((t) => t.live) || list[0]
+      if (live) setChosenTheme(live.id)
+    } catch { setThemes([]) }
+    finally { setThemesLoading(false) }
+  }, [themes])
 
   /* ── reopen a saved page (re-rendered server-side) into the preview step ── */
   const [opening, setOpening] = useState<string | null>(null)
@@ -251,6 +284,49 @@ export default function BuilderPage() {
     finally { setOpening(null) }
   }, [])
 
+  /* ── inline copy editor for a saved page ── */
+  const [editSchema, setEditSchema] = useState<EditSlot[] | null>(null)
+  const [editContent, setEditContent] = useState<Record<string, any>>({})
+  const [editErr, setEditErr] = useState('')
+  const [saving, setSaving] = useState(false)
+  const editDraft = useCallback(async (id: string) => {
+    setOpening(id); setEditErr('')
+    try {
+      const r = await fetch(`/api/builder/drafts?id=${encodeURIComponent(id)}`)
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error || 'Could not open')
+      setPageId(j.pageId || id)
+      setEditSchema(j.schema || [])
+      setEditContent(j.content || {})
+      setPublishedUrl(j.shopifyUrl || '')
+      setStep('edit')
+    } catch { setToast('Could not open that page.'); setTimeout(() => setToast(''), 3200) }
+    finally { setOpening(null) }
+  }, [])
+  const setField = (key: string, value: any) => setEditContent((c) => ({ ...c, [key]: value }))
+  const setItemField = (key: string, idx: number, field: string, value: any) => setEditContent((c) => {
+    const arr = Array.isArray(c[key]) ? [...c[key]] : []
+    arr[idx] = { ...(arr[idx] || {}), [field]: value }
+    return { ...c, [key]: arr }
+  })
+  const saveEdit = useCallback(async () => {
+    if (!pageId) return
+    setSaving(true); setEditErr('')
+    try {
+      const r = await fetch('/api/builder/update', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pageId, content: editContent }),
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error || 'Could not save')
+      setPreviewHtml(j.previewHtml || '')
+      setPublishErr('')
+      setStep('preview')
+      loadPages()
+    } catch (e: any) { setEditErr(e?.message || 'Could not save') }
+    finally { setSaving(false) }
+  }, [pageId, editContent, loadPages])
+
   /* ── reset all wizard state and start a brand-new page ── */
   const startNew = useCallback(() => {
     setStep(1); setTplId(null); setProductId(null); setQ(''); clearResearch()
@@ -258,21 +334,24 @@ export default function BuilderPage() {
     setPreviewHtml(''); setPageId(''); setPublishedUrl(''); setBuildErr(''); personaFetchedFor.current = null
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
 
-  const publish = useCallback(async () => {
+  const publish = useCallback(async (themeId?: number | null) => {
     if (!pageId) return
+    const theme = themes?.find((t) => t.id === themeId) || null
     setPublishing(true); setPublishErr('')
     try {
       const r = await fetch('/api/builder/publish', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId }),
+        body: JSON.stringify({ pageId, themeId: themeId ?? undefined, themeLive: theme?.live ?? undefined }),
       })
       const j = await r.json()
       if (!r.ok) throw new Error(j?.error || 'Import failed — please try again')
       setPublishedUrl(j.url || '')
+      setPreviewUrl(j.previewUrl || '')
+      setPickerOpen(false)
       setStep('published')
     } catch (e: any) { setPublishErr(e?.message || 'Import failed — please try again') }
     finally { setPublishing(false) }
-  }, [pageId])
+  }, [pageId, themes])
 
   /* ── step gating ── */
   const canNext = (
@@ -336,7 +415,7 @@ export default function BuilderPage() {
       </div>
 
       {/* main: content + right-rail summary */}
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (step === 'list' || step === 'preview' || step === 'published' || step === 'building') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (step === 'list' || step === 'preview' || step === 'published' || step === 'building' || step === 'edit') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
         <section style={{ minWidth: 0 }}>
           {/* ── LANDING · YOUR PAGES ── */}
           {step === 'list' && (
@@ -377,6 +456,7 @@ export default function BuilderPage() {
                           {pg.status === 'published' && pg.shopify_url && (
                             <a href={pg.shopify_url} target="_blank" rel="noopener noreferrer" style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13 }}>View →</a>
                           )}
+                          <button onClick={() => editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>Edit</button>
                           <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
                         </div>
                       </div>
@@ -607,6 +687,66 @@ export default function BuilderPage() {
             </div>
           )}
 
+          {/* ── EDIT COPY ── */}
+          {step === 'edit' && (
+            <div style={{ maxWidth: 760, margin: '0 auto' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+                <div>
+                  <button onClick={() => { loadPages(); setStep('list') }} style={{ border: 'none', background: 'none', color: SUB, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', padding: 0, marginBottom: 4 }}>← My pages</button>
+                  <div style={eyebrow}>Edit copy</div>
+                  <h2 style={{ ...cardTitle, fontSize: 24, marginTop: 3 }}>Edit your page</h2>
+                  <p style={{ fontSize: 13.5, color: SUB, marginTop: 5 }}>Change any wording, then save to preview and publish. Images stay as generated.</p>
+                </div>
+              </div>
+              {editErr && <ErrorStrip msg={editErr} onRetry={saveEdit} />}
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+                {(editSchema || []).map((s) => {
+                  const val = editContent[s.key]
+                  const itemFields = ITEM_FIELDS[s.type]
+                  return (
+                    <div key={s.key} style={{ ...CARD, padding: 16 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: INK }}>{s.label}</div>
+                      {s.hint && <div style={{ fontSize: 12, color: FAINT, marginTop: 2, lineHeight: 1.4 }}>{s.hint}</div>}
+
+                      {/* array slots → edit each item's text fields */}
+                      {itemFields ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                          {(Array.isArray(val) ? val : []).map((item: any, idx: number) => (
+                            <div key={idx} style={{ border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, background: INSET }}>
+                              <div style={{ fontSize: 11, fontWeight: 800, color: FAINT, marginBottom: 8 }}>#{idx + 1}</div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                {itemFields.map((f) => (
+                                  f.area ? (
+                                    <textarea key={f.field} value={String(item?.[f.field] ?? '')} onChange={(e) => setItemField(s.key, idx, f.field, e.target.value)} placeholder={f.label} rows={2} style={editArea} />
+                                  ) : (
+                                    <input key={f.field} value={String(item?.[f.field] ?? '')} onChange={(e) => setItemField(s.key, idx, f.field, e.target.value)} placeholder={f.label} style={editInput} />
+                                  )
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : s.type === 'richtext' ? (
+                        <textarea value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} rows={4} style={{ ...editArea, marginTop: 10 }} />
+                      ) : s.type === 'number' ? (
+                        <input type="number" value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value === '' ? '' : Number(e.target.value))} style={{ ...editInput, marginTop: 10, maxWidth: 160 }} />
+                      ) : (
+                        // text + image (image = the URL)
+                        <input value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} placeholder={s.type === 'image' ? 'Image URL' : ''} style={{ ...editInput, marginTop: 10 }} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20, position: 'sticky', bottom: 0, background: '#fff', paddingTop: 12, borderTop: `1px solid ${LINE2}` }}>
+                <button onClick={() => { loadPages(); setStep('list') }} disabled={saving} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Cancel</button>
+                <button onClick={saveEdit} disabled={saving} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: saving ? 'default' : 'pointer', opacity: saving ? 0.6 : 1 }}>{saving ? 'Saving…' : 'Save & preview →'}</button>
+              </div>
+            </div>
+          )}
+
           {/* ── PREVIEW ── */}
           {step === 'preview' && (
             <div>
@@ -624,7 +764,7 @@ export default function BuilderPage() {
                     ))}
                   </div>
                   <button onClick={() => showToast('Saved as draft — you can reopen it any time.')} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Save as draft</button>
-                  <button onClick={publish} disabled={publishing} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 20px', fontWeight: 700, fontSize: 13.5, cursor: publishing ? 'default' : 'pointer', opacity: publishing ? 0.6 : 1 }}>{publishing ? 'Importing…' : 'Import to Shopify →'}</button>
+                  <button onClick={openThemePicker} disabled={publishing} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 20px', fontWeight: 700, fontSize: 13.5, cursor: publishing ? 'default' : 'pointer', opacity: publishing ? 0.6 : 1 }}>Publish to Shopify →</button>
                 </div>
               </div>
               {publishErr && <ErrorStrip msg={publishErr} onRetry={publish} />}
@@ -645,10 +785,13 @@ export default function BuilderPage() {
             <div style={{ maxWidth: 520, margin: '48px auto', textAlign: 'center' }}>
               <div style={{ width: 60, height: 60, borderRadius: 999, background: '#e7f7ee', display: 'grid', placeItems: 'center', margin: '0 auto 18px', fontSize: 30 }}>🎉</div>
               <h2 style={{ ...cardTitle, fontSize: 26 }}>Published!</h2>
-              <p style={{ fontSize: 14.5, color: SUB, marginTop: 8, lineHeight: 1.55 }}>Your page is now a native Shopify page. You can edit it any time inside Shopify.</p>
+              <p style={{ fontSize: 14.5, color: SUB, marginTop: 8, lineHeight: 1.55 }}>Your page is now a native Shopify page.{previewUrl ? ' Use the theme preview link to see it staged under your chosen theme before it goes live.' : ' You can edit it any time inside Shopify.'}</p>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 22, flexWrap: 'wrap' }}>
+                {previewUrl && (
+                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>Preview under theme →</a>
+                )}
                 {publishedUrl && (
-                  <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>View page →</a>
+                  <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ background: previewUrl ? '#fff' : ORANGE, color: previewUrl ? INK : '#fff', border: previewUrl ? `1px solid ${LINE}` : 'none', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>View page →</a>
                 )}
                 <button onClick={() => { loadPages(); setStep('list') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>My pages</button>
                 <button onClick={startNew} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Build another</button>
@@ -684,6 +827,40 @@ export default function BuilderPage() {
           </aside>
         )}
       </div>
+
+      {/* ── theme picker modal (Atlas-style: detected from the connected store) ── */}
+      {pickerOpen && (
+        <div onClick={() => !publishing && setPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,18,15,.45)', display: 'grid', placeItems: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...CARD, width: 'min(460px, 100%)', padding: 22 }}>
+            <div style={eyebrow}>Publish to Shopify</div>
+            <h3 style={{ ...cardTitle, fontSize: 22, marginTop: 4 }}>Which theme?</h3>
+            <p style={{ fontSize: 13, color: SUB, marginTop: 6, lineHeight: 1.5 }}>Detected from your connected store. The page publishes as a native Shopify page — pick a theme to view it under. A draft theme lets you stage it before going live.</p>
+            {publishErr && <ErrorStrip msg={publishErr} />}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '46vh', overflowY: 'auto' }}>
+              {themesLoading && <SkeletonRows />}
+              {!themesLoading && themes && themes.length === 0 && (
+                <div style={{ fontSize: 13, color: SUB, background: INSET, borderRadius: 12, padding: 14, lineHeight: 1.5 }}>We couldn’t detect your themes — the page will publish to your live store.</div>
+              )}
+              {!themesLoading && (themes || []).map((t) => {
+                const on = chosenTheme === t.id
+                return (
+                  <button key={t.id} onClick={() => setChosenTheme(t.id)} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left', padding: '12px 14px', cursor: 'pointer', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : 'none' }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 650, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>{t.name}{t.live && <span style={{ fontSize: 11, fontWeight: 800, color: GOOD, background: '#e7f7ee', borderRadius: 20, padding: '2px 9px' }}>Live</span>}</div>
+                      <div style={{ fontSize: 12, color: FAINT, marginTop: 2, textTransform: 'capitalize' }}>{t.role === 'main' ? 'Published theme' : t.role}</div>
+                    </div>
+                    <input type="radio" className="bld-radio" checked={on} readOnly />
+                  </button>
+                )
+              })}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+              <button onClick={() => setPickerOpen(false)} disabled={publishing} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Cancel</button>
+              <button onClick={() => publish(chosenTheme)} disabled={publishing || themesLoading} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 22px', fontWeight: 700, fontSize: 13.5, cursor: (publishing || themesLoading) ? 'default' : 'pointer', opacity: (publishing || themesLoading) ? 0.6 : 1 }}>{publishing ? 'Publishing…' : 'Publish here →'}</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 120, background: INK, color: '#fff', padding: '12px 20px', borderRadius: 999, fontSize: 13.5, fontWeight: 600, boxShadow: '0 16px 40px -12px rgba(0,0,0,.4)' }}>{toast}</div>
