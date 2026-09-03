@@ -21,7 +21,8 @@ type Product = { id: string; title: string; handle?: string; price?: string; ima
 type Angle = { id: string; title: string; promise: string }
 type Persona = { id: string; name: string; description: string; angles: Angle[]; custom?: boolean }
 
-type Step = 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published'
+type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published'
+type SavedPage = { id: string; type: string; template_id: string; product_name: string; status: string; shopify_url?: string; created_at: string }
 
 const STEP_LABELS = ['Template', 'Product', 'Research', 'Persona & angle']
 
@@ -64,7 +65,15 @@ function Thumb({ src, seed, label, height = 132 }: { src?: string; seed: number;
 }
 
 export default function BuilderPage() {
-  const [step, setStep] = useState<Step>(1)
+  const [step, setStep] = useState<Step>('list')
+
+  /* ── landing: the user's already-generated pages ── */
+  const [pages, setPages] = useState<SavedPage[] | null>(null)
+  const loadPages = useCallback(async () => {
+    try { const r = await fetch('/api/builder/drafts'); const j = await r.json(); setPages(j.pages || []) }
+    catch { setPages([]) }
+  }, [])
+  useEffect(() => { loadPages() }, [loadPages])
 
   // load Hedvig serif once (same as HqRunable)
   useEffect(() => {
@@ -224,6 +233,31 @@ export default function BuilderPage() {
   const [publishedUrl, setPublishedUrl] = useState('')
   const [toast, setToast] = useState('')
   const showToast = (m: string) => { setToast(m); setTimeout(() => setToast(''), 3200) }
+
+  /* ── reopen a saved page (re-rendered server-side) into the preview step ── */
+  const [opening, setOpening] = useState<string | null>(null)
+  const openDraft = useCallback(async (id: string) => {
+    setOpening(id)
+    try {
+      const r = await fetch(`/api/builder/drafts?id=${encodeURIComponent(id)}`)
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error || 'Could not open')
+      setPageId(j.pageId || id)
+      setPreviewHtml(j.previewHtml || '')
+      setPublishedUrl(j.shopifyUrl || '')
+      setPublishErr('')
+      setStep('preview')
+    } catch { setToast('Could not open that page.'); setTimeout(() => setToast(''), 3200) }
+    finally { setOpening(null) }
+  }, [])
+
+  /* ── reset all wizard state and start a brand-new page ── */
+  const startNew = useCallback(() => {
+    setStep(1); setTplId(null); setProductId(null); setQ(''); clearResearch()
+    setPersonas(null); setPersonaId(null); setAngleId(null); setCustomName(''); setCustomDesc(''); setShowCustom(false)
+    setPreviewHtml(''); setPageId(''); setPublishedUrl(''); setBuildErr(''); personaFetchedFor.current = null
+  }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+
   const publish = useCallback(async () => {
     if (!pageId) return
     setPublishing(true); setPublishErr('')
@@ -249,7 +283,8 @@ export default function BuilderPage() {
   )
   const goNext = () => { if (step === 1) setStep(2); else if (step === 2) setStep(3); else if (step === 3) setStep(4) }
   const goBack = () => {
-    if (step === 2) setStep(1)
+    if (step === 1) setStep('list')
+    else if (step === 2) setStep(1)
     else if (step === 3) setStep(2)
     else if (step === 4) setStep(3)
     else if (step === 'preview') setStep(4)
@@ -301,8 +336,57 @@ export default function BuilderPage() {
       </div>
 
       {/* main: content + right-rail summary */}
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (step === 'preview' || step === 'published' || step === 'building') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (step === 'list' || step === 'preview' || step === 'published' || step === 'building') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
         <section style={{ minWidth: 0 }}>
+          {/* ── LANDING · YOUR PAGES ── */}
+          {step === 'list' && (
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+                <div>
+                  <h2 style={cardTitle}>Your pages</h2>
+                  <p style={{ fontSize: 14, color: SUB, marginTop: 6 }}>Reopen a page to preview or publish it, or build a new one.</p>
+                </div>
+                <button onClick={startNew} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '11px 22px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>+ New page</button>
+              </div>
+
+              {!pages && <div style={{ marginTop: 18 }}><SkeletonRows /></div>}
+              {pages && pages.length === 0 && (
+                <div style={{ ...CARD, padding: 34, textAlign: 'center', marginTop: 18 }}>
+                  <div style={{ fontSize: 30, marginBottom: 10 }}>🗂️</div>
+                  <div style={{ fontSize: 16, fontWeight: 700 }}>No pages yet</div>
+                  <div style={{ fontSize: 13, color: SUB, margin: '8px auto 16px', maxWidth: 380 }}>Build your first high-converting landing page — pick a template, a product, and go.</div>
+                  <button onClick={startNew} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '11px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>Build a page →</button>
+                </div>
+              )}
+              {pages && pages.length > 0 && (
+                <div style={{ marginTop: 18, display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {pages.map((pg) => {
+                    const badge = pg.status === 'published' ? { t: 'Published', c: GOOD, bg: '#e7f7ee' }
+                      : pg.status === 'failed' ? { t: 'Failed', c: '#9a2b2b', bg: '#fdecec' }
+                      : { t: 'Draft', c: SUB, bg: INSET }
+                    return (
+                      <div key={pg.id} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 14, padding: 14, flexWrap: 'wrap' }}>
+                        <div style={{ flex: 1, minWidth: 200 }}>
+                          <div style={{ fontSize: 15, fontWeight: 650, display: 'flex', alignItems: 'center', gap: 9, flexWrap: 'wrap' }}>
+                            {pg.product_name || 'Landing page'}
+                            <span style={{ fontSize: 11, fontWeight: 800, color: badge.c, background: badge.bg, borderRadius: 20, padding: '2px 9px' }}>{badge.t}</span>
+                          </div>
+                          <div style={{ fontSize: 12, color: FAINT, marginTop: 3, textTransform: 'capitalize' }}>{pg.type} · {new Date(pg.created_at).toLocaleDateString()}</div>
+                        </div>
+                        <div style={{ display: 'flex', gap: 9 }}>
+                          {pg.status === 'published' && pg.shopify_url && (
+                            <a href={pg.shopify_url} target="_blank" rel="noopener noreferrer" style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13 }}>View →</a>
+                          )}
+                          <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* ── STEP 1 · TEMPLATE ── */}
           {step === 1 && (
             <div>
@@ -528,6 +612,7 @@ export default function BuilderPage() {
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
                 <div>
+                  <button onClick={() => { loadPages(); setStep('list') }} style={{ border: 'none', background: 'none', color: SUB, fontWeight: 600, fontSize: 12.5, cursor: 'pointer', padding: 0, marginBottom: 4 }}>← My pages</button>
                   <div style={eyebrow}>Preview</div>
                   <h2 style={{ ...cardTitle, fontSize: 24, marginTop: 3 }}>Your page is ready</h2>
                 </div>
@@ -565,12 +650,8 @@ export default function BuilderPage() {
                 {publishedUrl && (
                   <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>View page →</a>
                 )}
-                <button onClick={() => {
-                  // reset to a fresh build
-                  setStep(1); setTplId(null); setProductId(null); setQ(''); clearResearch()
-                  setPersonas(null); setPersonaId(null); setAngleId(null); setCustomName(''); setCustomDesc(''); setShowCustom(false)
-                  setPreviewHtml(''); setPageId(''); personaFetchedFor.current = null
-                }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Build another</button>
+                <button onClick={() => { loadPages(); setStep('list') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>My pages</button>
+                <button onClick={startNew} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Build another</button>
               </div>
             </div>
           )}
@@ -578,7 +659,7 @@ export default function BuilderPage() {
           {/* ── footer nav (steps 1-4 only) ── */}
           {typeof step === 'number' && (
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 28, paddingTop: 18, borderTop: `1px solid ${LINE2}` }}>
-              <button onClick={goBack} disabled={step === 1} style={{ border: `1px solid ${LINE}`, background: '#fff', color: step === 1 ? FAINT : INK, borderRadius: 999, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: step === 1 ? 'default' : 'pointer', opacity: step === 1 ? 0.5 : 1 }}>← Back</button>
+              <button onClick={goBack} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '10px 20px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>{step === 1 ? '← My pages' : '← Back'}</button>
               {step === 4 ? (
                 <button onClick={runBuild} disabled={!selectedPersona} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '11px 26px', fontWeight: 700, fontSize: 14, cursor: selectedPersona ? 'pointer' : 'default', opacity: selectedPersona ? 1 : 0.5 }}>Build page →</button>
               ) : (

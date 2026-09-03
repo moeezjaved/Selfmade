@@ -1,16 +1,38 @@
-/** GET /api/builder/drafts — the user's saved/published pages (for a "Your pages" list). */
-import { NextResponse } from 'next/server'
+/**
+ * GET /api/builder/drafts — the user's saved/published pages (for a "Your pages" list).
+ * GET /api/builder/drafts?id=<pageId> — reopen ONE saved page: returns its re-rendered preview HTML
+ * (from the stored content + render_opts) so the wizard can drop it back into the preview step.
+ */
+import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getTemplate } from '@/lib/builder/templates'
+import { assembleDocument } from '@/lib/builder/assemble'
+import type { RenderOpts } from '@/lib/builder/types'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(req: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
+  const id = req.nextUrl.searchParams.get('id')
+
+  if (id) {
+    const { data: row } = await admin.from('builder_pages').select('*').eq('id', id).eq('user_id', user.id).maybeSingle()
+    if (!row) return NextResponse.json({ error: 'not_found' }, { status: 404 })
+    const tpl = getTemplate(row.template_id)
+    if (!tpl) return NextResponse.json({ error: 'unknown_template' }, { status: 400 })
+    const opts: RenderOpts = row.render_opts || { productName: row.product_name || 'Product', ctaHref: row.cta_href || '#' }
+    const previewHtml = assembleDocument(tpl, row.content || {}, opts)
+    return NextResponse.json({
+      pageId: row.id, previewHtml, status: row.status,
+      productName: row.product_name, templateId: row.template_id, shopifyUrl: row.shopify_url,
+    })
+  }
+
   const { data } = await admin
     .from('builder_pages')
     .select('id, type, template_id, product_name, status, shopify_url, created_at')
