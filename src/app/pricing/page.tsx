@@ -8,7 +8,7 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { V3Mark } from '@/app/v3/V3Mark'
+import { V3Logo } from '@/app/v3/V3Mark'
 import { V3Pricing } from '@/app/v3/V3Pricing'
 
 export const dynamic = 'force-dynamic'
@@ -109,7 +109,7 @@ export default async function PricingPage() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       <nav className="pg-nav"><div className="pg-shell pg-nav-in">
-        <a className="pg-brand" href="/"><span className="pg-mark"><V3Mark size={24} /></span> Selfmade</a>
+        <a className="pg-brand" href="/"><V3Logo /></a>
         <div className="pg-links">
           <Menu label="Product" items={PRODUCT} />
           <Menu label="Solutions" items={SOLUTIONS} />

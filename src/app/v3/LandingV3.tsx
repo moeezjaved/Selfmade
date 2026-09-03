@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect, useRef, type FormEvent } from 'react'
-import { V3Mark } from './V3Mark'
+import { V3Logo } from './V3Mark'
 import { V3Pricing } from './V3Pricing'
 
 const CSS = `
@@ -353,7 +353,7 @@ export default function LandingV3() {
       <a className="v3-ann" href="/store-audit">New · Selfmade now builds &amp; runs your Shopify store — on autopilot →</a>
 
       <nav className="v3-nav"><div className="v3-shell v3-nav-in">
-        <a className="v3-brand" href="/"><span className="v3-mark"><V3Mark size={24} /></span> Selfmade</a>
+        <a className="v3-brand" href="/"><V3Logo /></a>
         <div className="v3-links">
           <div className="v3-drop">
             <button type="button" className="v3-dropbtn">Product <span className="v3-caret">▾</span></button>
