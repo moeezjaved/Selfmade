@@ -21,6 +21,9 @@ function img(url: any, alt: string, cls: string, label?: string): string {
   return `<div class="${cls} ph">${esc(label || 'Image')}</div>`
 }
 
+// Heading with a **highlighted** phrase → accent-colored span (Atlas two-tone headings).
+const hl = (s: any) => esc(String(s ?? '')).replace(/\*\*([^*]+)\*\*/g, '<span class="hl">$1</span>')
+
 // A UGC card: a real uploaded <video>, else a poster image with a play badge.
 function mediaCard(u: any, poster: any, name: string): string {
   const isVid = typeof u === 'string' && /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u)
@@ -108,12 +111,40 @@ const CSS = `
 .pgbld h2.sec{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--ink);text-align:center;margin:0 0 8px}
 .pgbld .seclead{text-align:center;color:var(--muted);font-size:16px;max-width:640px;margin:0 auto 26px}
 .pgbld .feat{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center;padding:48px 0}
-.pgbld .feat:nth-of-type(even) .fimg{order:2}
+.pgbld .feat.rev .fimg{order:2}
+/* as seen on band */
+.pgbld .seenband{padding:46px 0 34px;text-align:center}
+.pgbld .seenband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0}
+.pgbld .logos{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px 48px;margin-top:26px}
+.pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase}
+/* pink gradient CTA band */
+.pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
+.pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}
+.pgbld .pinkband p{font-size:17px;color:rgba(255,255,255,.92);max-width:660px;margin:0 auto 26px}
+.pgbld .pinkband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:16px 40px;font-weight:800;font-size:17px}
+.pgbld .pcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
+.pgbld .pcard{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:16px;padding:24px 18px;font-size:15px;font-weight:600;text-align:center;color:#fff}
+/* comparison on a gradient band (Atlas 'what makes us different') */
+.pgbld .cmpband{background:var(--grad);color:#fff;padding:56px 0;margin:26px 0}
+.pgbld .cmpband .in{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.pgbld .cmpband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 14px;text-align:left}
+.pgbld .cmpband h2 .hl{color:#fff;font-style:italic;opacity:.85}
+.pgbld .cmpband p{color:rgba(255,255,255,.9);font-size:16px;margin:0 0 22px}
+.pgbld .cmpband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:15px 40px;font-weight:800;font-size:16px}
+.pgbld .ctab{position:relative}
+.pgbld .ctab .ch2{display:grid;grid-template-columns:1fr 96px 96px;margin-bottom:4px}
+.pgbld .ctab .ch2>div{text-align:center;font-weight:800;font-size:15px;padding:6px 0}
+.pgbld .ctab .cr2{display:grid;grid-template-columns:1fr 96px 96px;align-items:center;padding:12px 0;border-top:1px solid rgba(255,255,255,.18)}
+.pgbld .ctab .cr2 .lab{display:flex;align-items:center;gap:12px;font-weight:600}
+.pgbld .ctab .cr2 .lab::before{content:"\\2713";width:22px;height:22px;border-radius:50%;background:#fff;color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;flex:none}
+.pgbld .ctab .cr2 .yes,.pgbld .ctab .cr2 .no{text-align:center;font-size:16px;font-weight:800}
+.pgbld .ctab .usbox{position:absolute;top:0;bottom:0;right:96px;width:96px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:16px;pointer-events:none}
 .pgbld .fimg,.pgbld .fimg.ph{border-radius:20px;aspect-ratio:4/3;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
-.pgbld .feat h2{font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 12px;text-align:left}
-.pgbld .fbul{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px}
-.pgbld .fbul li{position:relative;padding-left:30px;font-size:15px}
-.pgbld .fbul li::before{content:"\\2713";position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:#eafaf2;color:var(--good);font-size:11px;font-weight:800;display:grid;place-items:center}
+.pgbld .feat h2{font-size:clamp(22px,2.8vw,32px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 12px;text-align:left;line-height:1.1}
+.pgbld .feat h2 .hl{color:var(--accent2)}
+.pgbld .fbul{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:14px}
+.pgbld .fbul li{position:relative;padding-left:32px;font-size:15.5px}
+.pgbld .fbul li::before{content:"\\2713";position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:linear-gradient(100deg,#fbeaf5,#efe6ff);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;border:1px dashed #e2b7d5}
 .pgbld .seen{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:20px;opacity:.55;font-weight:800;color:var(--muted)}
 /* stats */
 .pgbld .stats{background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:48px 0}
@@ -159,10 +190,27 @@ const CSS = `
 .pgbld .tcard .lab{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent)}
 .pgbld .tcard h3{font-size:18px;font-weight:800;color:var(--ink);margin:8px 0 6px}
 .pgbld .tcard p{margin:0;font-size:14px}
-/* faq */
-.pgbld .faq{max-width:760px;margin:0 auto;padding:8px 0}
-.pgbld .faq .q{font-weight:800;color:var(--ink);font-size:16.5px;margin:18px 0 4px}
-.pgbld .faq .a{margin:0}
+/* transform gradient band */
+.pgbld .transband{background:var(--grad);color:#fff;padding:56px 0;margin:26px 0}
+.pgbld .transband .in{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.pgbld .transband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 20px;text-align:left}
+.pgbld .transband h2 .hl{color:#fff;font-style:italic;opacity:.9}
+.pgbld .tlist{display:flex;flex-direction:column;gap:4px}
+.pgbld .titem{padding:16px 0;border-top:1px solid rgba(255,255,255,.2)}
+.pgbld .titem:first-child{border-top:0}
+.pgbld .titem .tlab{display:inline-block;background:#fff;color:var(--ink);font-size:12px;font-weight:800;padding:3px 12px;border-radius:100px;margin-bottom:8px}
+.pgbld .titem h3{font-size:19px;font-weight:800;color:#fff;margin:0 0 4px}
+.pgbld .titem p{margin:0;font-size:14.5px;color:rgba(255,255,255,.9)}
+.pgbld .timg,.pgbld .timg.ph{border-radius:20px;aspect-ratio:1/1;object-fit:cover;width:100%}
+/* faq accordion (numbered) */
+.pgbld .faqacc{max-width:820px;margin:0 auto;padding:8px 0;display:flex;flex-direction:column;gap:12px}
+.pgbld .fq{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pgbld .fq summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:14px;padding:18px 20px;font-weight:700;color:var(--ink);font-size:16px}
+.pgbld .fq summary::-webkit-details-marker{display:none}
+.pgbld .fq summary::after{content:"+";margin-left:auto;font-size:22px;font-weight:700;color:var(--muted)}
+.pgbld .fq[open] summary::after{content:"\\2013"}
+.pgbld .fq .fn{width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--ink);flex:none}
+.pgbld .fq .fqa{padding:0 20px 18px 62px;color:var(--body);font-size:14.5px}
 /* float bar */
 .pgbld .floatcta{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -10px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(18px,calc((100% - 1160px)/2 + 22px));transition:transform .28s ease}
 .pgbld .floatcta.hide{transform:translateY(115%)}
@@ -170,7 +218,7 @@ const CSS = `
 .pgbld .fc-thumb{width:44px;height:44px;border-radius:9px;flex:none;object-fit:cover}
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
 .pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
-@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat:nth-of-type(even) .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}}
 @media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
 `
 
@@ -187,7 +235,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="us"><span class="yes">✓</span></div><div><span class="no">✕</span></div></div>`).join('')
   const revs = arr(c.testimonials).map((t) => `<div class="gcard"><div class="av">${esc(String(t.name || 'A').trim().charAt(0).toUpperCase() || 'A')}</div><div><div class="st">${stars}</div><div class="rt">${esc((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="who">${esc(t.name)}</div></div></div>`).join('')
   const trio = arr(c.transform_items).map((t, i) => `<div class="tcard"><div class="lab">${esc((t as any).lab || ['First','Second','Third'][i] || 'Benefit')} benefit</div><h3>${esc(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
-  const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
+  const faqs = arr(c.faqs).map((f, i) => `<details class="fq"><summary><span class="fn">${i + 1}</span><span class="fqq">${esc(f.q)}</span></summary><div class="fqa">${esc(f.a)}</div></details>`).join('')
 
   return `
   <div class="pgbld">
@@ -236,29 +284,30 @@ function render(c: FilledContent, o: RenderOpts): string {
     </div>
   </div></div>
 
-  <div class="wrap">
-    <section class="feat">
-      ${img(c.image_feature_1, o.productName, 'fimg', 'Lifestyle')}
-      <div>
-        <h2>${esc(c.feature_1_head)}</h2>
-        ${rt(c.feature_1_body)}
-        <ul class="fbul">${f1bul}</ul>
-        <div class="seen">${esc(c.as_seen_on || 'As seen on')} <span>FORBES</span><span>VOGUE</span><span>ELLE</span></div>
-      </div>
-    </section>
-    <section class="feat">
-      ${img(c.image_feature_2, o.productName, 'fimg', 'In use')}
-      <div>
-        <h2>${esc(c.feature_2_head)}</h2>
-        ${rt(c.feature_2_body)}
-        <ul class="fbul">${f2bul}</ul>
-        <a class="buy grad" style="max-width:220px;margin-top:20px" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Add to cart')}</a>
-      </div>
-    </section>
-  </div>
+  <div class="wrap"><section class="feat">
+    ${img(c.image_feature_1, o.productName, 'fimg', 'Lifestyle')}
+    <div><h2>${hl(c.feature_1_head)}</h2>${rt(c.feature_1_body)}<ul class="fbul">${f1bul}</ul></div>
+  </section></div>
+
+  <div class="seenband"><div class="wrap">
+    <h2>${esc(c.as_seen_on || 'As seen on')}</h2>
+    <div class="logos"><span>Forbes</span><span>Vogue</span><span>Elle</span><span>Allure</span><span>Bazaar</span></div>
+  </div></div>
+
+  <div class="wrap"><section class="feat rev">
+    ${img(c.image_feature_2, o.productName, 'fimg', 'In use')}
+    <div><h2>${hl(c.feature_2_head)}</h2>${rt(c.feature_2_body)}<ul class="fbul">${f2bul}</ul></div>
+  </section></div>
+
+  <div class="pinkband"><div class="wrap">
+    <h2>${hl(c.pink_head || 'Confidence that starts within')}</h2>
+    <p>${esc(c.pink_sub)}</p>
+    <a class="bag" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Add to cart')}</a>
+    <div class="pcards">${arr(c.pink_items).map((i) => `<div class="pcard">${escp(i.label)}</div>`).join('')}</div>
+  </div></div>
 
   <div class="stats"><div class="wrap">
-    <h2 class="sec">${esc(c.stats_head || 'The reason customers choose us again and again')}</h2>
+    <h2 class="sec">${hl(c.stats_head || 'The reason customers choose us **again and again**')}</h2>
     <p class="seclead">${esc(c.stats_sub)}</p>
     <div class="statgrid">${stats}</div>
   </div></div>
@@ -266,23 +315,40 @@ function render(c: FilledContent, o: RenderOpts): string {
   <div class="wrap">
     <h2 class="sec" style="margin-top:48px">${esc(c.benefits_head || 'Benefits you\'ll love')}</h2>
     <div class="bgrid">${bene}</div>
+  </div>
 
-    <h2 class="sec" style="margin-top:52px">${esc(c.compare_head || 'What makes us different')}</h2>
-    <p class="seclead">${esc(c.compare_body)}</p>
-    <div class="cmp">
-      <div class="ch"><div>&nbsp;</div><div>${esc(o.productName).split(' ')[0] || 'Us'}</div><div>Others</div></div>
-      ${cmpRows}
+  <div class="cmpband"><div class="wrap"><div class="in">
+    <div>
+      <h2>${hl(c.compare_head || 'What makes us **different**')}</h2>
+      <p>${esc(c.compare_body)}</p>
+      <a class="bag" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Shop now')}</a>
     </div>
+    <div class="ctab">
+      <div class="usbox"></div>
+      <div class="ch2"><div>&nbsp;</div><div>${esc(o.productName).split(' ')[0] || 'Us'}</div><div>Others</div></div>
+      ${arr(c.compare_rows).map((r) => `<div class="cr2"><div class="lab">${escp(r.label)}</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div>`).join('')}
+    </div>
+  </div></div></div>
 
-    <h2 class="sec" style="margin-top:52px">${esc(c.reviews_head || 'Join 10,000+ happy customers')}</h2>
+  <div class="wrap">
+    <h2 class="sec" style="margin-top:20px">${hl(c.reviews_head || 'Join 10,000+ **happy customers**')}</h2>
     <div class="gcar">${revs}</div>
+  </div>
 
-    <h2 class="sec" style="margin-top:44px">${esc(c.transform_head || 'How this will transform your day')}</h2>
-    <div class="trio">${trio}</div>
+  <div class="transband"><div class="wrap"><div class="in">
+    <div>
+      <h2>${hl(c.transform_head || 'How this will transform **your day**')}</h2>
+      <div class="tlist">
+        ${arr(c.transform_items).map((t, i) => `<div class="titem"><span class="tlab">${escp((t as any).label || ((['First', 'Second', 'Third'][i] || 'Next') + ' benefit'))}</span><h3>${escp(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')}
+      </div>
+    </div>
+    ${img(c.image_transform || o.productImage, o.productName, 'timg', 'Lifestyle')}
+  </div></div></div>
 
-    <h2 class="sec" style="margin-top:52px">Frequently asked questions</h2>
+  <div class="wrap">
+    <h2 class="sec" style="margin-top:44px">${hl(c.faq_head || 'Frequently asked **questions**')}</h2>
     <p class="seclead">${esc(c.faq_sub || 'Quick answers to the most common questions.')}</p>
-    <div class="faq">${faqs}</div>
+    <div class="faqacc">${faqs}</div>
 
     <a class="buy grad big" style="margin-top:34px" href="${esc(o.ctaHref)}">${esc(c.final_cta || `Get ${o.productName}`)}</a>
   </div>
@@ -351,7 +417,12 @@ export const productV1: PageTemplate = {
     { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
     { key: 'testimonials', type: 'testimonials', label: 'Reviews', count: 4, hint: 'name, city, quote. Use the "city" field as a SHORT review title.' },
     { key: 'transform_head', type: 'text', label: 'Transform heading' },
+    { key: 'pink_head', type: 'text', label: 'Highlight band heading', hint: 'A punchy benefit headline; wrap the strongest word(s) in **…** to highlight them.' },
+    { key: 'pink_sub', type: 'text', label: 'Highlight band subtext' },
+    { key: 'pink_items', type: 'list', label: 'Highlight band cards', count: 4, hint: 'Each label only: a short benefit sentence.' },
     { key: 'transform_items', type: 'reasons', label: 'Transform trio', count: 3, hint: 'label = 1-2 word tag; title = benefit; body = one sentence.' },
+    { key: 'image_transform', type: 'image', role: 'lifestyle', label: 'Transform section image' },
+    { key: 'faq_head', type: 'text', label: 'FAQ heading', hint: 'e.g. "Frequently asked **questions**".' },
     { key: 'faq_sub', type: 'text', label: 'FAQ subheading' },
     { key: 'faqs', type: 'faq', label: 'FAQ', count: 5, hint: 'Cover results time, safety, usage, shipping, returns.' },
     { key: 'final_cta', type: 'text', label: 'Final button label' },
