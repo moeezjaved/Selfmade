@@ -101,19 +101,26 @@ export default function CatalogPage() {
         {AGENTS.map((a) => {
           const drafts = data.drafts?.[a.key] || []
           const gap = a.gap(h)
+          // `done` only when this agent has a measurable gap (alt / SEO title) and it's now zero.
+          // Null-gap agents (title, tags, collection, page) have no signal, so never show "done".
+          const done = gap === 0
           const expanded = open === a.key
           return (
             <div key={a.key} style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 14, padding: 18, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 200, flex: 1 }}>
                   <div style={{ fontSize: 16, fontWeight: 800 }}>{a.name}
-                    {drafts.length > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: LIME, background: '#fff1ec', borderRadius: 20, padding: '2px 9px', marginLeft: 8 }}>{drafts.length} drafted</span>}
+                    {done
+                      ? <span style={{ fontSize: 12, fontWeight: 800, color: GOOD, background: '#e9f7ee', borderRadius: 20, padding: '2px 9px', marginLeft: 8 }}>Fixed ✓</span>
+                      : drafts.length > 0 && <span style={{ fontSize: 12, fontWeight: 800, color: LIME, background: '#fff1ec', borderRadius: 20, padding: '2px 9px', marginLeft: 8 }}>{drafts.length} drafted</span>}
                   </div>
-                  <div style={{ fontSize: 13, color: SUB, marginTop: 3 }}>{a.blurb}{gap != null ? ` · ${gap} ${a.gapLabel}` : ''}</div>
+                  <div style={{ fontSize: 13, color: SUB, marginTop: 3 }}>{a.blurb}{gap != null && !done ? ` · ${gap} ${a.gapLabel}` : ''}</div>
                 </div>
-                <div style={{ display: 'flex', gap: 10 }}>
+                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
                   {drafts.length > 0 && <button onClick={() => setOpen(expanded ? null : a.key)} style={ghostBtn}>{expanded ? 'Hide' : 'Review'}</button>}
-                  <button onClick={() => draft(a.key)} disabled={!!busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy === `draft:${a.key}` ? 'Drafting…' : drafts.length ? 'Draft more' : 'Draft fixes'}</button>
+                  {done
+                    ? (drafts.length === 0 && <span style={{ fontSize: 13, fontWeight: 700, color: GOOD }}>All fixed</span>)
+                    : <button onClick={() => draft(a.key)} disabled={!!busy} style={{ ...primaryBtn, opacity: busy ? 0.6 : 1 }}>{busy === `draft:${a.key}` ? 'Drafting…' : drafts.length ? 'Draft more' : 'Draft fixes'}</button>}
                 </div>
               </div>
 
