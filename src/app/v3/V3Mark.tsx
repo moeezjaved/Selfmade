@@ -3,7 +3,7 @@
  *
  * V3Mark — the symbol: THREE separate dumbbell shapes (a bar with a round node at each end) arranged
  * at 120°, with three gaps between them (it is NOT a closed ring — matches the supplied logo). Renders
- * in `currentColor`; animates Firecrawl-style — the whole mark rotates slowly and the nodes pulse.
+ * in `currentColor`. Static (no animation) — the spin softened the edges when the mark rotated.
  * V3Wordmark — the "Selfmade" wordmark in the brand's own font, from /logo.png via a CSS mask so it can
  * be recolored. V3Logo — mark + wordmark together, so every page shows the exact same logo.
  * Self-contained + reduced-motion-safe. Pure/presentational — safe in server or client components.
@@ -18,23 +18,15 @@ const NODES = [0, 60, 120, 180, 240, 300].map(P)
 export function V3Mark({ size = 26 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 100 100" className="v3mark" aria-hidden="true" style={{ display: 'block', color: 'inherit', overflow: 'visible' }}>
-      <style>{`
-        .v3mark .v3mark-g{transform-origin:50px 50px;animation:v3mark-spin 22s linear infinite}
-        .v3mark circle{animation:v3mark-pulse 2.4s ease-in-out infinite}
-        @keyframes v3mark-spin{to{transform:rotate(360deg)}}
-        @keyframes v3mark-pulse{0%,100%{opacity:.55}50%{opacity:1}}
-        @media(prefers-reduced-motion:reduce){.v3mark .v3mark-g,.v3mark circle{animation:none}}
-      `}</style>
-      <g className="v3mark-g">
-        <g fill="none" stroke="currentColor" strokeWidth={12} strokeLinecap="round">
-          {ARCS.map(([a, b], i) => {
-            const [x1, y1] = P(a), [x2, y2] = P(b)
-            return <line key={i} x1={x1.toFixed(2)} y1={y1.toFixed(2)} x2={x2.toFixed(2)} y2={y2.toFixed(2)} />
-          })}
-        </g>
-        <g fill="currentColor">
-          {NODES.map((p, i) => <circle key={i} cx={p[0].toFixed(2)} cy={p[1].toFixed(2)} r={12} style={{ animationDelay: `${i * 0.3}s` }} />)}
-        </g>
+      {/* Static (no animation) — the spin softened the edges when rotated. */}
+      <g fill="none" stroke="currentColor" strokeWidth={12} strokeLinecap="round">
+        {ARCS.map(([a, b], i) => {
+          const [x1, y1] = P(a), [x2, y2] = P(b)
+          return <line key={i} x1={x1.toFixed(2)} y1={y1.toFixed(2)} x2={x2.toFixed(2)} y2={y2.toFixed(2)} />
+        })}
+      </g>
+      <g fill="currentColor">
+        {NODES.map((p, i) => <circle key={i} cx={p[0].toFixed(2)} cy={p[1].toFixed(2)} r={12} />)}
       </g>
     </svg>
   )
@@ -58,7 +50,7 @@ export function V3Wordmark({ height = 19, color = '#0d0d0d' }: { height?: number
 }
 
 /** Full logo lockup — the mark + the wordmark. One component so the logo is identical on every page. */
-export function V3Logo({ markSize = 32, wordHeight = 23, markColor = '#ff5a2c', wordColor = '#0d0d0d' }: {
+export function V3Logo({ markSize = 34, wordHeight = 27, markColor = '#ff5a2c', wordColor = '#0d0d0d' }: {
   markSize?: number; wordHeight?: number; markColor?: string; wordColor?: string
 }) {
   return (
