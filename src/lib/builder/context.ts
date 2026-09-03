@@ -4,8 +4,22 @@
  * one image-download path. Everything here is best-effort: a missing brand or a dead image URL degrades
  * gracefully (never throws), because a page must still generate for a brand-new store.
  */
-import { generateImage, geminiImageMime, type ImageInput } from '@/lib/gemini/image'
+import { generateImage, geminiImageMime, describeProduct, type ImageInput } from '@/lib/gemini/image'
 import { uploadBufferToR2 } from '@/lib/r2'
+
+/**
+ * What the product ACTUALLY is, read from its own photo (vision) — e.g. "light pink graphic t-shirt".
+ * This is the single most important grounding signal: it stops the copy from drifting to the brand's
+ * category when the product is something else. Best-effort — null if there's no image or vision fails.
+ */
+export async function productVision(imageUrl: string | null | undefined): Promise<string | null> {
+  if (!imageUrl) return null
+  try {
+    const ref = await fetchImageInput(imageUrl)
+    if (!ref) return null
+    return await describeProduct(ref)
+  } catch { return null }
+}
 
 /** The real brand voice we ground copy in — tone/USPs from the brand row + the remembered category. */
 export interface BrandVoice {

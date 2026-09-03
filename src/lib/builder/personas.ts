@@ -8,7 +8,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { llm } from '@/lib/llm'
 import { getBuilderProduct } from './products'
-import { loadBrandVoice, voiceBrief, slugify, parseJsonObject } from './context'
+import { loadBrandVoice, voiceBrief, productVision, slugify, parseJsonObject } from './context'
 
 export interface BuilderAngle { id: string; title: string; promise: string }
 export interface BuilderPersona { id: string; name: string; description: string; angles: BuilderAngle[] }
@@ -18,33 +18,37 @@ export async function generatePersonas(
   args: { productId: string; brandId?: string | null; research?: string },
 ): Promise<{ personas: BuilderPersona[] }> {
   const admin = createAdminClient()
-  const [product, voice] = await Promise.all([
-    getBuilderProduct(userId, args.productId, args.brandId ?? null),
+  const product = await getBuilderProduct(userId, args.productId, args.brandId ?? null)
+  const [voice, vision] = await Promise.all([
     loadBrandVoice(admin, userId, args.brandId ?? null),
+    productVision(product?.image || product?.images?.[0] || null),
   ])
 
   const productBlock = product
     ? [
         `Title: ${product.title}`,
+        vision && `What it actually is (read from its photo): ${vision}`,
         product.price && `Price: ${product.price}`,
         product.description && `Description: ${product.description}`,
       ].filter(Boolean).join('\n')
     : 'No product data available.'
   const research = (args.research || '').trim().slice(0, 4000)
 
-  const sys = `You are a senior DTC direct-response strategist. From the REAL product and brand voice below, propose the target CUSTOMERS and the marketing ANGLES a high-converting landing page could be built around.
+  const sys = `You are a senior DTC direct-response strategist. Propose the target CUSTOMERS and marketing ANGLES a high-converting landing page for the PRODUCT below could be built around.
 
-${voiceBrief(voice)}
-
-PRODUCT (ground everything in this — do NOT invent ingredients, results, or claims it doesn't support):
+THE PRODUCT IS THE SUBJECT — build the personas around who actually buys and loves THIS product (from its title, its photo, and its description). Do NOT invent ingredients, results, or claims it doesn't support.
+PRODUCT:
 ${productBlock}
 ${research ? `\nADDITIONAL RESEARCH the founder pasted (use it, but stay honest):\n${research}` : ''}
 
+Brand voice (use ONLY for tone/style — NOT for what the product is; if the brand's category differs from the product above, follow the PRODUCT):
+${voiceBrief(voice)}
+
 Rules:
 - Return 1-2 distinct personas (2 only if the product genuinely serves two different buyers).
-- Each persona: a short human "name" label (e.g. "Busy new moms"), and a one-sentence description of who they are + their core pain.
-- Each persona has 3-4 angles. An angle = a single marketing hook this specific buyer responds to: a "title" (a few words, e.g. "The 5-minute morning fix") and a "promise" (one honest sentence on the transformation, supported by the product).
-- Be specific to THIS product and category. No generic filler. Never promise outcomes the product can't deliver.
+- Each persona: a short human "name" label (e.g. "Busy new moms"), and a one-sentence description of who they are + their core desire/pain AS IT RELATES TO THIS PRODUCT.
+- Each persona has 3-4 angles. An angle = a single marketing hook this buyer responds to: a "title" (a few words) and a "promise" (one honest sentence on the value, supported by the product).
+- Be specific to THIS exact product (e.g. a graphic t-shirt's buyers care about the design/vibe/fit — not the brand's other categories). No generic filler.
 
 Return ONLY JSON:
 {"personas":[{"name":"...","description":"...","angles":[{"title":"...","promise":"..."}]}]}`
