@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect, useRef, type FormEvent } from 'react'
-import PricingSection from '@/components/pricing/PricingSection'
+import { V3Mark } from './V3Mark'
+import { V3Pricing } from './V3Pricing'
 
 const CSS = `
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -14,8 +15,9 @@ const CSS = `
 .v3-ann{background:var(--orange);color:#fff;text-align:center;font-size:13.5px;font-weight:600;padding:10px 16px}
 .v3-nav{position:sticky;top:0;z-index:40;background:rgba(250,248,243,.86);backdrop-filter:saturate(180%) blur(10px);border-bottom:1px solid var(--hair)}
 .v3-nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
-.v3-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
+.v3-brand{display:flex;align-items:center;gap:9px;font-weight:800;font-size:19px;letter-spacing:-.02em}
 .v3-spark{color:var(--orange)}
+.v3-mark{color:var(--orange);display:inline-flex}
 .v3-links{display:flex;align-items:center;gap:28px;font-size:14.5px;font-weight:600;color:var(--soft)}
 .v3-links>a:hover{color:var(--ink)}
 .v3-drop{position:relative}
@@ -351,7 +353,7 @@ export default function LandingV3() {
       <a className="v3-ann" href="/store-audit">New · Selfmade now builds &amp; runs your Shopify store — on autopilot →</a>
 
       <nav className="v3-nav"><div className="v3-shell v3-nav-in">
-        <a className="v3-brand" href="/"><span className="v3-spark">✦</span> Selfmade</a>
+        <a className="v3-brand" href="/"><span className="v3-mark"><V3Mark size={24} /></span> Selfmade</a>
         <div className="v3-links">
           <div className="v3-drop">
             <button type="button" className="v3-dropbtn">Product <span className="v3-caret">▾</span></button>
@@ -497,7 +499,7 @@ export default function LandingV3() {
       {/* PRICING — on the landing itself, visible with no login/signup */}
       <section id="pricing" className="v3-price v3-sec"><div className="v3-shell">
         <div className="v3-sec-head rev"><div className="v3-eye">✦ Pricing</div><h2 className="v3-sec-h">Start free. Go full-time when you&apos;re ready.</h2><p className="v3-sec-p">One flat plan runs your ads, SEO, website &amp; store — you only pay for the media you make.</p></div>
-        <div className="rev"><PricingSection variant="landing" /></div>
+        <div className="rev"><V3Pricing /></div>
       </div></section>
 
       {/* STATEMENT */}

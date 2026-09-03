@@ -8,7 +8,8 @@
 import type { Metadata } from 'next'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import PricingSection from '@/components/pricing/PricingSection'
+import { V3Mark } from '@/app/v3/V3Mark'
+import { V3Pricing } from '@/app/v3/V3Pricing'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +34,7 @@ const CSS = `
 .pg-nav-in{display:flex;align-items:center;justify-content:space-between;height:64px}
 .pg-brand{display:flex;align-items:center;gap:8px;font-weight:800;font-size:19px;letter-spacing:-.02em}
 .pg-spark{color:var(--orange)}
+.pg-mark{color:var(--orange);display:inline-flex}
 .pg-links{display:flex;align-items:center;gap:28px;font-size:14.5px;font-weight:600;color:var(--soft)}
 .pg-links>a:hover,.pg-links>a.on{color:var(--ink)}
 .pg-links>a.on{color:var(--orange)}
@@ -107,7 +109,7 @@ export default async function PricingPage() {
       <style dangerouslySetInnerHTML={{ __html: CSS }} />
 
       <nav className="pg-nav"><div className="pg-shell pg-nav-in">
-        <a className="pg-brand" href="/"><span className="pg-spark">✦</span> Selfmade</a>
+        <a className="pg-brand" href="/"><span className="pg-mark"><V3Mark size={24} /></span> Selfmade</a>
         <div className="pg-links">
           <Menu label="Product" items={PRODUCT} />
           <Menu label="Solutions" items={SOLUTIONS} />
@@ -124,7 +126,7 @@ export default async function PricingPage() {
       </header>
 
       <main className="pg-body">
-        <PricingSection variant="landing" />
+        <V3Pricing />
       </main>
 
       <footer className="pg-foot"><div className="pg-shell pg-foot-in">
