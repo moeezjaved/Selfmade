@@ -731,9 +731,10 @@ export default function BuilderPage() {
                         <textarea value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} rows={4} style={{ ...editArea, marginTop: 10 }} />
                       ) : s.type === 'number' ? (
                         <input type="number" value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value === '' ? '' : Number(e.target.value))} style={{ ...editInput, marginTop: 10, maxWidth: 160 }} />
+                      ) : s.type === 'image' ? (
+                        <ImageEditor value={typeof val === 'string' ? val : ''} onChange={(url) => setField(s.key, url)} />
                       ) : (
-                        // text + image (image = the URL)
-                        <input value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} placeholder={s.type === 'image' ? 'Image URL' : ''} style={{ ...editInput, marginTop: 10 }} />
+                        <input value={String(val ?? '')} onChange={(e) => setField(s.key, e.target.value)} style={{ ...editInput, marginTop: 10 }} />
                       )}
                     </div>
                   )
@@ -865,6 +866,64 @@ export default function BuilderPage() {
       {toast && (
         <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 120, background: INK, color: '#fff', padding: '12px 20px', borderRadius: 999, fontSize: 13.5, fontWeight: 600, boxShadow: '0 16px 40px -12px rgba(0,0,0,.4)' }}>{toast}</div>
       )}
+    </div>
+  )
+}
+
+/* ── image slot editor: keep the current image, upload your own, or generate one with AI ── */
+function ImageEditor({ value, onChange }: { value?: string; onChange: (url: string) => void }) {
+  const [busy, setBusy] = useState<'upload' | 'gen' | null>(null)
+  const [prompt, setPrompt] = useState('')
+  const [err, setErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const onFile = async (f: File | null) => {
+    if (!f) return
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { setErr('Please pick a JPEG, PNG, WebP or GIF.'); return }
+    if (f.size > 8 * 1024 * 1024) { setErr('Image must be under 8MB.'); return }
+    setBusy('upload'); setErr('')
+    try {
+      const dataB64 = await new Promise<string>((res, rej) => {
+        const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('read')); r.readAsDataURL(f)
+      })
+      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'upload', dataB64, mimeType: f.type }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Upload failed')
+      onChange(j.url)
+    } catch (e: any) { setErr(e?.message || 'Upload failed') }
+    finally { setBusy(null); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  const generate = async () => {
+    if (!prompt.trim()) { setErr('Describe the image you want first.'); return }
+    setBusy('gen'); setErr('')
+    try {
+      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'generate', prompt: prompt.trim() }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Could not generate')
+      onChange(j.url); setPrompt('')
+    } catch (e: any) { setErr(e?.message || 'Could not generate') }
+    finally { setBusy(null) }
+  }
+
+  const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 14px', fontWeight: 650, fontSize: 13, cursor: 'pointer' }
+  return (
+    <div style={{ marginTop: 10 }}>
+      <input ref={fileRef} type="file" accept="image/*" onChange={(e) => onFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+        <div style={{ width: 96, height: 96, borderRadius: 12, overflow: 'hidden', flex: 'none', background: INSET, border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center' }}>
+          {value ? <img src={value} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 11, color: FAINT }}>No image</span>}
+        </div>
+        <div style={{ flex: 1, minWidth: 220 }}>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => fileRef.current?.click()} disabled={!!busy} style={{ ...btn, opacity: busy ? 0.6 : 1 }}>{busy === 'upload' ? 'Uploading…' : '⬆ Upload'}</button>
+            {value && <button onClick={() => onChange('')} disabled={!!busy} style={btn}>Remove</button>}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe an image to generate…" onKeyDown={(e) => { if (e.key === 'Enter') generate() }} style={{ ...editInput, flex: 1 }} />
+            <button onClick={generate} disabled={!!busy} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{busy === 'gen' ? 'Generating…' : '✨ AI'}</button>
+          </div>
+          {err && <div style={{ fontSize: 12, color: '#9a2b2b', marginTop: 6 }}>{err}</div>}
+        </div>
+      </div>
     </div>
   )
 }
