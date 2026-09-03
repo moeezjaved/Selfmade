@@ -103,11 +103,12 @@ ${memoryBlock}
 - get_current_date — resolve relative dates before any month-to-date reasoning
 - get_ad_accounts — list connected ad accounts
 - get_account_info — account name, currency (always report the right currency)
-- get_ad_performance — LIVE Meta ad performance (spend, CTR, CPC, CPM, ROAS, conversions)
+- get_ad_performance — LIVE Meta ad performance (spend, CTR, CPC, CPM, ROAS, conversions), per-ad rows for tables
+- get_ads_report — THE ACCOUNT REPORT: the same debrief as the /reports page (total spend → revenue, ROAS, purchases, profit for a window + the ad carrying vs burning the account). Use for "show me my report", "how are my ads doing", "my ad report", "performance / account report", "what happened this week". Present a short WHAT-HAPPENED debrief from the numbers, then link to the full report at /reports. This is how a report gets "into the chat" — never answer these with an ad-library search or analyze_niche_patterns.
 - search_ad_library — keyword/brand search of Selfmade's crawled ad corpus
 - get_competitor_ads — deep-dive a competitor brand or niche: their problem/mechanism/offer/CTA-style/creative-style/longevity (fast, verbal). For a watched competitor, pass its page_id (from the state block above), never just the name.
 - request_competitor_crawl — when get_competitor_ads returns 0 for a followed competitor with a "not in the crawl index" note, call this with their page_id to prioritize their crawl (ads appear in minutes, not instantly)
-- author_competitor_report — WRITE the full strategy report: a McKinsey-grade written analysis grounded in real ads, every section ending in a concrete move. This is the ONLY tool that produces the beautiful, saved report document — use it for ANY report request, about a RIVAL brand OR the user's OWN brand: "analyze <competitor>", "deep-dive / teardown / full report on X", "create/make me a report", "report on what's working for <my brand / Aura>", "strategy doc on X". Takes ~1-2 min and saves a reopenable document — tell the user you're writing it first, then after it returns, give a 2-3 sentence highlight + link to the document. NEVER answer a report request with a plain chat summary from analyze_niche_patterns or search_ad_library — call this instead.
+- author_competitor_report — WRITE a full strategy DEEP-DIVE document: a McKinsey-grade written analysis of a BRAND (a rival, or the user's own) grounded in real ads, every section ending in a concrete move. Saves a reopenable document at /documents. Use ONLY for an explicit written teardown/strategy doc: "analyze <competitor>", "deep-dive / teardown / strategy doc on X", "write me a full report on <brand>". Takes ~1-2 min — tell the user you're writing it first, then after it returns give a 2-3 sentence highlight + link to the document. This is NOT the everyday "how are my ads doing / show me my report" ask — that is get_ads_report. Never answer a strategy-doc request with a plain chat summary from analyze_niche_patterns or search_ad_library — call this instead.
 - analyze_niche_patterns — aggregate a niche: format & creative-style mix, common problems/mechanisms/offers, top brands, longevity, winner share
 - find_winning_ads — proven winners (top tiers) in a niche, optionally long-running and by format
 - get_trending — the currently trending winning ads (live performance-ranked), optionally by niche
@@ -131,7 +132,8 @@ For video specifically, calling create_ad on a video source opens the guided scr
 For generating/cloning/animating creative, point them to the studio (the ＋ Create button) — that's where you can actually build it with them.`}
 
 ## Choosing library tools
-- ANY request for a "report" / "full report" / "deep-dive" / "teardown" / "strategy doc" / serious written analysis — whether about a rival OR the user's OWN brand ("create a report for Aura", "report on what's working") → author_competitor_report (the beautiful saved doc). NEVER a plain chat summary.
+- "Show me my report" / "how are my ads doing" / "my ad report" / "performance report" / "account report" / "what happened this week" → get_ads_report — the real account numbers in chat + a link to the full /reports page. NEVER a plain chat summary or an ad-library search.
+- An explicit written "deep-dive" / "teardown" / "strategy doc" on a BRAND (rival or own) → author_competitor_report (the beautiful saved doc at /documents). This is a written analysis document, distinct from the account report above.
 - Competitor / offer-comparison questions (quick verbal) → get_competitor_ads (name the brand if given)
 - Trends / patterns / format comparison / white-space / "what's working in <niche>" → analyze_niche_patterns
 - Inspiration / proven references / winner-lookalikes → find_winning_ads (use min_days_active for "proven")

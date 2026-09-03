@@ -6,7 +6,7 @@
  * user's selection comes back as the next chat message. This avoids cross-request
  * blocking (serverless-friendly) while preserving the inline-picker UX.
  */
-import { listAdAccounts, getAccountInfo, getAdPerformance, searchAdLibrary } from './meta-data'
+import { listAdAccounts, getAccountInfo, getAdPerformance, getReportSummary, searchAdLibrary } from './meta-data'
 import { getCompetitorAds, analyzeNichePatterns, findWinningAds } from './library-data'
 import { addMemory } from './memory'
 import { getTrending, listBoards, createBoard, saveAdToBoard, searchMyAssets, watchBrand, unwatchBrand, requestCompetitorCrawl } from './actions'
@@ -52,6 +52,20 @@ export const TOOLS = [
         type: 'object',
         properties: {
           account_id: { type: 'string', description: 'act_xxx id, or omit for the primary account' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_ads_report',
+      description: 'The account REPORT — the exact debrief shown on the /reports page: total spend, revenue, ROAS and purchases for a window, plus which ad is carrying the account and which is burning budget. Use this for ANY request to SEE a report on the user\'s OWN ads / account — "show me my report", "how are my ads doing", "my ad report", "performance report", "account report", "what happened this week/last 14 days". Returns REAL numbers from the connected Meta account (same source as the Reports page, so they always match). Present them as a short WHAT-HAPPENED debrief and then link the user to the full report at /reports. Do NOT answer these with an ad-library search, analyze_niche_patterns, or a raw metric dump — call this instead.',
+      parameters: {
+        type: 'object',
+        properties: {
+          account_id: { type: 'string', description: 'act_xxx id, or omit for the active brand\'s primary account' },
+          date_preset: { type: 'string', enum: ['last_7d', 'last_14d', 'last_28d', 'last_30d', 'last_90d', 'this_month', 'last_month'], description: 'Window, default last_14d (matches the Reports page default).' },
         },
       },
     },
@@ -351,6 +365,7 @@ export const TOOL_LABELS: Record<string, string> = {
   get_ad_accounts: 'Checking your connected ad accounts…',
   get_account_info: 'Getting account info…',
   get_ad_performance: 'Loading live ad performance…',
+  get_ads_report: 'Pulling your ad report…',
   search_ad_library: 'Searching the ad library…',
   get_competitor_ads: 'Analyzing competitor ads…',
   analyze_niche_patterns: 'Analyzing niche patterns…',
@@ -463,6 +478,8 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return await getAccountInfo(ctx.userId, args.account_id)
     case 'get_ad_performance':
       return await getAdPerformance(ctx.userId, args)
+    case 'get_ads_report':
+      return await getReportSummary(ctx.userId, { accountId: args.account_id, date_preset: args.date_preset })
     case 'search_ad_library':
       return await searchAdLibrary(args)
     case 'get_competitor_ads':
@@ -617,6 +634,10 @@ export function formatToolResult(name: string, result: any): { sub_item?: any; i
   }
   if (name === 'get_ad_performance') {
     return { icon: 'chart', sub_item: { label: `Loaded ${result?.count ?? 0} ${result?.level || 'ad'}(s)` } }
+  }
+  if (name === 'get_ads_report') {
+    const cur = result?.currency || ''
+    return { icon: 'chart', sub_item: { label: result?.spend != null ? `${cur} ${result.spend} → ${cur} ${result.revenue} · ${result.roas}x` : 'Report ready' } }
   }
   if (name === 'search_ad_library' || name === 'find_winning_ads') {
     return { icon: 'search', sub_item: { label: `Found ${result?.count ?? 0} ad(s)` } }
