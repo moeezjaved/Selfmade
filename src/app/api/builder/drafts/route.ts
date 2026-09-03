@@ -30,6 +30,9 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       pageId: row.id, previewHtml, status: row.status,
       productName: row.product_name, templateId: row.template_id, shopifyUrl: row.shopify_url,
+      // for the inline editor: the saved copy + the template's editable slots
+      content: row.content || {},
+      schema: tpl.schema.map((s) => ({ key: s.key, type: s.type, label: s.label, hint: s.hint })),
     })
   }
 
