@@ -121,6 +121,11 @@ const CSS = `
 .pgbld .frev .loc{font-size:13px;color:rgba(255,255,255,.85)}
 .pgbld .frev .st{color:#ffd24a;font-size:14px;margin-top:2px}
 .pgbld .frev .q{font-size:15px;line-height:1.55;color:rgba(255,255,255,.95)}
+/* trust + UGC live INSIDE the buy-box column (Atlas placement) — compact them */
+.pgbld .buybox .trust{justify-content:space-between;gap:10px;padding:14px 0;margin-top:16px;background:none}
+.pgbld .buybox .ugc{padding:22px 0 4px}
+.pgbld .buybox .ugc .top h2{font-size:20px}
+.pgbld .buybox .frev{grid-template-columns:1fr;gap:12px;padding:18px 20px}
 /* trust row */
 .pgbld .trust{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 44px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 22px;background:var(--paper)}
 .pgbld .trust .ti{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink)}
@@ -308,6 +313,20 @@ function render(c: FilledContent, o: RenderOpts): string {
         <a class="buy grad" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Add to cart')}</a>
         <div class="pay">${PAYICONS}</div>
         <div class="social">${esc(c.social_line || 'Loved by thousands of happy customers')}</div>
+        <div class="trust">${trust}</div>
+        <div class="ugc">
+          <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
+          <div class="wall">
+            ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${mediaCard(u, o.productImage, o.productName)}</div>`).join('')}
+          </div>
+          ${(() => { const t0 = arr(c.testimonials)[0] || {}; return t0.quote ? `<div class="frev">
+            <div class="who">
+              <div class="av">${img((c.image_rev1 as any) || o.productImage, esc(t0.name), '')}</div>
+              <div><div class="nm">${esc(t0.name)} <span class="chk">✓</span></div><div class="loc">${esc(t0.city)}</div><div class="st">${stars}</div></div>
+            </div>
+            <div class="q">${esc(t0.quote)}</div>
+          </div>` : '' })()}
+        </div>
         <div class="acc">
           <details open><summary>How to use</summary><div class="body">${esc(c.howto_body)}</div></details>
           <details><summary>Shipping &amp; delivery</summary><div class="body">${esc(c.shipping_body)}</div></details>
@@ -317,22 +336,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     </div>
   </div>
 
-  <div class="trust">${trust}</div>
   <div class="marq"><div class="marq-track">${marqOne}${marqOne}</div></div>
-
-  <div class="wrap"><div class="ugc">
-    <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
-    <div class="wall">
-      ${[c.image_ugc1, c.image_ugc2, c.image_ugc3, c.image_ugc4, c.image_ugc5].map((u) => `<div class="vc">${mediaCard(u, o.productImage, o.productName)}</div>`).join('')}
-    </div>
-    ${(() => { const t0 = arr(c.testimonials)[0] || {}; return t0.quote ? `<div class="frev">
-      <div class="who">
-        <div class="av">${img((c.image_rev1 as any) || o.productImage, esc(t0.name), '')}</div>
-        <div><div class="nm">${esc(t0.name)} <span class="chk">✓</span></div><div class="loc">${esc(t0.city)}</div><div class="st">${stars}</div></div>
-      </div>
-      <div class="q">${esc(t0.quote)}</div>
-    </div>` : '' })()}
-  </div></div>
 
   <div class="wrap"><section class="feat">
     ${img(c.image_feature_1, o.productName, 'fimg', 'Lifestyle')}
