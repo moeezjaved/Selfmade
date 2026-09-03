@@ -7,7 +7,7 @@
  * keeps every generated page on-template and high-converting.
  */
 
-export type TemplateType = 'advertorial' | 'listicle'
+export type TemplateType = 'advertorial' | 'listicle' | 'product' | 'home'
 
 /** The kinds of slot the AI fills. */
 export type SlotType =
