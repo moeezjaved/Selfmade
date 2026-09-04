@@ -104,6 +104,8 @@ const CSS = `
 .pgbld .sf-pill{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:border-color .12s,box-shadow .12s}
 .pgbld .sf-pill:hover{border-color:var(--ink)}
 .pgbld .sf-pill.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pgbld .sf-pill.sf-soldout{opacity:.4;text-decoration:line-through}
+.pgbld .sf-pill.sf-soldout.on{opacity:.65}
 .pgbld .sf-pill.sf-color{padding:7px 14px 7px 8px}
 .pgbld .sf-dot{width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,.14);flex:none;background:#e7e4ee}
 .pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
