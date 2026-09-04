@@ -993,7 +993,7 @@ export default function BuilderPage() {
       {/* ── theme picker modal (Atlas-style: detected from the connected store) ── */}
       {pickerOpen && (
         <div onClick={() => !publishing && setPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,18,15,.45)', display: 'grid', placeItems: 'center', padding: 20 }}>
-          <div onClick={(e) => e.stopPropagation()} style={{ ...CARD, width: 'min(460px, 100%)', padding: 22 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ ...CARD, width: 'min(460px, 100%)', padding: 22, maxHeight: 'calc(100vh - 40px)', overflowY: 'auto' }}>
             <div style={eyebrow}>Publish to Shopify</div>
             <h3 style={{ ...cardTitle, fontSize: 22, marginTop: 4 }}>{needsScopes ? 'One quick step' : 'Where should it go?'}</h3>
             {needsScopes ? (
