@@ -172,19 +172,30 @@ type Setting = { type: string; id: string; label: string; default?: string }
 const TEXT_TAGS = 'h1|h2|h3|h4|h5|h6|p|li|a|button|figcaption|blockquote|summary'
 const hasLiquid = (x: string) => /\{\{|\{%/.test(x)
 
+// Real editable copy, not chrome: must contain a letter/number and be more than a lone symbol. Filters
+// out gallery arrows (‹ ›), check/star/emoji icons (✓ ★ ✦), and stray punctuation.
+const isRealText = (s: string) => /[a-z0-9]/i.test(s) && s.replace(/[^a-z0-9]/gi, '').length >= 2
+
 function editablize(html: string): { html: string; settings: Setting[] } {
   const settings: Setting[] = []
   let tn = 0, imn = 0
   let s = html
+  const addText = (clean: string) => { tn++; const id = `t${tn}`; settings.push({ type: clean.length > 70 ? 'textarea' : 'text', id, label: (clean.slice(0, 38) || `Text ${tn}`), default: clean }); return id }
 
-  // TEXT — pure-text leaves (no nested tags). Skip anything already dynamic.
+  // TEXT pass 1 — pure-text leaves (no nested tags). Skip dynamic bits + icon/arrow noise.
   s = s.replace(new RegExp(`(<(?:${TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${TEXT_TAGS})>)`, 'gi'), (m, open, text, close) => {
     const clean = stripMd(text)
-    if (!clean || hasLiquid(text) || tn >= 20) return m
-    tn++
-    const id = `t${tn}`
-    settings.push({ type: clean.length > 70 ? 'textarea' : 'text', id, label: (clean.slice(0, 38) || `Text ${tn}`), default: clean })
-    return `${open}{{ section.settings.${id} }}${close}`
+    if (!clean || hasLiquid(text) || tn >= 20 || !isRealText(clean)) return m
+    return `${open}{{ section.settings.${addText(clean)} }}${close}`
+  })
+
+  // TEXT pass 2 — headings that still have inner markup (e.g. a two-tone accent <span>). Make them
+  // editable as PLAIN text (the accent styling is dropped in Shopify; edit the styled version in Selfmade).
+  s = s.replace(/<(h[1-6])\b([^>]*)>([\s\S]*?)<\/\1>/gi, (m, tag, attrs, inner) => {
+    if (hasLiquid(inner) || tn >= 20) return m
+    const clean = stripMd(inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '))
+    if (!clean || !isRealText(clean)) return m
+    return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
   // IMAGES — static <img src="url">. Merchant can pick a new image; the original renders as fallback.
