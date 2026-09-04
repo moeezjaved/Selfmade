@@ -224,6 +224,25 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
+  // BUTTON pass — CTA anchors (.buy/.cta/.fc-btn/.btn) get an editable label AND an editable link (a
+  // Shopify `url` setting). The generic text pass below would make only the label editable and leave the
+  // href hard-coded. (On product templates these anchors are already forms, so this mainly hits home /
+  // advertorial / listicle CTAs.)
+  let bn = 0
+  s = s.replace(/<a\b([^>]*)>([^<]{1,120})<\/a>/gi, (m, attrs, label) => {
+    const clean = stripMd(label)
+    if (hasLiquid(m) || !isRealText(clean) || bn >= 4 || tn >= 40) return m
+    if (!/\bclass=["'][^"']*\b(?:buy|cta|fc-btn|btn)\b/i.test(attrs)) return m
+    bn++
+    const urlId = `btn${bn}url`
+    settings.push({ type: 'url', id: urlId, label: `Button ${bn} link` })
+    const orig = (/\shref=["']([^"']*)["']/i.exec(attrs)?.[1] || '#').replace(/'/g, '')
+    const withHref = /\shref=/i.test(attrs)
+      ? attrs.replace(/\shref=["'][^"']*["']/i, ` href="{{ section.settings.${urlId} | default: '${orig}' }}"`)
+      : `${attrs} href="{{ section.settings.${urlId} | default: '${orig}' }}"`
+    return `<a${withHref}>{{ section.settings.${addText(clean)} }}</a>`
+  })
+
   // TEXT pass 1 — pure-text leaves (no nested tags). Skip dynamic bits + icon/arrow noise.
   s = s.replace(new RegExp(`(<(?:${TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${TEXT_TAGS})>)`, 'gi'), (m, open, text, close) => {
     const clean = stripMd(text)
@@ -269,11 +288,36 @@ function editablize(html: string): { html: string; settings: Setting[] } {
 const GALLERY_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var tr=(root&&root.querySelector('.gtrack'))||document.querySelector('.gtrack');if(!tr)return;var scope=tr.closest('.pgbld')||root||document;var dots=[].slice.call(scope.querySelectorAll('.gdots .gdot'));var ths=[].slice.call(scope.querySelectorAll('.thumbs .gthumb'));var n=tr.children.length;if(n<2)return;function cur(){return Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth));}function u(){var i=cur();dots.forEach(function(d,j){d.classList.toggle('on',j===i);});ths.forEach(function(x,j){x.classList.toggle('on',j===i);});}tr.addEventListener('scroll',function(){requestAnimationFrame(u);},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'});});});var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function go(d){var i=((cur()+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});}if(pv)pv.addEventListener('click',function(){go(-1);});if(nx)nx.addEventListener('click',function(){go(1);});var t=setInterval(function(){go(1);},4500);var h=scope.querySelector('.gallery')||tr;h.addEventListener('mouseenter',function(){clearInterval(t);});})();</script>`
 const withGalleryDriver = (html: string): string => (/\bgtrack\b/.test(html) ? html + GALLERY_SCRIPT : html)
 
+// Every section gets a native "Section style" settings group — background, text colour, alignment,
+// spacing and text size — editable in Shopify's theme editor like a real theme. Applied via a scoped
+// {% style %} block on the section's own `.pgbld` root so it can't leak into other sections.
+const SECTION_STYLE_SETTINGS: any[] = [
+  { type: 'header', content: 'Section style' },
+  { type: 'color', id: 'sf_bg', label: 'Background' },
+  { type: 'color', id: 'sf_text', label: 'Text colour' },
+  { type: 'select', id: 'sf_align', label: 'Text alignment', default: 'default', options: [
+    { value: 'default', label: 'Default' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }] },
+  { type: 'select', id: 'sf_space', label: 'Spacing (top & bottom)', default: 'default', options: [
+    { value: 'default', label: 'Theme default' }, { value: '0', label: 'None' }, { value: '24', label: 'Small' }, { value: '48', label: 'Medium' }, { value: '80', label: 'Large' }, { value: '120', label: 'X-Large' }] },
+  { type: 'select', id: 'sf_scale', label: 'Text size', default: '100', options: [
+    { value: '85', label: 'Smaller' }, { value: '100', label: 'Default' }, { value: '115', label: 'Larger' }, { value: '130', label: 'Largest' }] },
+]
+const sectionStyleCss = `{% style %}
+#shopify-section-{{ section.id }} > .pgbld{
+{% if section.settings.sf_bg != blank %}background:{{ section.settings.sf_bg }} !important;{% endif %}
+{% if section.settings.sf_text != blank %}color:{{ section.settings.sf_text }};{% endif %}
+{% if section.settings.sf_align != 'default' %}text-align:{{ section.settings.sf_align }};{% endif %}
+{% if section.settings.sf_space != 'default' %}padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important;{% endif %}
+{% unless section.settings.sf_scale == '100' %}font-size:{{ section.settings.sf_scale }}%;{% endunless %}
+}
+{% endstyle %}`
+
 function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = []): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = name.slice(0, 25)
-  const schema = { name: nm, settings, presets: [{ name: nm }] }
+  const schema = { name: nm, settings: [...settings, ...SECTION_STYLE_SETTINGS], presets: [{ name: nm }] }
   return `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
+${sectionStyleCss}
 ${html}
 {% schema %}
 ${JSON.stringify(schema)}
