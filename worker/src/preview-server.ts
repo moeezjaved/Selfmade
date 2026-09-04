@@ -67,6 +67,35 @@ interface PreviewAd {
 // Render a URL at desktop + mobile viewports and return above-the-fold JPEGs (base64) for the CRO
 // vision audit. Above-the-fold is where 5-second-clarity / CTA / hero-trust live — and it keeps the
 // images small for the vision model.
+// Load a URL in a real (stealth) browser through the IPRoyal residential session and return the
+// rendered DOM. Used by the Page Builder's URL importer for sites that block bare/proxied HTTP fetch.
+async function fetchRenderedHtml(target: string): Promise<{ html: string | null; error?: string }> {
+  const sessionId = randomBytes(4).toString('hex').slice(0, 8)
+  let proxy: { url: string; close: () => Promise<void> } | null = null
+  let browser: Browser | null = null
+  try {
+    if (proxyChainEnabled) proxy = await startProxyChain({ sessionId, lifetime: '5m', country: 'us' })
+    browser = await chromiumExtra.launch({
+      headless: false,
+      args: ['--headless=new', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled', '--disable-gpu'],
+      proxy: proxy ? { server: proxy.url } : undefined,
+    }) as unknown as Browser
+    const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 900 }, locale: 'en-US' })
+    const page = await ctx.newPage()
+    try {
+      await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+      await page.waitForTimeout(1600)   // let JSON-LD + client-rendered product data settle
+      const html = await page.content()
+      return { html: html.slice(0, 3_000_000) }
+    } finally { await ctx.close().catch(() => {}) }
+  } catch (e: any) {
+    return { html: null, error: String(e?.message || e).slice(0, 160) }
+  } finally {
+    if (proxy) await proxy.close().catch(() => {})
+    if (browser) await browser.close().catch(() => {})
+  }
+}
+
 async function captureShots(target: string): Promise<{ desktop: string | null; mobile: string | null; error?: string }> {
   let browser: Browser | null = null
   try {
@@ -142,7 +171,7 @@ const server = createServer(async (req, res) => {
       return
     }
 
-    if (url.pathname !== '/preview' && url.pathname !== '/search' && url.pathname !== '/screenshot') {
+    if (url.pathname !== '/preview' && url.pathname !== '/search' && url.pathname !== '/screenshot' && url.pathname !== '/fetch-html') {
       res.statusCode = 404
       res.end('not found')
       return
@@ -190,6 +219,26 @@ const server = createServer(async (req, res) => {
       res.statusCode = 200
       res.setHeader('Content-Type', 'application/json')
       res.end(JSON.stringify(shots))
+      return
+    }
+
+    // ── Render a page's HTML through a real browser (Playwright + IPRoyal + stealth) for the Page
+    // Builder's URL importer — the last-resort fallback for sites that block bare/proxied fetch
+    // (Amazon, Cloudflare-protected Shopify Plus). Returns the DOM after JS runs, so JSON-LD +
+    // client-rendered product data are present. HTML only — never downloads the page's images/video. ──
+    if (url.pathname === '/fetch-html') {
+      const target = (url.searchParams.get('url') || '').trim()
+      if (!/^https?:\/\//.test(target)) {
+        res.statusCode = 400
+        res.setHeader('Content-Type', 'application/json')
+        res.end(JSON.stringify({ error: 'url required (http/https)' }))
+        return
+      }
+      console.log(`[fetch-html] ${target}`)
+      const out = await fetchRenderedHtml(target)
+      res.statusCode = out.html ? 200 : 502
+      res.setHeader('Content-Type', 'application/json')
+      res.end(JSON.stringify(out))
       return
     }
 

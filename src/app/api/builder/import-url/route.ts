@@ -16,7 +16,7 @@ import type { ImportedProduct } from '@/lib/builder/types'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 60
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
 
@@ -63,6 +63,9 @@ export async function POST(req: NextRequest) {
     let html = await fetchText(url.toString())
     let viaProxy = false
     if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
+    // Last resort for JS-challenge sites (Amazon, Cloudflare-Shopify-Plus): render the HTML in a real
+    // browser on the droplet (Playwright + IPRoyal). HTML only — images/video are never fetched there.
+    if (!html && !shopify) { html = await fetchViaDroplet(url.toString()); if (html) viaProxy = true }
     if (!shopify && !html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
 
     const fromLd = html ? fromJsonLd(html, url) : null
@@ -92,6 +95,23 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Import failed — try again.' }, { status: 502 })
   }
+}
+
+// Render a URL in the droplet's real browser (Playwright + IPRoyal + stealth) — the last resort for
+// JS-challenge sites (Amazon, Cloudflare-Shopify-Plus). Returns the post-JS DOM. HTML only; the droplet
+// never downloads the page's media. No-ops when DROPLET_PREVIEW_URL / PREVIEW_SECRET aren't configured.
+async function fetchViaDroplet(target: string): Promise<string | null> {
+  const base = process.env.DROPLET_PREVIEW_URL, secret = process.env.PREVIEW_SECRET
+  if (!base || !secret) return null
+  try {
+    const u = new URL('/fetch-html', base.replace(/\/$/, ''))
+    u.searchParams.set('url', target)
+    const r = await fetch(u.toString(), { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(45_000) })
+    if (!r.ok) return null
+    const j = await r.json().catch(() => null)
+    const html = j?.html
+    return typeof html === 'string' && html.length > 200 ? html : null
+  } catch { return null }
 }
 
 async function fetchText(u: string, viaProxy = false): Promise<string | null> {
