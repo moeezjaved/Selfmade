@@ -156,6 +156,7 @@ export const EDITOR_JS = `
       +'<button data-cmd="alignright" title="Align right">⇥</button>'
       +'<span class="ed-tsep"></span>'
       +'<button data-cmd="icon" title="Insert an icon">☆</button>'
+      +'<button data-cmd="img" title="Insert an image / logo">🖼</button>'
       +'<button data-cmd="link" title="Add link">🔗</button>'
       +'<button data-cmd="unlink" title="Remove link">✗</button>'
       +'<span class="ed-linkbox"><input type="url" placeholder="https://… or /pages/…"><button data-cmd="applylink">Add</button></span>'
@@ -166,6 +167,7 @@ export const EDITOR_JS = `
       if(c==='applylink'){ ev.preventDefault(); applyLink(); return; }
       if(c==='link'){ ev.preventDefault(); openLinkBox(); return; }
       if(c==='icon'){ ev.preventDefault(); toggleIconBox(); return; }
+      if(c==='img'){ ev.preventDefault(); insertImageAtEditing(); return; }
       if(c==='ins'){ ev.preventDefault(); restoreRange(); document.execCommand('insertText',false,btn.getAttribute('data-ch')); markDirty(); closeIconBox(); return; }
       if(c==='smaller'||c==='bigger'){ ev.preventDefault(); bumpSize(c==='bigger'?1:-1); return; }
       if(c==='alignleft'||c==='aligncenter'||c==='alignright'){ ev.preventDefault(); setAlign(c.slice(5)); return; }
@@ -177,6 +179,18 @@ export const EDITOR_JS = `
     tbInput=tb.querySelector('.ed-linkbox input');
     tbInput.addEventListener('keydown', function(ev){ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); applyLink(); } else if(ev.key==='Escape'){ ev.preventDefault(); closeLinkBox(); } });
     document.body.appendChild(tb); return tb;
+  }
+  // Insert a brand-new image (logo/badge/photo) right after the text you're editing, then open the
+  // Upload / Generate / Swap popover for it (reuses the same flow as any existing image). In a press-logo
+  // row it drops in as a logo; elsewhere as a responsive block image.
+  var IMG_PH='data:image/svg+xml;utf8,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="240" height="96"><rect width="100%" height="100%" rx="10" fill="#efe6ff"/><text x="50%" y="54%" text-anchor="middle" fill="#8b7fb0" font-family="sans-serif" font-size="13">Add image</text></svg>');
+  function insertImageAtEditing(){
+    if(!editing) return;
+    var host=editing, img=document.createElement('img'); img.src=IMG_PH; img.alt='';
+    if(host.classList.contains('plogo') || (host.closest&&host.closest('.logos'))){ img.className='plogo'; }
+    else { img.className='ed-inserted'; img.style.maxWidth='100%'; img.style.height='auto'; img.style.display='block'; img.style.margin='12px 0'; img.style.borderRadius='10px'; }
+    host.insertAdjacentElement('afterend', img);
+    eid(img); markDirty(); stopEdit(); selectImage(img);
   }
   function bumpSize(dir){ if(!editing) return; var cur=parseFloat(getComputedStyle(editing).fontSize)||16; var nv=Math.max(9, Math.min(96, cur+dir*(cur>=28?3:2))); editing.style.fontSize=Math.round(nv)+'px'; markDirty(); }
   function setAlign(a){ if(!editing) return; editing.style.textAlign=a; markDirty(); }
