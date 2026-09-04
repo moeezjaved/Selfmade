@@ -66,10 +66,12 @@ function topLevelChildren(inner: string): string[] {
   return out.filter((s) => s.trim())
 }
 
+const stripMd = (s: string) => String(s || '').replace(/\*\*(.+?)\*\*/g, '$1').replace(/\*/g, '').trim()
+
 /** A human name for a section, inferred from its content so the customizer list is readable. */
 function nameFor(html: string, i: number): string {
   const cls = /class=["']([^"']+)["']/.exec(html)?.[1] || ''
-  const h = /<h[1-3][^>]*>([^<]{2,60})/i.exec(html.replace(/<span[^>]*>|<\/span>/g, ''))?.[1]?.trim()
+  const h = stripMd(/<h[1-3][^>]*>([^<]{2,60})/i.exec(html.replace(/<span[^>]*>|<\/span>/g, ''))?.[1]?.trim() || '')
   if (/\bhero\b/.test(cls)) return 'Hero'
   if (/\bfloatcta\b/.test(cls)) return 'Sticky buy bar'
   if (/\b(faqacc|faq)\b/.test(cls)) return 'FAQ'
@@ -163,12 +165,49 @@ function dynamizeProduct(html: string, mode: DynamicMode): string {
 }
 
 /** Wrap one section's HTML into a Liquid section file, loading the shared CSS + a schema so it's native. */
-function liquidSection(cssKey: string, name: string, html: string): string {
+// ── Editability: lift a section's static text + images into Shopify schema settings, so the merchant can
+// edit the copy and swap images natively in the theme customizer (Atlas-style). Dynamic `{{ product.* }}`
+// bits and loops are left untouched, and elements with nested markup stay static (edited in Selfmade). ──
+type Setting = { type: string; id: string; label: string; default?: string }
+const TEXT_TAGS = 'h1|h2|h3|h4|h5|h6|p|li|a|button|figcaption|blockquote|summary'
+const hasLiquid = (x: string) => /\{\{|\{%/.test(x)
+
+function editablize(html: string): { html: string; settings: Setting[] } {
+  const settings: Setting[] = []
+  let tn = 0, imn = 0
+  let s = html
+
+  // TEXT — pure-text leaves (no nested tags). Skip anything already dynamic.
+  s = s.replace(new RegExp(`(<(?:${TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${TEXT_TAGS})>)`, 'gi'), (m, open, text, close) => {
+    const clean = stripMd(text)
+    if (!clean || hasLiquid(text) || tn >= 20) return m
+    tn++
+    const id = `t${tn}`
+    settings.push({ type: clean.length > 70 ? 'textarea' : 'text', id, label: (clean.slice(0, 38) || `Text ${tn}`), default: clean })
+    return `${open}{{ section.settings.${id} }}${close}`
+  })
+
+  // IMAGES — static <img src="url">. Merchant can pick a new image; the original renders as fallback.
+  s = s.replace(/<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi, (m, pre, src, post) => {
+    if (hasLiquid(m) || imn >= 8 || !/^(https?:|\/\/)/.test(src)) return m
+    imn++
+    const id = `img${imn}`
+    settings.push({ type: 'image_picker', id, label: `Image ${imn}` })
+    const attrs = `${pre}${post}`.replace(/\ssrcset=["'][^"']*["']/i, '')
+    return `{% if section.settings.${id} %}<img${attrs} src="{{ section.settings.${id} | image_url: width: 1600 }}">{% else %}<img${attrs} src="${src}">{% endif %}`
+  })
+
+  return { html: s, settings }
+}
+
+function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = []): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
+  const nm = name.slice(0, 25)
+  const schema = { name: nm, settings, presets: [{ name: nm }] }
   return `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
 ${html}
 {% schema %}
-{"name": ${JSON.stringify(name.slice(0, 25))}, "settings": [], "presets": [{"name": ${JSON.stringify(name.slice(0, 25))}}]}
+${JSON.stringify(schema)}
 {% endschema %}`
 }
 
@@ -183,7 +222,10 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
 
   const sections = parts.map((p, i) => {
     const key = `${slug}-${i + 1}`
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, dynamizeProduct(p.html, dyn)) }
+    // 1) inject product-dynamic Liquid, then 2) lift the remaining static text/images into editable settings.
+    const dynamized = dynamizeProduct(p.html, dyn)
+    const { html, settings } = editablize(dynamized)
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, html, settings) }
   })
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
