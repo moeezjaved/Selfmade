@@ -57,19 +57,27 @@ export async function publishToTheme(store: StoreRow, opts: {
   for (const s of assets.sections) { await put(s.key, s.value); await sleep(140) }   // gentle on the 2 req/s theme limit
   await put(templateKey, assets.templateValue)
 
+  // Use the store's PRIMARY storefront domain for links — the myshopify domain 301-redirects to it and
+  // drops ?preview_theme_id, which breaks draft-theme previews. shop.json's `domain` is the primary.
+  let host = store.shop_domain
+  try { const s = await shopifyRest(store.shop_domain, token, 'shop.json'); if (s?.shop?.domain) host = s.shop.domain } catch {}
+
   // Assign the template to the right products / surface, and compute a link back.
-  let url = `https://${store.shop_domain}/`
+  let path = '/'
   if (opts.kind === 'product') {
     if (opts.target !== 'store') {
       const ids = (opts.productIds || []).map(numericId).filter(Boolean)
       for (const pid of ids) { await shopifyRest(store.shop_domain, token, `products/${pid}.json`, { method: 'PUT', body: { product: { id: Number(pid), template_suffix: suffix } } }).catch(() => {}); await sleep(140) }
       const first = ids[0] ? await shopifyRest(store.shop_domain, token, `products/${ids[0]}.json`).catch(() => null) : null
-      if (first?.product?.handle) url = `https://${store.shop_domain}/products/${first.product.handle}`
+      if (first?.product?.handle) path = `/products/${first.product.handle}`
     } else {
-      url = `https://${store.shop_domain}/collections/all`
+      path = '/collections/all'
     }
   }
 
-  const previewUrl = (opts.themeId && opts.themeLive === false) ? `${url}${url.includes('?') ? '&' : '?'}preview_theme_id=${theme.id}` : undefined
+  const url = `https://${host}${path}`
+  // On a draft theme, hand back a preview link on the PRIMARY domain (survives the redirect) + a theme-
+  // editor deep link as the always-reliable fallback (renders even for unpublished products).
+  const previewUrl = (opts.themeLive === false) ? `${url}${path.includes('?') ? '&' : '?'}preview_theme_id=${theme.id}` : undefined
   return { url, previewUrl, sections: assets.sections.length, themeId: Number(theme.id) }
 }
