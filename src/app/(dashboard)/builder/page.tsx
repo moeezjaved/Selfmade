@@ -318,7 +318,7 @@ export default function BuilderPage() {
       if (live) setChosenTheme(live.id)
     } catch { setThemes([]) }
     finally { setThemesLoading(false) }
-  }, [themes])
+  }, [themes, pageId])
 
   /* ── reopen a saved page (re-rendered server-side) into the preview step ── */
   const [opening, setOpening] = useState<string | null>(null)
