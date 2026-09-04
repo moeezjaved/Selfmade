@@ -174,6 +174,7 @@ export default function FunnelPage() {
   const [auditFunnel, setAuditFunnel] = useState<Step[]>([])
   const [anon, setAnon] = useState<AnonAudit[]>([])
   const [anonCount, setAnonCount] = useState(0)
+  const [recentSignups, setRecentSignups] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [openDomain, setOpenDomain] = useState<string | null>(null)
   const [scans, setScans] = useState<Record<string, any>>({})
@@ -213,6 +214,7 @@ export default function FunnelPage() {
         setAuditFunnel(d.auditFunnel || [])
         setAnon(d.anonymousAudits || [])
         setAnonCount(d.anonymousAuditsCount || 0)
+        setRecentSignups(d.recentSignups || [])
         setLoading(false)
       })
   }, [])
@@ -228,6 +230,53 @@ export default function FunnelPage() {
           <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111', margin: '0 0 4px' }}>Audit → Activation</h2>
           <p style={{ color: '#999', fontSize: '13px', margin: '0 0 16px' }}>Everyone who finished the free audit, and how far they got.</p>
           <FunnelBars steps={auditFunnel} denomLabel="audits" />
+
+          {/* Every recent signup + where they got stuck — so no new account is invisible */}
+          <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e8e8e8', overflow: 'hidden', margin: '8px 0 36px' }}>
+            <div style={{ padding: '18px 20px 8px' }}>
+              <h2 style={{ fontSize: '15px', fontWeight: 700, color: '#111', margin: 0 }}>
+                Recent signups <span style={{ color: '#888' }}>({recentSignups.length.toLocaleString()})</span>
+              </h2>
+              <p style={{ color: '#999', fontSize: '13px', margin: '4px 0 0' }}>Every new account, newest first, and the furthest stage it reached — so you always know what happened to a signup.</p>
+            </div>
+            {recentSignups.length === 0 ? (
+              <div style={{ padding: '24px 20px', color: '#aaa', fontSize: 13 }}>No signups yet.</div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#fafafa', borderTop: '1px solid #f0f0f0', borderBottom: '1px solid #f0f0f0' }}>
+                    {['Email', 'Via', 'Stage', 'Brand', 'Signed up'].map(h => (
+                      <th key={h} style={{ padding: '9px 20px', textAlign: 'left', color: '#999', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentSignups.map((u, i) => {
+                    const S: Record<string, { t: string; c: string; bg: string }> = {
+                      signed_up: { t: 'Signed up', c: '#6b7280', bg: '#f3f4f6' },
+                      audit_started: { t: 'Reached audit', c: '#b45309', bg: '#fef3c7' },
+                      audit_done: { t: 'Completed audit', c: '#1d4ed8', bg: '#dbeafe' },
+                      connected: { t: 'Connected store', c: '#0f766e', bg: '#ccfbf1' },
+                      generated: { t: 'Generated an ad', c: '#7c3aed', bg: '#ede9fe' },
+                      paid: { t: 'Paid', c: '#15803d', bg: '#dcfce7' },
+                    }
+                    const s = S[u.stage] || S.signed_up
+                    return (
+                      <tr key={(u.email || i) + i} style={{ borderBottom: '1px solid #f6f6f6' }}>
+                        <td style={{ padding: '10px 20px', color: '#111', fontWeight: 600 }}>{u.email || '—'}</td>
+                        <td style={{ padding: '10px 20px', color: '#777', textTransform: 'capitalize' }}>{u.provider || 'email'}</td>
+                        <td style={{ padding: '10px 20px' }}><span style={{ fontSize: 11, fontWeight: 700, color: s.c, background: s.bg, borderRadius: 20, padding: '2px 10px' }}>{s.t}</span></td>
+                        <td style={{ padding: '10px 20px', color: '#555' }}>{u.brand || <span style={{ color: '#c3c7c3' }}>—</span>}</td>
+                        <td style={{ padding: '10px 20px', color: '#888' }}>{fmt(u.created_at)}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+              </div>
+            )}
+          </div>
 
           {/* Completed the audit but never signed up */}
           <div style={{ background: '#fff', borderRadius: '12px', border: '1px solid #e8e8e8', overflow: 'hidden', marginBottom: 36 }}>

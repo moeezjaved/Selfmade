@@ -62,9 +62,11 @@ export async function GET(request: NextRequest) {
   // PAYMENT (see paypal grant), so resolve "signed up" by matching the lead email to a registered
   // account — otherwise everyone who signed up but hasn't paid wrongly shows as a non-signup.
   const emailToId = new Map<string, string>()
+  let allUsers: any[] = []
   try {
     const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 })
-    for (const u of (list?.users || [])) if (u.email) emailToId.set(String(u.email).toLowerCase(), u.id)
+    allUsers = list?.users || []
+    for (const u of allUsers) if (u.email) emailToId.set(String(u.email).toLowerCase(), u.id)
   } catch { /* best-effort */ }
   const leadUserId = (l: any): string | null => l.converted_user_id || emailToId.get(String(l.email || '').toLowerCase()) || null
 
@@ -112,6 +114,48 @@ export async function GET(request: NextRequest) {
   const signedUpFromAudit = convertedIds.length
   const pct = (n: number) => (auditsCompleted > 0 ? Math.round((n / auditsCompleted) * 100) : 0)
 
+  // ── EVERY recent signup + the furthest stage they reached — so no new account is invisible. Answers
+  // "this person signed up, what happened to them?" by cross-referencing the account tables. ──
+  const recent = [...allUsers]
+    .sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime())
+    .slice(0, 100)
+  const recentIds = recent.map((u) => u.id)
+  let recentSignups: any[] = []
+  if (recentIds.length) {
+    const [stR, mtR, cgR, subR, asR] = await Promise.all([
+      admin.from('shopify_stores').select('user_id').in('user_id', recentIds),
+      admin.from('meta_accounts').select('user_id').in('user_id', recentIds).eq('status', 'active'),
+      admin.from('creative_generations').select('user_id').in('user_id', recentIds),
+      admin.from('subscriptions').select('owner_id, status').in('owner_id', recentIds),
+      admin.from('activity_logs').select('user_id').eq('action_type', 'AUDIT_STARTED').in('user_id', recentIds),
+    ])
+    const paidSet = new Set((subR.data || []).filter((r: any) => ['active', 'trialing'].includes(String(r.status))).map((r: any) => r.owner_id))
+    const genSet = new Set((cgR.data || []).map((r: any) => r.user_id))
+    const connSet = new Set<string>([...(stR.data || []).map((r: any) => r.user_id), ...(mtR.data || []).map((r: any) => r.user_id)])
+    const startedSet = new Set((asR.data || []).map((r: any) => r.user_id))
+    // user id → their audit lead (a COMPLETED audit), for brand + stage
+    const leadByUser = new Map<string, any>()
+    for (const l of leads) { const uid = leadUserId(l); if (uid) leadByUser.set(uid, l) }
+    const stageOf = (uid: string): string => {
+      if (paidSet.has(uid)) return 'paid'
+      if (genSet.has(uid)) return 'generated'
+      if (connSet.has(uid)) return 'connected'
+      if (leadByUser.has(uid)) return 'audit_done'
+      if (startedSet.has(uid)) return 'audit_started'
+      return 'signed_up'
+    }
+    recentSignups = recent.map((u) => {
+      const lead = leadByUser.get(u.id)
+      return {
+        email: u.email || null,
+        created_at: u.created_at || null,
+        provider: (u.app_metadata?.provider || u.app_metadata?.providers?.[0] || 'email'),
+        stage: stageOf(u.id),
+        brand: lead ? (lead.brand_name || lead.domain || null) : null,
+      }
+    })
+  }
+
   return NextResponse.json({
     // Old M4 ads funnel (kept).
     steps: [
@@ -133,5 +177,7 @@ export async function GET(request: NextRequest) {
     anonymousAudits: anonymousAudits.slice(0, 200),
     auditsCompletedSeo: auditsCompleted,
     auditsCompletedAds: adsCompleted,
+    // Every recent signup + the furthest stage they reached (newest first).
+    recentSignups,
   })
 }
