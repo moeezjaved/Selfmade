@@ -30,7 +30,7 @@ const H = (s: string, sub?: string) =>
 const card = 'background:var(--paper,#faf8fc);border:1px solid var(--line,#eee7f0);border-radius:16px'
 // A visible, CLICKABLE placeholder for image slots the agent couldn't fill — so the section is never a
 // blank/broken <img> (the user clicks it to upload/generate in the editor).
-const IMG_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='500'%3E%3Crect width='1200' height='500' fill='%23f0eaf7'/%3E%3Ctext x='600' y='258' font-family='sans-serif' font-size='30' fill='%23a99fc0' text-anchor='middle'%3E%F0%9F%96%BC Click to add an image%3C/text%3E%3C/svg%3E"
+export const IMG_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='500'%3E%3Crect width='1200' height='500' fill='%23f0eaf7'/%3E%3Ctext x='600' y='258' font-family='sans-serif' font-size='30' fill='%23a99fc0' text-anchor='middle'%3E%F0%9F%96%BC Click to add an image%3C/text%3E%3C/svg%3E"
 
 export const BLOCKS: BlockDef[] = [
   {
