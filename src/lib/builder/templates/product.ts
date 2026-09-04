@@ -91,6 +91,13 @@ const CSS = `
 .pgbld .buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
 .pgbld .buy.big{max-width:520px;margin:8px auto 0}
 .pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
+.pgbld .pdetails{border-top:1px solid var(--line);margin-top:16px}
+.pgbld .pdetails summary{cursor:pointer;list-style:none;padding:14px 0;font-weight:800;color:var(--ink);font-size:14.5px;display:flex;justify-content:space-between;align-items:center}
+.pgbld .pdetails summary::-webkit-details-marker{display:none}
+.pgbld .pdetails summary::after{content:"+";color:var(--muted);font-weight:700;font-size:18px}
+.pgbld .pdetails[open] summary::after{content:"\\2212"}
+.pgbld .pdesc{padding:0 0 16px;color:var(--body);font-size:14px;line-height:1.65}
+.pgbld .pdesc:empty{display:none}
 /* payment icons */
 .pgbld .pay{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
 .pgbld .pay svg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff}
@@ -315,6 +322,7 @@ function render(c: FilledContent, o: RenderOpts): string {
         <div class="pay">${PAYICONS}</div>
         <div class="social">${esc(c.social_line || 'Loved by thousands of happy customers')}</div>
         <div class="trust">${trust}</div>
+        <details class="pdetails"><summary>${esc((c as any).details_label || 'Product details')}</summary><div class="pdesc">${esc((c as any).product_details || (c as any).description || `Full details for ${o.productName}.`)}</div></details>
         <div class="ugc">
           <div class="top"><h2>${esc(c.ugc_head || 'What our customers think')}</h2><div class="socials">${esc(c.ugc_socials || '📷 🎵 ▶️ 📌')}</div></div>
           <div class="wall">

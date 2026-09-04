@@ -116,20 +116,28 @@ export function splitPageIntoSections(body: string): PageSection[] {
 //                             renders its own.
 export type DynamicMode = 'none' | 'cart' | 'full'
 
-// A real variant picker that works WITHOUT section JS (Shopify strips no-JS is fine): for a product with
-// options (size/colour/…) render a <select name="id"> of its variants; single-variant products get a
-// hidden input. The storefront submits the chosen variant id straight to /cart/add.
-const variantSelect =
-  `{% unless product.has_only_default_variant %}` +
-  `<select name="id" class="sf-vselect" aria-label="Choose an option" style="display:block;width:100%;margin:0 0 10px;padding:12px 14px;border:1px solid #e7e4ee;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#181720;cursor:pointer">` +
-  `{% for variant in product.variants %}<option value="{{ variant.id }}"{% unless variant.available %} disabled{% endunless %}{% if variant == product.selected_or_first_available_variant %} selected{% endif %}>{{ variant.title }}{% unless variant.available %} — sold out{% endunless %}</option>{% endfor %}` +
-  `</select>` +
-  `{% else %}<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">{% endunless %}`
+// A proper Shopify product form: per-option pickers (Size / Colour / …), a quantity stepper, and a real
+// Add-to-Cart. A scoped script resolves the chosen variant id and updates the live price + availability;
+// it is no-JS-safe (the hidden id defaults to the first available variant). `withOptions=false` for the
+// slim sticky bar (id + qty only).
+const FORM_JS = `<script>(function(){var f=document.currentScript.closest('form');if(!f)return;var vid=f.querySelector('[data-sf-vid]');var dataEl=f.querySelector('[data-sf-vdata]');if(!vid||!dataEl)return;var variants;try{variants=JSON.parse(dataEl.textContent);}catch(e){return;}var selects=[].slice.call(f.querySelectorAll('.sf-opt'));var priceEl=document.querySelector('[data-sf-price]');var btn=f.querySelector('button[type=submit]');var cur=(window.Shopify&&Shopify.currency&&Shopify.currency.active)||'USD';function pick(){var chosen=selects.map(function(s){return s.value;});var v=variants.filter(function(x){return (x.options||[]).join(' / ')===chosen.join(' / ');})[0]||variants[0];if(!v)return;vid.value=v.id;if(priceEl&&v.price!=null){try{priceEl.textContent=(v.price/100).toLocaleString(undefined,{style:'currency',currency:cur});}catch(e){}}if(btn){if(v.available===false){btn.setAttribute('disabled','');if(!btn.dataset.label)btn.dataset.label=btn.textContent;btn.textContent='Sold out';}else{btn.removeAttribute('disabled');if(btn.dataset.label)btn.textContent=btn.dataset.label;}}}selects.forEach(function(s){s.addEventListener('change',pick);});pick();})();</script>`
 
-const cartForm = (label: string, cls: string, withVariants = true) =>
-  `<form method="post" action="/cart/add" style="margin:0" data-sf-cart>` +
-  (withVariants ? variantSelect : `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">`) +
-  `<button type="submit" class="${cls}">${label.trim() || 'Add to cart'}</button></form>`
+const productForm = (label: string, cls: string, withOptions = true): string => {
+  const iStyle = 'padding:12px 14px;border:1px solid #e7e4ee;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#181720'
+  const pickers = withOptions
+    ? `{% unless product.has_only_default_variant %}<div class="sf-variants" style="display:flex;flex-direction:column;gap:11px;margin:0 0 14px">{% for opt in product.options_with_values %}<label style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:700;color:#181720"><span>{{ opt.name }}</span><select class="sf-opt" data-opt="{{ forloop.index0 }}" style="width:100%;cursor:pointer;${iStyle}">{% for val in opt.values %}<option{% if opt.selected_value == val %} selected{% endif %}>{{ val | escape }}</option>{% endfor %}</select></label>{% endfor %}</div><script type="application/json" data-sf-vdata>{{ product.variants | json }}</script>{% endunless %}`
+    : ''
+  const qty = withOptions
+    ? `<label class="sf-qty" style="display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:13px;font-weight:700;color:#181720"><span>Quantity</span><input type="number" name="quantity" value="1" min="1" style="width:78px;text-align:center;${iStyle}"></label>`
+    : `<input type="hidden" name="quantity" value="1">`
+  return `<form method="post" action="/cart/add" style="margin:0" data-sf-cart>` +
+    pickers +
+    `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" data-sf-vid>` +
+    qty +
+    `<button type="submit" class="${cls}">${label.trim() || 'Add to cart'}</button>` +
+    (withOptions ? FORM_JS : '') +
+    `</form>`
+}
 
 // Replace the inner content of the first element carrying `cls` with a Liquid expression.
 function replaceInner(html: string, cls: string, liquid: string): string {
@@ -163,17 +171,19 @@ function galleryLoop(html: string): string {
 function dynamizeProduct(html: string, mode: DynamicMode): string {
   if (mode === 'none') return html
   let s = html
-  // Any primary CTA (a.buy) or sticky-bar button (a.fc-btn) → a real Add-to-Cart form (both modes).
-  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bbuy\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls))
-  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls, false))
-  if (mode === 'full') {
-    s = replaceInner(s, 'ptitle', '{{ product.title }}')
-    s = replaceInner(s, 'now', '{{ product.price | money }}')
-    s = replaceInner(s, 'was', '{% if product.compare_at_price > product.price %}{{ product.compare_at_price | money }}{% endif %}')
-    s = replaceInner(s, 'fc-name', '{{ product.title }}')
-    s = galleryLoop(s)                                                   // main gallery → loop each product's own images
-    s = replaceImgSrc(s, 'fc-thumb', '{{ product.featured_image | image_url: width: 120 }}')
-  }
+  // Primary CTA (a.buy) → a full product form (options + quantity + add-to-cart); sticky bar (a.fc-btn) → slim form.
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bbuy\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => productForm(label, cls, true))
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => productForm(label, cls, false))
+  // The product form is ALWAYS live from the real Shopify product — in both 'this product' and 'all
+  // products' modes — so title / price / description / gallery reflect the actual product, never static.
+  s = replaceInner(s, 'ptitle', '{{ product.title }}')
+  s = replaceInner(s, 'now', '{{ product.price | money }}')
+  s = replaceInner(s, 'was', '{% if product.compare_at_price > product.price %}{{ product.compare_at_price | money }}{% endif %}')
+  s = replaceInner(s, 'fc-name', '{{ product.title }}')
+  s = replaceInner(s, 'pdesc', '{{ product.description }}')
+  s = s.replace('<span class="now">', '<span class="now" data-sf-price>')   // live-price target for the variant script
+  s = galleryLoop(s)                                                        // main gallery → loop the product's own images
+  s = replaceImgSrc(s, 'fc-thumb', '{{ product.featured_image | image_url: width: 120 }}')
   return s
 }
 
