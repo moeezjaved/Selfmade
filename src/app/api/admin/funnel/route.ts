@@ -147,6 +147,7 @@ export async function GET(request: NextRequest) {
     recentSignups = recent.map((u) => {
       const lead = leadByUser.get(u.id)
       return {
+        id: u.id,
         email: u.email || null,
         created_at: u.created_at || null,
         provider: (u.app_metadata?.provider || u.app_metadata?.providers?.[0] || 'email'),
