@@ -99,7 +99,7 @@ export async function generatePage(
     productImage: productImage || undefined,
     priceLabel: product?.price || undefined,
     ctaHref: handle ? `/products/${handle}` : '/',
-    rating: { stars: 4.8, countLabel: '[4.8] Rated by 10,000+ Customers' },
+    rating: ratingFor(product),
     paletteId: args.paletteId || undefined,
   }
 
@@ -108,14 +108,32 @@ export async function generatePage(
 
 // ── copy ─────────────────────────────────────────────────────────────────────
 
-function productBlock(product: Awaited<ReturnType<typeof getBuilderProduct>>, vision?: string | null): string {
+// Real rating from an imported product when we scraped one; otherwise the house default.
+function ratingFor(product: any): { stars: number; countLabel: string } {
+  const r = Number(product?.rating)
+  if (Number.isFinite(r) && r > 0) {
+    const n = Number(product?.ratingCount)
+    const count = Number.isFinite(n) && n > 0 ? n.toLocaleString('en-US') : '10,000+'
+    return { stars: Math.min(5, Math.max(1, r)), countLabel: `[${r.toFixed(1)}] Rated by ${count} Customers` }
+  }
+  return { stars: 4.8, countLabel: '[4.8] Rated by 10,000+ Customers' }
+}
+
+function productBlock(product: any, vision?: string | null): string {
   if (!product) return 'No product data available — keep copy generic and make NO specific product claims.'
+  const feats: string[] = Array.isArray(product.features) ? product.features : []
+  const reviews: { name?: string; rating?: number; body: string }[] = Array.isArray(product.reviews) ? product.reviews : []
   return [
     `Title: ${product.title}`,
+    product.brand && `Brand: ${product.brand}`,
     vision && `What it actually is (read from its photo): ${vision}`,
     product.price && `Price: ${product.price}`,
+    product.compareAtPrice && `Original price (for a discount): ${product.compareAtPrice}`,
+    product.rating && `Real average rating: ${product.rating}${product.ratingCount ? ` from ${product.ratingCount} reviews` : ''} — use THIS honest rating, don't invent one.`,
     product.sku && `SKU: ${product.sku}`,
     product.description && `Description: ${product.description}`,
+    feats.length && `Real feature/benefit points from the source page (ground the benefit copy in these, don't fabricate):\n${feats.map((f) => `- ${f}`).join('\n')}`,
+    reviews.length && `Real customer reviews from the source page (echo this genuine sentiment when writing testimonials; keep them believable, you may lightly clean wording):\n${reviews.map((r) => `- ${r.rating ? r.rating + '★ ' : ''}${r.name ? r.name + ': ' : ''}"${r.body}"`).join('\n')}`,
   ].filter(Boolean).join('\n')
 }
 
