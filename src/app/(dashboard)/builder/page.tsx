@@ -289,6 +289,18 @@ export default function BuilderPage() {
     finally { setOpening(null) }
   }, [])
 
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const deleteDraft = useCallback(async (id: string, name: string) => {
+    if (!window.confirm(`Delete "${name || 'this page'}"? This can't be undone.`)) return
+    setDeleting(id)
+    try {
+      const r = await fetch(`/api/builder/drafts?id=${encodeURIComponent(id)}`, { method: 'DELETE' })
+      if (!r.ok) throw new Error('delete_failed')
+      setPages((prev) => (prev || []).filter((p) => p.id !== id))
+    } catch { setToast('Could not delete that page.'); setTimeout(() => setToast(''), 3200) }
+    finally { setDeleting(null) }
+  }, [])
+
   /* ── inline copy editor for a saved page ── */
   const [editSchema, setEditSchema] = useState<EditSlot[] | null>(null)
   const [editContent, setEditContent] = useState<Record<string, any>>({})
@@ -462,6 +474,7 @@ export default function BuilderPage() {
                           {pg.status === 'published' && pg.shopify_url && (
                             <a href={pg.shopify_url} target="_blank" rel="noopener noreferrer" style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13 }}>View →</a>
                           )}
+                          <button onClick={() => deleteDraft(pg.id, pg.product_name)} disabled={deleting === pg.id} title="Delete page" style={{ border: `1px solid ${LINE}`, background: '#fff', color: '#9a2b2b', borderRadius: 999, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: deleting === pg.id ? 'default' : 'pointer', opacity: deleting === pg.id ? 0.6 : 1 }}>{deleting === pg.id ? 'Deleting…' : 'Delete'}</button>
                           <button onClick={() => editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>Edit</button>
                           <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
                         </div>
