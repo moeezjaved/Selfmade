@@ -37,9 +37,14 @@ export const EDITOR_CSS = `
   .ed-add{position:relative;height:0;z-index:9998}
   .ed-add > button{position:absolute;left:50%;top:-15px;transform:translateX(-50%);background:var(--accent,#d6248f);color:#fff;border:none;border-radius:100px;height:30px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;opacity:0;transition:opacity .12s;box-shadow:0 4px 14px -4px rgba(0,0,0,.4);white-space:nowrap}
   .ed-add:hover > button{opacity:1}
-  .ed-toolbar{position:fixed;z-index:10000;display:none;gap:2px;background:#111;border-radius:9px;padding:4px;box-shadow:0 8px 24px -6px rgba(0,0,0,.5)}
+  .ed-toolbar{position:fixed;z-index:10000;display:none;align-items:center;gap:2px;background:#111;border-radius:9px;padding:4px;box-shadow:0 8px 24px -6px rgba(0,0,0,.5)}
   .ed-toolbar button{all:unset;color:#fff;min-width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-size:14px;font-weight:800;cursor:pointer;padding:0 6px}
   .ed-toolbar button:hover{background:rgba(255,255,255,.16)}
+  .ed-toolbar .ed-tsep{width:1px;height:18px;background:rgba(255,255,255,.2);margin:0 3px}
+  .ed-toolbar .ed-linkbox{display:none;align-items:center;gap:4px;margin-left:3px;padding-left:5px;border-left:1px solid rgba(255,255,255,.2)}
+  .ed-toolbar .ed-linkbox input{all:unset;background:#fff;color:#181720;border-radius:6px;padding:5px 9px;font-size:13px;width:170px;height:auto}
+  .ed-toolbar .ed-linkbox button{background:var(--accent,#d6248f);min-width:auto;padding:0 12px;height:26px}
+  .ed-toolbar .ed-linkbox button:hover{filter:brightness(1.1);background:var(--accent,#d6248f)}
   .ed-img-badge{position:absolute;inset:0;display:none;place-items:center;pointer-events:none}
   .pgbld [data-ed-imgwrap]{position:relative}
 `
@@ -100,8 +105,10 @@ export const EDITOR_JS = `
     showToolbar(el);
     el.addEventListener('input', markDirty);
     el.addEventListener('keydown', onKey);
-    el.addEventListener('blur', stopEdit, {once:true});
+    el.addEventListener('blur', onBlur);
   }
+  // Don't stop editing when focus moves INTO the toolbar (e.g. the link URL input) — only on a real blur.
+  function onBlur(ev){ if(ev.relatedTarget && tb && tb.contains(ev.relatedTarget)) return; stopEdit(); }
   function onKey(ev){
     if(ev.key==='Escape'){ ev.preventDefault(); stopEdit(); }
     // single-line fields (headings, labels, buttons) commit on Enter
@@ -112,17 +119,50 @@ export const EDITOR_JS = `
     var el=editing; editing=null;
     el.removeEventListener('input', markDirty);
     el.removeEventListener('keydown', onKey);
+    el.removeEventListener('blur', onBlur);
     el.removeAttribute('contenteditable');
     hideToolbar();
   }
 
-  // ── floating toolbar (Bold = wrap in <strong> = the accent word) ──
-  var tb;
-  function toolbar(){ if(tb) return tb; tb=document.createElement('div'); tb.className='ed-toolbar';
-    tb.innerHTML='<button data-cmd="bold" title="Accent (bold)">B</button><button data-cmd="italic" title="Italic" style="font-style:italic;font-weight:600">i</button>';
-    tb.addEventListener('mousedown', function(ev){ ev.preventDefault(); var c=ev.target.getAttribute('data-cmd'); if(c){ document.execCommand(c,false,null); markDirty(); } });
-    document.body.appendChild(tb); return tb; }
-  function showToolbar(el){ var t=toolbar(); var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-40)+'px'; }
+  // ── floating rich-text toolbar: Bold (accent), Italic, Link, Unlink (Shopify-style) ──
+  var tb, tbInput, savedRange;
+  function saveRange(){ var s=getSelection(); if(s && s.rangeCount) savedRange=s.getRangeAt(0).cloneRange(); }
+  function restoreRange(){ if(savedRange){ var s=getSelection(); s.removeAllRanges(); s.addRange(savedRange); } }
+  function currentHref(){ var n=getSelection().anchorNode; for(var i=0;i<6&&n;i++){ if(n.nodeType===1 && n.tagName==='A') return n.getAttribute('href')||''; n=n.parentNode; } return ''; }
+  function toolbar(){
+    if(tb) return tb;
+    tb=document.createElement('div'); tb.className='ed-toolbar';
+    tb.innerHTML='<button data-cmd="bold" title="Bold / accent">B</button>'
+      +'<button data-cmd="italic" title="Italic" style="font-style:italic;font-weight:600">i</button>'
+      +'<span class="ed-tsep"></span>'
+      +'<button data-cmd="link" title="Add link">🔗</button>'
+      +'<button data-cmd="unlink" title="Remove link">✗</button>'
+      +'<span class="ed-linkbox"><input type="url" placeholder="https://… or /pages/…"><button data-cmd="applylink">Add</button></span>';
+    tb.addEventListener('mousedown', function(ev){
+      var btn=ev.target.closest && ev.target.closest('button'); if(!btn) return;
+      var c=btn.getAttribute('data-cmd');
+      if(c==='applylink'){ ev.preventDefault(); applyLink(); return; }
+      if(c==='link'){ ev.preventDefault(); openLinkBox(); return; }
+      ev.preventDefault();
+      if(c==='bold'||c==='italic'||c==='unlink'){ document.execCommand(c==='unlink'?'unlink':c,false,null); markDirty(); }
+    });
+    tbInput=tb.querySelector('.ed-linkbox input');
+    tbInput.addEventListener('keydown', function(ev){ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); applyLink(); } else if(ev.key==='Escape'){ ev.preventDefault(); closeLinkBox(); } });
+    document.body.appendChild(tb); return tb;
+  }
+  function openLinkBox(){ saveRange(); var box=tb.querySelector('.ed-linkbox'); box.style.display='inline-flex'; tbInput.value=currentHref(); setTimeout(function(){ tbInput.focus(); tbInput.select(); },0); }
+  function closeLinkBox(){ if(tb){ tb.querySelector('.ed-linkbox').style.display='none'; tbInput.value=''; } if(editing) editing.focus(); }
+  function applyLink(){
+    var url=(tbInput.value||'').trim();
+    restoreRange();
+    if(url){ if(!/^(https?:\/\/|\/|mailto:|tel:|#)/i.test(url)) url='https://'+url; document.execCommand('createLink',false,url);
+      // open in a new tab for external links
+      try{ var a=getSelection().anchorNode; var el=a&&a.nodeType===1?a:a&&a.parentNode; var link=el&&el.closest?el.closest('a'):null; if(link&&/^https?:/i.test(url)){ link.setAttribute('target','_blank'); link.setAttribute('rel','noopener'); } }catch(_){}
+      markDirty();
+    }
+    closeLinkBox();
+  }
+  function showToolbar(el){ var t=toolbar(); t.querySelector('.ed-linkbox').style.display='none'; var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-42)+'px'; }
   function hideToolbar(){ if(tb) tb.style.display='none'; }
 
   // ── sections: wrap every top-level section so we can hover a rail + insert ＋ between them ──
