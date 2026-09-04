@@ -205,10 +205,10 @@ function editablize(html: string): { html: string; settings: Setting[] } {
   const videoTag = (id: string) => `{{ section.settings.${id} | video_tag: controls: true, muted: true, loop: true, playsinline: true }}`
   const addVideo = () => { vn++; const id = `vid${vn}`; settings.push({ type: 'video', id, label: `Video ${vn}` }); return id }
 
-  // FAQ pass — question spans (.fqq) and answer divs (.fqa) become editable text. The generic text
-  // passes below only match TEXT_TAGS (no span/div), so without this a whole FAQ section would show
-  // "No customizable settings" — merchants could edit neither the question nor the answer.
-  s = s.replace(/<(span|div)\b([^>]*\bclass=["'][^"']*\b(?:fqq|fqa)\b[^"']*["'][^>]*)>([^<]{1,600}?)<\/\1>/gi, (m, tag, attrs, text) => {
+  // FAQ + press-logo pass — question spans (.fqq), answer divs (.fqa) and "as seen on" text logos
+  // (.plogo) become editable text. The generic text passes below only match TEXT_TAGS (no span/div), so
+  // without this an FAQ shows "No customizable settings" and press names couldn't be edited.
+  s = s.replace(/<(span|div)\b([^>]*\bclass=["'][^"']*\b(?:fqq|fqa|plogo)\b[^"']*["'][^>]*)>([^<]{1,600}?)<\/\1>/gi, (m, tag, attrs, text) => {
     const clean = stripMd(text)
     if (!clean || hasLiquid(text) || tn >= 40 || !isRealText(clean)) return m
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
