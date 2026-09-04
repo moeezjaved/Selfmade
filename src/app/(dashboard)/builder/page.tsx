@@ -971,6 +971,9 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
   const [refUrl, setRefUrl] = useState('')
   const [refBusy, setRefBusy] = useState(false)
   const refFileRef = useRef<HTMLInputElement>(null)
+  const [voice, setVoice] = useState('nova')
+  const [aspect, setAspect] = useState('9:16')
+  const [vibe, setVibe] = useState('')
   const [prog, setProg] = useState('Starting…')
 
   const onRefFile = async (f: File | null) => {
@@ -1009,7 +1012,7 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
     if (!pageId) { setErr('Save the page first, then generate.'); return }
     setGen('working'); setErr(''); setProg('Analyzing your product…')
     try {
-      const r = await fetch('/api/builder/ugc-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, duration: dur, characterLook: look.trim(), language: lang, referenceUrl: refUrl.trim() }) })
+      const r = await fetch('/api/builder/ugc-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, duration: dur, characterLook: look.trim(), language: lang, referenceUrl: refUrl.trim(), voice, aspect, vibe: vibe.trim() }) })
       const j = await r.json(); if (!r.ok || !j.jobId) throw new Error(j?.error || 'Could not start generation')
       poll(j.jobId)
     } catch (e: any) { setErr(e?.message || 'Could not start generation'); setGen('idle') }
@@ -1052,37 +1055,39 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
             {value && gen === 'idle' && <button onClick={() => onChange('')} disabled={busy} style={btn}>Remove</button>}
           </div>
 
-          {gen === 'form' && (
-            <div style={{ marginTop: 10, border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, background: INSET }}>
-              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8 }}>Generate a UGC video from this product</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                <label style={{ fontSize: 12, color: SUB }}>Duration
-                  <select value={dur} onChange={(e) => setDur(Number(e.target.value))} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 8px', fontSize: 13, marginTop: 3, background: '#fff' }}>
-                    {[8, 10, 15, 20, 30].map((d) => <option key={d} value={d}>{d} seconds</option>)}
-                  </select>
-                </label>
-                <label style={{ fontSize: 12, color: SUB }}>Language
-                  <select value={lang} onChange={(e) => setLang(e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 8px', fontSize: 13, marginTop: 3, background: '#fff' }}>
-                    {UGC_LANGS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
-                  </select>
-                </label>
-              </div>
-              <label style={{ fontSize: 12, color: SUB, display: 'block', marginTop: 8 }}>Creator look
-                <input value={look} onChange={(e) => setLook(e.target.value)} placeholder="e.g. Pakistani woman, 25–30, warm and friendly" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, marginTop: 3, fontFamily: 'inherit' }} />
-              </label>
-              <div style={{ fontSize: 12, color: SUB, marginTop: 8 }}>Reference clip <span style={{ color: FAINT }}>— a short UGC video whose style the new one follows</span></div>
-              <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
-                <input value={refUrl} onChange={(e) => setRefUrl(e.target.value)} placeholder="Paste a video URL…" style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
-                <input ref={refFileRef} type="file" accept="video/*" onChange={(e) => onRefFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-                <button onClick={() => refFileRef.current?.click()} disabled={refBusy} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, padding: '8px 12px', fontWeight: 650, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>{refBusy ? 'Uploading…' : '⬆ Upload'}</button>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-                <button onClick={generate} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Generate{ugcCost != null ? ` — uses ${ugcCost.toLocaleString()} credits` : ''}</button>
-                <button onClick={() => setGen('idle')} style={btn}>Cancel</button>
-                <span style={{ fontSize: 11.5, color: FAINT }}>Features your real product · a few minutes · refunded if it fails</span>
+          {gen === 'form' && (() => {
+            const fld: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, marginTop: 3, background: '#fff', fontFamily: 'inherit' }
+            const lbl: React.CSSProperties = { fontSize: 12, color: SUB, display: 'block' }
+            return (
+            <div onClick={() => setGen('idle')} style={{ position: 'fixed', inset: 0, zIndex: 200, background: 'rgba(20,18,15,.5)', display: 'grid', placeItems: 'center', padding: 20 }}>
+              <div onClick={(e) => e.stopPropagation()} style={{ width: 'min(470px, 100%)', maxHeight: '90vh', overflowY: 'auto', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 22 }}>
+                <div style={{ fontSize: 16, fontWeight: 800 }}>Generate a UGC video</div>
+                <div style={{ fontSize: 12.5, color: SUB, margin: '2px 0 14px' }}>Built from this product, in your style.</div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                  <label style={lbl}>Duration<select value={dur} onChange={(e) => setDur(Number(e.target.value))} style={fld}>{[8, 10, 15, 20, 30].map((d) => <option key={d} value={d}>{d} seconds</option>)}</select></label>
+                  <label style={lbl}>Language<select value={lang} onChange={(e) => setLang(e.target.value)} style={fld}>{UGC_LANGS.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
+                  <label style={lbl}>Voice<select value={voice} onChange={(e) => setVoice(e.target.value)} style={fld}>{[['nova', 'Nova (warm F)'], ['shimmer', 'Shimmer (bright F)'], ['onyx', 'Onyx (deep M)'], ['echo', 'Echo (calm M)']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></label>
+                  <label style={lbl}>Format<select value={aspect} onChange={(e) => setAspect(e.target.value)} style={fld}>{[['9:16', 'Vertical 9:16'], ['1:1', 'Square 1:1'], ['16:9', 'Wide 16:9']].map(([v, n]) => <option key={v} value={v}>{n}</option>)}</select></label>
+                </div>
+                <label style={{ ...lbl, marginTop: 10 }}>Creator look<input value={look} onChange={(e) => setLook(e.target.value)} placeholder="e.g. Pakistani woman, 25–30, warm and friendly" style={fld} /></label>
+                <label style={{ ...lbl, marginTop: 10 }}>Vibe / tone<input value={vibe} onChange={(e) => setVibe(e.target.value)} placeholder="e.g. excited, honest, casual" style={fld} /></label>
+                <div style={{ ...lbl, marginTop: 10 }}>Reference clip <span style={{ color: FAINT }}>— a short UGC video whose style the new one follows</span>
+                  <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
+                    <input value={refUrl} onChange={(e) => setRefUrl(e.target.value)} placeholder="Paste a video URL…" style={{ ...fld, marginTop: 0, flex: 1 }} />
+                    <input ref={refFileRef} type="file" accept="video/*" onChange={(e) => onRefFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+                    <button onClick={() => refFileRef.current?.click()} disabled={refBusy} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, padding: '8px 12px', fontWeight: 650, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>{refBusy ? 'Uploading…' : '⬆ Upload'}</button>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10, marginTop: 18, paddingTop: 14, borderTop: `1px solid ${LINE2}`, flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: 11.5, color: FAINT }}>A few minutes · refunded if it fails</span>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button onClick={() => setGen('idle')} style={btn}>Cancel</button>
+                    <button onClick={generate} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Generate{ugcCost != null ? ` — ${ugcCost.toLocaleString()} credits` : ''}</button>
+                  </div>
+                </div>
               </div>
             </div>
-          )}
+          )})()}
 
           {gen === 'working' && (
             <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 10, border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', background: INSET }}>

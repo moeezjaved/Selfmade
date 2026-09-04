@@ -80,6 +80,9 @@ export async function POST(req: NextRequest) {
   const duration = Math.min(30, Math.max(6, Number(b?.duration) || 15))
   const characterLook = String(b?.characterLook || '').slice(0, 60)
   const language = String(b?.language || 'en').slice(0, 5)
+  const voice = ['nova', 'shimmer', 'onyx', 'echo'].includes(String(b?.voice)) ? String(b.voice) : undefined
+  const aspect = ['9:16', '1:1', '16:9'].includes(String(b?.aspect)) ? String(b.aspect) : '9:16'
+  const vibe = String(b?.vibe || '').slice(0, 80)
 
   const admin = createAdminClient()
   const { data: page } = await admin.from('builder_pages').select('*').eq('id', pageId).eq('user_id', user.id).maybeSingle()
@@ -95,7 +98,7 @@ export async function POST(req: NextRequest) {
   if (!productImages.length) return NextResponse.json({ error: 'This page has no product photos to build the video from.' }, { status: 400 })
 
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
-  const productDetails = { name: (page as any).product_name || 'the product', benefits: '', tone: 'authentic, upbeat UGC creator' }
+  const productDetails = { name: (page as any).product_name || 'the product', benefits: '', tone: vibe || 'authentic, upbeat UGC creator' }
 
   let started
   try {
@@ -105,8 +108,8 @@ export async function POST(req: NextRequest) {
       body: JSON.stringify({
         asUserId: user.id, brandId,
         sourceVideoUrl: ref, productImages, productDetails,
-        tier: 'premium', duration, aspect: '9:16', resolution: '720p',
-        characterLook: characterLook || undefined, language,
+        tier: 'premium', duration, aspect, resolution: '720p',
+        characterLook: characterLook || undefined, language, voice,
       }),
     }).then((r) => r.json())
   } catch { return NextResponse.json({ error: 'Could not start generation — try again.' }, { status: 502 }) }
