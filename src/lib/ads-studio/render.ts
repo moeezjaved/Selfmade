@@ -38,15 +38,20 @@ export type FreeRenderOpts = {
   brandName?: string
   productDesc?: string
   niche?: string | null          // resolve once in the caller and pass in (avoids N lookups for N templates)
+  isService?: boolean            // force service/SaaS mode; if omitted, auto-detected from whether product photos resolved
 }
 
 /** Generate one ad with the Pro engine and NO credit charge. Returns the permanent R2 url (+ data image). */
 export async function renderAdFree(admin: any, userId: string, brandId: string | null, opts: FreeRenderOpts): Promise<{ url: string | null; image: string } | null> {
   if (!geminiEnabled) return null
-  // A real product photo is REQUIRED — the ad must show the store's ACTUAL product, never a fabricated
-  // one. If none is available the caller must fetch product images first (we never invent a product).
+  // Auto-detect the store TYPE from what we could fetch:
+  //  • has real product photos  → PHYSICAL product: the ad MUST show the store's actual product (we pass
+  //    the photos and verify 1:1; we never fabricate a product).
+  //  • no product photos at all  → SERVICE / SaaS / app: there IS no physical product, so we render a
+  //    concept-led ad (typography, brand color, a person mid-benefit) — this is correct, not a fake product.
+  // The caller (audit) force-crawls the catalog first, so an EMPTY result here means genuinely no product.
   const products = (await Promise.all(opts.productImages.slice(0, 2).map(fetchImageB64))).filter(Boolean) as Img[]
-  if (!products.length) return null
+  const isService = opts.isService ?? (products.length === 0)
 
   const niche = opts.niche ?? (await resolveBrandNiche(admin, null).catch(() => null))
   const insights = await getNicheInsights(admin, niche)
@@ -59,7 +64,7 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
 
   const prompt = buildStudioPrompt({
     brandName: opts.brandName, newHeadline: opts.headline, aspectRatio: aspect, hasLogo: !!logoImg,
-    numInspirations: fetched.length, numProducts: products.length,
+    numInspirations: fetched.length, numProducts: products.length, isService,
     colors: opts.colors?.slice(0, 4), fonts: opts.fonts, styleTags, insights, productDesc: opts.productDesc,
     angle: opts.angle,
   })
