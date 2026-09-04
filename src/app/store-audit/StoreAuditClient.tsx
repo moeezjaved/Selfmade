@@ -113,22 +113,24 @@ export default function StoreAuditClient() {
         <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
       )}
 
+      {/* ✨ HEADLINE REVEAL — the ads we'd make you (5 free renders). Placed right after the ads audit so
+          it's the emotional peak, not buried at the very end. It starts rendering immediately and the
+          rest of the audit (search & AI) continues below. */}
+      {adsDone && brandId && <AuditAds domain={started.domain} headline />}
+      {adsDone && atCap && (
+        <div style={{ padding: '10px 24px 0', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUB, fontSize: 14 }}>
+            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: '#fff', fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll render your ads.
+          </div>
+        </div>
+      )}
+
       {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished (or was
           skipped for a website-only scan). */}
       {adsDone && (
         <div ref={act2Ref}>
           <ActDivider n={(started.seed.pageId || started.seed.adLibraryUrl) ? 2 : 1} label="Your search & AI visibility" />
           <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
-        </div>
-      )}
-
-      {/* The ads we made you — 5 REAL renders (free) + 5 more you can generate with credits. */}
-      {seoDone && brandId && <AuditAds domain={started.domain} />}
-      {seoDone && atCap && (
-        <div style={{ padding: '10px 24px 0', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUB, fontSize: 14 }}>
-            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: '#fff', fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll render your ads.
-          </div>
         </div>
       )}
 
@@ -315,12 +317,20 @@ function buildReport(adsData: any, seoData: any) {
  * watches the first 5 appear and taps Generate on any of the other 5. */
 const FREE = 5
 type Tpl = { title: string; concept?: string; headline?: string; angle?: string; image?: string | null; generating?: boolean; failed?: boolean; locked?: boolean }
-function AuditAds({ domain }: { domain: string }) {
+function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) {
   const [tpls, setTpls] = useState<Tpl[] | null>(null)
   const [kit, setKit] = useState<any>(null)
   const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
   const [needCredits, setNeedCredits] = useState(false)
   const kicked = useRef(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+  const scrolled = useRef(false)
+  // Auto-scroll to the reveal the moment the first real ad lands — make it the moment you can't miss.
+  useEffect(() => {
+    if (scrolled.current || !tpls || !headline) return
+    if (tpls.slice(0, FREE).some((t) => t.image)) { scrolled.current = true; rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }
+  }, [tpls, headline])
+  const doneCount = (tpls || []).slice(0, FREE).filter((t) => t.image).length
 
   useEffect(() => {
     if (!domain) return
@@ -384,11 +394,16 @@ function AuditAds({ domain }: { domain: string }) {
   if (tpls !== null && tpls.length === 0) return null
   const cards = tpls || Array.from({ length: 10 }, () => null)
   return (
-    <div style={{ padding: '20px 24px 0', display: 'flex', justifyContent: 'center' }}>
-      <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}`}</style>
-      <div style={{ maxWidth: 1100, width: '100%' }}>
-        <h2 style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: '#fff', margin: '0 0 4px' }}>The ads we made you</h2>
-        <p style={{ fontSize: 15, color: SUB, margin: '0 0 20px', maxWidth: 640, lineHeight: 1.5 }}>Built from the winning DNA your rivals use, with your product. The first 5 are on us — tap <b style={{ color: '#fff' }}>Generate</b> on any of the others to make it with your credits.</p>
+    <div ref={rootRef} style={{ padding: headline ? '44px 24px 12px' : '20px 24px 0', display: 'flex', justifyContent: 'center', ...(headline ? { background: 'linear-gradient(180deg, rgba(224,47,6,.10), rgba(224,47,6,0) 70%)' } : {}) }}>
+      <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}@keyframes sfreveal{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}`}</style>
+      <div style={{ maxWidth: 1100, width: '100%', ...(headline ? { animation: 'sfreveal .5s ease both' } : {}) }}>
+        {headline && (
+          <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: ORANGE, marginBottom: 10, textAlign: 'center' }}>
+            ✨ Here&rsquo;s what we&rsquo;d make you{doneCount > 0 ? ` · ${doneCount}/${FREE} ready` : ' · rendering now…'}
+          </div>
+        )}
+        <h2 style={{ fontFamily: SERIF, fontSize: headline ? 42 : 30, fontWeight: 700, color: '#fff', margin: '0 0 4px', textAlign: headline ? 'center' : 'left', lineHeight: 1.05 }}>The ads we made you</h2>
+        <p style={{ fontSize: headline ? 16 : 15, color: SUB, margin: headline ? '0 auto 24px' : '0 0 20px', maxWidth: 640, lineHeight: 1.5, textAlign: headline ? 'center' : 'left' }}>Built from the winning DNA your rivals use, with your product — rendered live, just for your store. The first 5 are on us — tap <b style={{ color: '#fff' }}>Generate</b> on any of the others to make it with your credits.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))', gap: 16 }}>
           {cards.map((t, i) => {
             const paid = i >= FREE
