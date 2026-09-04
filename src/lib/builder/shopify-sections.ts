@@ -408,10 +408,43 @@ ${JSON.stringify({
   return { value, blocks, blockOrder: ['title', 'price', 'highlights', 'buy_buttons', 'trust', 'description'] }
 }
 
-function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = []): string {
+// Phase 4 — block-ify marketing list sections. A section whose main content is a uniform list (review
+// cards, FAQ items, feature/benefit cards, …) becomes a native section with one BLOCK per item, so the
+// merchant can add / remove / reorder items in the theme editor. Each item's markup is preserved as an
+// editable `liquid` block setting and the item's wrapper tag+class is kept so the grid layout stays intact.
+const LIST_CONTAINERS: Array<[string, string]> = [
+  ['faqacc', 'Question'], ['revs', 'Review'], ['bgrid', 'Feature'], ['trio', 'Card'],
+  ['wall', 'Media'], ['pcards', 'Card'], ['statgrid', 'Stat'], ['logos', 'Logo'],
+]
+const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[1] || '').trim().split(/\s+/)[0]
+function blockifyList(html: string): { html: string; blocks: Record<string, any>; blockOrder: string[]; itemName: string } | null {
+  for (const [cc, itemName] of LIST_CONTAINERS) {
+    const inner = innerOf(html, cc); if (!inner) continue
+    const items = topLevelChildren(inner.inner).map((s) => s.trim()).filter((s) => /^<\w/.test(s))
+    if (items.length < 2) continue
+    const tm = /^<(\w+)([^>]*)>/.exec(items[0]); if (!tm) continue
+    const itemTag = tm[1], itemClass = (/\bclass=["']([^"']*)["']/.exec(tm[2])?.[1] || '').trim()
+    if (!itemClass) continue
+    const c0 = firstClass(tm[2])
+    // require a UNIFORM list (same tag + same lead class) so we don't mangle mixed containers
+    const uniform = items.every((it) => { const m = /^<(\w+)([^>]*)>/.exec(it); return !!m && m[1] === itemTag && firstClass(m[2]) === c0 })
+    if (!uniform) continue
+    const blocks: Record<string, any> = {}, order: string[] = []
+    items.forEach((it, i) => {
+      const content = it.replace(/^<\w+[^>]*>/, '').replace(/<\/\w+>\s*$/, '')
+      const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: { content } }; order.push(id)
+    })
+    const loop = `{% for block in section.blocks %}<${itemTag} class="${itemClass}" {{ block.shopify_attributes }}>{{ block.settings.content }}</${itemTag}>{% endfor %}`
+    return { html: html.slice(0, inner.start) + loop + html.slice(inner.end), blocks, blockOrder: order, itemName }
+  }
+  return null
+}
+
+function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = [], blockDefs?: any[]): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = name.slice(0, 25)
-  const schema = { name: nm, settings: [...settings, ...SECTION_STYLE_SETTINGS], presets: [{ name: nm }] }
+  const schema: any = { name: nm, settings: [...settings, ...SECTION_STYLE_SETTINGS], presets: [{ name: nm }] }
+  if (blockDefs && blockDefs.length) schema.blocks = blockDefs
   return `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
 ${sectionStyleCss}
 ${html}
@@ -438,9 +471,12 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
       const mp = mainProductSection(p.html, cssKey, p.name)
       return { id: key, key: `sections/${key}.liquid`, value: mp.value, blocks: mp.blocks, blockOrder: mp.blockOrder }
     }
-    const dynamized = dynamizeProduct(p.html, dyn)
+    // Phase 4: turn a uniform list section (reviews / FAQ / feature cards / …) into add/remove/reorder blocks.
+    const bl = blockifyList(p.html)
+    const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings), blocks: undefined as any, blockOrder: undefined as any }
+    const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: [{ type: 'liquid', id: 'content', label: 'Content' }] }] : undefined
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
