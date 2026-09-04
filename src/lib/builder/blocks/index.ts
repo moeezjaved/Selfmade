@@ -28,6 +28,9 @@ const wrap = (inner: string, pad = '64px') =>
 const H = (s: string, sub?: string) =>
   `<div style="text-align:center;margin-bottom:36px"><h2 style="font-family:'Hanken Grotesk',sans-serif;font-size:clamp(26px,3.2vw,38px);font-weight:800;letter-spacing:-.02em;color:var(--ink,#181720);margin:0 0 10px">${hl(s)}</h2>${sub ? `<p style="font-size:16px;color:var(--muted,#6b6775);max-width:620px;margin:0 auto">${esc(sub)}</p>` : ''}</div>`
 const card = 'background:var(--paper,#faf8fc);border:1px solid var(--line,#eee7f0);border-radius:16px'
+// A visible, CLICKABLE placeholder for image slots the agent couldn't fill — so the section is never a
+// blank/broken <img> (the user clicks it to upload/generate in the editor).
+const IMG_PLACEHOLDER = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='500'%3E%3Crect width='1200' height='500' fill='%23f0eaf7'/%3E%3Ctext x='600' y='258' font-family='sans-serif' font-size='30' fill='%23a99fc0' text-anchor='middle'%3E%F0%9F%96%BC Click to add an image%3C/text%3E%3C/svg%3E"
 
 export const BLOCKS: BlockDef[] = [
   {
@@ -107,7 +110,7 @@ export const BLOCKS: BlockDef[] = [
       { key: 'caption', type: 'text', label: 'Caption' },
     ],
     render: (c, o) => wrap(
-      `<img src="${esc(c.image || o?.productImage || '')}" alt="${esc(c.caption || '')}" style="width:100%;border-radius:20px;display:block;object-fit:cover">${c.caption ? `<p style="text-align:center;font-size:14px;color:var(--muted,#6b6775);margin:14px 0 0">${esc(c.caption)}</p>` : ''}`, '40px'),
+      `<img src="${esc(c.image || o?.productImage || '') || IMG_PLACEHOLDER}" alt="${esc(c.caption || 'Add an image')}" style="width:100%;min-height:220px;border-radius:20px;display:block;object-fit:cover;background:linear-gradient(135deg,#f3eef8,#efe6ff)">${c.caption ? `<p style="text-align:center;font-size:14px;color:var(--muted,#6b6775);margin:14px 0 0">${esc(c.caption)}</p>` : ''}`, '40px'),
   },
   {
     type: 'guarantee',

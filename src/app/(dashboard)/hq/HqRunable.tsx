@@ -232,7 +232,10 @@ export default function HqRunable() {
               <button key={m} onClick={() => setMode(m)} style={{ border: 0, background: mode === m ? '#fff' : 'transparent', color: mode === m ? INK : SUB, fontWeight: mode === m ? 700 : 600, fontSize: 15, padding: '9px 30px', borderRadius: 999, cursor: 'pointer', boxShadow: mode === m ? `0 1px 3px rgba(20,18,15,.16), 0 0 0 1px ${LINE}` : 'none', textTransform: 'capitalize' }}>{m}</button>
             ))}
           </div>
-          {normalizePlan(credits.plan) === 'free'
+          {/* Wait for the real plan before deciding — else it flashes ⚡ Upgrade for paid users on load. */}
+          {credits.loading
+            ? <span style={{ width: 96, height: 30, borderRadius: 999, background: INSET }} />
+            : normalizePlan(credits.plan) === 'free'
             ? <Link href="/upgrade" style={{ border: `1px solid ${ORANGE}`, color: ORANGE, fontWeight: 600, fontSize: 13, padding: '7px 16px', borderRadius: 999, textDecoration: 'none' }}>⚡ Upgrade</Link>
             : <span />}
         </div>
@@ -299,7 +302,9 @@ export default function HqRunable() {
       <aside style={{ width: isMobile ? '100%' : 312, flex: 'none', borderLeft: isMobile ? 'none' : `1px solid ${LINE}`, borderTop: isMobile ? `1px solid ${LINE}` : 'none', padding: '18px 16px', overflowY: isMobile ? 'visible' : 'auto', display: 'flex', flexDirection: 'column', gap: 14 }}>
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
           <div style={{ fontSize: 13, fontWeight: 700 }}>Your store</div>
-          {journey?.store ? (
+          {journey === null ? (
+            <div style={{ marginTop: 10, height: 40, borderRadius: 9, background: INSET }} />
+          ) : journey.store ? (
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 500 }}>🔗 {journey.store.name || journey.store.domain}{journey.store.name && journey.store.domain ? <span style={{ color: SUB, fontWeight: 400, fontSize: 12 }}>· {journey.store.domain}</span> : null}</div>
           ) : (
             <div style={{ marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 12.5, color: SUB }}>No Shopify store connected for <b style={{ color: INK, textTransform: 'capitalize' }}>{brand}</b>. <Link href="/connect/shopify" style={{ color: ORANGE, fontWeight: 700 }}>Connect →</Link></div>
@@ -320,7 +325,9 @@ export default function HqRunable() {
                 <span style={{ display: 'flex', alignItems: 'center', gap: 9, fontSize: 13, fontWeight: 500, color: '#3a3833' }}>
                   <span style={{ width: 24, height: 24, borderRadius: 7, background: INSET, display: 'grid', placeItems: 'center' }}>{c.icon}</span>{c.name}
                 </span>
-                {c.on
+                {journey === null
+                  ? <span style={{ width: 66, height: 20, borderRadius: 999, background: INSET }} />
+                  : c.on
                   ? <span style={{ fontSize: 11.5, fontWeight: 600, color: GOOD }}>✓ Connected</span>
                   : <Link href={c.href} style={{ fontSize: 11.5, fontWeight: 600, color: ORANGE, textDecoration: 'none', border: `1px solid ${WASH}`, borderRadius: 999, padding: '3px 11px' }}>Connect</Link>}
               </div>
@@ -330,7 +337,7 @@ export default function HqRunable() {
 
         <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15 }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: 13, fontWeight: 700 }}>Plan <Link href="/billing" style={{ fontSize: 12, color: ORANGE, textDecoration: 'none', fontWeight: 600 }}>Manage</Link></div>
-          <div style={{ fontSize: 12.5, color: SUB, marginTop: 8 }}><b style={{ color: INK }}>{PLANS[normalizePlan(credits.plan)]?.label || 'Free'}</b> · <b style={{ color: INK }}>{credits.loading ? '…' : credits.balance.toLocaleString()}</b> credits</div>
+          <div style={{ fontSize: 12.5, color: SUB, marginTop: 8 }}><b style={{ color: INK }}>{credits.loading ? '…' : (PLANS[normalizePlan(credits.plan)]?.label || 'Free')}</b> · <b style={{ color: INK }}>{credits.loading ? '…' : credits.balance.toLocaleString()}</b> credits</div>
         </div>
 
         <Link href="/mission" style={{ border: `1px solid ${LINE}`, borderRadius: 14, padding: 15, textDecoration: 'none', color: INK }}>

@@ -36,6 +36,9 @@ export default function GeoPage() {
   const [writing, setWriting] = useState<string | null>(null)   // the prompt currently being written
   const [openAsset, setOpenAsset] = useState<string | null>(null)
   const [copied, setCopied] = useState<string | null>(null)
+  // In-app toast (replaces browser alert() so confirmations feel native, not "www.tryselfmade.ai says…").
+  const [toast, setToast] = useState<{ text: string; tone: 'ok' | 'err' } | null>(null)
+  const flash = useCallback((text: string, tone: 'ok' | 'err' = 'ok') => { setToast({ text, tone }); setTimeout(() => setToast(null), 3600) }, [])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -59,9 +62,9 @@ export default function GeoPage() {
       const j = await r.json()
       if (r.ok && j?.asset?.body_markdown) { setAssets((a) => [j.asset as Asset, ...a]); setOpenAsset(j.asset.id || prompt) }
       else if (r.status === 402) openCredits('buy', j.reason || 'Writing a GEO answer page costs credits — top up to continue.')
-      else if (r.ok && j?.asset && !j.asset.body_markdown) alert('The writer came back empty — please try again.')
-      else alert(j?.detail || j?.error || 'Couldn’t write that page — try again.')
-    } catch { alert('Network error — try again.') }
+      else if (r.ok && j?.asset && !j.asset.body_markdown) flash('The writer came back empty — please try again.', 'err')
+      else flash(j?.detail || j?.error || 'Couldn’t write that page — try again.', 'err')
+    } catch { flash('Network error — try again.', 'err') }
     setWriting(null)
   }
   const copy = async (a: Asset) => { try { await navigator.clipboard.writeText(a.body_markdown); setCopied(a.id || a.target_prompt); setTimeout(() => setCopied(null), 1800) } catch { /* ignore */ } }
@@ -79,8 +82,8 @@ export default function GeoPage() {
       if (r.ok && j?.url) { setAssets((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'published', published_url: j.url } : x))) }
       else if (r.status === 402) openCredits('plan', j.reason || 'Publishing live is a paid feature — upgrade to publish.')
       else if (j?.error === 'no_store') openCredits('plan', j.reason || 'Connect your Shopify store to publish.')
-      else alert(j?.detail || j?.reason || 'Couldn’t publish — try again.')
-    } catch { alert('Network error — try again.') }
+      else flash(j?.detail || j?.reason || 'Couldn’t publish — try again.', 'err')
+    } catch { flash('Network error — try again.', 'err') }
     setPublishing(null)
   }
 
@@ -94,11 +97,11 @@ export default function GeoPage() {
     try {
       const r = await fetch('/api/geo/build', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ action: 'apply', id: a.id }) })
       const j = await r.json()
-      if (r.ok) { const live = j.url || null; setAssets((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'published', published_url: live } : x))); if (j.applied === 'theme') alert(j.alreadyPresent ? 'Schema updated in your store theme.' : 'Schema added to your store’s <head>.') }
+      if (r.ok) { const live = j.url || null; setAssets((list) => list.map((x) => (x.id === a.id ? { ...x, status: 'published', published_url: live } : x))); if (j.applied === 'theme') flash(j.alreadyPresent ? 'Schema updated in your store theme.' : 'Schema added to your store’s head.') }
       else if (r.status === 402) openCredits('plan', j.reason || 'Applying live is a paid feature — upgrade.')
       else if (j?.error === 'no_store') openCredits('plan', j.reason || 'Connect your Shopify store to apply.')
-      else alert(j?.reason || j?.detail || 'Couldn’t apply — try again.')
-    } catch { alert('Network error — try again.') }
+      else flash(j?.reason || j?.detail || 'Couldn’t apply — try again.', 'err')
+    } catch { flash('Network error — try again.', 'err') }
     setApplying(null)
   }
 
@@ -370,6 +373,9 @@ export default function GeoPage() {
         )}
       </div>
       {guideAsset && <LlmsGuide content={guideAsset.body_markdown} domain={status?.understanding?.websiteUrl} onClose={() => setGuideAsset(null)} />}
+      {toast && (
+        <div style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 200, background: toast.tone === 'err' ? '#b42318' : '#181712', color: '#fff', padding: '12px 20px', borderRadius: 999, fontSize: 13.5, fontWeight: 600, boxShadow: '0 16px 40px -12px rgba(0,0,0,.4)', maxWidth: '90vw' }}>{toast.text}</div>
+      )}
     </div>
   )
 }
