@@ -178,9 +178,19 @@ const isRealText = (s: string) => /[a-z0-9]/i.test(s) && s.replace(/[^a-z0-9]/gi
 
 function editablize(html: string): { html: string; settings: Setting[] } {
   const settings: Setting[] = []
-  let tn = 0, imn = 0
+  let tn = 0, imn = 0, vn = 0
   let s = html
   const addText = (clean: string) => { tn++; const id = `t${tn}`; settings.push({ type: clean.length > 70 ? 'textarea' : 'text', id, label: (clean.slice(0, 38) || `Text ${tn}`), default: clean }); return id }
+  // Templatize an <img> into an editable image_picker (original renders as fallback). Returns null if not eligible.
+  const templatizeImg = (imgTag: string): string | null => {
+    const mm = /<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/i.exec(imgTag)
+    if (!mm || hasLiquid(imgTag) || imn >= 8 || !/^(https?:|\/\/)/.test(mm[2])) return null
+    imn++; const id = `img${imn}`; settings.push({ type: 'image_picker', id, label: `Image ${imn}` })
+    const attrs = `${mm[1]}${mm[3]}`.replace(/\ssrcset=["'][^"']*["']/i, '')
+    return `{% if section.settings.${id} %}<img${attrs} src="{{ section.settings.${id} | image_url: width: 1600 }}">{% else %}<img${attrs} src="${mm[2]}">{% endif %}`
+  }
+  const videoTag = (id: string) => `{{ section.settings.${id} | video_tag: controls: true, muted: true, loop: true, playsinline: true }}`
+  const addVideo = () => { vn++; const id = `vid${vn}`; settings.push({ type: 'video', id, label: `Video ${vn}` }); return id }
 
   // TEXT pass 1 — pure-text leaves (no nested tags). Skip dynamic bits + icon/arrow noise.
   s = s.replace(new RegExp(`(<(?:${TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${TEXT_TAGS})>)`, 'gi'), (m, open, text, close) => {
@@ -198,15 +208,24 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
-  // IMAGES — static <img src="url">. Merchant can pick a new image; the original renders as fallback.
-  s = s.replace(/<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi, (m, pre, src, post) => {
-    if (hasLiquid(m) || imn >= 8 || !/^(https?:|\/\/)/.test(src)) return m
-    imn++
-    const id = `img${imn}`
-    settings.push({ type: 'image_picker', id, label: `Image ${imn}` })
-    const attrs = `${pre}${post}`.replace(/\ssrcset=["'][^"']*["']/i, '')
-    return `{% if section.settings.${id} %}<img${attrs} src="{{ section.settings.${id} | image_url: width: 1600 }}">{% else %}<img${attrs} src="${src}">{% endif %}`
+  // VIDEO pass (before images) — video slots become uploadable: a Shopify `video` setting (upload to
+  // Content → Files, then pick it). Covers real <video> and the poster+▶ placeholder cards (mediaCard).
+  //  (a) real <video src="…">…</video>
+  s = s.replace(/<video\b[^>]*>[\s\S]*?<\/video>/gi, (m) => {
+    if (hasLiquid(m) || vn >= 6) return m
+    const id = addVideo()
+    return `{% if section.settings.${id} %}${videoTag(id)}{% else %}${m}{% endif %}`
   })
+  //  (b) poster image + play badge (no video uploaded yet) → a video field + keep the poster editable.
+  s = s.replace(/(<img\b[^>]*>)(\s*<div class="play">[\s\S]*?<\/div>)/gi, (m, imgTag, playDiv) => {
+    if (hasLiquid(m) || vn >= 6) return m
+    const id = addVideo()
+    const poster = templatizeImg(imgTag) || imgTag
+    return `{% if section.settings.${id} %}${videoTag(id)}{% else %}${poster}${playDiv}{% endif %}`
+  })
+
+  // IMAGES — remaining static <img src="url"> → editable image_picker (original renders as fallback).
+  s = s.replace(/<img\b[^>]*?\ssrc=["'][^"']+["'][^>]*>/gi, (m) => templatizeImg(m) || m)
 
   return { html: s, settings }
 }
