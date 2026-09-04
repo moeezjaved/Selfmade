@@ -43,8 +43,10 @@ export type FreeRenderOpts = {
 /** Generate one ad with the Pro engine and NO credit charge. Returns the permanent R2 url (+ data image). */
 export async function renderAdFree(admin: any, userId: string, brandId: string | null, opts: FreeRenderOpts): Promise<{ url: string | null; image: string } | null> {
   if (!geminiEnabled) return null
+  // A product photo makes the ad product-accurate, but it is NOT required — a store the crawler hasn't
+  // pulled products from (or a website-only audit) would otherwise blank the whole "here's what we'd make
+  // you" reveal. Without one we still render a brand-grounded concept from the niche inspirations + kit.
   const products = (await Promise.all(opts.productImages.slice(0, 2).map(fetchImageB64))).filter(Boolean) as Img[]
-  if (!products.length) return null
 
   const niche = opts.niche ?? (await resolveBrandNiche(admin, null).catch(() => null))
   const insights = await getNicheInsights(admin, niche)
