@@ -35,43 +35,37 @@ export async function GET(request: NextRequest) {
   const scaled = distinctScaleRes
   const paid = paidRes.count || 0
 
-  // ── Audit → activation funnel (the lead-magnet theater). Every completed public scan is stored in
-  // audit_scans (no login). claimed_by fills in once that founder signs up + connects the domain, so an
-  // UNCLAIMED scan = someone who completed the audit but never signed up. ──
-  const { data: scans } = await admin
-    .from('audit_scans')
-    .select('domain, site_name, score, category, claimed_by, created_at')
+  // ── Audit → activation funnel. Since the Aug-2026 "signup-first / audit IS onboarding" refactor, the
+  // audit writes `audit_leads` (email + brand + domain, then converted_user_id on signup) — NOT the
+  // retired anonymous audit_scans/ads_audit_scans. So the funnel reads audit_leads: every row = someone
+  // who ran the audit and entered their details; status='converted' (converted_user_id set) = signed up. ──
+  const { data: leadsRaw } = await admin
+    .from('audit_leads')
+    .select('email, domain, brand_name, status, converted_user_id, created_at')
     .order('created_at', { ascending: false })
-    .limit(1000)
-  const allScans = scans || []
-  const auditsCompleted = allScans.length
-  const claimedIds = Array.from(new Set(allScans.filter((s: any) => s.claimed_by).map((s: any) => s.claimed_by)))
+    .limit(2000)
+  const leads = leadsRaw || []
+  const auditsCompleted = leads.length
+  const adsCompleted = leads.filter((l: any) => !l.domain).length
+  const convertedIds = Array.from(new Set(leads.filter((l: any) => l.converted_user_id).map((l: any) => l.converted_user_id)))
 
-  // Anonymous ADS audits (the ads counterpart, keyed by Facebook page_id — no domain).
-  const { data: adsScans } = await admin
-    .from('ads_audit_scans')
-    .select('page_id, brand_name, niche, score, claimed_by, created_at')
-    .order('created_at', { ascending: false })
-    .limit(1000)
-  const adsCompleted = (adsScans || []).length
+  // Everyone who audited but hasn't signed up — the hot-lead list ("which brands/sites are auditing").
+  const anonymousAudits = leads
+    .filter((l: any) => !l.converted_user_id)
+    .map((l: any) => ({
+      type: l.domain ? 'seo' : 'ads', domain: l.domain, page_id: null,
+      site_name: l.brand_name || l.domain || l.email, score: null, category: null,
+      email: l.email, status: l.status, created_at: l.created_at,
+    }))
 
-  const anonymousAudits = [
-    ...allScans.filter((s: any) => !s.claimed_by).map((s: any) => ({
-      type: 'seo', domain: s.domain, page_id: null, site_name: s.site_name, score: s.score, category: s.category, created_at: s.created_at,
-    })),
-    ...(adsScans || []).filter((s: any) => !s.claimed_by).map((s: any) => ({
-      type: 'ads', domain: null, page_id: s.page_id, site_name: s.brand_name, score: s.score, category: s.niche, created_at: s.created_at,
-    })),
-  ].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
-
-  // Activation among the founders who DID claim their audit.
+  // Activation among the founders whose audit lead CONVERTED to an account.
   let connected = 0, generatedAd = 0, paidFromAudit = 0
-  if (claimedIds.length) {
+  if (convertedIds.length) {
     const [storesR, metaR, creativesR, subsR] = await Promise.all([
-      admin.from('shopify_stores').select('user_id').in('user_id', claimedIds),
-      admin.from('meta_accounts').select('user_id').in('user_id', claimedIds).eq('status', 'active'),
-      admin.from('creative_generations').select('user_id').in('user_id', claimedIds),
-      admin.from('subscriptions').select('owner_id, status').in('owner_id', claimedIds),
+      admin.from('shopify_stores').select('user_id').in('user_id', convertedIds),
+      admin.from('meta_accounts').select('user_id').in('user_id', convertedIds).eq('status', 'active'),
+      admin.from('creative_generations').select('user_id').in('user_id', convertedIds),
+      admin.from('subscriptions').select('owner_id, status').in('owner_id', convertedIds),
     ])
     const connectedSet = new Set<string>()
     for (const r of (storesR.data || [])) connectedSet.add((r as any).user_id)
@@ -80,7 +74,7 @@ export async function GET(request: NextRequest) {
     generatedAd = new Set((creativesR.data || []).map((r: any) => r.user_id)).size
     paidFromAudit = new Set((subsR.data || []).filter((r: any) => ['active', 'trialing'].includes(String(r.status))).map((r: any) => r.owner_id)).size
   }
-  const signedUpFromAudit = claimedIds.length
+  const signedUpFromAudit = convertedIds.length
   const pct = (n: number) => (auditsCompleted > 0 ? Math.round((n / auditsCompleted) * 100) : 0)
 
   return NextResponse.json({

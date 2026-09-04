@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 interface Step { label: string; count: number; pct: number }
-interface AnonAudit { type?: 'seo' | 'ads'; domain: string | null; page_id?: string | null; site_name: string | null; score: number | null; category: string | null; created_at: string }
+interface AnonAudit { type?: 'seo' | 'ads'; domain: string | null; page_id?: string | null; site_name: string | null; score: number | null; category: string | null; created_at: string; email?: string | null; status?: string | null }
 
 const SEV_COLOR: Record<string, string> = { high: '#dc2626', medium: '#d97706', low: '#6b7280' }
 const money = (n: number, cur: string) => { try { return new Intl.NumberFormat('en-US', { style: 'currency', currency: cur || 'USD', maximumFractionDigits: 0 }).format(n || 0) } catch { return `${Math.round(n || 0)} ${cur}` } }
@@ -271,7 +271,7 @@ export default function FunnelPage() {
                         <td style={{ padding: '10px 20px', color: '#333' }}>{a.site_name || '—'}</td>
                         <td style={{ padding: '10px 20px', color: '#777' }}>{a.category || '—'}</td>
                         <td style={{ padding: '10px 20px' }}><span style={{ fontWeight: 800, color: scoreColor(a.score) }}>{a.score ?? '—'}</span></td>
-                        <td style={{ padding: '10px 20px', color: '#c3c7c3' }} title="The audit runs with no login, so no email is captured. Add an email gate to the theater to collect these.">— none</td>
+                        <td style={{ padding: '10px 20px', color: a.email ? '#333' : '#c3c7c3' }}>{a.email ? <a href={`mailto:${a.email}`} onClick={(e) => e.stopPropagation()} style={{ color: '#2563eb', textDecoration: 'none' }}>{a.email}</a> : '— none'}</td>
                         <td style={{ padding: '10px 20px', color: '#888' }}>{fmt(a.created_at)}</td>
                       </tr>
                       {open && (
