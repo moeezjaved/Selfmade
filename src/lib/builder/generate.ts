@@ -10,7 +10,7 @@
 import { createAdminClient } from '@/lib/supabase/server'
 import { llm } from '@/lib/llm'
 import { getTemplate } from './templates'
-import type { FilledContent, RenderOpts, SlotDef, SlotValue } from './types'
+import type { FilledContent, RenderOpts, SlotDef, SlotValue, ImportedProduct } from './types'
 import { getBuilderProduct } from './products'
 import { loadBrandVoice, voiceBrief, productVision, fetchImageInput, generateAndHost, slugify, parseJsonObject } from './context'
 import type { ImageInput } from '@/lib/gemini/image'
@@ -29,14 +29,18 @@ const SOFT_AI_ROLES = new Set(['editorial', 'lifestyle'])
 
 export async function generatePage(
   userId: string,
-  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string; paletteId?: string },
+  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string; paletteId?: string; importedProduct?: ImportedProduct | null },
 ): Promise<GenerateResult> {
   const template = getTemplate(args.templateId)
   if (!template) throw new Error(`Unknown template: ${args.templateId}`)
 
   const admin = createAdminClient()
+  // Product source: an externally-imported product (pasted URL from Amazon/Etsy/etc.) wins; otherwise
+  // pull the chosen product live from the connected Shopify store.
   const [product, voice] = await Promise.all([
-    getBuilderProduct(userId, args.productId, args.brandId ?? null),
+    args.importedProduct
+      ? Promise.resolve(args.importedProduct as any)
+      : getBuilderProduct(userId, args.productId, args.brandId ?? null),
     loadBrandVoice(admin, userId, args.brandId ?? null),
   ])
 

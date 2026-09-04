@@ -45,6 +45,18 @@ export type SlotValue =
 /** slot key → value. The single source of truth a page renders from (persisted on builder_pages). */
 export type FilledContent = Record<string, SlotValue>
 
+/** A product scraped from an external URL (Amazon/Etsy/Shopify/AliExpress/any site) used to build a page. */
+export interface ImportedProduct {
+  title: string
+  handle?: string
+  price?: string
+  image?: string | null
+  images?: string[]
+  description?: string
+  sku?: string | null
+  sourceUrl?: string
+}
+
 export interface RenderOpts {
   /** product name shown in offer cards + CTAs */
   productName: string
