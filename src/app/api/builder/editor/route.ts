@@ -68,7 +68,11 @@ export async function POST(req: NextRequest) {
   const opts = optsFrom(row)
   const previewHtml = assembleDocumentEdited(tpl, row.content || {}, opts, edited)   // refresh the cached snapshot too
   const now = new Date().toISOString()
-  await admin.from('builder_pages').update({ edited_html: edited, preview_html: previewHtml, edited_at: now, updated_at: now }).eq('id', pageId)
-
+  const { error } = await admin.from('builder_pages').update({ edited_html: edited, preview_html: previewHtml, edited_at: now, updated_at: now }).eq('id', pageId)
+  if (error) {
+    // Most likely the visual-editor columns aren't migrated yet — surface it instead of falsely reporting saved.
+    const needsMigration = /column .*edited_html|edited_at|blocks/i.test(error.message || '')
+    return NextResponse.json({ error: needsMigration ? 'The editor needs a quick database update before it can save (migration 180).' : 'Could not save — please try again.', code: needsMigration ? 'needs_migration' : 'save_failed' }, { status: 500 })
+  }
   return NextResponse.json({ ok: true })
 }
