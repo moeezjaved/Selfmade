@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useIsMobile } from '@/lib/useIsMobile'
+import { PALETTES, DEFAULT_PALETTE_ID } from '@/lib/builder/palettes'
 
 /* ── theme tokens (shared with HqRunable / Reports) ── */
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
@@ -104,6 +105,7 @@ export default function BuilderPage() {
   const [tplErr, setTplErr] = useState('')
   const [tplId, setTplId] = useState<string | null>(null)
   const [language, setLanguage] = useState('English')
+  const [paletteId, setPaletteId] = useState(DEFAULT_PALETTE_ID)
   const loadTemplates = useCallback(async () => {
     setTplErr(''); setTemplates(null)
     try {
@@ -231,6 +233,7 @@ export default function BuilderPage() {
           persona: selectedPersona, angle: selectedAngle,
           research: researchPayload(),
           language,
+          paletteId,
         }),
       })
       const j = await r.json()
@@ -518,6 +521,25 @@ export default function BuilderPage() {
                 <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit', minWidth: 180 }}>
                   {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
+              </div>}
+
+              {/* colour palette — re-skins the whole generated page; shown once a template is chosen */}
+              {tplId && <div style={{ ...CARD, marginTop: 12, padding: '14px 16px' }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Colour palette</div>
+                <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>Sets the accent + gradient for the whole page. You can fine-tune copy and images later.</div>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
+                  {PALETTES.map((p) => {
+                    const on = paletteId === p.id
+                    return (
+                      <button key={p.id} type="button" onClick={() => setPaletteId(p.id)} title={p.name} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5, border: `2px solid ${on ? INK : LINE}`, borderRadius: 12, padding: 7, background: '#fff', cursor: 'pointer' }}>
+                        <span style={{ display: 'flex', width: 62, height: 34, borderRadius: 7, overflow: 'hidden', boxShadow: 'inset 0 0 0 1px rgba(0,0,0,.05)' }}>
+                          {p.swatch.map((c, i) => <span key={i} style={{ flex: 1, background: c }} />)}
+                        </span>
+                        <span style={{ fontSize: 11, fontWeight: on ? 800 : 600, color: on ? INK : SUB }}>{p.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
               </div>}
             </div>
           )}

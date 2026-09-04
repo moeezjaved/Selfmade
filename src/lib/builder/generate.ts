@@ -29,7 +29,7 @@ const SOFT_AI_ROLES = new Set(['editorial', 'lifestyle'])
 
 export async function generatePage(
   userId: string,
-  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string },
+  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string; paletteId?: string },
 ): Promise<GenerateResult> {
   const template = getTemplate(args.templateId)
   if (!template) throw new Error(`Unknown template: ${args.templateId}`)
@@ -96,6 +96,7 @@ export async function generatePage(
     priceLabel: product?.price || undefined,
     ctaHref: handle ? `/products/${handle}` : '/',
     rating: { stars: 4.8, countLabel: '[4.8] Rated by 10,000+ Customers' },
+    paletteId: args.paletteId || undefined,
   }
 
   return { content, renderOpts, productName, ctaHref: renderOpts.ctaHref, productImage }
