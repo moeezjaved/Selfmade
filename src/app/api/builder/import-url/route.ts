@@ -23,15 +23,25 @@ const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (
 // Residential-proxy (IPRoyal) fallback for bot-blocked sites (Amazon, some marketplaces). It is used
 // ONLY for the HTML page fetch below — NEVER to download images or video (metered residential bandwidth):
 // imported media is kept as plain URLs the shopper's own browser loads directly.
-const PROXY_URL = (() => {
+function buildProxyUrl(): string {
   if (process.env.BUILDER_SCRAPER_PROXY) return process.env.BUILDER_SCRAPER_PROXY
   const host = process.env.WORKER_PROXY_HOST, port = process.env.WORKER_PROXY_PORT || '12321'
   const user = process.env.WORKER_PROXY_USER, pass = process.env.WORKER_PROXY_PASS
   const country = (process.env.WORKER_PROXY_COUNTRY || 'us').toLowerCase()
   if (!host || !user || !pass) return ''
-  const p = /country-/.test(pass) ? pass : `${pass}_country-${country}` // IPRoyal embeds geo in the password
-  return `http://${encodeURIComponent(user)}:${encodeURIComponent(p)}@${host}:${port}`
-})()
+  // IPRoyal expects modifiers in the password field (verified format, matches admin/brands/preview).
+  const sid = Math.random().toString(36).slice(2, 10)
+  const stickyPass = `${pass}_session-${sid}_lifetime-5m_country-${country}`
+  return `http://${encodeURIComponent(user)}:${encodeURIComponent(stickyPass)}@${host}:${port}`
+}
+const PROXY_CONFIGURED = !!buildProxyUrl()
+
+export async function GET(req: NextRequest) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  return NextResponse.json({ proxyConfigured: PROXY_CONFIGURED })
+}
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -52,7 +62,7 @@ export async function POST(req: NextRequest) {
     // that the Shopify `.json` endpoint omits. Direct first; IPRoyal fallback for bot-blocked sites.
     let html = await fetchText(url.toString())
     let viaProxy = false
-    if (!html && PROXY_URL) { html = await fetchText(url.toString(), true); viaProxy = true }
+    if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
     if (!shopify && !html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
 
     const fromLd = html ? fromJsonLd(html, url) : null
@@ -87,8 +97,8 @@ export async function POST(req: NextRequest) {
 async function fetchText(u: string, viaProxy = false): Promise<string | null> {
   try {
     const opts: any = { headers: { 'user-agent': UA, accept: 'text/html,application/xhtml+xml' }, redirect: 'follow' }
-    // Proxy is applied ONLY to this HTML fetch — never to any image/video (see PROXY_URL note).
-    if (viaProxy && PROXY_URL) opts.dispatcher = new ProxyAgent(PROXY_URL)
+    // Proxy is applied ONLY to this HTML fetch — never to any image/video. Fresh session per call.
+    if (viaProxy) { const purl = buildProxyUrl(); if (purl) opts.dispatcher = new ProxyAgent(purl) }
     const r = await fetch(u, opts)
     if (!r.ok) return null
     return (await r.text()).slice(0, 2_500_000)
