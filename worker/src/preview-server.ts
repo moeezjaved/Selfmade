@@ -91,7 +91,10 @@ async function extractAmazonProduct(page: any): Promise<ExtractedProduct | null>
   try {
     return await page.evaluate(() => {
       const txt = (sel: string) => { const el = document.querySelector(sel) as HTMLElement | null; return el ? (el.innerText || '').trim() : '' }
-      const full = (s: string) => s.replace(/\._[A-Z0-9,_-]+_\.(jpg|jpeg|png|webp)(\b|$)/i, '.$1')
+      // Amazon serves size-tokened variants of the SAME image (`ID._AC_SX425_.jpg`, `ID._SX35_SY46.jpg`,
+      // `ID._SL1500_.jpg`…). Strip every modifier back to `ID.jpg` = full resolution, so tiny nav
+      // thumbnails become full-res and all variants of one image dedupe to a single URL (→ one R2 copy).
+      const full = (s: string) => s.replace(/(\/images\/I\/[A-Za-z0-9@%+-]+)\.[^/]+(\.(?:jpg|jpeg|png|webp|gif))(?:$|\?)/i, '$1$2')
       const title = txt('#productTitle') || txt('#title')
       const price = txt('.a-price .a-offscreen') || txt('#priceblock_ourprice') || txt('#corePrice_feature_div .a-offscreen')
       const imgs = new Set<string>()
