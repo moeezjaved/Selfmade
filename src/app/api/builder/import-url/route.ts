@@ -62,17 +62,21 @@ export async function POST(req: NextRequest) {
     // that the Shopify `.json` endpoint omits. Direct first; IPRoyal fallback for bot-blocked sites.
     // Amazon is special: a bare fetch just returns the captcha/robot page (HTTP 200), so we skip straight
     // to the droplet's real browser, which rewrites to the mobile product page and extracts the product.
-    const amazon = isAmazon(url)
+    // Bot-protected marketplaces (Amazon, Etsy, eBay, AliExpress, Alibaba, …) return an HTTP-200 bot/JS
+    // shell to a plain fetch — non-empty but with NO product data — so we'd never fall through to the
+    // browser. Route them straight to the droplet's real browser (renders JS, IPRoyal + stealth), exactly
+    // like Amazon; the rendered DOM then yields JSON-LD / OpenGraph product data.
+    const forceBrowser = isAmazon(url) || isMarketplace(url)
     let html: string | null = null
     let viaProxy = false
     let dropletProduct: DropletProduct | undefined
-    if (!amazon) {
+    if (!forceBrowser) {
       html = await fetchText(url.toString())
       if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
     }
-    // Last resort (and first resort for Amazon): render in a real browser on the droplet (Playwright +
-    // IPRoyal). HTML only — images/video are never fetched there; Amazon also returns structured product.
-    if (amazon || (!html && !shopify)) {
+    // Render in a real browser on the droplet (Playwright + IPRoyal). HTML only — images/video are never
+    // fetched there; Amazon also returns a structured product from its mobile DOM.
+    if (forceBrowser || (!html && !shopify)) {
       const d = await fetchViaDroplet(url.toString())
       html = d.html; dropletProduct = d.product; if (html) viaProxy = true
     }
@@ -129,6 +133,20 @@ async function fetchViaDroplet(target: string): Promise<{ html: string | null; p
 }
 
 function isAmazon(u: URL): boolean { return /(^|\.)amazon\.[a-z.]+$/i.test(u.hostname) }
+
+// Marketplaces whose product pages are JS-rendered and/or bot-protected — a plain fetch gets a shell,
+// so they must go through the droplet's real browser. (Amazon is handled separately above.)
+function isMarketplace(u: URL): boolean {
+  const h = u.hostname.toLowerCase()
+  return (
+    /(^|\.)etsy\.com$/.test(h) ||
+    /(^|\.)ebay\.[a-z.]+$/.test(h) ||           // ebay.com, ebay.co.uk, ebay.de, …
+    /(^|\.)aliexpress\.[a-z.]+$/.test(h) ||     // aliexpress.com, aliexpress.us, …
+    /(^|\.)alibaba\.com$/.test(h) ||            // www./m./spanish. alibaba.com
+    /(^|\.)walmart\.com$/.test(h) ||
+    /(^|\.)temu\.com$/.test(h)
+  )
+}
 
 async function fetchText(u: string, viaProxy = false): Promise<string | null> {
   try {
