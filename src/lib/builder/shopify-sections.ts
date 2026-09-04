@@ -322,6 +322,75 @@ const sectionStyleCss = `{% style %}
 }
 {% endstyle %}`
 
+// ── Phase 1: native theme-blocks product section ────────────────────────────────────────────────
+// The buy-box slice becomes a Shopify main-product-style section whose INFO column is composed of native
+// section BLOCKS (title, price, highlights, buy buttons, description) the merchant can add / remove /
+// reorder in the theme editor — plus `@app` blocks (reviews, upsells). The gallery stays as the media
+// column. Uses the classic section-blocks model ({% for block in section.blocks %}) for max theme support.
+function outerEl(html: string, cls: string): string {
+  const f = innerOf(html, cls); if (!f) return ''
+  const openStart = html.lastIndexOf('<', f.start - 1)   // f.start-1 is the opening tag's '>'; step back to its '<'
+  const closeEnd = html.indexOf('>', f.end)
+  return openStart >= 0 && closeEnd >= f.end ? html.slice(openStart, closeEnd + 1) : ''
+}
+
+function mainProductSection(hero: string, cssKey: string, name: string): { value: string; blocks: Record<string, any>; blockOrder: string[] } {
+  const cssHandle = cssKey.replace(/^assets\//, '')
+  const nm = (name || 'Product').slice(0, 25)
+  const galleryLiquid = withGalleryDriver(galleryLoop(outerEl(hero, 'gallery')))
+  const highlightsHtml = ['pills', 'buyopt'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
+  const trustHtml = ['pay', 'social', 'trust'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
+  const ctaLabel = (/(<a[^>]*\bclass=["'][^"']*\bbuy\b[^"']*["'][^>]*>)([^<]{1,60})<\/a>/i.exec(hero)?.[2] || 'Add to cart').trim()
+  const strip = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const eyebrow = strip(innerOf(hero, 'rpill')?.inner || '').replace(/[★☆]+/g, '').replace(/\s+/g, ' ').trim()
+  const tagline = strip(innerOf(hero, 'newline')?.inner || '')
+  const form = productForm(ctaLabel, 'buy grad', true)
+
+  const value = `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
+${sectionStyleCss}
+<div class="pgbld"><div class="wrap"><div class="hero">
+<div class="gallery">${galleryLiquid}</div>
+<div class="buybox">
+{% for block in section.blocks %}{% case block.type %}
+{% when 'title' %}<div {{ block.shopify_attributes }}>{% if block.settings.eyebrow != blank %}<div class="rpill">{{ block.settings.eyebrow }}</div>{% endif %}<h1 class="ptitle">{{ product.title }}</h1>{% if block.settings.tagline != blank %}<div class="newline">{{ block.settings.tagline }}</div>{% endif %}</div>
+{% when 'price' %}<div class="priceRow" {{ block.shopify_attributes }}><span class="now" data-sf-price>{{ product.price | money }}</span>{% if product.compare_at_price > product.price %}<span class="was">{{ product.compare_at_price | money }}</span>{% endif %}</div>
+{% when 'highlights' %}<div {{ block.shopify_attributes }}>{{ block.settings.content }}</div>
+{% when 'buy_buttons' %}<div {{ block.shopify_attributes }}>${form}</div>
+{% when 'trust' %}<div {{ block.shopify_attributes }}>{{ block.settings.content }}</div>
+{% when 'description' %}<details class="pdetails" {{ block.shopify_attributes }}><summary>{{ block.settings.label | default: 'Product details' }}</summary><div class="pdesc">{{ product.description }}</div></details>
+{% when '@app' %}{% render block %}
+{% endcase %}{% endfor %}
+</div>
+</div></div></div>
+{% schema %}
+${JSON.stringify({
+    name: nm,
+    tag: 'section',
+    settings: SECTION_STYLE_SETTINGS,
+    blocks: [
+      { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }] },
+      { type: 'price', name: 'Price', settings: [] },
+      { type: 'highlights', name: 'Highlights', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
+      { type: 'buy_buttons', name: 'Buy buttons', settings: [] },
+      { type: 'trust', name: 'Trust & payment', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
+      { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }] },
+      { type: '@app' },
+    ],
+    presets: [{ name: nm, blocks: [{ type: 'title' }, { type: 'price' }, { type: 'highlights' }, { type: 'buy_buttons' }, { type: 'trust' }, { type: 'description' }] }],
+  })}
+{% endschema %}`
+
+  const blocks: Record<string, any> = {
+    title: { type: 'title', settings: { eyebrow, tagline } },
+    price: { type: 'price', settings: {} },
+    highlights: { type: 'highlights', settings: { content: highlightsHtml } },
+    buy_buttons: { type: 'buy_buttons', settings: {} },
+    trust: { type: 'trust', settings: { content: trustHtml } },
+    description: { type: 'description', settings: { label: 'Product details' } },
+  }
+  return { value, blocks, blockOrder: ['title', 'price', 'highlights', 'buy_buttons', 'trust', 'description'] }
+}
+
 function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = []): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = name.slice(0, 25)
@@ -345,16 +414,25 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
 
   const sections = parts.map((p, i) => {
     const key = `${slug}-${i + 1}`
-    // 1) inject product-dynamic Liquid, then 2) lift the remaining static text/images into editable settings.
+    // The product buy-box slice → a native main-product section composed of theme BLOCKS (add/remove/
+    // reorder + @app). Every other slice → the normal dynamize + editablize pipeline.
+    const isBuyBox = dyn !== 'none' && /\bclass=["'][^"']*\bbuybox\b/.test(p.html) && /\bgtrack\b/.test(p.html)
+    if (isBuyBox) {
+      const mp = mainProductSection(p.html, cssKey, p.name)
+      return { id: key, key: `sections/${key}.liquid`, value: mp.value, blocks: mp.blocks, blockOrder: mp.blockOrder }
+    }
     const dynamized = dynamizeProduct(p.html, dyn)
     const { html, settings } = editablize(dynamized)
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings) }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings), blocks: undefined as any, blockOrder: undefined as any }
   })
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
   const order: Record<string, any> = {}
   const orderArr: string[] = []
-  for (const s of sections) { order[s.id] = { type: s.id }; orderArr.push(s.id) }
+  for (const s of sections) {
+    order[s.id] = s.blocks ? { type: s.id, blocks: s.blocks, block_order: s.blockOrder } : { type: s.id }
+    orderArr.push(s.id)
+  }
   const templateValue = JSON.stringify({ sections: order, order: orderArr }, null, 2)
 
   const templateKey =
