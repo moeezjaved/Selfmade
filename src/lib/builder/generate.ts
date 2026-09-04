@@ -12,6 +12,7 @@ import { llm } from '@/lib/llm'
 import { getTemplate } from './templates'
 import type { FilledContent, RenderOpts, SlotDef, SlotValue, ImportedProduct } from './types'
 import { getBuilderProduct } from './products'
+import { persistImagesToR2 } from '@/lib/brand-photos'
 import { loadBrandVoice, voiceBrief, productVision, fetchImageInput, generateAndHost, slugify, parseJsonObject } from './context'
 import type { ImageInput } from '@/lib/gemini/image'
 
@@ -37,10 +38,16 @@ export async function generatePage(
   const admin = createAdminClient()
   // Product source: an externally-imported product (pasted URL from Amazon/Etsy/etc.) wins; otherwise
   // pull the chosen product live from the connected Shopify store.
+  let imported = args.importedProduct as any
+  // Re-host the imported product's photos into our own R2 so the page has PERMANENT product images
+  // (not fragile hotlinks to the source's CDN). Download is DIRECT (uploadToR2, browser headers) —
+  // never through IPRoyal, exactly like the Spy media path; failures fall back to the original URL.
+  if (imported?.images?.length) {
+    const rehosted = await persistImagesToR2(userId, imported.images).catch(() => imported.images as string[])
+    imported = { ...imported, images: rehosted, image: rehosted[0] || imported.image }
+  }
   const [product, voice] = await Promise.all([
-    args.importedProduct
-      ? Promise.resolve(args.importedProduct as any)
-      : getBuilderProduct(userId, args.productId, args.brandId ?? null),
+    imported ? Promise.resolve(imported) : getBuilderProduct(userId, args.productId, args.brandId ?? null),
     loadBrandVoice(admin, userId, args.brandId ?? null),
   ])
 
