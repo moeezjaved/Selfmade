@@ -106,6 +106,47 @@ export function splitPageIntoSections(body: string): PageSection[] {
   }))
 }
 
+// ── Dynamic product Liquid ────────────────────────────────────────────────────────────────────────
+// On a PRODUCT template each section renders with a live `product` object. We rewrite the buy-box bits so
+// each product shows its OWN data + a working Add-to-Cart:
+//   'cart' (single product) → keep the built copy/images, but wire a real cart form.
+//   'full' (all products)   → also swap title / price / featured image to {{ product.* }} so every product
+//                             renders its own.
+export type DynamicMode = 'none' | 'cart' | 'full'
+
+const cartForm = (label: string, cls: string) =>
+  `<form method="post" action="/cart/add" style="margin:0" data-sf-cart>` +
+  `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">` +
+  `<button type="submit" class="${cls}">${label.trim() || 'Add to cart'}</button></form>`
+
+// Replace the inner content of the first element carrying `cls` with a Liquid expression.
+function replaceInner(html: string, cls: string, liquid: string): string {
+  const re = new RegExp(`(<(\\w+)[^>]*\\bclass=["'][^"']*\\b${cls}\\b[^"']*["'][^>]*>)([\\s\\S]*?)(<\\/\\2>)`, 'i')
+  return html.replace(re, `$1${liquid}$4`)
+}
+// Point every <img class="cls"> at a Liquid image url.
+function replaceImgSrc(html: string, cls: string, liquidSrc: string): string {
+  const re = new RegExp(`<img\\b([^>]*\\bclass=["'][^"']*\\b${cls}\\b[^"']*["'][^>]*)>`, 'gi')
+  return html.replace(re, (_m, attrs) => `<img${String(attrs).replace(/\ssrc=["'][^"']*["']/i, '').replace(/\ssrcset=["'][^"']*["']/i, '')} src="${liquidSrc}">`)
+}
+
+function dynamizeProduct(html: string, mode: DynamicMode): string {
+  if (mode === 'none') return html
+  let s = html
+  // Any primary CTA (a.buy) or sticky-bar button (a.fc-btn) → a real Add-to-Cart form (both modes).
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bbuy\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls))
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls))
+  if (mode === 'full') {
+    s = replaceInner(s, 'ptitle', '{{ product.title }}')
+    s = replaceInner(s, 'now', '{{ product.price | money }}')
+    s = replaceInner(s, 'was', '{% if product.compare_at_price > product.price %}{{ product.compare_at_price | money }}{% endif %}')
+    s = replaceInner(s, 'fc-name', '{{ product.title }}')
+    s = replaceImgSrc(s, 'gimg', '{{ product.featured_image | image_url: width: 1200 }}')
+    s = replaceImgSrc(s, 'fc-thumb', '{{ product.featured_image | image_url: width: 120 }}')
+  }
+  return s
+}
+
 /** Wrap one section's HTML into a Liquid section file, loading the shared CSS + a schema so it's native. */
 function liquidSection(cssKey: string, name: string, html: string): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
@@ -117,15 +158,17 @@ ${html}
 }
 
 /** Build every theme asset for a page: the CSS, one section per slice, and the JSON template. */
-export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: string; body: string; templateSuffix: string }): ThemeAssets {
+export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: string; body: string; templateSuffix: string; dynamic?: DynamicMode }): ThemeAssets {
   const slug = `sf-${opts.pageId.replace(/[^a-z0-9]/gi, '').slice(0, 12)}`
   const cssKey = `assets/${slug}.css`
   const cssValue = FONT_IMPORT + opts.css
   const parts = splitPageIntoSections(opts.body)
+  // Product templates get live `{{ product.* }}` data + a real Add-to-Cart form.
+  const dyn: DynamicMode = opts.kind === 'product' ? (opts.dynamic || 'none') : 'none'
 
   const sections = parts.map((p, i) => {
     const key = `${slug}-${i + 1}`
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, p.html) }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, dynamizeProduct(p.html, dyn)) }
   })
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
