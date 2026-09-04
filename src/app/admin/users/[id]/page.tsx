@@ -18,6 +18,7 @@ interface UserDetail {
   logins?: { d7: number; d30: number; total: number; recent: string[] };
   revenue?: { total: number; organic: number; orders: number; currency: string };
   reports?: { id: string; kind: string; title: string; subject: string | null; model: string | null; ad_count: number | null; body_md?: string; created_at: string }[];
+  audit?: { reached: boolean; completed: boolean; domain: string | null; brand_name: string | null; status: string | null; created_at: string | null; report: any | null };
   brands_workspace?: BrandWorkspace[];
 }
 
@@ -293,6 +294,32 @@ export default function UserProfile({ params }: { params: { id: string } }) {
           <Row label="Brands Created" value={user.brands_count ?? 0} />
         </Section>
       </div>
+
+      {/* Store Audit — where this user is in the audit + the report SNAPSHOT they saw (score, leaks, rival, AI). */}
+      <Section title="Store Audit">
+        <Row label="Reached the audit" value={<Check yes={!!user.audit?.reached || !!user.audit?.completed} />} />
+        <Row label="Completed the audit" value={<Check yes={!!user.audit?.completed} />} />
+        {user.audit?.completed ? (
+          <>
+            <Row label="Audited brand" value={user.audit?.brand_name || user.audit?.domain || '—'} />
+            {user.audit?.domain && <Row label="Domain" value={<span onClick={() => router.push(`/admin/site/${encodeURIComponent(String(user.audit!.domain).replace(/^https?:\/\//, '').replace(/\/.*$/, ''))}`)} style={{ color: '#2563eb', cursor: 'pointer' }} title="Open everything about this site">🌐 {user.audit!.domain}</span>} />}
+            <Row label="Ran on" value={fmt(user.audit?.created_at)} />
+            {user.audit?.report && (() => { const r = user.audit!.report; const cur = r.currency || '$'
+              return (<>
+                {r.score != null && <Row label="Audit score" value={<span style={{ fontWeight: 800, color: r.score >= 70 ? '#16a34a' : r.score >= 45 ? '#d97706' : '#dc2626' }}>{r.score}</span>} />}
+                {r.category && <Row label="Category" value={r.category} />}
+                {r.revenueLostPerYear != null && <Row label="Revenue lost / yr" value={<span style={{ fontWeight: 700, color: '#dc2626' }}>{cur}{Number(r.revenueLostPerYear).toLocaleString()}</span>} />}
+                {r.topLeak && <Row label="Top leak" value={r.topLeak} />}
+                {Array.isArray(r.leaks) && r.leaks.length > 0 && <Row label="Leaks" value={<ul style={{ margin: 0, paddingLeft: 16 }}>{r.leaks.map((l: string, i: number) => <li key={i} style={{ fontSize: 13, color: '#444' }}>{l}</li>)}</ul>} />}
+                {r.rivalName && <Row label="Rival winning" value={`${r.rivalName}${r.rivalFormula ? ` — ${r.rivalFormula}` : ''}`} />}
+                {(r.aiTotal != null) && <Row label="AI visibility" value={`Missing from ${r.aiMissing ?? '—'} of ${r.aiTotal} AI answers`} />}
+              </>)
+            })()}
+          </>
+        ) : (
+          <Row label="Status" value={<span style={{ color: '#d97706' }}>{user.audit?.reached ? 'Reached the audit but did not finish it' : 'Signed up — never reached the audit'}</span>} />
+        )}
+      </Section>
 
       {/* Per-brand workspace — website, connections, KB, products, templates, audiences, SEO push, revenue. */}
       {(user.brands_workspace?.length ?? 0) > 0 && (

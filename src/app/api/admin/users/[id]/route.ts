@@ -43,6 +43,28 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   ])
 
   const authUser = authRes.data?.user
+
+  // The store-audit the founder ran: the lead row carries the report SNAPSHOT (score, leaks, revenue lost,
+  // rival, AI visibility) + their brand/domain. Match by account id or email. Plus whether they even
+  // REACHED the audit (AUDIT_STARTED activity) — so the admin sees exactly where this user is.
+  const emailLc = (authUser?.email || '').toLowerCase()
+  const [auditLeadRes, auditStartedRes] = await Promise.all([
+    admin.from('audit_leads')
+      .select('email, domain, brand_name, report, status, converted_user_id, created_at')
+      .or(`converted_user_id.eq.${userId}${emailLc ? `,email.eq.${emailLc.replace(/,/g, '')}` : ''}`)
+      .order('created_at', { ascending: false }).limit(1),
+    admin.from('activity_logs').select('id').eq('user_id', userId).eq('action_type', 'AUDIT_STARTED').limit(1).maybeSingle(),
+  ])
+  const auditLead = (auditLeadRes.data || [])[0] || null
+  const audit = {
+    reached: !!auditStartedRes.data,
+    completed: !!auditLead,
+    domain: auditLead?.domain || null,
+    brand_name: auditLead?.brand_name || null,
+    status: auditLead?.status || null,
+    created_at: auditLead?.created_at || null,
+    report: auditLead?.report || null,
+  }
   const profile = profileRes.data
 
   // The REAL plan the app grants (subscriptions.plan / user_profiles.plan_id, most-generous) — NOT the
@@ -204,6 +226,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     logins,
     revenue,
     reports,
+    audit,
     brands_workspace,
     // Brands (projects) this user created — count + list for the admin.
     brands_count: (brandsRes.data || []).length,
