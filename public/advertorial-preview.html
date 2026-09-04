@@ -1,0 +1,317 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Advertorial template preview</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* ── Design tokens captured from the reference advertorial ── */
+  :root{
+    --ink:#1c1c1c; --body:#333; --muted:#6b6b6b;
+    --green:#356a3d;                 /* brand-accent headings */
+    --red:#d0342b;                   /* CTAs */
+    --pink:#fbe9ef;                  /* offer-card band + soft callouts */
+    --pink2:#fdeef2;
+    --greenbox:#edf6e9;              /* ✅ benefit boxes */
+    --dark:#1b1b28;                  /* countdown bar */
+    --cream:#f3e4bf;                 /* BEFORE pill */
+    --yellow:#f2d64e;                /* AFTER pill */
+    --line:#e7e7e7;
+    --sans:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#fff;color:var(--body);font-family:var(--sans);font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+  img{max-width:100%;display:block}
+  b,strong{color:var(--ink);font-weight:700}
+  .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+
+  /* Countdown bar */
+  .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
+  .count .lbl{opacity:.85;margin-right:8px}
+  .count b{color:#fff}
+
+  /* Two-column layout */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:44px;padding:40px 0 70px}
+  .main > *{margin:0 0 20px}
+
+  h1.head{font-size:40px;line-height:1.12;font-weight:800;color:var(--ink);letter-spacing:-.02em;margin:6px 0 14px}
+  h2.sec{font-size:26px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin:34px 0 10px}
+  h2.sec.brand{color:var(--green)}
+
+  .byline{display:flex;align-items:center;gap:11px;margin:0 0 18px}
+  .byline .av{width:40px;height:40px;border-radius:50%;background:#dcdcdc;display:grid;place-items:center;color:#999;flex:none}
+  .byline .n{font-size:15px;line-height:1.25}
+  .byline .n b{display:block;color:var(--ink)}
+  .byline .n span{color:var(--muted);font-size:13px}
+  .lead{font-size:19px;color:var(--body)}
+
+  .imgrow{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .ph{border-radius:6px;aspect-ratio:1/1;display:grid;place-items:center;color:#a2823a;font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;background:
+    radial-gradient(120% 120% at 60% 30%, #fdf3d4 0%, #f4dd94 45%, #eaca6a 100%)}
+  .ph.tall{aspect-ratio:auto;min-height:420px}
+  .ba{position:relative;border-radius:6px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;min-height:360px}
+  .ba .side{display:grid;place-items:center;color:#7a6a52;font-weight:700;letter-spacing:.06em}
+  .ba .b{background:linear-gradient(#d9cbb3,#c7b596)}
+  .ba .a{background:linear-gradient(#c69a63,#a5713f)}
+  .ba .pill{position:absolute;top:20px;padding:8px 20px;border-radius:100px;font-weight:800;font-size:15px;letter-spacing:.05em}
+  .ba .pill.bp{left:18px;background:var(--cream);color:#6b5a34}
+  .ba .pill.ap{right:18px;background:var(--yellow);color:#4a3d05}
+
+  /* ❌ / ✅ lists */
+  .xlist,.clist{list-style:none;padding:0;margin:14px 0}
+  .xlist li{position:relative;padding:8px 0 8px 34px;line-height:1.5}
+  .xlist li::before{content:"❌";position:absolute;left:0;top:7px;font-size:16px}
+  .cbox{background:var(--greenbox);border-radius:12px;padding:8px 20px;margin:16px 0}
+  .cbox li{position:relative;padding:12px 0 12px 34px;line-height:1.5;border-bottom:1px solid #dcebd4}
+  .cbox li:last-child{border-bottom:0}
+  .cbox li::before{content:"✅";position:absolute;left:0;top:12px;font-size:15px}
+
+  .costs p{margin:10px 0}
+  .callout{background:var(--pink2);border-radius:12px;padding:20px 24px;margin:18px 0}
+  .callout .tot{color:var(--red);font-weight:800;font-size:22px;margin:0 0 4px}
+
+  /* Timeline */
+  .tl{display:flex;flex-direction:column;gap:22px;margin:16px 0}
+  .tl .row{display:grid;grid-template-columns:120px 1fr;gap:18px;align-items:start}
+  .tl .thumb{border-radius:8px;aspect-ratio:1/1;background:radial-gradient(120% 120% at 60% 30%, #fdf3d4, #eaca6a)}
+  .tl .lab{display:inline-block;background:#33333f;color:#fff;font-size:14px;font-weight:700;padding:5px 12px;border-radius:7px;margin-bottom:7px}
+
+  /* Testimonials */
+  .tests{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:16px 0}
+  .tcard{border:1px solid var(--line);border-radius:14px;padding:18px}
+  .tcard .who{font-weight:800;color:var(--ink)}
+  .tcard .city{color:var(--muted);font-size:13px;margin-bottom:8px}
+  .tcard .stars{color:#f4b400;font-size:14px;margin-bottom:8px}
+  .tcard p{margin:0;font-size:15px}
+
+  /* FAQ */
+  .faq q{display:block;font-weight:800;color:var(--ink);font-size:17px;margin:18px 0 4px}
+  .faq p{margin:0 0 6px}
+
+  /* Big CTA button */
+  .cta-big{display:block;background:var(--red);color:#fff;text-decoration:none;text-align:center;border-radius:10px;padding:20px;font-weight:800;font-size:20px;margin:22px 0}
+  .cta-big small{display:block;font-weight:600;font-size:14px;opacity:.92;margin-top:5px}
+
+  /* Guarantee band */
+  .guar{background:var(--pink2);border-radius:14px;padding:26px;text-align:center;margin:26px 0}
+  .guar h3{margin:0 0 8px;font-size:22px;color:var(--ink);font-weight:800}
+
+  /* ── Sticky offer card ── */
+  .aside{position:relative}
+  .offer{position:sticky;top:20px;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 10px 30px -18px rgba(0,0,0,.25)}
+  .offer .pimg{aspect-ratio:1/1;background:radial-gradient(120% 120% at 55% 30%, #fdf3d4, #f0d281);display:grid;place-items:center;color:#a2823a;font-weight:700;letter-spacing:.08em;font-size:12px}
+  .offer .band{background:var(--pink);text-align:center;padding:16px}
+  .offer .band .st{color:#111;font-size:15px;letter-spacing:2px}
+  .offer .band .rt{font-size:12.5px;color:#555;margin:5px 0}
+  .offer .band .pn{font-weight:800;color:var(--ink);font-size:15px}
+  .offer .buy{display:block;background:var(--red);color:#fff;text-align:center;text-decoration:none;font-weight:800;font-size:18px;padding:18px}
+  .offer .trust{text-align:center;font-size:13px;color:#444;padding:12px 10px 16px;line-height:1.9}
+
+  .inline-offer{max-width:420px;margin:26px auto}
+  .inline-offer .offer{position:static;box-shadow:none}
+
+  .date{color:var(--muted);font-size:14px;margin-top:6px}
+
+  @media(max-width:900px){
+    .grid{grid-template-columns:1fr;gap:0}
+    h1.head{font-size:30px}
+    .aside{order:-1}                    /* card appears after hero on mobile — Atlas floats it; here we keep it in flow */
+    .offer{position:static;margin:18px 0}
+    .tests{grid-template-columns:1fr}
+    .tl .row{grid-template-columns:84px 1fr}
+  }
+  .note{background:#111;color:#fff;font-size:12.5px;text-align:center;padding:7px}
+
+  /* ── Floating sticky CTA bar (appears on scroll; the always-visible buy bar) ── */
+  body{padding-bottom:84px}
+  .floatcta{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(18px,calc((100% - 1180px)/2 + 22px));transform:translateY(115%);transition:transform .28s ease}
+  .floatcta.show{transform:none}
+  .fc-info{display:flex;align-items:center;gap:12px;min-width:0}
+  .fc-thumb{width:46px;height:46px;border-radius:8px;flex:none;background:radial-gradient(120% 120% at 55% 30%, #fdf3d4, #f0d281)}
+  .fc-name{font-weight:700;color:var(--ink);font-size:15px;line-height:1.25;min-width:0}
+  .fc-name b{color:var(--red)}
+  .fc-btn{background:var(--red);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 26px;border-radius:9px;white-space:nowrap;flex:none}
+  @media(max-width:600px){.fc-btn{padding:13px 18px;font-size:15px}.fc-name{font-size:13.5px}}
+</style>
+</head>
+<body>
+  <div class="note">▲ TEMPLATE PREVIEW — Selfmade advertorial_v1 (throwaway mock, sample copy). Layout &amp; design only; real builds swap product/copy/images.</div>
+
+  <!-- 1 · Countdown -->
+  <div class="count"><span class="lbl">LIMITED TIME :</span> <b>14 HRS</b> : <b>13 MINS</b> : <b>18 SECS</b></div>
+
+  <div class="wrap">
+  <div class="grid">
+    <!-- MAIN -->
+    <div class="main">
+      <h1 class="head">Transform dull strands into vibrant, healthy-looking hair</h1>
+      <div class="byline">
+        <div class="av">◍</div>
+        <div class="n"><b>By Fatima K.</b><span>Verified Customer</span></div>
+      </div>
+      <p class="lead">The nutrient-rich pre-wash oil that brings life back to tired hair without any harsh chemicals.</p>
+
+      <div class="imgrow">
+        <div class="ph">Product</div>
+        <div class="ph">Editorial shot</div>
+      </div>
+
+      <p>I still remember the day I realized my hair had lost its shine.</p>
+      <p>It was a sunny afternoon in June 2022, and I was getting ready for a friend's wedding. As I styled my hair, I caught a glimpse of my reflection and felt my heart sink. <b>My once vibrant locks looked dull and lifeless.</b></p>
+      <p>I thought it was just a bad hair day, but as the weeks passed, it only got worse.</p>
+
+      <h2 class="sec">When Dull Hair Took Over My Confidence</h2>
+      <p>It was like a shadow had crept over me. Every time I brushed my hair, I could see it breaking and feeling dry. <b>I started avoiding social gatherings</b> because I felt embarrassed of my hair.</p>
+
+      <div class="ba">
+        <div class="side b"></div><div class="side a"></div>
+        <span class="pill bp">BEFORE</span><span class="pill ap">AFTER</span>
+      </div>
+
+      <h2 class="sec">What I Was Facing Every Day:</h2>
+      <ul class="xlist">
+        <li><b>Dryness</b> – My hair felt like straw, brittle and lifeless.</li>
+        <li><b>Frizz</b> – No matter what I did, I couldn't tame the frizz.</li>
+        <li><b>Loss of Volume</b> – My hair looked flat and lifeless; it lacked body.</li>
+        <li><b>Self-Confidence</b> – I avoided mirrors and photos, feeling insecure.</li>
+      </ul>
+
+      <h2 class="sec">What Dull Hair Really Costs You</h2>
+      <div class="costs">
+        <p><b>At work:</b> I felt less confident during presentations, worrying about how I looked.</p>
+        <p><b>At home:</b> My family noticed my mood swings; I was irritable and withdrawn.</p>
+        <p><b>In relationships:</b> Friends started asking if I was okay; I was no longer myself.</p>
+      </div>
+
+      <h2 class="sec">The Day I Decided Enough Was Enough 😤</h2>
+      <p>I remember standing in front of the mirror one morning, feeling utterly defeated. <b>"I can't live like this anymore!"</b></p>
+      <ul class="xlist">
+        <li><b>Moisturizing Shampoo (PKR 1,499)</b> – Only made my hair feel greasy.</li>
+        <li><b>Deep Conditioning Mask (PKR 1,999)</b> – Heavy, weighed my hair down.</li>
+        <li><b>Hair Serum (PKR 999)</b> – Promised shine, left my hair flat.</li>
+        <li><b>Professional Treatment (PKR 5,000)</b> – Expensive, didn't fix the cause.</li>
+      </ul>
+      <div class="callout"><p class="tot">Total wasted: PKR 10,000+</p>And yet, my hair felt just as lifeless as before.</div>
+
+      <h2 class="sec">Running Out of Options</h2>
+      <p>I felt <b>stuck</b>, like I had exhausted all possibilities. I was desperate to find something that would actually work for my nutrient-deprived hair.</p>
+
+      <h2 class="sec brand">Then I Found G&amp;T Pre-Wash Oil</h2>
+      <p>Scrolling through social media one night, I stumbled upon a glowing review. <b>Real people. Real results.</b> Made from natural ingredients like ginger and turmeric, promising to nourish my hair without harsh chemicals. <b>Hope sparked in me again.</b></p>
+      <ul class="cbox">
+        <li><b>Revitalizes dull hair</b> – Brings back the shine and softness.</li>
+        <li><b>Natural ingredients</b> – Uses ginger and turmeric for nourishment.</li>
+        <li><b>Supports scalp health</b> – Refreshes and invigorates my scalp.</li>
+        <li><b>Easy to use</b> – Just apply before washing, no fuss involved.</li>
+      </ul>
+
+      <h2 class="sec">How G&amp;T Pre-Wash Oil Changed Everything</h2>
+      <p><b>What's in it:</b></p>
+      <ul class="cbox">
+        <li><b>Ginger</b> – Stimulates scalp circulation for healthier hair growth.</li>
+        <li><b>Turmeric</b> – Packed with antioxidants to revitalize hair.</li>
+        <li><b>Calendula Extract</b> – Nourishes and strengthens dry strands.</li>
+        <li><b>Vitamins &amp; Minerals</b> – Essential nutrients for healthier-looking hair.</li>
+      </ul>
+
+      <!-- inline offer card -->
+      <div class="inline-offer">
+        <div class="offer">
+          <div class="pimg">Product image</div>
+          <div class="band"><div class="st">★ ★ ★ ★ ★</div><div class="rt">[4.8] Rated by 10,000+ Customers</div><div class="pn">G&amp;T Pre-Wash Oil for Nutrient-Deprived Hair</div></div>
+          <a class="buy" href="#">👉 Check Availability</a>
+          <div class="trust">🔒 100% Secure Checkout<br>💰 90-Day Money-Back Guarantee</div>
+        </div>
+      </div>
+
+      <h2 class="sec">My Results, Week by Week</h2>
+      <div class="tl">
+        <div class="row"><div class="thumb"></div><div><span class="lab">Week 1</span><p style="margin:0">A slight improvement in texture — my hair felt softer and more manageable.</p></div></div>
+        <div class="row"><div class="thumb"></div><div><span class="lab">Week 2-3</span><p style="margin:0">I could see <b>more shine</b> returning! Friends started complimenting my hair.</p></div></div>
+        <div class="row"><div class="thumb"></div><div><span class="lab">Month 2-4</span><p style="margin:0">My hair transformed completely! <b>It looked fuller and more vibrant</b>, and I felt like myself again.</p></div></div>
+      </div>
+
+      <h2 class="sec">The Little Moments That Made It Worth It</h2>
+      <p>Like when my daughter said, <b>"Mom, your hair is so pretty!"</b> Or when my husband commented, <b>"You look so youthful!"</b> I felt like I was glowing from the inside out.</p>
+
+      <div class="tests">
+        <div class="tcard"><div class="stars">★★★★★</div><div class="who">Sarah M.</div><div class="city">Karachi</div><p>This oil truly changed my hair. It feels alive again! Highly recommend it.</p></div>
+        <div class="tcard"><div class="stars">★★★★★</div><div class="who">Ali R.</div><div class="city">Lahore</div><p>I was skeptical, but this product really works! My hair has never looked better.</p></div>
+        <div class="tcard"><div class="stars">★★★★★</div><div class="who">Fatima S.</div><div class="city">Islamabad</div><p>Finally, something that nourishes my hair without weighing it down. In love!</p></div>
+      </div>
+
+      <h2 class="sec">Why G&amp;T Pre-Wash Oil Works When Others Don't</h2>
+      <p>Unlike products that only mask the problem, it <b>targets the root causes</b> of dull hair, nourishing from the inside out.</p>
+      <ul class="cbox">
+        <li><b>Targets root causes</b> – Nourishes hair at a cellular level.</li>
+        <li><b>Natural ingredients</b> – No harmful chemicals that damage hair.</li>
+        <li><b>Easy application</b> – Just apply before washing for quick results.</li>
+        <li><b>Real testimonials</b> – Proven success from people just like you.</li>
+      </ul>
+
+      <h2 class="sec">How Everything Changed After G&amp;T Pre-Wash Oil</h2>
+      <p>💼 <b>Work:</b> I feel more confident presenting to my team.<br>
+         🏠 <b>Home:</b> I'm happier, and my family notices the difference.<br>
+         💖 <b>Social:</b> I love going out and getting compliments on my hair!<br>
+         ✨ <b>Self-esteem:</b> I finally feel like myself again.</p>
+      <p>Honestly? <b>I just wish I'd found it sooner.</b></p>
+      <p class="date">Wednesday, 15 October 2025</p>
+
+      <!-- 2nd countdown + guarantee -->
+      <div class="count" style="border-radius:10px"><span class="lbl">LIMITED TIME :</span> <b>14 HRS</b> : <b>13 MINS</b> : <b>04 SECS</b></div>
+      <div class="guar">
+        <h3>Try G&amp;T Pre-Wash Oil for 30 Days. Don't See Results? Get a 100% Refund</h3>
+        <p style="margin:0 0 14px">Limited stock available, so act fast and revive your hair today!</p>
+        <a class="cta-big" style="margin:0" href="#">👉 Apply Discount &amp; Check Availability</a>
+      </div>
+
+      <h2 class="sec">Common Questions</h2>
+      <div class="faq">
+        <q>How long does it take to see results?</q>
+        <p>Many users notice a difference within the first few weeks; for best results use it consistently for at least a month.</p>
+        <q>Is it safe for all hair types?</q>
+        <p>Absolutely! It's formulated with natural ingredients that are safe for all hair types.</p>
+        <q>What if it doesn't work for me?</q>
+        <p>We offer a 100% money-back guarantee. If you're not satisfied, just let us know!</p>
+        <q>Can I use it alongside other hair products?</q>
+        <p>Yes — apply it before washing your hair for the best results.</p>
+      </div>
+
+      <h2 class="sec brand">That's My Story</h2>
+      <p>If you're struggling with dull, lifeless hair, I urge you to give G&amp;T Pre-Wash Oil a try. It's time to take back your confidence. <b>Don't wait any longer!</b></p>
+      <a class="cta-big" href="#">👉 CHECK OUT G&amp;T PRE-WASH OIL →<small>⭐ 4.8/5 stars from 10,000+ verified users</small></a>
+    </div>
+
+    <!-- STICKY OFFER CARD -->
+    <div class="aside">
+      <div class="offer">
+        <div class="pimg">Product image</div>
+        <div class="band"><div class="st">★ ★ ★ ★ ★</div><div class="rt">[4.8] Rated by 10,000+ Customers</div><div class="pn">G&amp;T Pre-Wash Oil for Nutrient-Deprived Hair</div></div>
+        <a class="buy" href="#">👉 Check Availability</a>
+        <div class="trust">🔒 100% Secure Checkout<br>💰 90-Day Money-Back Guarantee</div>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- Floating sticky CTA bar -->
+  <div class="floatcta" id="floatcta">
+    <div class="fc-info">
+      <span class="fc-thumb"></span>
+      <span class="fc-name">G&amp;T Pre-Wash Oil · <b>PKR 2,499</b></span>
+    </div>
+    <a class="fc-btn" href="#">👉 Check Availability</a>
+  </div>
+
+  <script>
+    // Reveal the floating CTA once the reader scrolls past the hero.
+    var fc = document.getElementById('floatcta');
+    function toggleFc(){ fc.classList.toggle('show', window.scrollY > 480); }
+    window.addEventListener('scroll', toggleFc, { passive:true });
+    toggleFc();
+  </script>
+</body>
+</html>
