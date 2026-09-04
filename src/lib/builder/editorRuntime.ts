@@ -19,13 +19,23 @@ export const EDITOR_CSS = `
   [contenteditable=true]{outline:2px solid var(--accent,#d6248f)!important;outline-offset:2px;cursor:text}
   [contenteditable=true]:focus{outline:2px solid var(--accent,#d6248f)!important}
   .ed-secwrap{position:relative}
-  .ed-secwrap[data-ed-sechover]{outline:2px dashed rgba(0,0,0,.18);outline-offset:0;border-radius:6px}
-  .ed-rail{position:absolute;top:8px;right:8px;z-index:9999;display:none;gap:2px;background:#111;border-radius:9px;padding:4px;box-shadow:0 6px 20px -6px rgba(0,0,0,.5)}
+  .ed-secwrap[data-ed-sechover]{box-shadow:inset 0 0 0 2px rgba(37,99,235,.5);border-radius:6px}
+  .ed-secwrap.ed-drag-src{opacity:.4}
+  /* a clean light toolbar (Notion/Webflow-style) — appears top-right on section hover */
+  .ed-rail{position:absolute;top:10px;right:10px;z-index:9999;display:none;align-items:center;gap:1px;background:#fff;border:1px solid rgba(20,18,15,.1);border-radius:11px;padding:3px;box-shadow:0 8px 24px -8px rgba(20,18,15,.35)}
   .ed-secwrap[data-ed-sechover] > .ed-rail{display:flex}
-  .ed-rail button{all:unset;color:#fff;width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-size:14px;cursor:pointer;line-height:1}
-  .ed-rail button:hover{background:rgba(255,255,255,.16)}
-  .ed-add{position:relative;height:0}
-  .ed-add > button{position:absolute;left:50%;top:-14px;transform:translateX(-50%);z-index:9998;background:var(--accent,#d6248f);color:#fff;border:none;border-radius:100px;height:28px;padding:0 14px;font-size:13px;font-weight:700;cursor:pointer;opacity:0;transition:opacity .12s;box-shadow:0 4px 14px -4px rgba(0,0,0,.4)}
+  .ed-rail button{all:unset;color:#4a4653;min-width:30px;height:30px;display:grid;place-items:center;border-radius:8px;font-size:15px;cursor:pointer;line-height:1}
+  .ed-rail button:hover{background:#f0edf6;color:#181720}
+  .ed-rail .grip{cursor:grab;color:#9891a6;font-size:16px;letter-spacing:-2px}
+  .ed-rail .grip:active{cursor:grabbing}
+  .ed-rail .sep{width:1px;height:18px;background:rgba(20,18,15,.1);margin:0 2px}
+  .ed-rail .del:hover{background:#fdecec;color:#c0392b}
+  /* the insertion line shown while dragging a section */
+  .ed-drop{position:fixed;height:3px;background:var(--accent,#d6248f);border-radius:3px;z-index:100000;pointer-events:none;box-shadow:0 0 0 3px rgba(214,36,143,.18)}
+  body.ed-dragging, body.ed-dragging *{cursor:grabbing !important;user-select:none !important}
+  /* ＋ add-a-section button that appears between sections */
+  .ed-add{position:relative;height:0;z-index:9998}
+  .ed-add > button{position:absolute;left:50%;top:-15px;transform:translateX(-50%);background:var(--accent,#d6248f);color:#fff;border:none;border-radius:100px;height:30px;padding:0 16px;font-size:13px;font-weight:700;cursor:pointer;opacity:0;transition:opacity .12s;box-shadow:0 4px 14px -4px rgba(0,0,0,.4);white-space:nowrap}
   .ed-add:hover > button{opacity:1}
   .ed-toolbar{position:fixed;z-index:10000;display:none;gap:2px;background:#111;border-radius:9px;padding:4px;box-shadow:0 8px 24px -6px rgba(0,0,0,.5)}
   .ed-toolbar button{all:unset;color:#fff;min-width:28px;height:28px;display:grid;place-items:center;border-radius:6px;font-size:14px;font-weight:800;cursor:pointer;padding:0 6px}
@@ -129,19 +139,67 @@ export const EDITOR_JS = `
       sec.classList.add('ed-secwrap');
       eid(sec);
       var rail=document.createElement('div'); rail.className='ed-rail'; rail.contentEditable='false';
-      rail.innerHTML='<button data-a="up" title="Move up">▲</button><button data-a="down" title="Move down">▼</button><button data-a="dupe" title="Duplicate">⧉</button><button data-a="del" title="Delete">🗑</button>';
-      rail.addEventListener('click', function(ev){ ev.stopPropagation(); ev.preventDefault(); var a=ev.target.getAttribute('data-a'); if(a) sectionAction(sec,a); });
+      rail.innerHTML='<button class="grip" title="Drag to move this section">⠿</button><span class="sep"></span>'
+        +'<button data-a="up" title="Move up">↑</button><button data-a="down" title="Move down">↓</button>'
+        +'<span class="sep"></span><button data-a="dupe" title="Duplicate">⧉</button><button class="del" data-a="del" title="Delete">🗑</button>';
+      rail.addEventListener('click', function(ev){ ev.stopPropagation(); ev.preventDefault(); var a=(ev.target.getAttribute&&ev.target.getAttribute('data-a')); if(a) sectionAction(sec,a); });
+      // drag-to-reorder from the grip handle (Notion/Webflow-style)
+      var grip=rail.querySelector('.grip');
+      grip.addEventListener('pointerdown', function(ev){ ev.preventDefault(); ev.stopPropagation(); startDrag(sec, grip, ev); });
       sec.appendChild(rail);
+      // a ＋ divider (Notion/Framer-style) in the gap ABOVE this section → asks the parent to add here
+      if(!(sec.previousElementSibling&&sec.previousElementSibling.classList.contains('ed-add'))){
+        var add=document.createElement('div'); add.className='ed-add'; add.contentEditable='false';
+        add.innerHTML='<button title="Add a section here">＋ Add section here</button>';
+        add.querySelector('button').addEventListener('click', function(ev){ ev.preventDefault(); ev.stopPropagation(); post({t:'addAt', anchorId:eid(sec)}); });
+        sec.parentNode.insertBefore(add, sec);
+      }
     });
-    // hover state on sections
   }
-  document.addEventListener('mouseover', function(e){ var s=e.target.closest('.ed-secwrap'); document.querySelectorAll('.ed-secwrap[data-ed-sechover]').forEach(function(x){ if(x!==s) x.removeAttribute('data-ed-sechover'); }); if(s) s.setAttribute('data-ed-sechover',''); }, true);
+  document.addEventListener('mouseover', function(e){ if(dragEl) return; var s=e.target.closest('.ed-secwrap'); document.querySelectorAll('.ed-secwrap[data-ed-sechover]').forEach(function(x){ if(x!==s) x.removeAttribute('data-ed-sechover'); }); if(s) s.setAttribute('data-ed-sechover',''); }, true);
 
+  function siblingSections(sec){ return Array.prototype.filter.call((sec.parentNode||document).children, function(c){ return c.classList.contains('ed-secwrap'); }); }
   function sectionAction(sec, a){
-    if(a==='del'){ sec.remove(); markDirty(); }
-    else if(a==='up'){ var p=sec.previousElementSibling; while(p&&!p.classList.contains('ed-secwrap')) p=p.previousElementSibling; if(p) sec.parentNode.insertBefore(sec,p); markDirty(); }
-    else if(a==='down'){ var n=sec.nextElementSibling; while(n&&!n.classList.contains('ed-secwrap')) n=n.nextElementSibling; if(n) sec.parentNode.insertBefore(n,sec); markDirty(); }
+    if(a==='del'){ if(confirm('Delete this section?')){ sec.remove(); markDirty(); } }
+    else if(a==='up'){ var p=sec.previousElementSibling; while(p&&!p.classList.contains('ed-secwrap')) p=p.previousElementSibling; if(p){ sec.parentNode.insertBefore(sec,p); markDirty(); sec.scrollIntoView({behavior:'smooth',block:'center'}); } }
+    else if(a==='down'){ var n=sec.nextElementSibling; while(n&&!n.classList.contains('ed-secwrap')) n=n.nextElementSibling; if(n){ sec.parentNode.insertBefore(n,sec); markDirty(); sec.scrollIntoView({behavior:'smooth',block:'center'}); } }
     else if(a==='dupe'){ var clone=sec.cloneNode(true); clone.removeAttribute('data-eid'); eid(clone); sec.parentNode.insertBefore(clone, sec.nextSibling); markDirty(); }
+  }
+
+  // ── drag-to-reorder ──
+  var dragEl=null, dropLine=null, dropTarget=null, dropPos='before';
+  function startDrag(sec, grip, ev){
+    dragEl=sec; dropTarget=null;
+    sec.classList.add('ed-drag-src');
+    document.body.classList.add('ed-dragging');
+    document.querySelectorAll('.ed-secwrap[data-ed-sechover]').forEach(function(x){ x.removeAttribute('data-ed-sechover'); });
+    try{ grip.setPointerCapture(ev.pointerId); }catch(_){}
+    dropLine=document.createElement('div'); dropLine.className='ed-drop'; document.body.appendChild(dropLine);
+    grip.addEventListener('pointermove', onDrag);
+    grip.addEventListener('pointerup', endDrag, {once:true});
+    grip.addEventListener('pointercancel', endDrag, {once:true});
+  }
+  function onDrag(ev){
+    if(!dragEl) return;
+    // only reorder within the same container (keeps full-bleed bands vs contained sections in their lane)
+    var sibs=siblingSections(dragEl).filter(function(s){ return s!==dragEl; });
+    var y=ev.clientY, chosen=null, pos='after';
+    for(var i=0;i<sibs.length;i++){ var r=sibs[i].getBoundingClientRect(); if(y < r.top + r.height/2){ chosen=sibs[i]; pos='before'; break; } }
+    if(!chosen && sibs.length){ chosen=sibs[sibs.length-1]; pos='after'; }
+    dropTarget=chosen; dropPos=pos;
+    if(chosen && dropLine){ var rr=chosen.getBoundingClientRect(); dropLine.style.left=rr.left+'px'; dropLine.style.width=rr.width+'px'; dropLine.style.top=((pos==='before'?rr.top:rr.bottom)-1.5)+'px'; dropLine.style.display='block'; }
+    else if(dropLine){ dropLine.style.display='none'; }
+    // auto-scroll near edges
+    var vh=window.innerHeight; if(y<70) window.scrollBy(0,-14); else if(y>vh-70) window.scrollBy(0,14);
+  }
+  function endDrag(){
+    if(dragEl){
+      dragEl.classList.remove('ed-drag-src');
+      if(dropTarget && dropTarget!==dragEl){ if(dropPos==='before') dropTarget.parentNode.insertBefore(dragEl,dropTarget); else dropTarget.parentNode.insertBefore(dragEl,dropTarget.nextSibling); markDirty(); dragEl.scrollIntoView({behavior:'smooth',block:'center'}); }
+    }
+    document.body.classList.remove('ed-dragging');
+    if(dropLine){ dropLine.remove(); dropLine=null; }
+    dragEl=null; dropTarget=null;
   }
 
   // ── receive commands from the parent ──

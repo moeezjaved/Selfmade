@@ -8,7 +8,7 @@
  *   • Save → asks the iframe for clean HTML → POST /api/builder/editor (edited_html = source of truth)
  * Talks to the runtime over postMessage. See editorRuntime.ts for the protocol.
  */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 
 const ORANGE = '#e02f06', INK = '#181712', SUB = '#6b6560', LINE = '#e7e3dd', INSET = '#f6f4f1', WASH = '#fdeee9'
 
@@ -31,7 +31,9 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
   const [loadErr, setLoadErr] = useState('')
 
   const [imgTarget, setImgTarget] = useState<ImgTarget | null>(null)
+  const [anchor, setAnchor] = useState<string | null>(null)   // a ＋ was clicked → next added section lands here
   const [banner, setBanner] = useState<Msg>(null)
+  const composerRef = useRef<HTMLDivElement | null>(null)
   const htmlWaiters = useRef<Map<string, (html: string) => void>>(new Map())
 
   // ── load the editor document ──
@@ -61,6 +63,7 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
       if (!m || !m.__pgbld) return
       if (m.t === 'dirty') { setDirty(true) }
       else if (m.t === 'image') { setImgTarget({ id: m.id, src: m.src }) }
+      else if (m.t === 'addAt') { setAnchor(m.anchorId || null); composerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }) }
       else if (m.t === 'html') { const w = htmlWaiters.current.get(m.reqId); if (w) { w(m.html || ''); htmlWaiters.current.delete(m.reqId) } }
     }
     window.addEventListener('message', onMsg)
@@ -137,7 +140,14 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
           )}
         </div>
 
-        <SectionComposer pageId={pageId} productImage={productImage} onInsert={(html) => { send({ t: 'insertBlock', html }); setDirty(true) }} />
+        <SectionComposer
+          ref={composerRef}
+          pageId={pageId}
+          productImage={productImage}
+          anchored={!!anchor}
+          onClearAnchor={() => setAnchor(null)}
+          onInsert={(html) => { send({ t: 'insertBlock', html, ...(anchor ? { anchorId: anchor, position: 'before' } : {}) }); setAnchor(null); setDirty(true) }}
+        />
       </div>
 
       {imgTarget && (
@@ -153,7 +163,7 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
 }
 
 /* ─────────────────────────  AI "Add a section" composer  ───────────────────────── */
-function SectionComposer({ pageId, productImage, onInsert }: { pageId: string; productImage?: string | null; onInsert: (html: string) => void }) {
+const SectionComposer = forwardRef<HTMLDivElement, { pageId: string; productImage?: string | null; anchored?: boolean; onClearAnchor?: () => void; onInsert: (html: string) => void }>(function SectionComposer({ pageId, productImage, anchored, onClearAnchor, onInsert }, ref) {
   const [text, setText] = useState('')
   const [shot, setShot] = useState<string | null>(null)   // data URL of a screenshot to match
   const [busy, setBusy] = useState(false)
@@ -185,13 +195,19 @@ function SectionComposer({ pageId, productImage, onInsert }: { pageId: string; p
   const chips = ['Comparison vs competitors', 'Customer reviews', 'FAQ', 'Money-back guarantee', 'A stat band', 'Founder story']
 
   return (
-    <aside style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+    <aside ref={ref} style={{ border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
       <div style={{ padding: '16px 16px 12px', borderBottom: `1px solid ${LINE}` }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Add a section</div>
         <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, lineHeight: 1.5 }}>Describe it, or drop a screenshot to match. It writes on-brand copy and drops it in.</div>
       </div>
 
       <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minHeight: 0 }}>
+        {anchored && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: WASH, border: `1px solid ${ORANGE}33`, borderRadius: 10, padding: '8px 11px', fontSize: 12.5, color: ORANGE, fontWeight: 600 }}>
+            <span style={{ flex: 1 }}>↧ Inserting at the chosen spot</span>
+            <button onClick={onClearAnchor} style={{ border: 0, background: 'transparent', color: ORANGE, cursor: 'pointer', fontWeight: 700, fontSize: 12 }}>Add at end instead</button>
+          </div>
+        )}
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
           {chips.map((c) => (
             <button key={c} onClick={() => setText(c)} style={{ border: `1px solid ${LINE}`, background: INSET, color: INK, borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>{c}</button>
@@ -219,7 +235,7 @@ function SectionComposer({ pageId, productImage, onInsert }: { pageId: string; p
         )}
 
         {err && <div style={{ fontSize: 12.5, color: '#b42318' }}>{err}</div>}
-        {last && !err && <div style={{ fontSize: 12.5, color: '#087443' }}>✓ {last} — hover it to move, duplicate, or delete.</div>}
+        {last && !err && <div style={{ fontSize: 12.5, color: '#087443' }}>✓ {last} — hover it, then drag the ⠿ handle to move it, or use ⧉ / 🗑.</div>}
 
         <button onClick={run} disabled={busy || (!text.trim() && !shot)} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 12, padding: '11px 16px', fontWeight: 700, fontSize: 14, cursor: busy ? 'default' : 'pointer', opacity: busy || (!text.trim() && !shot) ? 0.5 : 1, marginTop: 'auto' }}>
           {busy ? 'Designing…' : 'Add section →'}
@@ -227,19 +243,24 @@ function SectionComposer({ pageId, productImage, onInsert }: { pageId: string; p
       </div>
     </aside>
   )
-}
+})
 
 /* ─────────────────────────  image click → Upload / Generate / Product photo  ───────────────────────── */
+const AI_IDEAS = ['On a marble counter, soft morning light', 'Held in a hand, lifestyle shot', 'On a clean studio background', 'Flat-lay with props']
 function ImagePopover({ target, productImage, onClose, onPick }: { target: ImgTarget; productImage?: string | null; onClose: () => void; onPick: (url: string) => void }) {
   const [tab, setTab] = useState<'upload' | 'generate'>('upload')
-  const [busy, setBusy] = useState(false)
+  const [busy, setBusy] = useState<false | 'upload' | 'generate' | 'product'>(false)
   const [err, setErr] = useState('')
   const [prompt, setPrompt] = useState('')
+  const [drag, setDrag] = useState(false)
+
+  useEffect(() => { const k = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }; window.addEventListener('keydown', k); return () => window.removeEventListener('keydown', k) }, [onClose])
 
   const upload = async (file?: File | null) => {
     if (!file) return
-    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) { setErr('Use JPEG, PNG, WebP or GIF.'); return }
-    setBusy(true); setErr('')
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(file.type)) { setErr('Use a JPEG, PNG, WebP or GIF.'); return }
+    if (file.size > 8 * 1024 * 1024) { setErr('That image is over 8MB — pick a smaller one.'); return }
+    setBusy('upload'); setErr('')
     try {
       const dataB64 = await new Promise<string>((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result || '').split(',')[1] || ''); rd.onerror = rej; rd.readAsDataURL(file) })
       const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ mode: 'upload', dataB64, mimeType: file.type }) })
@@ -250,7 +271,7 @@ function ImagePopover({ target, productImage, onClose, onPick }: { target: ImgTa
 
   const generate = async () => {
     if (!prompt.trim()) return
-    setBusy(true); setErr('')
+    setBusy('generate'); setErr('')
     try {
       const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, credentials: 'include', body: JSON.stringify({ mode: 'generate', prompt, referenceUrl: target.src, aspectRatio: '1:1' }) })
       const j = await r.json(); if (!r.ok || !j.url) throw new Error(j?.error || 'Could not generate.')
@@ -258,45 +279,70 @@ function ImagePopover({ target, productImage, onClose, onPick }: { target: ImgTa
     } catch (e: any) { setErr(e?.message || 'Could not generate.') } finally { setBusy(false) }
   }
 
+  const busyAny = busy !== false
+
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.42)', zIndex: 100, display: 'grid', placeItems: 'center', padding: 20 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '100%', background: '#fff', borderRadius: 18, overflow: 'hidden', boxShadow: '0 30px 80px -30px rgba(0,0,0,.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: 16, borderBottom: `1px solid ${LINE}` }}>
-          <img src={target.src} alt="" style={{ width: 52, height: 52, borderRadius: 10, objectFit: 'cover', border: `1px solid ${LINE}` }} />
-          <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 800, color: INK, fontSize: 15 }}>Replace image</div>
-            <div style={{ fontSize: 12.5, color: SUB }}>Upload your own or generate one with AI.</div>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.5)', backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', zIndex: 100, display: 'grid', placeItems: 'center', padding: 20, animation: 'edfade .16s ease' }}>
+      <style>{`@keyframes edfade{from{opacity:0}to{opacity:1}}@keyframes edpop{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:none}}@keyframes edspin{to{transform:rotate(360deg)}}`}</style>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 468, maxWidth: '100%', background: '#fff', borderRadius: 22, overflow: 'hidden', boxShadow: '0 40px 100px -30px rgba(20,18,15,.6), 0 0 0 1px rgba(20,18,15,.06)', animation: 'edpop .2s cubic-bezier(.2,.8,.2,1)' }}>
+        {/* header — current image as a soft banner preview */}
+        <div style={{ position: 'relative', height: 132, background: `${INSET} url(${target.src}) center/cover`, borderBottom: `1px solid ${LINE}` }}>
+          <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(180deg, rgba(20,18,15,0) 30%, rgba(20,18,15,.72))' }} />
+          <button onClick={onClose} aria-label="Close" style={{ position: 'absolute', top: 12, right: 12, border: 0, background: 'rgba(255,255,255,.92)', borderRadius: 999, width: 30, height: 30, cursor: 'pointer', fontSize: 17, color: INK, lineHeight: 1, boxShadow: '0 2px 8px rgba(0,0,0,.2)' }}>×</button>
+          <div style={{ position: 'absolute', left: 18, bottom: 14, color: '#fff' }}>
+            <div style={{ fontWeight: 800, fontSize: 17, letterSpacing: '-.01em' }}>Replace this image</div>
+            <div style={{ fontSize: 12.5, opacity: .9, marginTop: 2 }}>Upload your own, or generate one with AI.</div>
           </div>
-          <button onClick={onClose} style={{ border: 0, background: INSET, borderRadius: 999, width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: SUB }}>×</button>
         </div>
 
-        <div style={{ display: 'flex', gap: 4, padding: '12px 16px 0' }}>
-          {(['upload', 'generate'] as const).map((t) => (
-            <button key={t} onClick={() => setTab(t)} style={{ border: 0, background: tab === t ? WASH : 'transparent', color: tab === t ? ORANGE : SUB, fontWeight: 700, fontSize: 13, padding: '8px 14px', borderRadius: 999, cursor: 'pointer', textTransform: 'capitalize' }}>{t === 'upload' ? 'Upload' : 'Generate with AI'}</button>
+        {/* segmented tabs */}
+        <div style={{ display: 'flex', gap: 4, background: INSET, border: `1px solid ${LINE}`, borderRadius: 999, padding: 4, margin: '16px 18px 0' }}>
+          {([['upload', 'Upload'], ['generate', 'Generate with AI']] as const).map(([t, label]) => (
+            <button key={t} onClick={() => { setTab(t); setErr('') }} style={{ flex: 1, border: 0, background: tab === t ? '#fff' : 'transparent', color: tab === t ? ORANGE : SUB, fontWeight: 700, fontSize: 13, padding: '8px 10px', borderRadius: 999, cursor: 'pointer', boxShadow: tab === t ? '0 1px 3px rgba(20,18,15,.16)' : 'none', transition: 'all .12s' }}>{label}</button>
           ))}
         </div>
 
-        <div style={{ padding: 16 }}>
+        <div style={{ padding: '16px 18px 18px' }}>
           {tab === 'upload' ? (
-            <label style={{ display: 'block', border: `1.5px dashed ${LINE}`, borderRadius: 12, padding: '28px 16px', textAlign: 'center', cursor: 'pointer', color: SUB, fontSize: 13.5 }}>
-              {busy ? 'Uploading…' : '📤 Click to choose an image (max 8MB)'}
-              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={busy} onChange={(e) => upload(e.target.files?.[0])} style={{ display: 'none' }} />
+            <label
+              onDragOver={(e) => { e.preventDefault(); setDrag(true) }}
+              onDragLeave={() => setDrag(false)}
+              onDrop={(e) => { e.preventDefault(); setDrag(false); upload(e.dataTransfer.files?.[0]) }}
+              style={{ display: 'grid', placeItems: 'center', gap: 10, border: `2px dashed ${drag ? ORANGE : LINE}`, background: drag ? WASH : INSET, borderRadius: 16, padding: '30px 16px', textAlign: 'center', cursor: busyAny ? 'default' : 'pointer', transition: 'all .12s' }}>
+              <div style={{ width: 46, height: 46, borderRadius: 999, background: '#fff', border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center', fontSize: 20 }}>
+                {busy === 'upload' ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: 999, display: 'inline-block', animation: 'edspin .7s linear infinite' }} /> : '⤒'}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, color: INK, fontSize: 14 }}>{busy === 'upload' ? 'Uploading…' : drag ? 'Drop to upload' : 'Drag & drop, or click to upload'}</div>
+                <div style={{ fontSize: 12, color: SUB, marginTop: 3 }}>JPEG, PNG, WebP or GIF · up to 8MB</div>
+              </div>
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" disabled={busyAny} onChange={(e) => upload(e.target.files?.[0])} style={{ display: 'none' }} />
             </label>
           ) : (
             <div>
-              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the image — e.g. the product on a marble bathroom counter, soft morning light" style={{ width: '100%', minHeight: 84, resize: 'vertical', border: `1px solid ${LINE}`, borderRadius: 10, padding: 11, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', color: INK }} />
-              <button onClick={generate} disabled={busy || !prompt.trim()} style={{ marginTop: 10, width: '100%', border: 0, background: ORANGE, color: '#fff', borderRadius: 10, padding: '11px', fontWeight: 700, fontSize: 14, cursor: busy ? 'default' : 'pointer', opacity: busy || !prompt.trim() ? 0.5 : 1 }}>{busy ? 'Generating…' : 'Generate image'}</button>
+              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the image you want…" style={{ width: '100%', minHeight: 78, resize: 'vertical', border: `1px solid ${LINE}`, borderRadius: 12, padding: 12, fontSize: 13.5, fontFamily: 'inherit', outline: 'none', color: INK }} />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 8 }}>
+                {AI_IDEAS.map((s) => <button key={s} onClick={() => setPrompt(s)} style={{ border: `1px solid ${LINE}`, background: INSET, color: SUB, borderRadius: 999, padding: '4px 10px', fontSize: 11.5, fontWeight: 600, cursor: 'pointer' }}>{s}</button>)}
+              </div>
+              <button onClick={generate} disabled={busyAny || !prompt.trim()} style={{ marginTop: 12, width: '100%', border: 0, background: ORANGE, color: '#fff', borderRadius: 12, padding: '12px', fontWeight: 700, fontSize: 14, cursor: busyAny ? 'default' : 'pointer', opacity: busyAny || !prompt.trim() ? 0.55 : 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                {busy === 'generate' ? <><span style={{ width: 15, height: 15, border: '2px solid rgba(255,255,255,.5)', borderTopColor: '#fff', borderRadius: 999, display: 'inline-block', animation: 'edspin .7s linear infinite' }} /> Generating…</> : '✨ Generate image'}
+              </button>
               <div style={{ fontSize: 11.5, color: SUB, marginTop: 8, textAlign: 'center' }}>Uses AI image credits.</div>
             </div>
           )}
 
           {productImage && productImage !== target.src && (
-            <button onClick={() => onPick(productImage)} disabled={busy} style={{ marginTop: 12, width: '100%', border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 10, padding: '10px', fontWeight: 600, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
-              <img src={productImage} alt="" style={{ width: 22, height: 22, borderRadius: 5, objectFit: 'cover' }} /> Use the product photo
-            </button>
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '14px 0' }}><div style={{ flex: 1, height: 1, background: LINE }} /><span style={{ fontSize: 11, color: SUB, fontWeight: 600 }}>or</span><div style={{ flex: 1, height: 1, background: LINE }} /></div>
+              <button onClick={() => { setBusy('product'); onPick(productImage) }} disabled={busyAny} style={{ width: '100%', border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 12, padding: 10, fontWeight: 600, fontSize: 13, cursor: busyAny ? 'default' : 'pointer', display: 'flex', alignItems: 'center', gap: 10, textAlign: 'left' }}>
+                <img src={productImage} alt="" style={{ width: 34, height: 34, borderRadius: 8, objectFit: 'cover', border: `1px solid ${LINE}` }} />
+                <span style={{ flex: 1 }}>Use the product photo</span>
+                <span style={{ color: ORANGE, fontSize: 16 }}>→</span>
+              </button>
+            </>
           )}
 
-          {err && <div style={{ fontSize: 12.5, color: '#b42318', marginTop: 10 }}>{err}</div>}
+          {err && <div style={{ fontSize: 12.5, color: '#b42318', marginTop: 12, background: '#fdecec', borderRadius: 8, padding: '8px 11px' }}>{err}</div>}
         </div>
       </div>
     </div>
