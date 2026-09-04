@@ -12,15 +12,11 @@
  * force-overwrites the live theme silently. Requires write_themes — checked first; callers prompt a
  * one-time reconnect when it's missing.
  */
-import { shopifyRest, tokenFor, hasThemeScopes, type StoreRow } from '@/lib/shopify/client'
+import { shopifyRest, tokenFor, hasThemeScopes, fetchAccessScopes, type StoreRow } from '@/lib/shopify/client'
 import { buildThemeAssets, type PageKind } from './shopify-sections'
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const numericId = (id: string | number): string => String(id).replace(/^.*\/(\d+)$/, '$1').replace(/[^0-9]/g, '')
-
-async function grantedScopes(store: StoreRow, token: string): Promise<string> {
-  try { const sc = await shopifyRest(store.shop_domain, token, 'oauth/access_scopes.json'); return (sc?.access_scopes || []).map((x: any) => x.handle).join(',') } catch { return '' }
-}
 
 export type ThemeTarget = 'this' | 'selected' | 'store'
 export type ThemePublishResult = { url: string; previewUrl?: string; sections: number; themeId: number; needsScopes?: boolean }
@@ -37,7 +33,7 @@ export async function publishToTheme(store: StoreRow, opts: {
   themeLive?: boolean
 }): Promise<ThemePublishResult> {
   const token = tokenFor(store)
-  if (!hasThemeScopes(await grantedScopes(store, token))) return { url: '', sections: 0, themeId: 0, needsScopes: true }
+  if (!hasThemeScopes((await fetchAccessScopes(store.shop_domain, token)).join(','))) return { url: '', sections: 0, themeId: 0, needsScopes: true }
 
   // Resolve the target theme — the one the merchant chose, else the published (main) theme.
   const themes = await shopifyRest(store.shop_domain, token, 'themes.json')

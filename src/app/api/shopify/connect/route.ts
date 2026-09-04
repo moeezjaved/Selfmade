@@ -17,7 +17,7 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 import {
   normalizeShopDomain, isValidShopDomain, validateShopToken, encryptShopifyToken,
   resolveStore, seedBrandWebsite, SHOPIFY_REQUIRED_SCOPES, ShopifyError,
-  shopifyRest, tokenFor, hasThemeScopes,
+  tokenFor, hasThemeScopes, fetchAccessScopes,
 } from '@/lib/shopify/client'
 import { syncShopifyProducts, catalogHealth } from '@/lib/shopify/sync'
 
@@ -35,8 +35,7 @@ export async function GET(_req: NextRequest) {
   const health = await catalogHealth(admin, store.id).catch(() => null)
   // Live-check the granted scopes (truth from Shopify, not the stored value) — the Page Builder needs
   // write_themes to publish product/home pages as native theme sections.
-  let scopes: string[] = []
-  try { const sc = await shopifyRest(store.shop_domain, tokenFor(store), 'oauth/access_scopes.json'); scopes = (sc?.access_scopes || []).map((x: any) => x.handle).filter(Boolean) } catch {}
+  const scopes = await fetchAccessScopes(store.shop_domain, tokenFor(store))
   return NextResponse.json({
     connected: true,
     shop_domain: store.shop_domain,
