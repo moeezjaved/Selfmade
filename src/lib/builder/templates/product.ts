@@ -90,6 +90,16 @@ const CSS = `
 .pgbld .buy{display:block;width:100%;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
 .pgbld .buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
 .pgbld .buy.big{max-width:520px;margin:8px auto 0}
+/* native-style variant picker (pills + colour swatches) */
+.pgbld .sf-optrow{margin:0 0 13px}
+.pgbld .sf-optname{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 7px}
+.pgbld .sf-optname b{font-weight:800}
+.pgbld .sf-optvals{display:flex;flex-wrap:wrap;gap:8px}
+.pgbld .sf-pill{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:9px 15px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit;display:inline-flex;align-items:center;gap:8px;transition:border-color .12s,box-shadow .12s}
+.pgbld .sf-pill:hover{border-color:var(--ink)}
+.pgbld .sf-pill.on{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.pgbld .sf-pill.sf-color{padding:7px 14px 7px 8px}
+.pgbld .sf-dot{width:18px;height:18px;border-radius:50%;border:1px solid rgba(0,0,0,.14);flex:none;background:#e7e4ee}
 .pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
 .pgbld .pdetails{border-top:1px solid var(--line);margin-top:16px}
 .pgbld .pdetails summary{cursor:pointer;list-style:none;padding:14px 0;font-weight:800;color:var(--ink);font-size:14.5px;display:flex;justify-content:space-between;align-items:center}
