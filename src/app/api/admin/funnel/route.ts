@@ -45,8 +45,18 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(2000)
   const leads = leadsRaw || []
-  const auditsCompleted = leads.length
-  const adsCompleted = leads.filter((l: any) => !l.domain).length
+
+  // ALSO include the OLD anonymous audits (pre-refactor audit_scans / ads_audit_scans) so the funnel keeps
+  // the full history — the brands that scanned before the signup-first flow existed. Merged with the new
+  // audit_leads below, they form one complete "who audited" picture.
+  const [{ data: seoScans }, { data: adsScans }] = await Promise.all([
+    admin.from('audit_scans').select('domain, site_name, score, category, claimed_by, created_at').order('created_at', { ascending: false }).limit(1000),
+    admin.from('ads_audit_scans').select('page_id, brand_name, niche, score, claimed_by, created_at').order('created_at', { ascending: false }).limit(1000),
+  ])
+  const oldSeo = seoScans || [], oldAds = adsScans || []
+
+  const auditsCompleted = leads.length + oldSeo.length + oldAds.length
+  const adsCompleted = leads.filter((l: any) => !l.domain).length + oldAds.length
 
   // signup-first flow: a lead's email == their account email. `converted_user_id` is only set on
   // PAYMENT (see paypal grant), so resolve "signed up" by matching the lead email to a registered
@@ -57,16 +67,31 @@ export async function GET(request: NextRequest) {
     for (const u of (list?.users || [])) if (u.email) emailToId.set(String(u.email).toLowerCase(), u.id)
   } catch { /* best-effort */ }
   const leadUserId = (l: any): string | null => l.converted_user_id || emailToId.get(String(l.email || '').toLowerCase()) || null
-  const convertedIds = Array.from(new Set(leads.map(leadUserId).filter(Boolean))) as string[]
+
+  // Signed-up = new leads that resolved to an account + old scans that were claimed.
+  const convertedIds = Array.from(new Set([
+    ...leads.map(leadUserId).filter(Boolean),
+    ...oldSeo.filter((s: any) => s.claimed_by).map((s: any) => s.claimed_by),
+    ...oldAds.filter((s: any) => s.claimed_by).map((s: any) => s.claimed_by),
+  ])) as string[]
 
   // Everyone who audited but hasn't signed up — the hot-lead list ("which brands/sites are auditing").
-  const anonymousAudits = leads
-    .filter((l: any) => !leadUserId(l))
-    .map((l: any) => ({
+  // New leads (with a captured email) + old anonymous SEO/ADS scans that were never claimed.
+  const anonymousAudits = [
+    ...leads.filter((l: any) => !leadUserId(l)).map((l: any) => ({
       type: l.domain ? 'seo' : 'ads', domain: l.domain, page_id: null,
       site_name: l.brand_name || l.domain || l.email, score: null, category: null,
       email: l.email, status: l.status, created_at: l.created_at,
-    }))
+    })),
+    ...oldSeo.filter((s: any) => !s.claimed_by).map((s: any) => ({
+      type: 'seo', domain: s.domain, page_id: null, site_name: s.site_name, score: s.score, category: s.category,
+      email: null, status: null, created_at: s.created_at,
+    })),
+    ...oldAds.filter((s: any) => !s.claimed_by).map((s: any) => ({
+      type: 'ads', domain: null, page_id: s.page_id, site_name: s.brand_name, score: s.score, category: s.niche,
+      email: null, status: null, created_at: s.created_at,
+    })),
+  ].sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
 
   // Activation among the founders whose audit lead CONVERTED to an account.
   let connected = 0, generatedAd = 0, paidFromAudit = 0
