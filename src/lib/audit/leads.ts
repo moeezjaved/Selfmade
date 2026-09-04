@@ -13,6 +13,8 @@ export type LeadInput = {
   brandName?: string | null
   report?: AuditLead['report']
   adUrls?: string[]
+  /** the logged-in founder's id, if any — links the lead to the account at capture time (signup-first) */
+  userId?: string | null
 }
 
 /** Auto-send the full #1–#8 sequence? Default YES — the founder wants the whole drip to go out on schedule.
@@ -34,6 +36,11 @@ export async function captureAuditLead(admin: Admin, input: LeadInput): Promise<
   const { data: lead, error } = await admin.from('audit_leads').upsert({
     email, domain, brand_name: input.brandName || null, report: input.report || null,
     ad_urls: input.adUrls || [], status: 'active', updated_at: new Date().toISOString(),
+    // A logged-in founder finishing the audit IS the signup — link it to their account NOW, so the funnel
+    // reads a clean converted_user_id instead of relying on email-matching. Only SET it (never overwrite
+    // with null on an anonymous re-capture). status stays 'active' so the nurture drip still runs until
+    // they go paid (convertAuditLeads stops it then).
+    ...(input.userId ? { converted_user_id: input.userId } : {}),
   }, { onConflict: 'email,domain' }).select('*').maybeSingle()
   if (error || !lead) return { ok: false }
 

@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
 
   const res = await captureAuditLead(admin, {
     email, domain: body?.domain ? String(body.domain) : null, brandName: body?.brandName ? String(body.brandName).slice(0, 80) : null, report, adUrls,
+    userId: userId || null,   // signup-first: link the lead to the logged-in founder at capture time
   })
   if (!res.ok) return NextResponse.json({ error: 'capture_failed' }, { status: 500 })
   return NextResponse.json({ ok: true })
