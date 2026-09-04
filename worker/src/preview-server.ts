@@ -67,33 +67,92 @@ interface PreviewAd {
 // Render a URL at desktop + mobile viewports and return above-the-fold JPEGs (base64) for the CRO
 // vision audit. Above-the-fold is where 5-second-clarity / CTA / hero-trust live — and it keeps the
 // images small for the vision model.
-// Load a URL in a real (stealth) browser through the IPRoyal residential session and return the
-// rendered DOM. Used by the Page Builder's URL importer for sites that block bare/proxied HTTP fetch.
-async function fetchRenderedHtml(target: string): Promise<{ html: string | null; error?: string }> {
-  const sessionId = randomBytes(4).toString('hex').slice(0, 8)
-  let proxy: { url: string; close: () => Promise<void> } | null = null
-  let browser: Browser | null = null
+// A page that came back as a bot-block / challenge rather than the real product page.
+const BLOCK_RE = /Robot Check|not a robot|to discuss automated access|enter the characters you see|Type the characters|captcha|503\s*-?\s*Service Unavailable|Service Unavailable Error|Access Denied|Request blocked|cf-browser-verification|Just a moment\.\.\.|Attention Required|Please Wait\.\.\. \| Cloudflare/i
+function looksBlocked(status: number, html: string): boolean {
+  if (status === 503 || status === 429 || status === 403) return true
+  if (!html || html.length < 800) return true
+  return BLOCK_RE.test(html.slice(0, 8000))
+}
+
+// ── Amazon: the desktop /dp/ page is captcha-gated for datacenter+residential IPs, but the MOBILE
+// product page (/gp/aw/d/<ASIN>) serves the full product with far weaker bot defense. We rewrite to it,
+// then extract the product straight from the live DOM (the mobile page carries NO JSON-LD / og-tags, so
+// generic parsers get nothing). Images come from Amazon's public CDN, downloaded direct (never proxied). ──
+const AMZ_ASIN_RE = /\/(?:dp|gp\/product|gp\/aw\/d|product)\/([A-Z0-9]{10})(?:[/?]|$)/i
+export function isAmazonUrl(u: string): boolean { try { return /(^|\.)amazon\.[a-z.]+$/i.test(new URL(u).hostname) } catch { return false } }
+function amazonAsin(u: string): string | null { try { const m = AMZ_ASIN_RE.exec(new URL(u).pathname); return m ? m[1].toUpperCase() : null } catch { return null } }
+function amazonMobileUrl(u: string): string { const a = amazonAsin(u); return a ? `https://www.amazon.com/gp/aw/d/${a}` : u }
+
+type ExtractedProduct = { title?: string; price?: string; images: string[]; features: string[] }
+// Runs in the page. Pulls title/price/image/features from Amazon's mobile DOM and upscales thumbnails to
+// full resolution (strip the `._AC_SX425_` size token → base image). Kept dependency-free (page context).
+async function extractAmazonProduct(page: any): Promise<ExtractedProduct | null> {
   try {
-    if (proxyChainEnabled) proxy = await startProxyChain({ sessionId, lifetime: '5m', country: 'us' })
-    browser = await chromiumExtra.launch({
-      headless: false,
-      args: ['--headless=new', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled', '--disable-gpu'],
-      proxy: proxy ? { server: proxy.url } : undefined,
-    }) as unknown as Browser
-    const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 900 }, locale: 'en-US' })
-    const page = await ctx.newPage()
+    return await page.evaluate(() => {
+      const txt = (sel: string) => { const el = document.querySelector(sel) as HTMLElement | null; return el ? (el.innerText || '').trim() : '' }
+      const full = (s: string) => s.replace(/\._[A-Z0-9,_-]+_\.(jpg|jpeg|png|webp)(\b|$)/i, '.$1')
+      const title = txt('#productTitle') || txt('#title')
+      const price = txt('.a-price .a-offscreen') || txt('#priceblock_ourprice') || txt('#corePrice_feature_div .a-offscreen')
+      const imgs = new Set<string>()
+      const push = (s?: string | null) => { if (s && /\/images\/I\//.test(s)) imgs.add(full(s.split(' ')[0])) }
+      push((document.querySelector('#landingImage') as HTMLImageElement | null)?.currentSrc)
+      push((document.querySelector('#landingImage') as HTMLImageElement | null)?.getAttribute('data-old-hires'))
+      push((document.querySelector('#imgBlkFront') as HTMLImageElement | null)?.src)
+      const dyn = (document.querySelector('#landingImage') as HTMLElement | null)?.getAttribute('data-a-dynamic-image')
+      if (dyn) { try { Object.keys(JSON.parse(dyn)).forEach(push) } catch {} }
+      document.querySelectorAll('#altImages img, #main-image-container img, li.image img').forEach((e) => push((e as HTMLImageElement).src))
+      const features = Array.from(document.querySelectorAll('#feature-bullets li, #feature-bullets .a-list-item'))
+        .map((e) => (e as HTMLElement).innerText.trim())
+        .filter((t) => t && t.length > 8 && !/image (un)?available|not available for/i.test(t))
+      return { title, price, images: Array.from(imgs).slice(0, 8), features: features.slice(0, 8) }
+    })
+  } catch { return null }
+}
+
+// Load a URL in a real (stealth) browser through the IPRoyal residential session and return the rendered
+// DOM. Used by the Page Builder's URL importer for sites that block bare/proxied HTTP fetch. Retries with
+// a FRESH residential session (new IP) on a bot-block/challenge — the hostile sites (Amazon) 503 a given
+// IP but usually let a different one through.
+async function fetchRenderedHtml(target: string, attempts = 3): Promise<{ html: string | null; error?: string; product?: ExtractedProduct }> {
+  let lastErr: string | undefined
+  const amazon = isAmazonUrl(target)
+  const nav = amazon ? amazonMobileUrl(target) : target   // Amazon → reliable mobile product page
+  for (let i = 0; i < attempts; i++) {
+    const sessionId = randomBytes(4).toString('hex').slice(0, 8)   // new session id → new residential IP
+    let proxy: { url: string; close: () => Promise<void> } | null = null
+    let browser: Browser | null = null
     try {
-      await page.goto(target, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-      await page.waitForTimeout(1600)   // let JSON-LD + client-rendered product data settle
-      const html = await page.content()
-      return { html: html.slice(0, 3_000_000) }
-    } finally { await ctx.close().catch(() => {}) }
-  } catch (e: any) {
-    return { html: null, error: String(e?.message || e).slice(0, 160) }
-  } finally {
-    if (proxy) await proxy.close().catch(() => {})
-    if (browser) await browser.close().catch(() => {})
+      if (proxyChainEnabled) proxy = await startProxyChain({ sessionId, lifetime: '5m', country: 'us' })
+      browser = await chromiumExtra.launch({
+        headless: false,
+        args: ['--headless=new', '--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-blink-features=AutomationControlled', '--disable-gpu'],
+        proxy: proxy ? { server: proxy.url } : undefined,
+      }) as unknown as Browser
+      const ctx = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 900 }, locale: 'en-US' })
+      const page = await ctx.newPage()
+      try {
+        const resp = await page.goto(nav, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+        await page.waitForTimeout(1600)   // let JSON-LD + client-rendered product data settle
+        const html = await page.content()
+        const status = resp?.status() ?? 0
+        if (!looksBlocked(status, html)) {
+          // Amazon's mobile DOM has no JSON-LD/og-tags — extract the product here while we hold the page.
+          const product = amazon ? (await extractAmazonProduct(page)) ?? undefined : undefined
+          return { html: html.slice(0, 3_000_000), ...(product?.title ? { product } : {}) }
+        }
+        lastErr = `blocked (status=${status})`
+        console.log(`[fetch-html] attempt ${i + 1}/${attempts} ${lastErr} — retrying with a fresh session`)
+      } finally { await ctx.close().catch(() => {}) }
+    } catch (e: any) {
+      lastErr = String(e?.message || e).slice(0, 160)
+    } finally {
+      if (proxy) await proxy.close().catch(() => {})
+      if (browser) await browser.close().catch(() => {})
+    }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 700 + Math.random() * 1100))   // brief backoff
   }
+  return { html: null, error: lastErr || 'blocked' }
 }
 
 async function captureShots(target: string): Promise<{ desktop: string | null; mobile: string | null; error?: string }> {
