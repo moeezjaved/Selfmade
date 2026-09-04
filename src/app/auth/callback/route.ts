@@ -50,14 +50,17 @@ export async function GET(request: NextRequest) {
     }
   } catch { /* best-effort */ }
 
-  // First-time (or unfinished) users land in the competitor-first onboarding wizard instead of the
-  // dashboard — email signups already route there; this covers Google sign-ins. Best-effort: any
-  // lookup hiccup falls through to the normal destination rather than blocking login.
+  // The audit IS onboarding, so EVERY first-time user runs it — regardless of ?next — otherwise a Google
+  // sign-in (or any deep-linked signup) can skip the audit entirely and never enter the funnel (this is
+  // how gulzarmalik0987 landed on /hq with no audit). Read via the ADMIN client so RLS/timing can't make
+  // us miss the row. Only users who have ALREADY finished onboarding honor ?next / land on /hq. Best-effort:
+  // a lookup hiccup falls through to the normal destination rather than blocking login.
   try {
     const uid = data?.user?.id
-    if (uid && (!next || next === '/discovery' || next === '/brief' || next === '/hq')) {
-      const { data: prof } = await supabase.from('user_profiles').select('onboarding_completed').eq('user_id', uid).maybeSingle()
-      if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/store-audit`)   // the audit is onboarding now
+    if (uid && next !== '/store-audit') {
+      const admin = createAdminClient()
+      const { data: prof } = await admin.from('user_profiles').select('onboarding_completed').eq('user_id', uid).maybeSingle()
+      if (!(prof as any)?.onboarding_completed) return NextResponse.redirect(`${origin}/store-audit`)
     }
   } catch { /* fall through */ }
 
