@@ -123,6 +123,26 @@ export default function BuilderPage() {
   const [prodErr, setProdErr] = useState('')
   const [noStore, setNoStore] = useState(false)
   const [productId, setProductId] = useState<string | null>(null)
+  const [importedProduct, setImportedProduct] = useState<any | null>(null)
+  const [importUrl, setImportUrl] = useState('')
+  const [importing, setImporting] = useState(false)
+  const [importErr, setImportErr] = useState('')
+  const importProduct = useCallback(async () => {
+    const url = importUrl.trim()
+    if (!url || importing) return
+    setImporting(true); setImportErr('')
+    try {
+      const r = await fetch('/api/builder/import-url', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      })
+      const j = await r.json()
+      if (!r.ok) throw new Error(j?.error || 'Could not import that URL.')
+      setImportedProduct(j.product)      // becomes the selected product
+      setProductId(null)                 // imported product replaces any Shopify pick
+    } catch (e: any) { setImportErr(e?.message || 'Could not import that URL.') }
+    finally { setImporting(false) }
+  }, [importUrl, importing])
   const loadProducts = useCallback(async (query: string) => {
     setProdErr(''); setProducts(null)
     try {
@@ -220,7 +240,8 @@ export default function BuilderPage() {
   const STAGES = ['Reading your product…', 'Writing the copy…', 'Assembling the page…', 'Finalizing preview…']
 
   const runBuild = useCallback(async () => {
-    if (!tplId || !productId || !selectedPersona) return
+    // Shopify products go through persona/angle; an imported (pasted-URL) product builds directly.
+    if (!tplId || (!productId && !importedProduct)) return
     setBuildErr(''); setStep('building'); setStageIdx(0)
     // cosmetic staged progress while the real request runs
     const timers: any[] = []
@@ -229,7 +250,8 @@ export default function BuilderPage() {
       const r = await fetch('/api/builder/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          templateId: tplId, productId,
+          templateId: tplId, productId: productId || '',
+          importedProduct: importedProduct || undefined,
           persona: selectedPersona, angle: selectedAngle,
           research: researchPayload(),
           language,
@@ -246,7 +268,7 @@ export default function BuilderPage() {
       setBuildErr(e?.message || 'Build failed — please try again')
       setStep(4)
     } finally { timers.forEach(clearTimeout) }
-  }, [tplId, productId, selectedPersona, selectedAngle])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tplId, productId, importedProduct, selectedPersona, selectedAngle])   // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── publish ── */
   const [publishing, setPublishing] = useState(false)
@@ -349,7 +371,7 @@ export default function BuilderPage() {
 
   /* ── reset all wizard state and start a brand-new page ── */
   const startNew = useCallback(() => {
-    setStep(1); setTplId(null); setProductId(null); setQ(''); clearResearch()
+    setStep(1); setTplId(null); setProductId(null); setImportedProduct(null); setImportUrl(''); setImportErr(''); setQ(''); clearResearch()
     setPersonas(null); setPersonaId(null); setAngleId(null); setCustomName(''); setCustomDesc(''); setShowCustom(false)
     setPreviewHtml(''); setPageId(''); setPublishedUrl(''); setBuildErr(''); personaFetchedFor.current = null
   }, [])   // eslint-disable-line react-hooks/exhaustive-deps
@@ -376,11 +398,16 @@ export default function BuilderPage() {
   /* ── step gating ── */
   const canNext = (
     step === 1 ? !!tplId :
-    step === 2 ? !!productId :
+    step === 2 ? (!!productId || !!importedProduct) :
     step === 3 ? true :          // research is optional
     false
   )
-  const goNext = () => { if (step === 1) setStep(2); else if (step === 2) setStep(3); else if (step === 3) setStep(4) }
+  const goNext = () => {
+    if (step === 1) setStep(2)
+    // Imported (pasted-URL) products skip persona/angle and build straight away.
+    else if (step === 2) { if (importedProduct && !productId) runBuild(); else setStep(3) }
+    else if (step === 3) setStep(4)
+  }
   const goBack = () => {
     if (step === 1) setStep('list')
     else if (step === 2) setStep(1)
@@ -391,7 +418,7 @@ export default function BuilderPage() {
   }
 
   const selectedTemplate = (templates || []).find((t) => t.id === tplId) || null
-  const selectedProduct = (products || []).find((p) => p.id === productId) || null
+  const selectedProduct = importedProduct || (products || []).find((p) => p.id === productId) || null
 
   const stepNum = typeof step === 'number' ? step : (step === 'building' ? 4 : 4)
 
@@ -548,7 +575,39 @@ export default function BuilderPage() {
           {step === 2 && (
             <div>
               <h2 style={cardTitle}>Pick a product</h2>
-              <p style={{ fontSize: 14, color: SUB, marginTop: 6 }}>The page is built around one product from your store.</p>
+              <p style={{ fontSize: 14, color: SUB, marginTop: 6 }}>Import a product via URL from any website, or select one from your connected store.</p>
+
+              {/* import via URL — Amazon / Etsy / Shopify / AliExpress / any site */}
+              <div style={{ ...CARD, marginTop: 16, padding: '16px 18px' }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>Import via URL</div>
+                <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>Paste a product page link and we’ll pull its title, price, photos and description.</div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+                  <input value={importUrl} onChange={(e) => setImportUrl(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') importProduct() }} placeholder="https://www.amazon.com/dp/… or any product URL" style={{ flex: 1, minWidth: 220, border: `1px solid ${LINE}`, borderRadius: 10, padding: '10px 12px', fontSize: 14, color: INK, outline: 'none', fontFamily: 'inherit' }} />
+                  <button onClick={importProduct} disabled={!importUrl.trim() || importing} style={{ border: 0, background: importUrl.trim() && !importing ? ORANGE : INSET, color: importUrl.trim() && !importing ? '#fff' : FAINT, borderRadius: 10, padding: '10px 18px', fontWeight: 700, fontSize: 14, cursor: importUrl.trim() && !importing ? 'pointer' : 'default' }}>{importing ? 'Importing…' : 'Add product'}</button>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, flexWrap: 'wrap', fontSize: 12, color: FAINT }}>
+                  <span style={{ fontWeight: 600 }}>Works with</span>
+                  {['🛒 Amazon', '🎨 Etsy', '🛍️ Shopify', '📦 AliExpress', '🌐 Any website'].map((c) => (
+                    <span key={c} style={{ border: `1px solid ${LINE}`, borderRadius: 999, padding: '3px 10px', color: SUB, fontWeight: 600 }}>{c}</span>
+                  ))}
+                </div>
+                {importErr && <div style={{ fontSize: 12.5, color: '#9a2b2b', marginTop: 10 }}>{importErr}</div>}
+                {importedProduct && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 13, marginTop: 14, border: `2px solid ${ORANGE}`, boxShadow: `0 0 0 2px ${ORANGE}`, borderRadius: 12, padding: 11, background: '#fff' }}>
+                    <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flex: 'none' }}><Thumb src={importedProduct.image} seed={0} height={52} /></div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 14, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{importedProduct.title}</div>
+                      <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>{importedProduct.price ? `${importedProduct.price} · ` : ''}{(importedProduct.images?.length || 0)} photo{(importedProduct.images?.length || 0) === 1 ? '' : 's'} imported</div>
+                    </div>
+                    <button onClick={() => { setImportedProduct(null); setImportUrl('') }} title="Remove" style={{ border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '6px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}>Remove</button>
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, margin: '18px 0 4px', color: FAINT, fontSize: 12, fontWeight: 700, letterSpacing: '.04em' }}>
+                <span style={{ flex: 1, height: 1, background: LINE }} /> OR SELECT FROM YOUR CATALOG <span style={{ flex: 1, height: 1, background: LINE }} />
+              </div>
+
               {!noStore && (
                 <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search your products…" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14.5, color: INK, outline: 'none', marginTop: 16, fontFamily: 'inherit' }} />
               )}
@@ -569,7 +628,7 @@ export default function BuilderPage() {
                   {(products || []).map((p, i) => {
                     const on = productId === p.id
                     return (
-                      <button key={p.id} onClick={() => setProductId(p.id)} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 13, textAlign: 'left', cursor: 'pointer', padding: 11, font: 'inherit', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : CARD.boxShadow as string }}>
+                      <button key={p.id} onClick={() => { setProductId(p.id); setImportedProduct(null) }} style={{ ...CARD, display: 'flex', alignItems: 'center', gap: 13, textAlign: 'left', cursor: 'pointer', padding: 11, font: 'inherit', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : CARD.boxShadow as string }}>
                         <div style={{ width: 52, height: 52, borderRadius: 10, overflow: 'hidden', flex: 'none' }}>
                           <Thumb src={p.image} seed={i} height={52} />
                         </div>
@@ -868,7 +927,7 @@ export default function BuilderPage() {
               ) : (
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   {step === 3 && <button onClick={goNext} style={{ border: 'none', background: 'none', color: SUB, fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Skip</button>}
-                  <button onClick={goNext} disabled={!canNext} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '11px 26px', fontWeight: 700, fontSize: 14, cursor: canNext ? 'pointer' : 'default', opacity: canNext ? 1 : 0.5 }}>Next →</button>
+                  <button onClick={goNext} disabled={!canNext} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '11px 26px', fontWeight: 700, fontSize: 14, cursor: canNext ? 'pointer' : 'default', opacity: canNext ? 1 : 0.5 }}>{step === 2 && importedProduct && !productId ? 'Generate page →' : 'Next →'}</button>
                 </div>
               )}
             </div>

@@ -30,7 +30,19 @@ export async function POST(req: NextRequest) {
   const research = b?.research ? String(b.research) : undefined
   const language = b?.language ? String(b.language).slice(0, 40) : undefined
   const paletteId = b?.paletteId ? String(b.paletteId).slice(0, 40) : undefined
-  if (!templateId || !productId) return NextResponse.json({ error: 'templateId and productId are required' }, { status: 400 })
+  // An externally-imported product (pasted URL) can stand in for a Shopify productId.
+  const ip = b?.importedProduct && typeof b.importedProduct === 'object' ? b.importedProduct : null
+  const importedProduct = ip?.title ? {
+    title: String(ip.title).slice(0, 300),
+    handle: ip.handle ? String(ip.handle).slice(0, 200) : '',
+    price: ip.price ? String(ip.price).slice(0, 40) : undefined,
+    image: ip.image ? String(ip.image).slice(0, 2000) : null,
+    images: Array.isArray(ip.images) ? ip.images.map((x: any) => String(x).slice(0, 2000)).filter(Boolean).slice(0, 9) : [],
+    description: ip.description ? String(ip.description).slice(0, 1600) : undefined,
+    sku: ip.sku ? String(ip.sku).slice(0, 80) : null,
+    sourceUrl: ip.sourceUrl ? String(ip.sourceUrl).slice(0, 2000) : undefined,
+  } : null
+  if (!templateId || (!productId && !importedProduct)) return NextResponse.json({ error: 'templateId and a product (or imported product URL) are required' }, { status: 400 })
   const tpl = getTemplate(templateId)
   if (!tpl) return NextResponse.json({ error: 'unknown template' }, { status: 400 })
 
@@ -48,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   let gen
   try {
-    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId })
+    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId, importedProduct })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: e?.message || 'Generation failed' }, { status: 502 })
@@ -61,7 +73,7 @@ export async function POST(req: NextRequest) {
     brand_id: brandId,
     template_id: templateId,
     type: tpl.type,
-    product_id: productId,
+    product_id: productId || (importedProduct?.sourceUrl ? `url:${importedProduct.sourceUrl}`.slice(0, 300) : 'imported'),
     product_name: gen.productName,
     cta_href: gen.ctaHref,
     persona,
