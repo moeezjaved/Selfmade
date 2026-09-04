@@ -116,9 +116,19 @@ export function splitPageIntoSections(body: string): PageSection[] {
 //                             renders its own.
 export type DynamicMode = 'none' | 'cart' | 'full'
 
-const cartForm = (label: string, cls: string) =>
+// A real variant picker that works WITHOUT section JS (Shopify strips no-JS is fine): for a product with
+// options (size/colour/…) render a <select name="id"> of its variants; single-variant products get a
+// hidden input. The storefront submits the chosen variant id straight to /cart/add.
+const variantSelect =
+  `{% unless product.has_only_default_variant %}` +
+  `<select name="id" class="sf-vselect" aria-label="Choose an option" style="display:block;width:100%;margin:0 0 10px;padding:12px 14px;border:1px solid #e7e4ee;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#181720;cursor:pointer">` +
+  `{% for variant in product.variants %}<option value="{{ variant.id }}"{% unless variant.available %} disabled{% endunless %}{% if variant == product.selected_or_first_available_variant %} selected{% endif %}>{{ variant.title }}{% unless variant.available %} — sold out{% endunless %}</option>{% endfor %}` +
+  `</select>` +
+  `{% else %}<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">{% endunless %}`
+
+const cartForm = (label: string, cls: string, withVariants = true) =>
   `<form method="post" action="/cart/add" style="margin:0" data-sf-cart>` +
-  `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">` +
+  (withVariants ? variantSelect : `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}">`) +
   `<button type="submit" class="${cls}">${label.trim() || 'Add to cart'}</button></form>`
 
 // Replace the inner content of the first element carrying `cls` with a Liquid expression.
@@ -144,6 +154,9 @@ function galleryLoop(html: string): string {
     `{% for image in product.images %}<div class="gslide"><img class="gimg" src="{{ image | image_url: width: 1400 }}" alt="{{ product.title | escape }}"></div>{% endfor %}`)
   s = replaceContainerInner(s, 'thumbs',
     `{% for image in product.images %}<button class="gthumb{% if forloop.first %} on{% endif %}" data-i="{{ forloop.index0 }}"><img src="{{ image | image_url: width: 160 }}" alt=""></button>{% endfor %}`)
+  // keep the dots in step with the product's own image count
+  s = replaceContainerInner(s, 'gdots',
+    `{% for image in product.images %}<span class="gdot{% if forloop.first %} on{% endif %}"></span>{% endfor %}`)
   return s
 }
 
@@ -152,7 +165,7 @@ function dynamizeProduct(html: string, mode: DynamicMode): string {
   let s = html
   // Any primary CTA (a.buy) or sticky-bar button (a.fc-btn) → a real Add-to-Cart form (both modes).
   s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bbuy\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls))
-  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls))
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => cartForm(label, cls, false))
   if (mode === 'full') {
     s = replaceInner(s, 'ptitle', '{{ product.title }}')
     s = replaceInner(s, 'now', '{{ product.price | money }}')
@@ -239,6 +252,13 @@ function editablize(html: string): { html: string; settings: Setting[] } {
   return { html: s, settings }
 }
 
+// The built page's gallery is driven by a page-level <script> that's dropped when we split into sections,
+// so in Shopify the hero couldn't slide/loop and later images never showed. Inject a SELF-CONTAINED,
+// section-scoped driver (arrows, dots, thumbs + auto-advance loop) into any section that has a .gtrack.
+// Scoped via the section's own `.pgbld` wrapper, so duplicating the section keeps each gallery independent.
+const GALLERY_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var tr=(root&&root.querySelector('.gtrack'))||document.querySelector('.gtrack');if(!tr)return;var scope=tr.closest('.pgbld')||root||document;var dots=[].slice.call(scope.querySelectorAll('.gdots .gdot'));var ths=[].slice.call(scope.querySelectorAll('.thumbs .gthumb'));var n=tr.children.length;if(n<2)return;function cur(){return Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth));}function u(){var i=cur();dots.forEach(function(d,j){d.classList.toggle('on',j===i);});ths.forEach(function(x,j){x.classList.toggle('on',j===i);});}tr.addEventListener('scroll',function(){requestAnimationFrame(u);},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'});});});var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function go(d){var i=((cur()+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});}if(pv)pv.addEventListener('click',function(){go(-1);});if(nx)nx.addEventListener('click',function(){go(1);});var t=setInterval(function(){go(1);},4500);var h=scope.querySelector('.gallery')||tr;h.addEventListener('mouseenter',function(){clearInterval(t);});})();</script>`
+const withGalleryDriver = (html: string): string => (/\bgtrack\b/.test(html) ? html + GALLERY_SCRIPT : html)
+
 function liquidSection(cssKey: string, name: string, html: string, settings: Setting[] = []): string {
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = name.slice(0, 25)
@@ -264,7 +284,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     // 1) inject product-dynamic Liquid, then 2) lift the remaining static text/images into editable settings.
     const dynamized = dynamizeProduct(p.html, dyn)
     const { html, settings } = editablize(dynamized)
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, html, settings) }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings) }
   })
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
