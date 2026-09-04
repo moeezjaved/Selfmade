@@ -56,6 +56,8 @@ export interface RenderOpts {
   ctaHref: string
   /** star rating + review count shown in offer cards */
   rating?: { stars: number; countLabel: string }
+  /** chosen colour palette id (see lib/builder/palettes) — re-skins the page via a CSS-var override */
+  paletteId?: string
 }
 
 export interface PageTemplate {
