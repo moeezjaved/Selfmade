@@ -263,8 +263,11 @@ export default function FunnelPage() {
                     }
                     const s = S[u.stage] || S.signed_up
                     return (
-                      <tr key={(u.email || i) + i} style={{ borderBottom: '1px solid #f6f6f6' }}>
-                        <td style={{ padding: '10px 20px', color: '#111', fontWeight: 600 }}>{u.email || '—'}</td>
+                      <tr key={(u.email || i) + i} onClick={() => u.id && router.push(`/admin/users/${u.id}`)}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = '#faf9f6' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLTableRowElement).style.background = 'transparent' }}
+                        style={{ borderBottom: '1px solid #f6f6f6', cursor: u.id ? 'pointer' : 'default' }} title="Open full details — brands, audit, ads, connections">
+                        <td style={{ padding: '10px 20px', color: '#111', fontWeight: 600 }}><span style={{ color: '#c3c7c3', marginRight: 7 }}>▸</span>{u.email || '—'}</td>
                         <td style={{ padding: '10px 20px', color: '#777', textTransform: 'capitalize' }}>{u.provider || 'email'}</td>
                         <td style={{ padding: '10px 20px' }}><span style={{ fontSize: 11, fontWeight: 700, color: s.c, background: s.bg, borderRadius: 20, padding: '2px 10px' }}>{s.t}</span></td>
                         <td style={{ padding: '10px 20px', color: '#555' }}>{u.brand || <span style={{ color: '#c3c7c3' }}>—</span>}</td>
