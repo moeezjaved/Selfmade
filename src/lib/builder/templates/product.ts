@@ -55,6 +55,12 @@ const CSS = `
 .pgbld .gtrack::-webkit-scrollbar{display:none}
 .pgbld .gslide{flex:0 0 100%;scroll-snap-align:start;aspect-ratio:1/1;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
 .pgbld .gslide .gimg,.pgbld .gslide .gimg.ph{width:100%;height:100%;object-fit:cover;border-radius:20px;display:grid;place-items:center;color:#b06;font-weight:700}
+.pgbld .gslide video,.pgbld .gslide model-viewer,.pgbld .gslide iframe{width:100%;height:100%;object-fit:cover;border-radius:20px;border:0;display:block;background:#000}
+.pgbld .gthumb{position:relative}
+.pgbld .gbadge{position:absolute;top:5px;left:5px;z-index:1;background:rgba(20,18,15,.72);color:#fff;font-size:9px;font-weight:800;line-height:1;padding:3px 5px;border-radius:5px}
+.gzoom{position:fixed;inset:0;z-index:100001;background:rgba(20,18,15,.92);display:grid;place-items:center;padding:24px;cursor:zoom-out;animation:sfzin .18s ease}
+.gzoom img{max-width:min(1000px,94vw);max-height:92vh;object-fit:contain;border-radius:12px}
+@keyframes sfzin{from{opacity:0}to{opacity:1}}
 .pgbld .gdots{display:flex;gap:7px;justify-content:center;margin-top:2px}
 .pgbld .gdot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:width .2s,background .2s}
 .pgbld .gdot.on{background:var(--accent);width:22px;border-radius:5px}

@@ -334,10 +334,27 @@ function outerEl(html: string, cls: string): string {
   return openStart >= 0 && closeEnd >= f.end ? html.slice(openStart, closeEnd + 1) : ''
 }
 
+// Phase 2 — native media gallery. Loops product.MEDIA (not just images) so the gallery handles image,
+// video, external video and 3D/AR models like a stock theme, plus a click-to-zoom lightbox on images.
+const ZOOM_SCRIPT = `<script>(function(){var s=document.currentScript;var g=s&&s.parentElement?(s.parentElement.closest('.gallery')||s.parentElement):null;if(!g)return;function open(src){var o=document.createElement('div');o.className='gzoom';var im=document.createElement('img');im.src=src;o.appendChild(im);o.addEventListener('click',function(){o.remove();});document.addEventListener('keydown',function esc(e){if(e.key==='Escape'){o.remove();document.removeEventListener('keydown',esc);}});document.body.appendChild(o);}[].slice.call(g.querySelectorAll('.gimg[data-zoom]')).forEach(function(im){im.style.cursor='zoom-in';im.addEventListener('click',function(e){e.preventDefault();open(im.getAttribute('data-zoom')||im.src);});});})();</script>`
+
+function mediaGallery(galleryHtml: string): string {
+  if (!innerOf(galleryHtml, 'gtrack')) return galleryLoop(galleryHtml)
+  let s = galleryHtml
+  s = replaceContainerInner(s, 'gtrack',
+    `{% for media in product.media %}<div class="gslide" data-mtype="{{ media.media_type }}">{% case media.media_type %}{% when 'image' %}<img class="gimg" src="{{ media | image_url: width: 1400 }}" alt="{{ media.alt | escape }}" loading="lazy" data-zoom="{{ media | image_url: width: 2048 }}">{% when 'external_video' %}{{ media | external_video_tag }}{% when 'video' %}{{ media | video_tag: controls: true, muted: true, loop: true, playsinline: true }}{% when 'model' %}{{ media | model_viewer_tag }}{% else %}{{ media | media_tag }}{% endcase %}</div>{% endfor %}`)
+  s = replaceContainerInner(s, 'thumbs',
+    `{% for media in product.media %}<button class="gthumb{% if forloop.first %} on{% endif %}" data-i="{{ forloop.index0 }}" type="button">{% if media.media_type == 'model' %}<span class="gbadge">3D</span>{% elsif media.media_type == 'video' or media.media_type == 'external_video' %}<span class="gbadge">▶</span>{% endif %}<img src="{{ media.preview_image | image_url: width: 200 }}" alt=""></button>{% endfor %}`)
+  s = replaceContainerInner(s, 'gdots',
+    `{% for media in product.media %}<span class="gdot{% if forloop.first %} on{% endif %}"></span>{% endfor %}`)
+  const modelLib = `{% assign sf_has_model = product.media | where: 'media_type', 'model' | first %}{% if sf_has_model %}<script src="{{ 'model-viewer-ui.min.js' | shopify_asset_url }}" defer></script>{% endif %}`
+  return withGalleryDriver(s) + ZOOM_SCRIPT + modelLib
+}
+
 function mainProductSection(hero: string, cssKey: string, name: string): { value: string; blocks: Record<string, any>; blockOrder: string[] } {
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = (name || 'Product').slice(0, 25)
-  const galleryLiquid = withGalleryDriver(galleryLoop(outerEl(hero, 'gallery')))
+  const galleryLiquid = mediaGallery(outerEl(hero, 'gallery'))
   const highlightsHtml = ['pills', 'buyopt'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
   const trustHtml = ['pay', 'social', 'trust'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
   const ctaLabel = (/(<a[^>]*\bclass=["'][^"']*\bbuy\b[^"']*["'][^>]*>)([^<]{1,60})<\/a>/i.exec(hero)?.[2] || 'Add to cart').trim()
