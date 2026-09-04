@@ -127,11 +127,17 @@ export async function POST(req: NextRequest) {
     if (!tpls || !tpls[index]) return NextResponse.json({ error: 'no-template' }, { status: 404 })
     if (tpls[index].image && !body.force) return NextResponse.json({ image: tpls[index].image })   // already generated (unless force-regenerate)
 
-    // FIRST 5 renders per brand are FREE (the audit's promised concepts); beyond that each render charges
+    // FIRST 5 renders are FREE (the audit's promised concepts); beyond that each render charges
     // image_studio_pro credits — Pro renders cost real money and unlimited-free was bleeding ~$2.5/audit.
+    // The allowance is a LIFETIME count of the user's actual Pro renders (type 'inspired'), NOT the number
+    // of templates currently holding an image — otherwise re-auditing (regenerates templates → count
+    // resets) OR force-regenerating handed out unlimited free Pro renders. Both holes are closed here.
     const FREE_RENDERS = 5
-    const alreadyRendered = tpls.filter((t2: any) => t2.image).length
-    const isFree = alreadyRendered < FREE_RENDERS || (tpls[index].image && body.force)   // regenerating an existing one doesn't re-charge
+    const { count: renderedLifetime } = await admin
+      .from('creative_generations')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', user.id).eq('type', 'inspired')
+    const isFree = (renderedLifetime || 0) < FREE_RENDERS
     let txId: string | null = null
     if (!isFree) {
       const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'image_studio_pro' })
