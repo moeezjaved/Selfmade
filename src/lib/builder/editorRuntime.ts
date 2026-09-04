@@ -47,8 +47,18 @@ export const EDITOR_CSS = `
   .ed-toolbar .ed-linkbox button:hover{filter:brightness(1.1);background:var(--accent,#d6248f)}
   .ed-toolbar .ed-iconbox{display:none;position:absolute;top:34px;left:0;flex-wrap:wrap;gap:2px;width:236px;max-height:180px;overflow:auto;background:#111;border-radius:9px;padding:6px;box-shadow:0 8px 24px -6px rgba(0,0,0,.55)}
   .ed-toolbar .ed-iconbox button{min-width:30px;height:30px;font-size:17px;font-weight:400}
+  .ed-toolbar input[type=color]{width:24px;height:22px;border:none;border-radius:5px;padding:0;margin:0 1px;background:none;cursor:pointer;vertical-align:middle}
   .ed-img-badge{position:absolute;inset:0;display:none;place-items:center;pointer-events:none}
   .pgbld [data-ed-imgwrap]{position:relative}
+  /* section style popover (background + spacing) */
+  .ed-stylepop{position:fixed;z-index:10001;background:#fff;border:1px solid rgba(20,18,15,.12);border-radius:12px;padding:10px 11px;box-shadow:0 14px 34px -8px rgba(20,18,15,.42);width:236px;font:13px/1.3 system-ui,-apple-system,sans-serif;color:#181720}
+  .ed-stylepop .sp-h{font-size:11px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:#9891a6;margin:0 2px 6px}
+  .ed-stylepop .sp-row{display:flex;align-items:center;gap:8px;padding:5px 2px}
+  .ed-stylepop .sp-row span{flex:1;color:#4a4653;font-weight:600}
+  .ed-stylepop input[type=color]{width:30px;height:26px;border:1px solid rgba(0,0,0,.12);border-radius:6px;padding:0;background:none;cursor:pointer}
+  .ed-stylepop button{all:unset;min-width:26px;height:26px;display:inline-grid;place-items:center;border:1px solid rgba(0,0,0,.12);border-radius:6px;cursor:pointer;color:#333;font-weight:700}
+  .ed-stylepop button:hover{background:#f0edf6}
+  .ed-stylepop b{min-width:32px;text-align:center;font-variant-numeric:tabular-nums}
 `
 
 export const EDITOR_JS = `
@@ -58,6 +68,7 @@ export const EDITOR_JS = `
   function post(m){ try{ parent.postMessage(Object.assign({__pgbld:1}, m),'*'); }catch(e){} }
   function markDirty(){ if(!dirty){dirty=true;} post({t:'dirty'}); }
   function eid(el){ if(!el.dataset.eid){ el.dataset.eid='e'+(++uid); } return el.dataset.eid; }
+  function rgbToHex(c){ var m=/rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c||''); if(!m) return '#000000'; return '#'+[1,2,3].map(function(i){ return ('0'+parseInt(m[i],10).toString(16)).slice(-2); }).join(''); }
 
   // ── which elements are directly text-editable: a leaf that carries visible text and whose only
   // children (if any) are inline formatting. Skip elements that contain block children (they're layout). ──
@@ -137,6 +148,12 @@ export const EDITOR_JS = `
     var ICONS='✓ ✔ ★ ☆ ✦ ✧ ❤ ♥ ⚡ ✨ 🌿 🌱 💧 🔥 🛡️ ♻️ ⏱️ 🚚 🎁 💬 👍 🏆 🔒 ✅ 🌎 ⭐ 💯 ✂️ 🧴 💆 💊 🌸 🍯 🥇 📦 ➜ → ✱'.split(' ');
     tb.innerHTML='<button data-cmd="bold" title="Bold / accent">B</button>'
       +'<button data-cmd="italic" title="Italic" style="font-style:italic;font-weight:600">i</button>'
+      +'<input type="color" data-cmd="fg" title="Text colour">'
+      +'<button data-cmd="smaller" title="Smaller">A−</button>'
+      +'<button data-cmd="bigger" title="Bigger">A+</button>'
+      +'<button data-cmd="alignleft" title="Align left">⇤</button>'
+      +'<button data-cmd="aligncenter" title="Center">≡</button>'
+      +'<button data-cmd="alignright" title="Align right">⇥</button>'
       +'<span class="ed-tsep"></span>'
       +'<button data-cmd="icon" title="Insert an icon">☆</button>'
       +'<button data-cmd="link" title="Add link">🔗</button>'
@@ -150,13 +167,19 @@ export const EDITOR_JS = `
       if(c==='link'){ ev.preventDefault(); openLinkBox(); return; }
       if(c==='icon'){ ev.preventDefault(); toggleIconBox(); return; }
       if(c==='ins'){ ev.preventDefault(); restoreRange(); document.execCommand('insertText',false,btn.getAttribute('data-ch')); markDirty(); closeIconBox(); return; }
+      if(c==='smaller'||c==='bigger'){ ev.preventDefault(); bumpSize(c==='bigger'?1:-1); return; }
+      if(c==='alignleft'||c==='aligncenter'||c==='alignright'){ ev.preventDefault(); setAlign(c.slice(5)); return; }
       ev.preventDefault();
       if(c==='bold'||c==='italic'||c==='unlink'){ document.execCommand(c==='unlink'?'unlink':c,false,null); markDirty(); }
     });
+    // text colour (native picker; the editable keeps focus because the input lives inside the toolbar)
+    tb.addEventListener('input', function(ev){ if(ev.target&&ev.target.getAttribute('data-cmd')==='fg'&&editing){ editing.style.color=ev.target.value; markDirty(); } });
     tbInput=tb.querySelector('.ed-linkbox input');
     tbInput.addEventListener('keydown', function(ev){ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); applyLink(); } else if(ev.key==='Escape'){ ev.preventDefault(); closeLinkBox(); } });
     document.body.appendChild(tb); return tb;
   }
+  function bumpSize(dir){ if(!editing) return; var cur=parseFloat(getComputedStyle(editing).fontSize)||16; var nv=Math.max(9, Math.min(96, cur+dir*(cur>=28?3:2))); editing.style.fontSize=Math.round(nv)+'px'; markDirty(); }
+  function setAlign(a){ if(!editing) return; editing.style.textAlign=a; markDirty(); }
   function toggleIconBox(){ var box=tb.querySelector('.ed-iconbox'); if(box.style.display==='flex'){ closeIconBox(); return; } saveRange(); box.style.display='flex'; }
   function closeIconBox(){ if(tb){ tb.querySelector('.ed-iconbox').style.display='none'; } }
   function openLinkBox(){ saveRange(); var box=tb.querySelector('.ed-linkbox'); box.style.display='inline-flex'; tbInput.value=currentHref(); setTimeout(function(){ tbInput.focus(); tbInput.select(); },0); }
@@ -171,7 +194,7 @@ export const EDITOR_JS = `
     }
     closeLinkBox();
   }
-  function showToolbar(el){ var t=toolbar(); t.querySelector('.ed-linkbox').style.display='none'; t.querySelector('.ed-iconbox').style.display='none'; var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-42)+'px'; }
+  function showToolbar(el){ var t=toolbar(); t.querySelector('.ed-linkbox').style.display='none'; t.querySelector('.ed-iconbox').style.display='none'; try{ t.querySelector('input[data-cmd="fg"]').value=rgbToHex(getComputedStyle(el).color); }catch(_){} var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-42)+'px'; }
   function hideToolbar(){ if(tb) tb.style.display='none'; }
 
   // ── sections: wrap every top-level section so we can hover a rail + insert ＋ between them ──
@@ -190,7 +213,8 @@ export const EDITOR_JS = `
       var rail=document.createElement('div'); rail.className='ed-rail'; rail.contentEditable='false';
       rail.innerHTML='<button class="grip" title="Drag to move this section">⠿</button><span class="sep"></span>'
         +'<button data-a="up" title="Move up">↑</button><button data-a="down" title="Move down">↓</button>'
-        +'<span class="sep"></span><button data-a="dupe" title="Duplicate">⧉</button><button class="del" data-a="del" title="Delete">🗑</button>';
+        +'<span class="sep"></span><button data-a="style" title="Background &amp; spacing">🎨</button>'
+        +'<button data-a="dupe" title="Duplicate">⧉</button><button class="del" data-a="del" title="Delete">🗑</button>';
       rail.addEventListener('click', function(ev){ ev.stopPropagation(); ev.preventDefault(); var a=(ev.target.getAttribute&&ev.target.getAttribute('data-a')); if(a) sectionAction(sec,a); });
       // drag-to-reorder from the grip handle (Notion/Webflow-style)
       var grip=rail.querySelector('.grip');
@@ -213,7 +237,32 @@ export const EDITOR_JS = `
     else if(a==='up'){ var p=sec.previousElementSibling; while(p&&!p.classList.contains('ed-secwrap')) p=p.previousElementSibling; if(p){ sec.parentNode.insertBefore(sec,p); markDirty(); sec.scrollIntoView({behavior:'smooth',block:'center'}); } }
     else if(a==='down'){ var n=sec.nextElementSibling; while(n&&!n.classList.contains('ed-secwrap')) n=n.nextElementSibling; if(n){ sec.parentNode.insertBefore(n,sec); markDirty(); sec.scrollIntoView({behavior:'smooth',block:'center'}); } }
     else if(a==='dupe'){ var clone=sec.cloneNode(true); clone.removeAttribute('data-eid'); eid(clone); sec.parentNode.insertBefore(clone, sec.nextSibling); markDirty(); }
+    else if(a==='style'){ openSectionStyle(sec); }
   }
+
+  // ── section style popover: background colour + vertical spacing (padding) ──
+  var secPop=null;
+  function closeSecPop(){ if(secPop){ secPop.remove(); secPop=null; } }
+  function openSectionStyle(sec){
+    closeSecPop();
+    var cs=getComputedStyle(sec);
+    var pop=document.createElement('div'); pop.className='ed-stylepop'; pop.contentEditable='false';
+    pop.innerHTML=''
+      +'<div class="sp-h">Section style</div>'
+      +'<div class="sp-row"><span>Background</span><input type="color" data-s="bg" value="'+rgbToHex(cs.backgroundColor)+'"><button data-s="bgclear" title="Clear background">✗</button></div>'
+      +'<div class="sp-row"><span>Text colour</span><input type="color" data-s="fg" value="'+rgbToHex(cs.color)+'"></div>'
+      +'<div class="sp-row"><span>Space above/below</span><button data-s="padminus">−</button><b data-pad>'+Math.round(parseFloat(cs.paddingTop)||0)+'</b><button data-s="padplus">＋</button></div>';
+    document.body.appendChild(pop);
+    var r=sec.getBoundingClientRect();
+    pop.style.left=Math.max(8, Math.min(window.innerWidth-246, r.right-238))+'px';
+    pop.style.top=Math.max(8, Math.min(window.innerHeight-160, r.top+46))+'px';
+    pop.addEventListener('input', function(ev){ var s=ev.target.getAttribute('data-s'); if(s==='bg'){ sec.style.background=ev.target.value; markDirty(); } else if(s==='fg'){ sec.style.color=ev.target.value; markDirty(); } });
+    pop.addEventListener('click', function(ev){ var b=ev.target.closest&&ev.target.closest('button'); if(!b) return; var s=b.getAttribute('data-s');
+      if(s==='bgclear'){ sec.style.background=''; markDirty(); }
+      else if(s==='padminus'||s==='padplus'){ var cur=parseFloat(getComputedStyle(sec).paddingTop)||0; var nv=Math.max(0, cur+(s==='padplus'?8:-8)); sec.style.paddingTop=nv+'px'; sec.style.paddingBottom=nv+'px'; pop.querySelector('[data-pad]').textContent=Math.round(nv); markDirty(); }
+    });
+  }
+  document.addEventListener('mousedown', function(e){ if(secPop && !secPop.contains(e.target) && !(e.target.closest&&e.target.closest('.ed-rail'))) closeSecPop(); }, true);
 
   // ── drag-to-reorder ──
   var dragEl=null, dropLine=null, dropTarget=null, dropPos='before';
