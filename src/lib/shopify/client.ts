@@ -67,6 +67,22 @@ export class ShopifyError extends Error {
 }
 
 /** Raw REST call. `path` is like 'shop.json' or 'products/123.json'. */
+/**
+ * Read the app's granted access scopes. This endpoint is UN-versioned
+ * (/admin/oauth/access_scopes.json) — the versioned Admin API path 404s — so it needs its own fetch.
+ */
+export async function fetchAccessScopes(shop: string, token: string): Promise<string[]> {
+  try {
+    const r = await fetch(`https://${normalizeShopDomain(shop)}/admin/oauth/access_scopes.json`, {
+      headers: { 'X-Shopify-Access-Token': token, 'Accept': 'application/json' },
+      signal: AbortSignal.timeout(15000),
+    })
+    if (!r.ok) return []
+    const j = await r.json().catch(() => ({}))
+    return (j?.access_scopes || []).map((x: any) => x.handle).filter(Boolean)
+  } catch { return [] }
+}
+
 export async function shopifyRest(
   shop: string, token: string, path: string,
   init: { method?: string; body?: any } = {},
@@ -118,11 +134,7 @@ export async function validateShopToken(shop: string, token: string): Promise<{
 }> {
   const info = await shopifyRest(shop, token, 'shop.json')
   const s = info?.shop || {}
-  let scopes: string[] = []
-  try {
-    const sc = await shopifyRest(shop, token, 'oauth/access_scopes.json')
-    scopes = (sc?.access_scopes || []).map((x: any) => x.handle).filter(Boolean)
-  } catch { /* older tokens may not expose this; not fatal */ }
+  const scopes = await fetchAccessScopes(shop, token)   // un-versioned endpoint — the versioned path 404s
   return {
     shop_name: s.name || shop,
     plan_name: s.plan_display_name || s.plan_name || null,
