@@ -45,31 +45,34 @@ export async function POST(req: NextRequest) {
   if (!/^https?:$/.test(url.protocol)) return NextResponse.json({ error: 'Only http(s) URLs are supported.' }, { status: 400 })
 
   try {
-    // 1) Shopify fast-path — clean structured product JSON.
+    // Core product data: Shopify's `.json` is the cleanest source when present.
     const shopify = await tryShopifyJson(url)
-    if (shopify) return NextResponse.json({ product: shopify })
 
-    // Direct first (fast, free); if the site blocks datacenter IPs, retry the HTML through IPRoyal.
+    // Always fetch the page HTML too — it carries the rich signals (rating, reviews, brand, video)
+    // that the Shopify `.json` endpoint omits. Direct first; IPRoyal fallback for bot-blocked sites.
     let html = await fetchText(url.toString())
     let viaProxy = false
     if (!html && PROXY_URL) { html = await fetchText(url.toString(), true); viaProxy = true }
-    if (!html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
+    if (!shopify && !html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
 
-    const fromLd = fromJsonLd(html, url)
-    const fromMeta = fromMetaTags(html, url)
-    // Merge: JSON-LD is richest; fill gaps from meta + heuristic bullets.
+    const fromLd = html ? fromJsonLd(html, url) : null
+    const fromMeta = html ? fromMetaTags(html, url) : { title: undefined, price: undefined, description: undefined, images: [], brand: undefined, videos: [] }
+
+    // Merge: Shopify core (if any) for title/price/images/description; page JSON-LD/meta for the
+    // rich signals (rating, reviews, brand, video) that make the page land.
     const product: ImportedProduct = {
-      title: fromLd?.title || fromMeta.title || '',
-      price: fromLd?.price || fromMeta.price || undefined,
-      compareAtPrice: fromLd?.compareAtPrice || undefined,
-      description: fromLd?.description || fromMeta.description || undefined,
-      images: dedupe([...(fromLd?.images || []), ...(fromMeta.images || [])]).slice(0, 9),
-      handle: '',
-      sku: fromLd?.sku || null,
-      brand: fromLd?.brand || fromMeta.brand || undefined,
-      rating: fromLd?.rating,
+      title: shopify?.title || fromLd?.title || fromMeta.title || '',
+      handle: shopify?.handle || '',
+      price: shopify?.price || fromLd?.price || fromMeta.price || undefined,
+      compareAtPrice: shopify?.compareAtPrice || fromLd?.compareAtPrice || undefined,
+      description: shopify?.description || fromLd?.description || fromMeta.description || undefined,
+      images: dedupe([...(shopify?.images || []), ...(fromLd?.images || []), ...(fromMeta.images || [])]).slice(0, 9),
+      videos: dedupe([...(shopify?.videos || []), ...(fromLd?.videos || []), ...(fromMeta.videos || [])]).slice(0, 3),
+      sku: shopify?.sku || fromLd?.sku || null,
+      brand: shopify?.brand || fromLd?.brand || fromMeta.brand || undefined,
+      rating: fromLd?.rating,                 // Shopify .json has no rating — always from page JSON-LD
       ratingCount: fromLd?.ratingCount,
-      features: (fromLd?.features && fromLd.features.length ? fromLd.features : featureBullets(html)).slice(0, 8),
+      features: ((fromLd?.features && fromLd.features.length ? fromLd.features : (html ? featureBullets(html) : [])) || []).slice(0, 8),
       reviews: (fromLd?.reviews || []).slice(0, 8),
       sourceUrl: url.toString(),
     }
@@ -105,13 +108,24 @@ async function tryShopifyJson(url: URL): Promise<ImportedProduct | null> {
     const images: string[] = Array.isArray(p.images) ? p.images.map((im: any) => String(im?.src || '')).filter(Boolean) : []
     const variants: any[] = Array.isArray(p.variants) ? p.variants : []
     const prices = variants.map((v) => Number(v?.price)).filter((n) => Number.isFinite(n))
+    const comps = variants.map((v) => Number(v?.compare_at_price)).filter((n) => Number.isFinite(n) && n > 0)
+    const minPrice = prices.length ? Math.min(...prices) : null
+    const maxComp = comps.length ? Math.max(...comps) : null
+    // Shopify `media` may carry videos (media_type 'video'/'external_video' → sources[].url).
+    const videos: string[] = (Array.isArray(p.media) ? p.media : [])
+      .filter((md: any) => /video/i.test(String(md?.media_type)))
+      .map((md: any) => String((Array.isArray(md?.sources) ? md.sources[md.sources.length - 1]?.url : md?.external_video_url) || ''))
+      .filter(Boolean)
     return {
       title: String(p.title),
       handle: String(p.handle || m[1]),
-      price: prices.length ? String(Math.min(...prices)) : undefined,
+      price: minPrice != null ? String(minPrice) : undefined,
+      compareAtPrice: maxComp != null && (minPrice == null || maxComp > minPrice) ? String(maxComp) : undefined,
       image: images[0] || null,
       images: images.slice(0, 9),
+      videos: dedupe(videos).slice(0, 3),
       description: p.body_html ? stripHtml(String(p.body_html)).slice(0, 1200) : undefined,
+      brand: p.vendor ? String(p.vendor).slice(0, 80) : undefined,
       sku: variants.find((v) => v?.sku)?.sku || null,
       sourceUrl: url.toString(),
     }
@@ -119,7 +133,7 @@ async function tryShopifyJson(url: URL): Promise<ImportedProduct | null> {
 }
 
 interface LdResult {
-  title?: string; price?: string; compareAtPrice?: string; description?: string; images?: string[]; sku?: string | null
+  title?: string; price?: string; compareAtPrice?: string; description?: string; images?: string[]; videos?: string[]; sku?: string | null
   brand?: string; rating?: number; ratingCount?: number; features?: string[]; reviews?: { name?: string; rating?: number; body: string }[]
 }
 
@@ -144,12 +158,16 @@ function fromJsonLd(html: string, base: URL): LdResult | null {
       body: stripHtml(String(r?.reviewBody || r?.description || '')).slice(0, 320),
     })).filter((r) => r.body)
     const brand = typeof prod.brand === 'string' ? prod.brand : (prod.brand?.name || undefined)
+    // Video: a VideoObject on the product, or any VideoObject node on the page.
+    const vids = ([] as any[]).concat(prod.video || nodes.filter((n) => matchesType(n, 'VideoObject')))
+      .map((v: any) => absolutize(v?.contentUrl || v?.url, base)).filter(Boolean) as string[]
     return {
       title: typeof prod.name === 'string' ? prod.name : undefined,
       price: price != null ? String(price) : undefined,
       compareAtPrice: offers?.priceSpecification?.price && Number(offers.priceSpecification.price) > Number(price) ? String(offers.priceSpecification.price) : undefined,
       description: typeof prod.description === 'string' ? stripHtml(prod.description).slice(0, 1200) : undefined,
       images: dedupe(imgs),
+      videos: dedupe(vids).filter((u) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u)),
       sku: prod.sku ? String(prod.sku) : null,
       brand: brand ? String(brand).slice(0, 80) : undefined,
       rating: Number.isFinite(rating) && rating > 0 ? Math.round(rating * 10) / 10 : undefined,
@@ -169,7 +187,7 @@ function featureBullets(html: string): string[] {
   return dedupe(lis).slice(0, 8)
 }
 
-function fromMetaTags(html: string, base: URL): { title?: string; price?: string; description?: string; images?: string[]; brand?: string } {
+function fromMetaTags(html: string, base: URL): { title?: string; price?: string; description?: string; images?: string[]; brand?: string; videos?: string[] } {
   const meta = (prop: string) => {
     const re = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`, 'i')
     const m = html.match(re) || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`, 'i'))
@@ -178,12 +196,15 @@ function fromMetaTags(html: string, base: URL): { title?: string; price?: string
   const ogImages = Array.from(html.matchAll(/<meta[^>]+(?:property|name)=["']og:image(?::url)?["'][^>]*content=["']([^"']+)["']/gi))
     .map((m) => absolutize(decodeEntities(m[1]), base)).filter(Boolean) as string[]
   const title = meta('og:title') || (html.match(/<title[^>]*>([^<]+)<\/title>/i)?.[1] && decodeEntities(html.match(/<title[^>]*>([^<]+)<\/title>/i)![1]))
+  const ogVideos = Array.from(html.matchAll(/<meta[^>]+(?:property|name)=["']og:video(?::(?:secure_)?url)?["'][^>]*content=["']([^"']+)["']/gi))
+    .map((m) => absolutize(decodeEntities(m[1]), base)).filter((u) => /\.(mp4|webm|mov|m4v)(\?|$)/i.test(u))
   return {
     title: title ? title.trim().slice(0, 200) : undefined,
     price: meta('product:price:amount') || meta('og:price:amount'),
     description: (meta('og:description') || meta('description'))?.slice(0, 1200),
     images: dedupe(ogImages).slice(0, 9),
     brand: meta('og:brand') || meta('product:brand') || meta('og:site_name'),
+    videos: dedupe(ogVideos).slice(0, 3),
   }
 }
 

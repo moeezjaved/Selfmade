@@ -39,6 +39,7 @@ export async function POST(req: NextRequest) {
     compareAtPrice: ip.compareAtPrice ? String(ip.compareAtPrice).slice(0, 40) : undefined,
     image: ip.image ? String(ip.image).slice(0, 2000) : null,
     images: Array.isArray(ip.images) ? ip.images.map((x: any) => String(x).slice(0, 2000)).filter(Boolean).slice(0, 9) : [],
+    videos: Array.isArray(ip.videos) ? ip.videos.map((x: any) => String(x).slice(0, 2000)).filter(Boolean).slice(0, 3) : [],
     description: ip.description ? String(ip.description).slice(0, 1600) : undefined,
     sku: ip.sku ? String(ip.sku).slice(0, 80) : null,
     brand: ip.brand ? String(ip.brand).slice(0, 80) : undefined,

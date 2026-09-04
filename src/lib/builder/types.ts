@@ -54,6 +54,8 @@ export interface ImportedProduct {
   compareAtPrice?: string
   image?: string | null
   images?: string[]
+  /** product video URLs (og:video / JSON-LD VideoObject) — re-hosted to R2 and dropped into video slots */
+  videos?: string[]
   description?: string
   sku?: string | null
   /** the seller/brand name → wordmark + voice */

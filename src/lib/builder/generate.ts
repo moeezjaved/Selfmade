@@ -11,8 +11,10 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { llm } from '@/lib/llm'
 import { getTemplate } from './templates'
 import type { FilledContent, RenderOpts, SlotDef, SlotValue, ImportedProduct } from './types'
+import { randomUUID } from 'node:crypto'
 import { getBuilderProduct } from './products'
 import { persistImagesToR2 } from '@/lib/brand-photos'
+import { uploadToR2 } from '@/lib/r2'
 import { loadBrandVoice, voiceBrief, productVision, fetchImageInput, generateAndHost, slugify, parseJsonObject } from './context'
 import type { ImageInput } from '@/lib/gemini/image'
 
@@ -39,12 +41,18 @@ export async function generatePage(
   // Product source: an externally-imported product (pasted URL from Amazon/Etsy/etc.) wins; otherwise
   // pull the chosen product live from the connected Shopify store.
   let imported = args.importedProduct as any
-  // Re-host the imported product's photos into our own R2 so the page has PERMANENT product images
+  // Re-host the imported product's photos AND video into our own R2 so the page has PERMANENT media
   // (not fragile hotlinks to the source's CDN). Download is DIRECT (uploadToR2, browser headers) —
   // never through IPRoyal, exactly like the Spy media path; failures fall back to the original URL.
   if (imported?.images?.length) {
     const rehosted = await persistImagesToR2(userId, imported.images).catch(() => imported.images as string[])
     imported = { ...imported, images: rehosted, image: rehosted[0] || imported.image }
+  }
+  if (imported?.videos?.length) {
+    const vids = await Promise.all((imported.videos as string[]).slice(0, 3).map(async (v) => {
+      try { return (await uploadToR2(v, `builder-products/${userId}/${randomUUID()}.mp4`, 'video/mp4')) || null } catch { return null }
+    }))
+    imported = { ...imported, videos: vids.filter(Boolean) }
   }
   const [product, voice] = await Promise.all([
     imported ? Promise.resolve(imported) : getBuilderProduct(userId, args.productId, args.brandId ?? null),
@@ -97,6 +105,15 @@ export async function generatePage(
       if (slot.type === 'reasons' && Array.isArray(content[slot.key])) {
         content[slot.key] = (content[slot.key] as any[]).map((it, i) => ({ ...it, image: gallery[i % gallery.length] }))
       }
+    }
+  }
+
+  // An imported product's own video(s) → the template's video slots (UGC wall), re-hosted above.
+  const importedVideos: string[] = Array.isArray((product as any)?.videos) ? (product as any).videos : []
+  if (importedVideos.length) {
+    let vi = 0
+    for (const slot of template.schema) {
+      if (slot.type === 'video' && importedVideos[vi]) { content[slot.key] = importedVideos[vi]; vi++ }
     }
   }
 
