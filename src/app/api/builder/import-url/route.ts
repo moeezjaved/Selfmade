@@ -60,32 +60,44 @@ export async function POST(req: NextRequest) {
 
     // Always fetch the page HTML too — it carries the rich signals (rating, reviews, brand, video)
     // that the Shopify `.json` endpoint omits. Direct first; IPRoyal fallback for bot-blocked sites.
-    let html = await fetchText(url.toString())
+    // Amazon is special: a bare fetch just returns the captcha/robot page (HTTP 200), so we skip straight
+    // to the droplet's real browser, which rewrites to the mobile product page and extracts the product.
+    const amazon = isAmazon(url)
+    let html: string | null = null
     let viaProxy = false
-    if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
-    // Last resort for JS-challenge sites (Amazon, Cloudflare-Shopify-Plus): render the HTML in a real
-    // browser on the droplet (Playwright + IPRoyal). HTML only — images/video are never fetched there.
-    if (!html && !shopify) { html = await fetchViaDroplet(url.toString()); if (html) viaProxy = true }
-    if (!shopify && !html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
+    let dropletProduct: DropletProduct | undefined
+    if (!amazon) {
+      html = await fetchText(url.toString())
+      if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
+    }
+    // Last resort (and first resort for Amazon): render in a real browser on the droplet (Playwright +
+    // IPRoyal). HTML only — images/video are never fetched there; Amazon also returns structured product.
+    if (amazon || (!html && !shopify)) {
+      const d = await fetchViaDroplet(url.toString())
+      html = d.html; dropletProduct = d.product; if (html) viaProxy = true
+    }
+    if (!shopify && !html && !dropletProduct?.title) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
 
     const fromLd = html ? fromJsonLd(html, url) : null
     const fromMeta = html ? fromMetaTags(html, url) : { title: undefined, price: undefined, description: undefined, images: [], brand: undefined, videos: [] }
 
     // Merge: Shopify core (if any) for title/price/images/description; page JSON-LD/meta for the
     // rich signals (rating, reviews, brand, video) that make the page land.
+    // Amazon's structured DOM extract (from the droplet) is the most reliable source for that site — its
+    // mobile page has no JSON-LD/og-tags — so it leads the merge; everything else fills the rich signals.
     const product: ImportedProduct = {
-      title: shopify?.title || fromLd?.title || fromMeta.title || '',
+      title: dropletProduct?.title || shopify?.title || fromLd?.title || fromMeta.title || '',
       handle: shopify?.handle || '',
-      price: shopify?.price || fromLd?.price || fromMeta.price || undefined,
+      price: dropletProduct?.price || shopify?.price || fromLd?.price || fromMeta.price || undefined,
       compareAtPrice: shopify?.compareAtPrice || fromLd?.compareAtPrice || undefined,
       description: shopify?.description || fromLd?.description || fromMeta.description || undefined,
-      images: dedupe([...(shopify?.images || []), ...(fromLd?.images || []), ...(fromMeta.images || [])]).slice(0, 9),
+      images: dedupe([...(dropletProduct?.images || []), ...(shopify?.images || []), ...(fromLd?.images || []), ...(fromMeta.images || [])]).slice(0, 9),
       videos: dedupe([...(shopify?.videos || []), ...(fromLd?.videos || []), ...(fromMeta.videos || [])]).slice(0, 3),
       sku: shopify?.sku || fromLd?.sku || null,
       brand: shopify?.brand || fromLd?.brand || fromMeta.brand || undefined,
       rating: fromLd?.rating,                 // Shopify .json has no rating — always from page JSON-LD
       ratingCount: fromLd?.ratingCount,
-      features: ((fromLd?.features && fromLd.features.length ? fromLd.features : (html ? featureBullets(html) : [])) || []).slice(0, 8),
+      features: ((dropletProduct?.features && dropletProduct.features.length ? dropletProduct.features : (fromLd?.features && fromLd.features.length ? fromLd.features : (html ? featureBullets(html) : []))) || []).slice(0, 8),
       reviews: (fromLd?.reviews || []).slice(0, 8),
       sourceUrl: url.toString(),
     }
@@ -100,19 +112,23 @@ export async function POST(req: NextRequest) {
 // Render a URL in the droplet's real browser (Playwright + IPRoyal + stealth) — the last resort for
 // JS-challenge sites (Amazon, Cloudflare-Shopify-Plus). Returns the post-JS DOM. HTML only; the droplet
 // never downloads the page's media. No-ops when DROPLET_PREVIEW_URL / PREVIEW_SECRET aren't configured.
-async function fetchViaDroplet(target: string): Promise<string | null> {
+type DropletProduct = { title?: string; price?: string; images?: string[]; features?: string[] }
+async function fetchViaDroplet(target: string): Promise<{ html: string | null; product?: DropletProduct }> {
   const base = process.env.DROPLET_PREVIEW_URL, secret = process.env.PREVIEW_SECRET
-  if (!base || !secret) return null
+  if (!base || !secret) return { html: null }
   try {
     const u = new URL('/fetch-html', base.replace(/\/$/, ''))
     u.searchParams.set('url', target)
     const r = await fetch(u.toString(), { headers: { 'X-Preview-Secret': secret }, signal: AbortSignal.timeout(45_000) })
-    if (!r.ok) return null
+    if (!r.ok) return { html: null }
     const j = await r.json().catch(() => null)
-    const html = j?.html
-    return typeof html === 'string' && html.length > 200 ? html : null
-  } catch { return null }
+    const html = typeof j?.html === 'string' && j.html.length > 200 ? j.html : null
+    const product: DropletProduct | undefined = j?.product?.title ? j.product : undefined
+    return { html, product }
+  } catch { return { html: null } }
 }
+
+function isAmazon(u: URL): boolean { return /(^|\.)amazon\.[a-z.]+$/i.test(u.hostname) }
 
 async function fetchText(u: string, viaProxy = false): Promise<string | null> {
   try {
