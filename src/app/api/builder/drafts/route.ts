@@ -33,6 +33,8 @@ export async function GET(req: NextRequest) {
       // for the inline editor: the saved copy + the template's editable slots
       content: row.content || {},
       schema: tpl.schema.map((s) => ({ key: s.key, type: s.type, label: s.label, hint: s.hint })),
+      // whether this page was edited in the VISUAL editor (the classic form must warn before overwriting)
+      hasVisualEdits: !!row.edited_html,
     })
   }
 
