@@ -47,11 +47,21 @@ export async function GET(request: NextRequest) {
   const leads = leadsRaw || []
   const auditsCompleted = leads.length
   const adsCompleted = leads.filter((l: any) => !l.domain).length
-  const convertedIds = Array.from(new Set(leads.filter((l: any) => l.converted_user_id).map((l: any) => l.converted_user_id)))
+
+  // signup-first flow: a lead's email == their account email. `converted_user_id` is only set on
+  // PAYMENT (see paypal grant), so resolve "signed up" by matching the lead email to a registered
+  // account — otherwise everyone who signed up but hasn't paid wrongly shows as a non-signup.
+  const emailToId = new Map<string, string>()
+  try {
+    const { data: list } = await admin.auth.admin.listUsers({ perPage: 1000 })
+    for (const u of (list?.users || [])) if (u.email) emailToId.set(String(u.email).toLowerCase(), u.id)
+  } catch { /* best-effort */ }
+  const leadUserId = (l: any): string | null => l.converted_user_id || emailToId.get(String(l.email || '').toLowerCase()) || null
+  const convertedIds = Array.from(new Set(leads.map(leadUserId).filter(Boolean))) as string[]
 
   // Everyone who audited but hasn't signed up — the hot-lead list ("which brands/sites are auditing").
   const anonymousAudits = leads
-    .filter((l: any) => !l.converted_user_id)
+    .filter((l: any) => !leadUserId(l))
     .map((l: any) => ({
       type: l.domain ? 'seo' : 'ads', domain: l.domain, page_id: null,
       site_name: l.brand_name || l.domain || l.email, score: null, category: null,
