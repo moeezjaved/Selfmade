@@ -129,6 +129,21 @@ function replaceImgSrc(html: string, cls: string, liquidSrc: string): string {
   const re = new RegExp(`<img\\b([^>]*\\bclass=["'][^"']*\\b${cls}\\b[^"']*["'][^>]*)>`, 'gi')
   return html.replace(re, (_m, attrs) => `<img${String(attrs).replace(/\ssrc=["'][^"']*["']/i, '').replace(/\ssrcset=["'][^"']*["']/i, '')} src="${liquidSrc}">`)
 }
+// Replace the inner HTML of the first container with class `cls` (spliced via innerOf).
+function replaceContainerInner(html: string, cls: string, newInner: string): string {
+  const found = innerOf(html, cls)
+  return found ? html.slice(0, found.start) + newInner + html.slice(found.end) : html
+}
+// Turn the product-template gallery (fixed 4 slides of the built product) into a loop over EACH
+// product's own images — main slides + thumbnails. Falls back to the featured image if there's no gallery.
+function galleryLoop(html: string): string {
+  if (!innerOf(html, 'gtrack')) return replaceImgSrc(html, 'gimg', '{{ product.featured_image | image_url: width: 1200 }}')
+  let s = replaceContainerInner(html, 'gtrack',
+    `{% for image in product.images %}<div class="gslide"><img class="gimg" src="{{ image | image_url: width: 1400 }}" alt="{{ product.title | escape }}"></div>{% endfor %}`)
+  s = replaceContainerInner(s, 'thumbs',
+    `{% for image in product.images %}<button class="gthumb{% if forloop.first %} on{% endif %}" data-i="{{ forloop.index0 }}"><img src="{{ image | image_url: width: 160 }}" alt=""></button>{% endfor %}`)
+  return s
+}
 
 function dynamizeProduct(html: string, mode: DynamicMode): string {
   if (mode === 'none') return html
@@ -141,7 +156,7 @@ function dynamizeProduct(html: string, mode: DynamicMode): string {
     s = replaceInner(s, 'now', '{{ product.price | money }}')
     s = replaceInner(s, 'was', '{% if product.compare_at_price > product.price %}{{ product.compare_at_price | money }}{% endif %}')
     s = replaceInner(s, 'fc-name', '{{ product.title }}')
-    s = replaceImgSrc(s, 'gimg', '{{ product.featured_image | image_url: width: 1200 }}')
+    s = galleryLoop(s)                                                   // main gallery → loop each product's own images
     s = replaceImgSrc(s, 'fc-thumb', '{{ product.featured_image | image_url: width: 120 }}')
   }
   return s

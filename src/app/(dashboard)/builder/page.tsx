@@ -292,6 +292,18 @@ export default function BuilderPage() {
   const [publishKind, setPublishKind] = useState<string>('')            // 'product' | 'home' | …
   const [publishTarget, setPublishTarget] = useState<'this' | 'selected' | 'store'>('this')
   const [needsScopes, setNeedsScopes] = useState(false)
+  // 'Selected products' multi-select
+  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [pickProducts, setPickProducts] = useState<Product[] | null>(null)
+  const [pickQ, setPickQ] = useState('')
+  useEffect(() => {
+    if (!pickerOpen || publishTarget !== 'selected') return
+    let on = true
+    const t = setTimeout(async () => {
+      try { const r = await fetch(`/api/builder/products?q=${encodeURIComponent(pickQ)}`); const j = await r.json(); if (on) setPickProducts(j.products || []) } catch { if (on) setPickProducts([]) }
+    }, pickProducts ? 300 : 0)
+    return () => { on = false; clearTimeout(t) }
+  }, [pickerOpen, publishTarget, pickQ]) // eslint-disable-line react-hooks/exhaustive-deps
   const openThemePicker = useCallback(async () => {
     setPickerOpen(true); setPublishErr(''); setNeedsScopes(false)
     // Learn the page kind so the modal can offer product-page targeting (this / selected / whole store).
@@ -401,7 +413,7 @@ export default function BuilderPage() {
     try {
       const r = await fetch('/api/builder/publish', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId, themeId: themeId ?? undefined, themeLive: theme?.live ?? undefined, target: publishTarget }),
+        body: JSON.stringify({ pageId, themeId: themeId ?? undefined, themeLive: theme?.live ?? undefined, target: publishTarget, productIds: publishTarget === 'selected' ? selectedIds : undefined }),
       })
       const j = await r.json()
       // Product/home pages publish into the theme — that needs theme access the store may not have granted yet.
@@ -413,7 +425,7 @@ export default function BuilderPage() {
       setStep('published')
     } catch (e: any) { setPublishErr(e?.message || 'Import failed — please try again') }
     finally { setPublishing(false) }
-  }, [pageId, themes, publishTarget])
+  }, [pageId, themes, publishTarget, selectedIds])
 
   /* ── step gating ── */
   const canNext = (
@@ -1002,7 +1014,7 @@ export default function BuilderPage() {
               <div style={{ marginTop: 14 }}>
                 <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 8 }}>Apply this page to…</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  {([['this', 'Just this product', 'Only the product you built it from — others keep their pages.'], ['store', 'All products', 'Every product gets this design; each shows its own photo, price & details.']] as const).map(([v, l, d]) => {
+                  {([['this', 'Just this product', 'Only the product you built it from — others keep their pages.'], ['selected', 'Selected products', 'Pick which products get this page — each shows its own details.'], ['store', 'All products', 'Every product gets this design; each shows its own photo, price & details.']] as const).map(([v, l, d]) => {
                     const on = publishTarget === v
                     return (
                       <button key={v} onClick={() => setPublishTarget(v)} style={{ ...CARD, display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left', padding: '11px 13px', cursor: 'pointer', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : 'none' }}>
@@ -1012,6 +1024,26 @@ export default function BuilderPage() {
                     )
                   })}
                 </div>
+                {publishTarget === 'selected' && (
+                  <div style={{ marginTop: 10, border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden' }}>
+                    <input value={pickQ} onChange={(e) => setPickQ(e.target.value)} placeholder="Search products…" style={{ width: '100%', border: 0, borderBottom: `1px solid ${LINE}`, padding: '10px 12px', fontSize: 13, outline: 'none', color: INK, boxSizing: 'border-box' }} />
+                    <div style={{ maxHeight: 200, overflowY: 'auto' }}>
+                      {pickProducts === null && <div style={{ padding: 14, fontSize: 12.5, color: FAINT }}>Loading products…</div>}
+                      {pickProducts && pickProducts.length === 0 && <div style={{ padding: 14, fontSize: 12.5, color: FAINT }}>No products found.</div>}
+                      {(pickProducts || []).map((p) => {
+                        const on = selectedIds.includes(String(p.id))
+                        return (
+                          <button key={p.id} onClick={() => setSelectedIds((s) => on ? s.filter((x) => x !== String(p.id)) : [...s, String(p.id)])} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', textAlign: 'left', border: 0, borderBottom: `1px solid ${LINE2}`, background: on ? WASH : '#fff', padding: '8px 12px', cursor: 'pointer' }}>
+                            <span style={{ width: 17, height: 17, borderRadius: 4, border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? ORANGE : '#fff', color: '#fff', display: 'grid', placeItems: 'center', fontSize: 12, flex: 'none' }}>{on ? '✓' : ''}</span>
+                            {p.image && <img src={p.image} alt="" style={{ width: 26, height: 26, borderRadius: 5, objectFit: 'cover', flex: 'none' }} />}
+                            <span style={{ fontSize: 13, color: INK, flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</span>
+                          </button>
+                        )
+                      })}
+                    </div>
+                    <div style={{ padding: '8px 12px', fontSize: 12, color: SUB, background: INSET, borderTop: `1px solid ${LINE}` }}>{selectedIds.length} selected</div>
+                  </div>
+                )}
               </div>
             )}
             <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '38vh', overflowY: 'auto' }}>
@@ -1034,7 +1066,9 @@ export default function BuilderPage() {
             </div>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
               <button onClick={() => setPickerOpen(false)} disabled={publishing} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Cancel</button>
-              <button onClick={() => publish(chosenTheme)} disabled={publishing || themesLoading} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 22px', fontWeight: 700, fontSize: 13.5, cursor: (publishing || themesLoading) ? 'default' : 'pointer', opacity: (publishing || themesLoading) ? 0.6 : 1 }}>{publishing ? 'Publishing…' : 'Publish here →'}</button>
+              {(() => { const blocked = publishing || themesLoading || (publishKind === 'product' && publishTarget === 'selected' && selectedIds.length === 0); return (
+              <button onClick={() => publish(chosenTheme)} disabled={blocked} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 22px', fontWeight: 700, fontSize: 13.5, cursor: blocked ? 'default' : 'pointer', opacity: blocked ? 0.6 : 1 }}>{publishing ? 'Publishing…' : 'Publish here →'}</button>
+              ) })()}
             </div>
             </>)}
           </div>

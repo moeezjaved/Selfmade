@@ -17,6 +17,7 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 import {
   normalizeShopDomain, isValidShopDomain, validateShopToken, encryptShopifyToken,
   resolveStore, seedBrandWebsite, SHOPIFY_REQUIRED_SCOPES, ShopifyError,
+  shopifyRest, tokenFor, hasThemeScopes,
 } from '@/lib/shopify/client'
 import { syncShopifyProducts, catalogHealth } from '@/lib/shopify/sync'
 
@@ -32,6 +33,10 @@ export async function GET(_req: NextRequest) {
   const store = await resolveStore(admin, user.id, brandId)
   if (!store) return NextResponse.json({ connected: false })
   const health = await catalogHealth(admin, store.id).catch(() => null)
+  // Live-check the granted scopes (truth from Shopify, not the stored value) — the Page Builder needs
+  // write_themes to publish product/home pages as native theme sections.
+  let scopes: string[] = []
+  try { const sc = await shopifyRest(store.shop_domain, tokenFor(store), 'oauth/access_scopes.json'); scopes = (sc?.access_scopes || []).map((x: any) => x.handle).filter(Boolean) } catch {}
   return NextResponse.json({
     connected: true,
     shop_domain: store.shop_domain,
@@ -39,6 +44,8 @@ export async function GET(_req: NextRequest) {
     plan_name: store.plan_name,
     currency: store.currency,
     last_sync: (store as any).last_sync,
+    scopes,
+    themeAccess: hasThemeScopes(scopes.join(',')),
     health,
   })
 }
