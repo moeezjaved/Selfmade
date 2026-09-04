@@ -155,7 +155,7 @@ export const EDITOR_JS = `
   function applyLink(){
     var url=(tbInput.value||'').trim();
     restoreRange();
-    if(url){ if(!/^(https?:\/\/|\/|mailto:|tel:|#)/i.test(url)) url='https://'+url; document.execCommand('createLink',false,url);
+    if(url){ if(!/^(https?:|mailto:|tel:|#)/i.test(url) && url.charAt(0)!=='/') url='https://'+url; document.execCommand('createLink',false,url);
       // open in a new tab for external links
       try{ var a=getSelection().anchorNode; var el=a&&a.nodeType===1?a:a&&a.parentNode; var link=el&&el.closest?el.closest('a'):null; if(link&&/^https?:/i.test(url)){ link.setAttribute('target','_blank'); link.setAttribute('rel','noopener'); } }catch(_){}
       markDirty();
