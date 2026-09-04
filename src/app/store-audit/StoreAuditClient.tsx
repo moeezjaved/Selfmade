@@ -335,16 +335,28 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   useEffect(() => {
     if (!domain) return
     let on = true
+    const enc = encodeURIComponent(domain)
+    // Concepts + kit load fast.
     Promise.all([
-      fetch(`/api/ads-studio/templates?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => ({ templates: [] })),
-      fetch(`/api/ads-studio/brand-kit?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => null),
-      fetch(`/api/ads-studio/products?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => ({ products: [] })),
-    ]).then(([t, k, p]) => {
+      fetch(`/api/ads-studio/templates?domain=${enc}`).then((r) => r.json()).catch(() => ({ templates: [] })),
+      fetch(`/api/ads-studio/brand-kit?domain=${enc}`).then((r) => r.json()).catch(() => null),
+    ]).then(([t, k]) => {
       if (!on) return
-      setTpls((Array.isArray(t.templates) ? t.templates : []).slice(0, 10).map((x: any) => ({ ...x })))
+      // Only 5 concepts — image renders are expensive, so we never generate (or even offer) more than the
+      // 5 free ones in the audit.
+      setTpls((Array.isArray(t.templates) ? t.templates : []).slice(0, FREE).map((x: any) => ({ ...x })))
       setKit(k && !k.empty ? k : null)
-      setProducts(Array.isArray(p.products) ? p.products.map((x: any) => ({ title: x.title || '', image: x.image || (x.images || [])[0] || null })) : [])
     })
+    // The ads MUST use the store's REAL product photos. Read the cached catalog first; if it comes back
+    // without images (fresh brand / stale-empty cache), FORCE a live crawl so we always get real products.
+    ;(async () => {
+      const read = (force?: boolean) => fetch(`/api/ads-studio/products?domain=${enc}${force ? '&force=1' : ''}`).then((r) => r.json()).catch(() => ({ products: [] }))
+      let p = await read()
+      const hasImg = (x: any) => Array.isArray(x.products) && x.products.some((q: any) => q.image || (q.images || [])[0])
+      if (on && !hasImg(p)) p = await read(true)
+      if (!on) return
+      setProducts(Array.isArray(p.products) ? p.products.map((x: any) => ({ title: x.title || '', image: x.image || (x.images || [])[0] || null })) : [])
+    })()
     return () => { on = false }
   }, [domain])
 
@@ -378,11 +390,11 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: true } : x))
   }
 
-  // Auto-render the FIRST 5 (free) — 2 at a time — the moment the concepts load. The brand-kit is
-  // OPTIONAL (it only adds colors/fonts/logo); we must NOT wait on it, or a store with no detectable kit
-  // would sit on "Queued…" forever and never get the wow moment. The other 5 wait for a tap (cost credits).
+  // Auto-render the FIRST 5 (free) — 2 at a time — once we have the concepts AND at least one REAL product
+  // photo (the ad must show the store's actual product, never a fabricated one). The brand-kit stays
+  // OPTIONAL (colors/fonts/logo only). The other 5 wait for a tap (they cost credits).
   useEffect(() => {
-    if (kicked.current || !tpls) return
+    if (kicked.current || !tpls || !withImg.length) return
     const todo = tpls.slice(0, FREE).map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
     if (!todo.length) return
     kicked.current = true
@@ -392,7 +404,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   }, [tpls])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (tpls !== null && tpls.length === 0) return null
-  const cards = tpls || Array.from({ length: 10 }, () => null)
+  const cards = tpls || Array.from({ length: FREE }, () => null)
   return (
     <div ref={rootRef} style={{ padding: headline ? '44px 24px 12px' : '20px 24px 0', display: 'flex', justifyContent: 'center', ...(headline ? { background: 'linear-gradient(180deg, rgba(224,47,6,.10), rgba(224,47,6,0) 70%)' } : {}) }}>
       <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}@keyframes sfreveal{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}`}</style>
@@ -403,7 +415,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
           </div>
         )}
         <h2 style={{ fontFamily: SERIF, fontSize: headline ? 42 : 30, fontWeight: 700, color: '#fff', margin: '0 0 4px', textAlign: headline ? 'center' : 'left', lineHeight: 1.05 }}>The ads we made you</h2>
-        <p style={{ fontSize: headline ? 16 : 15, color: SUB, margin: headline ? '0 auto 24px' : '0 0 20px', maxWidth: 640, lineHeight: 1.5, textAlign: headline ? 'center' : 'left' }}>Built from the winning DNA your rivals use, with your product — rendered live, just for your store. The first 5 are on us — tap <b style={{ color: '#fff' }}>Generate</b> on any of the others to make it with your credits.</p>
+        <p style={{ fontSize: headline ? 16 : 15, color: SUB, margin: headline ? '0 auto 24px' : '0 0 20px', maxWidth: 640, lineHeight: 1.5, textAlign: headline ? 'center' : 'left' }}>Built from the winning DNA your rivals use, with <b style={{ color: '#fff' }}>your real product</b> — rendered live, just for your store. All 5 are on us.</p>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))', gap: 16 }}>
           {cards.map((t, i) => {
             const paid = i >= FREE

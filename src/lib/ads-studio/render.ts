@@ -43,10 +43,10 @@ export type FreeRenderOpts = {
 /** Generate one ad with the Pro engine and NO credit charge. Returns the permanent R2 url (+ data image). */
 export async function renderAdFree(admin: any, userId: string, brandId: string | null, opts: FreeRenderOpts): Promise<{ url: string | null; image: string } | null> {
   if (!geminiEnabled) return null
-  // A product photo makes the ad product-accurate, but it is NOT required — a store the crawler hasn't
-  // pulled products from (or a website-only audit) would otherwise blank the whole "here's what we'd make
-  // you" reveal. Without one we still render a brand-grounded concept from the niche inspirations + kit.
+  // A real product photo is REQUIRED — the ad must show the store's ACTUAL product, never a fabricated
+  // one. If none is available the caller must fetch product images first (we never invent a product).
   const products = (await Promise.all(opts.productImages.slice(0, 2).map(fetchImageB64))).filter(Boolean) as Img[]
+  if (!products.length) return null
 
   const niche = opts.niche ?? (await resolveBrandNiche(admin, null).catch(() => null))
   const insights = await getNicheInsights(admin, niche)
@@ -74,7 +74,7 @@ export async function renderAdFree(admin: any, userId: string, brandId: string |
   for (let i = 0; i < MAX_GENS; i++) {
     const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${fix}`
     const gen = await generateImage(attemptPrompt, genImages, 'pro', { aspectRatio: aspect, imageSize: '2K' })
-    if (!gen.ok) break                                   // busy → keep best-so-far (or null on 1st attempt)
+    if (!gen.ok) break                                    // busy → keep best-so-far (or null on 1st attempt)
     best = { mimeType: gen.mimeType, dataB64: gen.dataB64, model: gen.model }
     if (!products[0]) break                              // no product to verify against → accept
     const v = await verifyClonedAd(best, products[0], opts.brandName)
