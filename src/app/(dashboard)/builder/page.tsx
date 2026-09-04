@@ -85,8 +85,9 @@ function Thumb({ src, seed, label, height = 132 }: { src?: string; seed: number;
 export default function BuilderPage() {
   const isMobile = useIsMobile()
   const search = useSearchParams()
-  // ?editor=v2 → open pages in the click-anywhere visual editor instead of the copy form (build-flag).
-  const editorV2 = search?.get('editor') === 'v2'
+  // The click-anywhere visual editor is now the DEFAULT way to edit a page. `?editor=form` opts back to
+  // the classic copy form (kept as a rollback while the team pressure-tests the visual editor).
+  const editorV2 = search?.get('editor') !== 'form'
   const [step, setStep] = useState<Step>('list')
 
   /* ── landing: the user's already-generated pages ── */
@@ -336,6 +337,7 @@ export default function BuilderPage() {
   const [editContent, setEditContent] = useState<Record<string, any>>({})
   const [editErr, setEditErr] = useState('')
   const [saving, setSaving] = useState(false)
+  const [editHasVisual, setEditHasVisual] = useState(false)   // page was edited in the visual editor
   const editDraft = useCallback(async (id: string) => {
     setOpening(id); setEditErr('')
     try {
@@ -345,13 +347,14 @@ export default function BuilderPage() {
       setPageId(j.pageId || id)
       setEditSchema(j.schema || [])
       setEditContent(j.content || {})
+      setEditHasVisual(!!j.hasVisualEdits)
       setPublishedUrl(j.shopifyUrl || '')
       setStep('edit')
     } catch { setToast('Could not open that page.'); setTimeout(() => setToast(''), 3200) }
     finally { setOpening(null) }
   }, [])
 
-  // Open the click-anywhere visual editor for a saved page (build-flag ?editor=v2).
+  // Open the click-anywhere visual editor for a saved page (now the default editor).
   const openVisualEditor = useCallback((id: string) => { setPageId(id); setStep('editor') }, [])
   const setField = (key: string, value: any) => setEditContent((c) => ({ ...c, [key]: value }))
   const setItemField = (key: string, idx: number, field: string, value: any) => setEditContent((c) => {
@@ -361,11 +364,13 @@ export default function BuilderPage() {
   })
   const saveEdit = useCallback(async () => {
     if (!pageId) return
+    // This page was hand-edited in the visual editor — saving the form's copy discards those changes.
+    if (editHasVisual && !window.confirm('This page was edited in the visual editor. Saving here replaces it with this form’s copy and discards those visual changes. Continue?')) return
     setSaving(true); setEditErr('')
     try {
       const r = await fetch('/api/builder/update', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId, content: editContent }),
+        body: JSON.stringify({ pageId, content: editContent, discardVisualEdits: editHasVisual }),
       })
       const j = await r.json()
       if (!r.ok) throw new Error(j?.error || 'Could not save')
@@ -375,7 +380,7 @@ export default function BuilderPage() {
       loadPages()
     } catch (e: any) { setEditErr(e?.message || 'Could not save') }
     finally { setSaving(false) }
-  }, [pageId, editContent, loadPages])
+  }, [pageId, editContent, editHasVisual, loadPages])
 
   /* ── reset all wizard state and start a brand-new page ── */
   const startNew = useCallback(() => {

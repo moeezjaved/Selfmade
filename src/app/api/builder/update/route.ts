@@ -20,6 +20,8 @@ export async function POST(req: NextRequest) {
   const b = await req.json().catch(() => ({}))
   const pageId = String(b?.pageId || '')
   const content = (b?.content && typeof b.content === 'object') ? (b.content as FilledContent) : null
+  // The classic form sends this after the user confirms discarding visual-editor changes.
+  const discardVisualEdits = b?.discardVisualEdits === true
   if (!pageId || !content) return NextResponse.json({ error: 'pageId and content are required' }, { status: 400 })
 
   const admin = createAdminClient()
@@ -36,7 +38,11 @@ export async function POST(req: NextRequest) {
   // Preserve any pipeline-filled keys the editor didn't touch (e.g. images).
   const merged: FilledContent = { ...(row.content || {}), ...clean }
 
-  await admin.from('builder_pages').update({ content: merged, updated_at: new Date().toISOString() }).eq('id', pageId)
+  // If the caller confirmed, the form's structured copy becomes the source of truth again — drop the
+  // visual-editor override so preview + publish re-render from `content`.
+  const patch: any = { content: merged, updated_at: new Date().toISOString() }
+  if (discardVisualEdits && row.edited_html) { patch.edited_html = null; patch.edited_at = null }
+  await admin.from('builder_pages').update(patch).eq('id', pageId)
 
   const opts: RenderOpts = row.render_opts || { productName: row.product_name || 'Product', ctaHref: row.cta_href || '#' }
   const previewHtml = assembleDocument(tpl, merged, opts)
