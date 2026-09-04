@@ -289,8 +289,13 @@ export default function BuilderPage() {
   const [themesLoading, setThemesLoading] = useState(false)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [chosenTheme, setChosenTheme] = useState<number | null>(null)
+  const [publishKind, setPublishKind] = useState<string>('')            // 'product' | 'home' | …
+  const [publishTarget, setPublishTarget] = useState<'this' | 'selected' | 'store'>('this')
+  const [needsScopes, setNeedsScopes] = useState(false)
   const openThemePicker = useCallback(async () => {
-    setPickerOpen(true); setPublishErr('')
+    setPickerOpen(true); setPublishErr(''); setNeedsScopes(false)
+    // Learn the page kind so the modal can offer product-page targeting (this / selected / whole store).
+    if (pageId) fetch(`/api/builder/drafts?id=${encodeURIComponent(pageId)}`).then((r) => r.json()).then((j) => setPublishKind(j?.kind || '')).catch(() => {})
     if (themes) return
     setThemesLoading(true)
     try {
@@ -396,17 +401,19 @@ export default function BuilderPage() {
     try {
       const r = await fetch('/api/builder/publish', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ pageId, themeId: themeId ?? undefined, themeLive: theme?.live ?? undefined }),
+        body: JSON.stringify({ pageId, themeId: themeId ?? undefined, themeLive: theme?.live ?? undefined, target: publishTarget }),
       })
       const j = await r.json()
-      if (!r.ok) throw new Error(j?.error || 'Import failed — please try again')
+      // Product/home pages publish into the theme — that needs theme access the store may not have granted yet.
+      if (r.status === 409 && j?.error === 'needs_theme_scopes') { setNeedsScopes(true); setPublishErr(''); return }
+      if (!r.ok) throw new Error(j?.message || j?.error || 'Import failed — please try again')
       setPublishedUrl(j.url || '')
       setPreviewUrl(j.previewUrl || '')
       setPickerOpen(false)
       setStep('published')
     } catch (e: any) { setPublishErr(e?.message || 'Import failed — please try again') }
     finally { setPublishing(false) }
-  }, [pageId, themes])
+  }, [pageId, themes, publishTarget])
 
   /* ── step gating ── */
   const canNext = (
@@ -976,10 +983,38 @@ export default function BuilderPage() {
         <div onClick={() => !publishing && setPickerOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 130, background: 'rgba(20,18,15,.45)', display: 'grid', placeItems: 'center', padding: 20 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ ...CARD, width: 'min(460px, 100%)', padding: 22 }}>
             <div style={eyebrow}>Publish to Shopify</div>
-            <h3 style={{ ...cardTitle, fontSize: 22, marginTop: 4 }}>Which theme?</h3>
-            <p style={{ fontSize: 13, color: SUB, marginTop: 6, lineHeight: 1.5 }}>Detected from your connected store. The page publishes as a native Shopify page — pick a theme to view it under. A draft theme lets you stage it before going live.</p>
+            <h3 style={{ ...cardTitle, fontSize: 22, marginTop: 4 }}>{needsScopes ? 'One quick step' : 'Where should it go?'}</h3>
+            {needsScopes ? (
+              <div style={{ marginTop: 10 }}>
+                <p style={{ fontSize: 13.5, color: SUB, lineHeight: 1.6 }}>Product & home pages publish as <b>native, editable sections</b> straight into your theme (so they replace the real product/home page — not a separate page). That needs theme access your store hasn’t granted yet.</p>
+                <p style={{ fontSize: 13.5, color: SUB, lineHeight: 1.6, marginTop: 10 }}>Reconnect your store and add <code style={{ fontSize: 12 }}>read_themes, write_themes</code> to the app’s scopes — takes a minute.</p>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 18 }}>
+                  <button onClick={() => setPickerOpen(false)} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Later</button>
+                  <Link href="/connect/shopify" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', borderRadius: 999, padding: '9px 20px', fontWeight: 700, fontSize: 13.5 }}>Reconnect store →</Link>
+                </div>
+              </div>
+            ) : (<>
+            <p style={{ fontSize: 13, color: SUB, marginTop: 6, lineHeight: 1.5 }}>{publishKind === 'product' || publishKind === 'home'
+              ? 'Publishes as native, editable sections into your theme — it replaces your real ' + (publishKind === 'home' ? 'home page' : 'product page') + '. Pick a theme (a draft theme stages it before going live).'
+              : 'Publishes as a native Shopify page. Pick a theme to view it under — a draft theme stages it before going live.'}</p>
             {publishErr && <ErrorStrip msg={publishErr} />}
-            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '46vh', overflowY: 'auto' }}>
+            {publishKind === 'product' && (
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 12.5, fontWeight: 700, color: INK, marginBottom: 8 }}>Apply this page to…</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {([['this', 'Just this product', 'Only the product you built it from — others keep their pages.'], ['store', 'All products', 'Every product gets this design; each shows its own photo, price & details.']] as const).map(([v, l, d]) => {
+                    const on = publishTarget === v
+                    return (
+                      <button key={v} onClick={() => setPublishTarget(v)} style={{ ...CARD, display: 'flex', alignItems: 'flex-start', gap: 10, textAlign: 'left', padding: '11px 13px', cursor: 'pointer', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : 'none' }}>
+                        <input type="radio" className="bld-radio" checked={on} readOnly style={{ marginTop: 2 }} />
+                        <div><div style={{ fontSize: 13.5, fontWeight: 700 }}>{l}</div><div style={{ fontSize: 12, color: FAINT, marginTop: 2 }}>{d}</div></div>
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+            <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8, maxHeight: '38vh', overflowY: 'auto' }}>
               {themesLoading && <SkeletonRows />}
               {!themesLoading && themes && themes.length === 0 && (
                 <div style={{ fontSize: 13, color: SUB, background: INSET, borderRadius: 12, padding: 14, lineHeight: 1.5 }}>We couldn’t detect your themes — the page will publish to your live store.</div>
@@ -1001,6 +1036,7 @@ export default function BuilderPage() {
               <button onClick={() => setPickerOpen(false)} disabled={publishing} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Cancel</button>
               <button onClick={() => publish(chosenTheme)} disabled={publishing || themesLoading} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 22px', fontWeight: 700, fontSize: 13.5, cursor: (publishing || themesLoading) ? 'default' : 'pointer', opacity: (publishing || themesLoading) ? 0.6 : 1 }}>{publishing ? 'Publishing…' : 'Publish here →'}</button>
             </div>
+            </>)}
           </div>
         </div>
       )}

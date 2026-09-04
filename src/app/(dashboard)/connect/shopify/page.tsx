@@ -143,7 +143,7 @@ function ConnectShopifyInner() {
           <ol style={{ margin: '10px 0 18px', padding: 0, listStyle: 'none', display: 'grid', gap: 8 }}>
             {[
               ['1', <>In your store: <b>Settings → Apps → Develop apps → Create an app</b> (name it “Selfmade”).</>],
-              ['2', <>Add these Admin API scopes, then <b>Save</b> &amp; <b>Install</b>: <code style={{ fontSize: 11.5 }}>read_products, write_products, read_orders, read_inventory, read_content, write_content</code>.</>],
+              ['2', <>Add these Admin API scopes, then <b>Save</b> &amp; <b>Install</b>: <code style={{ fontSize: 11.5 }}>read_products, write_products, read_orders, read_inventory, read_content, write_content, read_themes, write_themes</code>.</>],
               ['3', <>Open <b>API credentials</b>, reveal the <b>Admin API access token</b> (<code>shpat_…</code>), and paste it below.</>],
             ].map(([n, body]) => (
               <li key={n as string} style={{ display: 'flex', gap: 10, fontSize: 13, color: INK, lineHeight: 1.5 }}>

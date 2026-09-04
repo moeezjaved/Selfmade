@@ -14,7 +14,16 @@ export const SHOPIFY_REQUIRED_SCOPES = [
   'read_orders',
   'read_inventory',
   'read_content', 'write_content',   // blog/pages for publish-to-blog
+  'read_themes', 'write_themes',      // Page Builder: publish pages as native theme sections/templates
 ]
+
+// Theme-write scope specifically — the Page Builder needs it to publish sections + templates. The
+// existing connection may predate it; publish checks this and prompts a one-time reconnect if missing.
+export const SHOPIFY_THEME_SCOPES = ['read_themes', 'write_themes']
+export function hasThemeScopes(granted?: string | null): boolean {
+  const set = new Set(String(granted || '').split(',').map((s) => s.trim()))
+  return SHOPIFY_THEME_SCOPES.every((s) => set.has(s))
+}
 
 export type StoreRow = {
   id: string

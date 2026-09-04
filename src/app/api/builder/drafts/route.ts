@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     const opts: RenderOpts = row.render_opts || { productName: row.product_name || 'Product', ctaHref: row.cta_href || '#' }
     const previewHtml = assembleDocument(tpl, row.content || {}, opts)
     return NextResponse.json({
-      pageId: row.id, previewHtml, status: row.status,
+      pageId: row.id, previewHtml, status: row.status, kind: tpl.type,
       productName: row.product_name, templateId: row.template_id, shopifyUrl: row.shopify_url,
       // for the inline editor: the saved copy + the template's editable slots
       content: row.content || {},
