@@ -368,16 +368,18 @@ function AuditAds({ domain }: { domain: string }) {
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: true } : x))
   }
 
-  // Auto-render the FIRST 5 (free) — 2 at a time. The other 5 wait for a tap (they cost credits).
+  // Auto-render the FIRST 5 (free) — 2 at a time — the moment the concepts load. The brand-kit is
+  // OPTIONAL (it only adds colors/fonts/logo); we must NOT wait on it, or a store with no detectable kit
+  // would sit on "Queued…" forever and never get the wow moment. The other 5 wait for a tap (cost credits).
   useEffect(() => {
-    if (kicked.current || !tpls || !kit) return
+    if (kicked.current || !tpls) return
     const todo = tpls.slice(0, FREE).map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
     if (!todo.length) return
     kicked.current = true
     let cursor = 0
     const worker = async () => { while (cursor < todo.length) await genOne(todo[cursor++].i) }
     worker(); worker()
-  }, [tpls, kit])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tpls])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (tpls !== null && tpls.length === 0) return null
   const cards = tpls || Array.from({ length: 10 }, () => null)
