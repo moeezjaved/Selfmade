@@ -81,6 +81,20 @@ export const BLOCKS: BlockDef[] = [
       `${c.heading ? H(c.heading) : ''}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px">${arr(c.items).slice(0, 4).map((t) => `<div style="${card};padding:22px"><div style="color:#f4b400;font-size:14px;margin-bottom:10px">★★★★★</div><p style="margin:0 0 12px;font-size:14.5px;line-height:1.6;color:var(--body,#4a4653)">"${esc(t.quote)}"</p><div style="font-size:13px;font-weight:700;color:var(--muted,#6b6775)">${esc(t.name)}${t.city ? ' · ' + esc(t.city) : ''}</div></div>`).join('')}</div>`),
   },
   {
+    type: 'before_after',
+    label: 'Before / after results',
+    description: 'A grid of customer TRANSFORMATION cards — each with a before+after image pair, the customer name, condition tags, a short quote, and the product used. Use when the reference shows before/after photos, real results, or transformation cards (NOT plain star-rating reviews).',
+    schema: [
+      { key: 'heading', type: 'text', label: 'Heading' },
+      { key: 'items', type: 'list', label: 'Results', itemFields: ['before', 'after', 'name', 'tags', 'quote', 'product'], count: 4 },
+    ],
+    render: (c) => wrap(
+      `${c.heading ? H(c.heading) : ''}<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px">${arr(c.items).slice(0, 4).map((it) => {
+        const before = esc(it.before) || IMG_PLACEHOLDER, after = esc(it.after) || IMG_PLACEHOLDER
+        return `<div style="${card};overflow:hidden"><div style="display:grid;grid-template-columns:1fr 1fr"><div style="position:relative"><img src="${before}" alt="Before" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block"><span style="position:absolute;left:8px;bottom:8px;background:#181720;color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px">BEFORE</span></div><div style="position:relative"><img src="${after}" alt="After" style="width:100%;aspect-ratio:3/4;object-fit:cover;display:block"><span style="position:absolute;right:8px;bottom:8px;background:var(--accent,#d6248f);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px">AFTER</span></div></div><div style="padding:14px 16px"><div style="font-weight:800;color:var(--ink,#181720);font-size:13.5px;text-transform:uppercase;letter-spacing:.02em">${esc(it.name) || 'Customer'}</div>${it.tags ? `<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0">${String(it.tags).split(',').slice(0, 3).map((t) => `<span style="background:#f7edc9;color:#8a6d1e;font-size:11px;font-weight:700;padding:2px 9px;border-radius:100px">${esc(t.trim())}</span>`).join('')}</div>` : ''}<p style="font-size:13px;color:var(--body,#4a4653);line-height:1.55;margin:8px 0 0;font-style:italic">"${esc(it.quote)}"</p>${it.product ? `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--line,#eee7f0);font-size:12px;font-weight:700;color:var(--accent,#d6248f)">${esc(it.product)} →</div>` : ''}</div></div>`
+      }).join('')}</div>`),
+  },
+  {
     type: 'stats',
     label: 'Stat band',
     description: 'A row of 3-4 big numbers with labels (e.g. "10,000+ customers", "98% would recommend"). Use to show scale or results at a glance.',
