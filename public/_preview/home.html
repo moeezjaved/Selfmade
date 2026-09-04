@@ -1,28 +1,4 @@
-/**
- * home_v1 — a store HOME page modelled on the Atlas demo store home: brand hero (rating + big promise +
- * shop CTA), "as seen on", a feature block, a benefit-blurbs row, a highlighted expert review, a
- * "transform your life" trio, a reviews grid, a "what makes us different" comparison, FAQ, a services
- * row, and a before/after + newsletter close. Product-scoped (built around the hero product + brand
- * voice). Layout is FIXED; the AI only fills `schema` slots. All CSS scoped under `.pgbld`.
- */
-import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../types'
-
-const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
-// esc + strip stray **markdown** the copy model sometimes leaves in short labels.
-const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
-// Heading with a **highlighted** phrase → accent span (two-tone headings).
-const hl = (s: any) => esc(String(s ?? '')).replace(/\*\*([^*]+)\*\*/g, '<span class="hl">$1</span>')
-function rt(s: any): string {
-  const safe = esc(s).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-  return safe.split(/\n\s*\n/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-}
-const arr = (v: SlotValue | undefined) => (Array.isArray(v) ? v : [])
-function img(url: any, alt: string, cls: string, label?: string): string {
-  if (url && typeof url === 'string') return `<img class="${cls}" src="${esc(url)}" alt="${esc(alt)}">`
-  return `<div class="${cls} ph">${esc(label || 'Image')}</div>`
-}
-
-const CSS = `
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lumière Glow Serum</title><link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
 /* Every rule scoped under .pgbld so nothing leaks into the merchant's theme (header/footer). */
 .pgbld{--ink:#17151a;--body:#514e57;--muted:#8b8792;--line:#ece9ef;--paper:#f8f6fb;--accent:#d6248f;--accent2:#7b2ff7;--grad:linear-gradient(100deg,#d6248f,#7b2ff7);--dark:#1a1720;--good:#22a06b;--sans:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--head:'Hanken Grotesk','Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;width:100%;color:var(--body);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased}
 .pgbld *{box-sizing:border-box}
@@ -50,7 +26,7 @@ const CSS = `
 .pgbld .feat h2{font-size:clamp(22px,2.6vw,32px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 12px;text-align:left}
 .pgbld .fbul{list-style:none;padding:0;margin:16px 0 0;display:flex;flex-direction:column;gap:10px}
 .pgbld .fbul li{position:relative;padding-left:30px;font-size:15px}
-.pgbld .fbul li::before{content:"\\2713";position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:#eafaf2;color:var(--good);font-size:11px;font-weight:800;display:grid;place-items:center}
+.pgbld .fbul li::before{content:"\2713";position:absolute;left:0;top:1px;width:20px;height:20px;border-radius:50%;background:#eafaf2;color:var(--good);font-size:11px;font-weight:800;display:grid;place-items:center}
 /* benefit blurbs */
 .pgbld .blurbs{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;padding:14px 0 6px}
 .pgbld .blurb{text-align:center;padding:20px 16px}
@@ -94,7 +70,7 @@ const CSS = `
 .pgbld .ctab .ch2>div{text-align:center;font-weight:800;font-size:15px;padding:6px 0}
 .pgbld .ctab .cr2{display:grid;grid-template-columns:1fr 96px 96px;align-items:center;padding:12px 0;border-top:1px solid rgba(255,255,255,.18)}
 .pgbld .ctab .cr2 .lab{display:flex;align-items:center;gap:12px;font-weight:600}
-.pgbld .ctab .cr2 .lab::before{content:"\\2713";width:22px;height:22px;border-radius:50%;background:#fff;color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;flex:none}
+.pgbld .ctab .cr2 .lab::before{content:"\2713";width:22px;height:22px;border-radius:50%;background:#fff;color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;flex:none}
 .pgbld .ctab .cr2 .yes,.pgbld .ctab .cr2 .no{text-align:center;font-size:16px;font-weight:800}
 .pgbld .ctab .usbox{position:absolute;top:0;bottom:0;right:96px;width:96px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:16px;pointer-events:none}
 /* photo review carousel */
@@ -151,137 +127,84 @@ const CSS = `
 .pgbld .news p{color:#c9c5d2;font-size:16px;max-width:520px;margin:0 auto 22px}
 @media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px;padding:34px 22px 24px}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:34px 0}.pgbld .blurbs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.pgbld .blurbs{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .ba{grid-template-columns:1fr 1fr}}
-`
-
-function render(c: FilledContent, o: RenderOpts): string {
-  const stars = '★★★★★'
-  const fbul = arr(c.feature_bullets).map((b) => `<li><strong>${escp(b.label)}</strong>${b.body ? ' — ' + escp(b.body) : ''}</li>`).join('')
-  const blurbs = arr(c.benefit_blurbs).map((b) => `<div class="blurb"><div class="ic">${esc((b as any).emoji || '✦')}</div><div class="bt">${escp(b.label)}</div><p>${esc(b.body)}</p></div>`).join('')
-  const trio = arr(c.transform_items).map((t, i) => `<div class="titem"><span class="tlab">${escp((t as any).label || ((['First', 'Second', 'Third'][i] || 'Next') + ' benefit'))}</span><h3>${escp(t.title || t.label)}</h3><p>${esc(t.body)}</p></div>`).join('')
-  const revPhotos = [c.image_hero, c.image_feature, c.image_before, c.image_after]
-  const revs = arr(c.testimonials).map((t, i) => `<div class="rcard">${img(revPhotos[i] || o.productImage, o.productName, 'rimg')}<div class="rov"><div class="st">${stars}</div><div class="rtt">${escp((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="rwho">${esc(t.name)}</div></div></div>`).join('')
-  const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr2"><div class="lab">${escp(r.label)}</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div>`).join('')
-  const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
-  const svc = arr(c.services).map((s) => `<div class="si">✓ ${escp(s.label)}</div>`).join('')
-
-  return `
+</style></head><body>
   <div class="pgbld">
   <section class="hero">
     <div>
-      <div class="rpill"><span>${stars}</span> ${esc(o.rating?.countLabel || 'Excellent 4.8 | 12,000+ Customers')}</div>
-      <h1>${esc(c.headline)}</h1>
-      <p class="lead">${esc(c.subhead)}</p>
-      <a class="cta" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Shop now')}</a>
+      <div class="rpill"><span>★★★★★</span> Excellent 4.8 | 12,000+ Customers</div>
+      <h1>Glow that lasts all day</h1>
+      <p class="lead">A featherweight vitamin-C serum that brightens, hydrates and protects — made for every skin type.</p>
+      <a class="cta" href="#">Shop now</a>
     </div>
-    ${img(c.image_hero || o.productImage, o.productName, 'himg', 'Hero')}
+    <img class="himg" src="https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=900&amp;q=80" alt="Lumière Glow Serum">
   </section>
 
-  <div class="seen"><div class="row"><span class="lbl">${esc(c.as_seen_on || 'As seen on')}</span><span>FORBES</span><span>VOGUE</span><span>ELLE</span><span>ALLURE</span></div></div>
+  <div class="seen"><div class="row"><span class="lbl">As seen in</span><span>FORBES</span><span>VOGUE</span><span>ELLE</span><span>ALLURE</span></div></div>
 
   <div class="wrap">
     <section class="feat">
-      ${img(c.image_feature, o.productName, 'fimg', 'Lifestyle')}
+      <img class="fimg" src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=900&amp;q=80" alt="Lumière Glow Serum">
       <div>
-        <h2>${esc(c.feature_head)}</h2>
-        ${rt(c.feature_body)}
-        <ul class="fbul">${fbul}</ul>
+        <h2>Clinically-backed brightening</h2>
+        <p>Formulated with 15% stabilized vitamin C and hyaluronic acid to visibly even tone in <strong>4 weeks</strong>.</p>
+        <ul class="fbul"><li><strong>Brightens fast</strong> — Visible glow in weeks, not months.</li><li><strong>Deep hydration</strong> — Plumps and locks in moisture all day.</li><li><strong>Clean formula</strong> — Vegan, fragrance-free, dermatologist-tested.</li></ul>
       </div>
     </section>
 
-    <div class="blurbs">${blurbs}</div>
+    <div class="blurbs"><div class="blurb"><div class="ic">✦</div><div class="bt">Even tone</div><p>Fades dark spots over time.</p></div><div class="blurb"><div class="ic">✦</div><div class="bt">Non-greasy</div><p>Absorbs in seconds.</p></div><div class="blurb"><div class="ic">✦</div><div class="bt">Antioxidant shield</div><p>Defends against pollution.</p></div><div class="blurb"><div class="ic">✦</div><div class="bt">Layer-friendly</div><p>Plays well under SPF &amp; makeup.</p></div></div>
   </div>
 
   <div class="expert"><div class="in">
-    <div class="st">${stars}</div>
-    <div class="who">${esc(c.expert_author || 'A verified expert')}</div>
-    <p>${esc(c.expert_quote)}</p>
+    <div class="st">★★★★★</div>
+    <div class="who">Dr. Lena Hart, Dermatologist</div>
+    <p>I recommend this to patients who want real brightening without irritation. The texture is exceptional and results show up fast.</p>
   </div></div>
 
   <div class="transband"><div class="wrap in">
     <div>
-      <h2>${hl(c.transform_head || 'How this will **transform** your day')}</h2>
-      <div class="tlist">${trio}</div>
+      <h2>How this will <span class="hl">transform</span> your routine</h2>
+      <div class="tlist"><div class="titem"><span class="tlab">Week 1</span><h3>Instant hydration</h3><p>Skin feels plumper and calmer from day one.</p></div><div class="titem"><span class="tlab">Week 2</span><h3>Brighter mornings</h3><p>Dullness lifts and your natural glow returns.</p></div><div class="titem"><span class="tlab">Week 4</span><h3>Even, radiant tone</h3><p>Dark spots fade and skin looks visibly renewed.</p></div></div>
     </div>
-    ${img(c.image_feature || o.productImage, o.productName, 'timg')}
+    <img class="timg" src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=900&amp;q=80" alt="Lumière Glow Serum">
   </div></div>
 
   <div class="wrap">
-    <h2 class="sec" style="margin-top:52px">${hl(c.reviews_head || 'Join 10,000+ **happy customers**')}</h2>
+    <h2 class="sec" style="margin-top:52px">Join 10,000+ <span class="hl">happy customers</span></h2>
   </div>
-  <div class="wrap"><div class="gcar">${revs}</div></div>
+  <div class="wrap"><div class="gcar"><div class="rcard"><img class="rimg" src="https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=900&amp;q=80" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">My skin has never looked better</div><p>Three weeks in and the compliments have not stopped. Absolutely obsessed.</p><div class="rwho">Amara P.</div></div></div><div class="rcard"><img class="rimg" src="https://images.unsplash.com/photo-1570172619644-dfd03ed5d881?w=900&amp;q=80" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">Worth every penny</div><p>The glow is real. It sinks in fast and never feels sticky.</p><div class="rwho">Jess R.</div></div></div><div class="rcard"><img class="rimg" src="https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=900&amp;q=80" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">Faded my dark spots</div><p>Old acne marks are finally fading. Nothing else worked like this.</p><div class="rwho">Priya M.</div></div></div><div class="rcard"><img class="rimg" src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=900&amp;q=80" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">A daily must-have</div><p>Lightweight, clean, and it actually delivers. Repurchasing for sure.</p><div class="rwho">Noor A.</div></div></div></div></div>
 
   <div class="cmpband"><div class="wrap in">
     <div>
-      <h2>${hl(c.compare_head || 'What makes us **different**')}</h2>
-      <p>${esc(c.compare_body)}</p>
-      <a class="bag" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Shop now')}</a>
+      <h2>What makes us <span class="hl">different</span></h2>
+      <p>Most serums pick one benefit. Ours does it all — without the price tag or the irritation.</p>
+      <a class="bag" href="#">Shop now</a>
     </div>
     <div class="ctab">
       <div class="usbox"></div>
-      <div class="ch2"><div></div><div>${esc(o.productName).split(' ')[0] || 'Us'}</div><div>Others</div></div>
-      ${cmpRows}
+      <div class="ch2"><div></div><div>Lumière</div><div>Others</div></div>
+      <div class="cr2"><div class="lab">15% stabilized vitamin C</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Fragrance-free &amp; vegan</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Dermatologist-tested</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">No sticky residue</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">60-day money-back guarantee</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div>
     </div>
   </div></div>
 
   <div class="wrap">
     <h2 class="sec" style="margin-top:52px">Frequently asked questions</h2>
-    <p class="seclead">${esc(c.faq_sub || 'Quick answers to the most common questions.')}</p>
-    <div class="faq">${faqs}</div>
+    <p class="seclead">Quick answers to the most common questions.</p>
+    <div class="faq"><div><div class="q">How soon will I see results?</div><p class="a">Most customers notice brighter, smoother skin within 2-4 weeks of daily use.</p></div><div><div class="q">Is it safe for sensitive skin?</div><p class="a">Yes — it is fragrance-free and dermatologist-tested for all skin types.</p></div><div><div class="q">When should I apply it?</div><p class="a">Apply in the morning after cleansing, before your moisturizer and SPF.</p></div><div><div class="q">Is it cruelty-free?</div><p class="a">Always. The formula is 100% vegan and never tested on animals.</p></div></div>
   </div>
 
-  <div class="svc">${svc}</div>
+  <div class="svc"><div class="si">✓ Free worldwide shipping</div><div class="si">✓ 60-day returns</div><div class="si">✓ 24/7 support</div><div class="si">✓ Secure checkout</div></div>
 
   <div class="wrap results">
-    <h2 class="sec">${esc(c.results_head || 'Real results')}</h2>
+    <h2 class="sec">Real results</h2>
     <div class="ba">
-      <figure>${img(c.image_before || o.productImage, 'Before', '')}<figcaption>Before</figcaption></figure>
-      <figure>${img(c.image_after || o.productImage, 'After', '')}<figcaption>After</figcaption></figure>
+      <figure><img class="" src="https://images.unsplash.com/photo-1608248543803-ba4f8c70ae0b?w=900&amp;q=80" alt="Before"><figcaption>Before</figcaption></figure>
+      <figure><img class="" src="https://images.unsplash.com/photo-1522335789203-aabd1fc54bc9?w=900&amp;q=80" alt="After"><figcaption>After</figcaption></figure>
     </div>
   </div>
 
   <div class="news">
-    <h2>${esc(c.newsletter_head || 'Ready when you are')}</h2>
-    <p>${esc(c.newsletter_sub)}</p>
-    <a class="cta" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Shop now')}</a>
+    <h2>Ready when you are</h2>
+    <p>Join the list for launches, tips and 10% off your first order.</p>
+    <a class="cta" href="#">Shop now</a>
   </div>
-  </div>`
-}
-
-export const homeV1: PageTemplate = {
-  id: 'home_v1',
-  type: 'home',
-  name: 'Home page',
-  description: 'A store homepage: brand hero, "as seen on", a feature block, benefit blurbs, an expert review, a transform trio, a reviews grid, a comparison, FAQ, a services row, and a before/after + newsletter close.',
-  thumbnail: '/builder/thumb-home.png',
-  css: CSS,
-  render,
-  schema: [
-    { key: 'headline', type: 'text', role: 'headline', label: 'Hero headline', hint: 'The big brand promise, ~4-7 words.' },
-    { key: 'subhead', type: 'text', role: 'body', label: 'Hero subhead', hint: '1-2 sentences on what it does + who it\'s for.' },
-    { key: 'cta_label', type: 'text', label: 'Button label', hint: 'e.g. "Shop now".' },
-    { key: 'image_hero', type: 'image', role: 'hero', label: 'Hero image' },
-    { key: 'as_seen_on', type: 'text', label: '"As seen on" label' },
-    { key: 'feature_head', type: 'text', label: 'Feature heading' },
-    { key: 'feature_body', type: 'richtext', role: 'body', label: 'Feature body' },
-    { key: 'feature_bullets', type: 'list', label: 'Feature bullets', count: 3, hint: 'Each: bold benefit + short line.' },
-    { key: 'image_feature', type: 'image', role: 'editorial', label: 'Feature image' },
-    { key: 'benefit_blurbs', type: 'list', label: 'Benefit blurbs', count: 4, hint: 'Each: bold short title (label) + one short line (body).' },
-    { key: 'expert_author', type: 'text', label: 'Expert review — name', hint: 'A believable expert/customer name + title, e.g. "Dr. Lena Hart, Nutritionist".' },
-    { key: 'expert_quote', type: 'text', label: 'Expert review — quote', hint: '2-3 sentences endorsing the product.' },
-    { key: 'transform_head', type: 'text', label: 'Transform heading' },
-    { key: 'transform_items', type: 'reasons', label: 'Transform trio', count: 3, hint: 'label = 1-2 word tag; title = benefit; body = one sentence.' },
-    { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
-    { key: 'testimonials', type: 'testimonials', label: 'Reviews', count: 4, hint: 'name, city, quote. Use "city" as a SHORT review title.' },
-    { key: 'compare_head', type: 'text', label: 'Comparison heading' },
-    { key: 'compare_body', type: 'text', label: 'Comparison intro' },
-    { key: 'compare_rows', type: 'list', label: 'Comparison rows', count: 5, hint: 'Each label only: a feature the product has and rivals don\'t.' },
-    { key: 'faq_sub', type: 'text', label: 'FAQ subheading' },
-    { key: 'faqs', type: 'faq', label: 'FAQ', count: 4, hint: 'Cover results time, safety, daily use, taste/usage.' },
-    { key: 'services', type: 'list', label: 'Services row', count: 4, hint: 'Each label only: e.g. "Worldwide shipping", "24/7 support".' },
-    { key: 'results_head', type: 'text', label: 'Before/after heading' },
-    { key: 'image_before', type: 'image', role: 'product', label: 'Before image' },
-    { key: 'image_after', type: 'image', role: 'lifestyle', label: 'After image' },
-    { key: 'newsletter_head', type: 'text', label: 'Newsletter heading' },
-    { key: 'newsletter_sub', type: 'text', label: 'Newsletter subtext' },
-  ],
-}
+  </div></body></html>
