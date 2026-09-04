@@ -169,7 +169,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   <section class="hero">
     <div>
       <div class="rpill"><span>${stars}</span> ${esc(o.rating?.countLabel || 'Excellent 4.8 | 12,000+ Customers')}</div>
-      <h1>${esc(c.headline)}</h1>
+      <h1>${hl(c.headline)}</h1>
       <p class="lead">${esc(c.subhead)}</p>
       <a class="cta" href="${esc(o.ctaHref)}">${esc(c.cta_label || 'Shop now')}</a>
     </div>
@@ -182,7 +182,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     <section class="feat">
       ${img(c.image_feature, o.productName, 'fimg', 'Lifestyle')}
       <div>
-        <h2>${esc(c.feature_head)}</h2>
+        <h2>${hl(c.feature_head)}</h2>
         ${rt(c.feature_body)}
         <ul class="fbul">${fbul}</ul>
       </div>
@@ -256,23 +256,23 @@ export const homeV1: PageTemplate = {
   css: CSS,
   render,
   schema: [
-    { key: 'headline', type: 'text', role: 'headline', label: 'Hero headline', hint: 'The big brand promise, ~4-7 words.' },
+    { key: 'headline', type: 'text', role: 'headline', label: 'Hero headline', hint: 'The big brand promise, ~4-7 words. Wrap the single most important 1-2 word phrase in **double asterisks** to accent it.' },
     { key: 'subhead', type: 'text', role: 'body', label: 'Hero subhead', hint: '1-2 sentences on what it does + who it\'s for.' },
     { key: 'cta_label', type: 'text', label: 'Button label', hint: 'e.g. "Shop now".' },
     { key: 'image_hero', type: 'image', role: 'hero', label: 'Hero image' },
     { key: 'as_seen_on', type: 'text', label: '"As seen on" label' },
-    { key: 'feature_head', type: 'text', label: 'Feature heading' },
+    { key: 'feature_head', type: 'text', label: 'Feature heading', hint: 'Wrap the key 1-2 word phrase in **double asterisks** to accent it.' },
     { key: 'feature_body', type: 'richtext', role: 'body', label: 'Feature body' },
     { key: 'feature_bullets', type: 'list', label: 'Feature bullets', count: 3, hint: 'Each: bold benefit + short line.' },
     { key: 'image_feature', type: 'image', role: 'editorial', label: 'Feature image' },
     { key: 'benefit_blurbs', type: 'list', label: 'Benefit blurbs', count: 4, hint: 'Each: bold short title (label) + one short line (body).' },
     { key: 'expert_author', type: 'text', label: 'Expert review — name', hint: 'A believable expert/customer name + title, e.g. "Dr. Lena Hart, Nutritionist".' },
     { key: 'expert_quote', type: 'text', label: 'Expert review — quote', hint: '2-3 sentences endorsing the product.' },
-    { key: 'transform_head', type: 'text', label: 'Transform heading' },
+    { key: 'transform_head', type: 'text', label: 'Transform heading', hint: 'Wrap the key 1-2 word phrase in **double asterisks** to accent it.' },
     { key: 'transform_items', type: 'reasons', label: 'Transform trio', count: 3, hint: 'label = 1-2 word tag; title = benefit; body = one sentence.' },
-    { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
+    { key: 'reviews_head', type: 'text', label: 'Reviews heading', hint: 'Wrap the key 1-2 word phrase in **double asterisks** to accent it.' },
     { key: 'testimonials', type: 'testimonials', label: 'Reviews', count: 4, hint: 'name, city, quote. Use "city" as a SHORT review title.' },
-    { key: 'compare_head', type: 'text', label: 'Comparison heading' },
+    { key: 'compare_head', type: 'text', label: 'Comparison heading', hint: 'Wrap the key 1-2 word phrase in **double asterisks** to accent it.' },
     { key: 'compare_body', type: 'text', label: 'Comparison intro' },
     { key: 'compare_rows', type: 'list', label: 'Comparison rows', count: 5, hint: 'Each label only: a feature the product has and rivals don\'t.' },
     { key: 'faq_sub', type: 'text', label: 'FAQ subheading' },
