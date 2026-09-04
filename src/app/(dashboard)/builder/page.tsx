@@ -496,8 +496,8 @@ export default function BuilderPage() {
                 })}
               </div>
 
-              {/* language — the page copy is generated in this language */}
-              <div style={{ ...CARD, marginTop: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              {/* language — the page copy is generated in this language; shown once a template is chosen */}
+              {tplId && <div style={{ ...CARD, marginTop: 16, padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700 }}>Language</div>
                   <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>The page copy is written in this language.</div>
@@ -505,7 +505,7 @@ export default function BuilderPage() {
                 <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit', minWidth: 180 }}>
                   {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
-              </div>
+              </div>}
             </div>
           )}
 
@@ -968,7 +968,24 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
   const [dur, setDur] = useState(15)
   const [look, setLook] = useState('')
   const [lang, setLang] = useState('en')
+  const [refUrl, setRefUrl] = useState('')
+  const [refBusy, setRefBusy] = useState(false)
+  const refFileRef = useRef<HTMLInputElement>(null)
   const [prog, setProg] = useState('Starting…')
+
+  const onRefFile = async (f: File | null) => {
+    if (!f) return
+    if (!/^video\//.test(f.type)) { setErr('Reference must be a video.'); return }
+    if (f.size > 120 * 1024 * 1024) { setErr('Reference must be under 120MB.'); return }
+    setRefBusy(true); setErr('')
+    try {
+      const r = await fetch('/api/builder/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contentType: f.type, size: f.size }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Upload failed')
+      await new Promise<void>((res, rej) => { const xhr = new XMLHttpRequest(); xhr.open('PUT', j.uploadUrl); xhr.setRequestHeader('Content-Type', f.type); xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? res() : rej(new Error('Upload failed'))); xhr.onerror = () => rej(new Error('Upload failed')); xhr.send(f) })
+      setRefUrl(j.publicUrl)
+    } catch (e: any) { setErr(e?.message || 'Reference upload failed') }
+    finally { setRefBusy(false); if (refFileRef.current) refFileRef.current.value = '' }
+  }
   const pollRef = useRef<any>(null)
   useEffect(() => () => { if (pollRef.current) clearTimeout(pollRef.current) }, [])
 
@@ -992,7 +1009,7 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
     if (!pageId) { setErr('Save the page first, then generate.'); return }
     setGen('working'); setErr(''); setProg('Analyzing your product…')
     try {
-      const r = await fetch('/api/builder/ugc-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, duration: dur, characterLook: look.trim(), language: lang }) })
+      const r = await fetch('/api/builder/ugc-video', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pageId, duration: dur, characterLook: look.trim(), language: lang, referenceUrl: refUrl.trim() }) })
       const j = await r.json(); if (!r.ok || !j.jobId) throw new Error(j?.error || 'Could not start generation')
       poll(j.jobId)
     } catch (e: any) { setErr(e?.message || 'Could not start generation'); setGen('idle') }
@@ -1053,6 +1070,12 @@ function MediaEditor({ value, onChange, pageId }: { value?: string; onChange: (u
               <label style={{ fontSize: 12, color: SUB, display: 'block', marginTop: 8 }}>Creator look
                 <input value={look} onChange={(e) => setLook(e.target.value)} placeholder="e.g. Pakistani woman, 25–30, warm and friendly" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, marginTop: 3, fontFamily: 'inherit' }} />
               </label>
+              <div style={{ fontSize: 12, color: SUB, marginTop: 8 }}>Reference clip <span style={{ color: FAINT }}>— a short UGC video whose style the new one follows</span></div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 3 }}>
+                <input value={refUrl} onChange={(e) => setRefUrl(e.target.value)} placeholder="Paste a video URL…" style={{ flex: 1, border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 13, fontFamily: 'inherit' }} />
+                <input ref={refFileRef} type="file" accept="video/*" onChange={(e) => onRefFile(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+                <button onClick={() => refFileRef.current?.click()} disabled={refBusy} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, padding: '8px 12px', fontWeight: 650, fontSize: 12.5, cursor: 'pointer', whiteSpace: 'nowrap' }}>{refBusy ? 'Uploading…' : '⬆ Upload'}</button>
+              </div>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                 <button onClick={generate} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13, cursor: 'pointer' }}>Generate{ugcCost != null ? ` — uses ${ugcCost.toLocaleString()} credits` : ''}</button>
                 <button onClick={() => setGen('idle')} style={btn}>Cancel</button>

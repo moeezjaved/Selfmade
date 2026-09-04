@@ -68,12 +68,15 @@ export async function POST(req: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const ref = process.env.BUILDER_UGC_REFERENCE_URL
-  if (!ref) return NextResponse.json({ error: 'UGC video generation isn’t set up yet — a house reference clip (BUILDER_UGC_REFERENCE_URL) is required.' }, { status: 503 })
-
   const b = await req.json().catch(() => ({}))
   const pageId = String(b?.pageId || '')
   if (!pageId) return NextResponse.json({ error: 'pageId is required' }, { status: 400 })
+
+  // The generator is a clone pipeline — it needs a reference clip. Use the merchant's own if provided,
+  // else a house default (BUILDER_UGC_REFERENCE_URL).
+  const refInput = String(b?.referenceUrl || '').trim()
+  const ref = (refInput && /^https?:\/\/.+\.(mp4|webm|mov|m4v)(\?|$)/i.test(refInput)) ? refInput : process.env.BUILDER_UGC_REFERENCE_URL
+  if (!ref) return NextResponse.json({ error: 'Add a reference clip (a short UGC video) to generate from — paste a video URL or upload one.' }, { status: 400 })
   const duration = Math.min(30, Math.max(6, Number(b?.duration) || 15))
   const characterLook = String(b?.characterLook || '').slice(0, 60)
   const language = String(b?.language || 'en').slice(0, 5)
