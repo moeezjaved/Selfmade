@@ -8,8 +8,10 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { PALETTES, DEFAULT_PALETTE_ID } from '@/lib/builder/palettes'
+import BuilderEditor from './BuilderEditor'
 
 /* ── theme tokens (shared with HqRunable / Reports) ── */
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
@@ -23,7 +25,7 @@ type Product = { id: string; title: string; handle?: string; price?: string; ima
 type Angle = { id: string; title: string; promise: string }
 type Persona = { id: string; name: string; description: string; angles: Angle[]; custom?: boolean }
 
-type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published' | 'edit'
+type Step = 'list' | 1 | 2 | 3 | 4 | 'building' | 'preview' | 'published' | 'edit' | 'editor'
 type SavedPage = { id: string; type: string; template_id: string; product_name: string; status: string; shopify_url?: string; created_at: string }
 type StoreTheme = { id: number; name: string; role: string; live: boolean }
 type EditSlot = { key: string; type: string; label: string; hint?: string }
@@ -82,6 +84,9 @@ function Thumb({ src, seed, label, height = 132 }: { src?: string; seed: number;
 
 export default function BuilderPage() {
   const isMobile = useIsMobile()
+  const search = useSearchParams()
+  // ?editor=v2 → open pages in the click-anywhere visual editor instead of the copy form (build-flag).
+  const editorV2 = search?.get('editor') === 'v2'
   const [step, setStep] = useState<Step>('list')
 
   /* ── landing: the user's already-generated pages ── */
@@ -345,6 +350,9 @@ export default function BuilderPage() {
     } catch { setToast('Could not open that page.'); setTimeout(() => setToast(''), 3200) }
     finally { setOpening(null) }
   }, [])
+
+  // Open the click-anywhere visual editor for a saved page (build-flag ?editor=v2).
+  const openVisualEditor = useCallback((id: string) => { setPageId(id); setStep('editor') }, [])
   const setField = (key: string, value: any) => setEditContent((c) => ({ ...c, [key]: value }))
   const setItemField = (key: string, idx: number, field: string, value: any) => setEditContent((c) => {
     const arr = Array.isArray(c[key]) ? [...c[key]] : []
@@ -463,7 +471,7 @@ export default function BuilderPage() {
       </div>
 
       {/* main: content + right-rail summary */}
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (isMobile || step === 'list' || step === 'preview' || step === 'published' || step === 'building' || step === 'edit') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
+      <div style={{ maxWidth: step === 'editor' ? 1320 : 1080, margin: '0 auto', padding: '26px', display: 'grid', gridTemplateColumns: (isMobile || step === 'list' || step === 'preview' || step === 'published' || step === 'building' || step === 'edit' || step === 'editor') ? '1fr' : 'minmax(0,1fr) 300px', gap: 24, alignItems: 'start' }}>
         <section style={{ minWidth: 0 }}>
           {/* ── LANDING · YOUR PAGES ── */}
           {step === 'list' && (
@@ -505,7 +513,7 @@ export default function BuilderPage() {
                             <a href={pg.shopify_url} target="_blank" rel="noopener noreferrer" style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13 }}>View →</a>
                           )}
                           <button onClick={() => deleteDraft(pg.id, pg.product_name)} disabled={deleting === pg.id} title="Delete page" style={{ border: `1px solid ${LINE}`, background: '#fff', color: '#9a2b2b', borderRadius: 999, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: deleting === pg.id ? 'default' : 'pointer', opacity: deleting === pg.id ? 0.6 : 1 }}>{deleting === pg.id ? 'Deleting…' : 'Delete'}</button>
-                          <button onClick={() => editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>Edit</button>
+                          <button onClick={() => editorV2 ? openVisualEditor(pg.id) : editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>{editorV2 ? '✨ Edit' : 'Edit'}</button>
                           <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
                         </div>
                       </div>
@@ -867,6 +875,14 @@ export default function BuilderPage() {
           )}
 
           {/* ── PREVIEW ── */}
+          {step === 'editor' && pageId && (
+            <BuilderEditor
+              pageId={pageId}
+              onBack={() => { loadPages(); setStep('list') }}
+              onPublish={() => { setStep('preview'); openThemePicker() }}
+            />
+          )}
+
           {step === 'preview' && (
             <div>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
@@ -882,6 +898,9 @@ export default function BuilderPage() {
                       <button key={d} onClick={() => setDevice(d)} style={{ border: 0, background: device === d ? '#fff' : 'transparent', color: device === d ? INK : SUB, fontWeight: device === d ? 700 : 600, fontSize: 13, padding: '7px 16px', borderRadius: 999, cursor: 'pointer', boxShadow: device === d ? `0 1px 2px rgba(20,18,15,.14)` : 'none', textTransform: 'capitalize' }}>{d}</button>
                     ))}
                   </div>
+                  {editorV2 && pageId && (
+                    <button onClick={() => openVisualEditor(pageId)} style={{ border: `1px solid ${ORANGE}`, background: WASH, color: ORANGE, borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>✨ Edit page</button>
+                  )}
                   <button onClick={() => showToast('Saved as draft — you can reopen it any time.')} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '9px 18px', fontWeight: 600, fontSize: 13.5, cursor: 'pointer' }}>Save as draft</button>
                   <button onClick={openThemePicker} disabled={publishing} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '9px 20px', fontWeight: 700, fontSize: 13.5, cursor: publishing ? 'default' : 'pointer', opacity: publishing ? 0.6 : 1 }}>Publish to Shopify →</button>
                 </div>

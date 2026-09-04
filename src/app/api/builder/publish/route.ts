@@ -37,7 +37,9 @@ export async function POST(req: NextRequest) {
 
   const opts: RenderOpts = row.render_opts || { productName: row.product_name || 'Product', ctaHref: row.cta_href || '#' }
   const title = String((row.content && row.content.headline) || row.product_name || 'Landing page').replace(/\*+/g, '').trim().slice(0, 250)
-  const body = assembleShopifyBody(tpl, row.content || {}, opts)
+  // Respect the visual editor: a hand-edited page publishes its edited_html body (the "page is the
+  // document" source of truth); an un-edited page re-renders from its slots as before.
+  const body = assembleShopifyBody(tpl, row.content || {}, opts, row.edited_html)
 
   let pub
   try {

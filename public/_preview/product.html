@@ -1,0 +1,374 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Lumière Glow Serum</title><link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"><style>
+/* Every rule scoped under .pgbld so nothing leaks into the merchant's theme (header/footer). */
+.pgbld{--ink:#17151a;--body:#514e57;--muted:#8b8792;--line:#ece9ef;--paper:#f8f6fb;--accent:#d6248f;--accent2:#7b2ff7;--grad:linear-gradient(100deg,#d6248f,#7b2ff7);--dark:#1a1720;--good:#22a06b;--sans:'Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;--head:'Hanken Grotesk','Plus Jakarta Sans',-apple-system,BlinkMacSystemFont,sans-serif;width:100%;color:var(--body);font-family:var(--sans);font-size:16px;line-height:1.6;-webkit-font-smoothing:antialiased;padding-bottom:78px}
+.pgbld *{box-sizing:border-box}
+.pgbld h1,.pgbld h2,.pgbld h3,.pgbld .sec,.pgbld h1.ptitle{font-family:var(--head)}
+.pgbld img{max-width:100%;display:block}
+.pgbld b,.pgbld strong{color:var(--ink);font-weight:700}
+.pgbld .wrap{max-width:1160px;margin:0 auto;padding:0 22px}
+.main-page-title,.shopify-page-title,.template-page .page-title{display:none!important}
+/* hero */
+.pgbld .hero{display:grid;grid-template-columns:1fr 1fr;gap:46px;padding:34px 0 40px;align-items:start}
+.pgbld .gallery{position:sticky;top:18px;display:flex;flex-direction:column;gap:12px}
+.pgbld .gtrack{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;border-radius:20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .gtrack::-webkit-scrollbar{display:none}
+.pgbld .gslide{flex:0 0 100%;scroll-snap-align:start;aspect-ratio:1/1;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .gslide .gimg,.pgbld .gslide .gimg.ph{width:100%;height:100%;object-fit:cover;border-radius:20px;display:grid;place-items:center;color:#b06;font-weight:700}
+.pgbld .gdots{display:flex;gap:7px;justify-content:center;margin-top:2px}
+.pgbld .gdot{width:8px;height:8px;border-radius:50%;background:var(--line);transition:width .2s,background .2s}
+.pgbld .gdot.on{background:var(--accent);width:22px;border-radius:5px}
+.pgbld .gwrap{position:relative}
+.pgbld .garr{position:absolute;top:50%;transform:translateY(-50%);width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.92);border:1px solid var(--line);display:grid;place-items:center;font-size:22px;color:var(--ink);cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,.14);z-index:2;line-height:1;padding:0}
+.pgbld .gprev{left:12px}
+.pgbld .gnext{right:12px}
+.pgbld .thumbs{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.pgbld .gthumb{border:1.5px solid var(--line);border-radius:12px;overflow:hidden;padding:0;background:none;cursor:pointer;aspect-ratio:1/1}
+.pgbld .gthumb.on{border-color:var(--accent)}
+.pgbld .gthumb img,.pgbld .gthumb .ph{width:100%;height:100%;object-fit:cover}
+.pgbld .rpill{display:inline-flex;align-items:center;gap:8px;background:var(--grad);color:#fff;border-radius:100px;padding:5px 12px;font-size:13px;font-weight:700}
+.pgbld .rpill .st{letter-spacing:1px}
+.pgbld h1.ptitle{font-size:clamp(28px,3.6vw,40px);font-weight:800;line-height:1.08;letter-spacing:-.02em;color:var(--ink);margin:14px 0 6px}
+.pgbld .newline{font-size:13.5px;font-weight:700;color:var(--accent);letter-spacing:.02em;margin:0 0 14px}
+.pgbld .priceRow{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:0 0 16px}
+.pgbld .priceRow .now{font-size:30px;font-weight:800;color:var(--ink)}
+.pgbld .priceRow .was{font-size:18px;color:var(--muted);text-decoration:line-through}
+.pgbld .priceRow .save{background:var(--grad);color:#fff;font-weight:800;font-size:12.5px;padding:5px 12px;border-radius:8px}
+.pgbld .pills{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 0 20px}
+.pgbld .pill{display:flex;align-items:center;gap:8px;border:1.5px dashed #e2b7d5;border-radius:100px;padding:9px 14px;font-size:14px;font-weight:600;color:var(--ink)}
+.pgbld .pill::before{content:"\2713";width:18px;height:18px;border-radius:50%;background:linear-gradient(100deg,#fbeaf5,#efe6ff);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;flex:none}
+.pgbld .buyopt{border:1.5px solid var(--line);border-radius:16px;overflow:hidden;margin:0 0 12px}
+.pgbld .buyopt .opt{padding:16px 18px;border-bottom:1px solid var(--line)}
+.pgbld .buyopt .opt:last-child{border-bottom:0}
+.pgbld .buyopt .opt.on{background:linear-gradient(100deg,#fbeaf5,#efe6ff);border-left:3px solid var(--accent)}
+.pgbld .buyopt .ohead{display:flex;align-items:center;justify-content:space-between;font-weight:800;color:var(--ink);font-size:15.5px}
+.pgbld .buyopt .otag{background:var(--grad);color:#fff;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:6px}
+.pgbld .buyopt .osub{font-size:13px;color:var(--muted);margin-top:3px}
+.pgbld .buyopt .obul{list-style:none;padding:0;margin:12px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.pgbld .buyopt .obul li{font-size:12.5px;color:var(--body);position:relative;padding-left:18px}
+.pgbld .buyopt .obul li::before{content:"\2713";position:absolute;left:0;color:var(--good);font-weight:800}
+.pgbld a.buy{display:block;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
+.pgbld a.buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
+.pgbld a.buy.big{max-width:520px;margin:8px auto 0}
+.pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
+/* payment icons */
+.pgbld .pay{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
+.pgbld .pay svg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff}
+/* product-info accordions (native details/summary) */
+.pgbld .acc{margin:14px 0 0;border-top:1px solid var(--line)}
+.pgbld .acc details{border-bottom:1px solid var(--line)}
+.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;padding:15px 2px;font-weight:800;color:var(--ink);font-size:15px}
+.pgbld .acc summary::-webkit-details-marker{display:none}
+.pgbld .acc summary::after{content:"+";font-size:20px;font-weight:700;color:var(--muted)}
+.pgbld .acc details[open] summary::after{content:"\2013"}
+.pgbld .acc .body{padding:0 2px 16px;font-size:14px;color:var(--body)}
+/* UGC video wall */
+.pgbld .ugc{padding:44px 0 8px}
+.pgbld .ugc .top{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:18px}
+.pgbld .ugc .top h2{font-size:clamp(22px,2.6vw,30px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0;text-align:left}
+.pgbld .ugc .socials{display:flex;gap:12px;font-size:20px}
+.pgbld .ugc .wall{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+.pgbld .ugc .vc{position:relative;border-radius:16px;overflow:hidden;aspect-ratio:9/16;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .ugc .vc img,.pgbld .ugc .vc video{width:100%;height:100%;object-fit:cover;display:block}
+.pgbld .ugc .vc .play{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none}
+.pgbld .ugc .vc .play span{width:48px;height:48px;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;display:grid;place-items:center;font-size:18px;backdrop-filter:blur(2px)}
+.pgbld .frev{margin-top:20px;background:var(--grad);color:#fff;border-radius:18px;padding:22px 24px;display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:center}
+.pgbld .frev .who{display:flex;align-items:center;gap:14px}
+.pgbld .frev .av{width:56px;height:56px;border-radius:50%;overflow:hidden;border:2px solid rgba(255,255,255,.5);flex:none}
+.pgbld .frev .av img,.pgbld .frev .av .ph{width:100%;height:100%;object-fit:cover}
+.pgbld .frev .nm{font-weight:800;font-size:16px;display:flex;align-items:center;gap:6px}
+.pgbld .frev .chk{width:16px;height:16px;border-radius:50%;background:#fff;color:var(--accent);font-size:10px;font-weight:800;display:inline-grid;place-items:center}
+.pgbld .frev .loc{font-size:13px;color:rgba(255,255,255,.85)}
+.pgbld .frev .st{color:#ffd24a;font-size:14px;margin-top:2px}
+.pgbld .frev .q{font-size:15px;line-height:1.55;color:rgba(255,255,255,.95)}
+/* trust + UGC live INSIDE the buy-box column (Atlas placement) — compact them */
+.pgbld .buybox .trust{justify-content:space-between;gap:10px;padding:14px 0;margin-top:16px;background:none}
+.pgbld .buybox .ugc{padding:22px 0 4px}
+.pgbld .buybox .ugc .top h2{font-size:20px}
+.pgbld .buybox .frev{grid-template-columns:1fr;gap:12px;padding:18px 20px}
+/* trust row */
+.pgbld .trust{display:flex;flex-wrap:wrap;justify-content:center;gap:12px 44px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 22px;background:var(--paper)}
+.pgbld .trust .ti{display:flex;align-items:center;gap:9px;font-size:14px;font-weight:700;color:var(--ink)}
+/* marquee */
+.pgbld .marq{overflow:hidden;background:var(--dark);color:#fff;padding:12px 0;white-space:nowrap}
+.pgbld .marq-track{display:inline-block;animation:pgbldmarq 22s linear infinite;font-size:13.5px;font-weight:700;letter-spacing:.02em}
+.pgbld .marq-track span{margin:0 26px}
+@keyframes pgbldmarq{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+/* section shells */
+.pgbld h2.sec{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--ink);text-align:center;margin:0 0 8px}
+.pgbld .seclead{text-align:center;color:var(--muted);font-size:16px;max-width:640px;margin:0 auto 26px}
+.pgbld .feat{display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;padding:66px 0}
+.pgbld .feat.rev .fimg{order:2}
+/* as seen on band */
+.pgbld .seenband{padding:46px 0 34px;text-align:center}
+.pgbld .seenband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0}
+.pgbld .logos{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px 48px;margin-top:26px}
+.pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase}
+/* pink gradient CTA band */
+.pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
+.pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}
+.pgbld .pinkband p{font-size:17px;color:rgba(255,255,255,.92);max-width:660px;margin:0 auto 26px}
+.pgbld .pinkband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:16px 40px;font-weight:800;font-size:17px}
+.pgbld .pcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
+.pgbld .pcard{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:16px;padding:24px 18px;font-size:15px;font-weight:600;text-align:center;color:#fff}
+/* comparison on a gradient band (Atlas 'what makes us different') */
+.pgbld .cmpband{background:var(--grad);color:#fff;padding:56px 0;margin:26px 0}
+.pgbld .cmpband .in{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.pgbld .cmpband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 14px;text-align:left}
+.pgbld .cmpband h2 .hl{color:#fff;font-style:italic;opacity:.85}
+.pgbld .cmpband p{color:rgba(255,255,255,.9);font-size:16px;margin:0 0 22px}
+.pgbld .cmpband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:15px 40px;font-weight:800;font-size:16px}
+.pgbld .ctab{position:relative}
+.pgbld .ctab .ch2{display:grid;grid-template-columns:1fr 96px 96px;margin-bottom:4px}
+.pgbld .ctab .ch2>div{text-align:center;font-weight:800;font-size:15px;padding:6px 0}
+.pgbld .ctab .cr2{display:grid;grid-template-columns:1fr 96px 96px;align-items:center;padding:12px 0;border-top:1px solid rgba(255,255,255,.18)}
+.pgbld .ctab .cr2 .lab{display:flex;align-items:center;gap:12px;font-weight:600}
+.pgbld .ctab .cr2 .lab::before{content:"\2713";width:22px;height:22px;border-radius:50%;background:#fff;color:var(--accent);font-weight:800;font-size:12px;display:grid;place-items:center;flex:none}
+.pgbld .ctab .cr2 .yes,.pgbld .ctab .cr2 .no{text-align:center;font-size:16px;font-weight:800}
+.pgbld .ctab .usbox{position:absolute;top:0;bottom:0;right:96px;width:96px;background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.3);border-radius:16px;pointer-events:none}
+.pgbld .fimg,.pgbld .fimg.ph{border-radius:24px;aspect-ratio:1/1;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .feat h2{font-size:clamp(28px,3.8vw,46px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0 0 16px;text-align:left;line-height:1.05}
+.pgbld .feat h2 .hl{color:var(--accent2)}
+.pgbld .fbul{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:14px}
+.pgbld .fbul li{position:relative;padding-left:32px;font-size:15.5px}
+.pgbld .fbul li::before{content:"\2713";position:absolute;left:0;top:0;width:21px;height:21px;border-radius:50%;background:linear-gradient(100deg,#fbeaf5,#efe6ff);color:var(--accent);font-size:11px;font-weight:800;display:grid;place-items:center;border:1px dashed #e2b7d5}
+.pgbld .seen{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:20px;opacity:.55;font-weight:800;color:var(--muted)}
+/* stats */
+.pgbld .stats{background:var(--paper);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:48px 0}
+.pgbld .statgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:22px;max-width:900px;margin:22px auto 0}
+.pgbld .stats .sin{display:grid;grid-template-columns:.9fr 1.05fr .9fr;gap:34px;align-items:center;padding-top:8px}
+.pgbld .stats .scard{display:grid;grid-template-columns:auto 1fr;gap:14px;align-items:center;background:var(--grad);color:#fff;border-radius:16px;padding:16px}
+.pgbld .stats .scard .simg,.pgbld .stats .scard .simg.ph{width:56px;height:56px;border-radius:10px;object-fit:cover}
+.pgbld .stats .scard .sct{font-weight:800;font-size:16px}
+.pgbld .stats .scard .scs{font-size:13px;color:rgba(255,255,255,.85)}
+.pgbld .stats .smid .simg2,.pgbld .stats .smid .simg2.ph{border-radius:20px;aspect-ratio:4/5;object-fit:cover;width:100%}
+.pgbld .stats .srow{display:grid;grid-template-columns:auto 1fr;gap:16px;align-items:center;padding:18px 0;border-top:1px solid var(--line)}
+.pgbld .stats .srow:first-child{border-top:0}
+.pgbld .stats .srow .n{font-size:38px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.pgbld .stats .srow .t{font-weight:800;color:var(--ink);font-size:17px}
+.pgbld .stats .srow .s{font-size:13px;color:var(--muted)}
+.pgbld .stat{text-align:center}
+.pgbld .stat .n{font-size:44px;font-weight:800;background:var(--grad);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;line-height:1}
+.pgbld .stat .t{font-weight:800;color:var(--ink);margin:8px 0 3px;font-size:16px}
+.pgbld .stat .s{font-size:13.5px;color:var(--muted)}
+/* benefits grid */
+.pgbld .bgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:20px 0 4px}
+.pgbld .bcard{background:#fff;border:1px solid var(--line);border-radius:16px;padding:22px 18px;text-align:center}
+.pgbld .bcard .ic{width:44px;height:44px;border-radius:12px;background:linear-gradient(100deg,#fbeaf5,#efe6ff);display:grid;place-items:center;margin:0 auto 12px;font-size:20px}
+.pgbld .bcard .bt{font-weight:800;color:var(--ink);font-size:15px}
+/* comparison */
+.pgbld .cmp{max-width:760px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:18px;overflow:hidden}
+.pgbld .cmp .ch{display:grid;grid-template-columns:1fr 110px 110px;background:var(--paper);font-weight:800;color:var(--ink);font-size:14px}
+.pgbld .cmp .ch>div{padding:14px 16px;text-align:center}
+.pgbld .cmp .ch>div:first-child{text-align:left}
+.pgbld .cmp .cr{display:grid;grid-template-columns:1fr 110px 110px;border-top:1px solid var(--line);align-items:center}
+.pgbld .cmp .cr>div{padding:14px 16px;text-align:center;font-size:14.5px}
+.pgbld .cmp .cr>div:first-child{text-align:left;font-weight:600;color:var(--ink)}
+.pgbld .cmp .yes{color:var(--good);font-weight:800}
+.pgbld .cmp .no{color:#c9c5cf;font-weight:800}
+.pgbld .cmp .us{background:linear-gradient(180deg,rgba(214,36,143,.06),rgba(123,47,247,.06))}
+/* photo testimonial carousel */
+.pgbld .gcar{display:flex;gap:16px;overflow-x:auto;scroll-snap-type:x mandatory;padding:6px 4px 20px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .gcar::-webkit-scrollbar{display:none}
+.pgbld .rcard{scroll-snap-align:start;flex:0 0 320px;max-width:82%;position:relative;border-radius:18px;overflow:hidden;aspect-ratio:3/4;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
+.pgbld .rcard .rimg,.pgbld .rcard .rimg.ph{width:100%;height:100%;object-fit:cover}
+.pgbld .rcard .rov{position:absolute;left:0;right:0;bottom:0;padding:22px 18px 18px;background:linear-gradient(to top,rgba(24,23,32,.94),rgba(24,23,32,.55) 55%,transparent);color:#fff}
+.pgbld .rcard .st{color:#ffd24a;font-size:14px;margin-bottom:6px}
+.pgbld .rcard .rtt{font-weight:800;font-size:16px;margin-bottom:6px}
+.pgbld .rcard p{margin:0 0 8px;font-size:13.5px;color:rgba(255,255,255,.94);line-height:1.5}
+.pgbld .rcard .rwho{font-size:12.5px;font-weight:700;color:rgba(255,255,255,.82)}
+/* reviews grid */
+.pgbld .revs{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;padding:24px 0}
+.pgbld .rev{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px}
+.pgbld .rev .st{color:#f4b400;font-size:13px;margin-bottom:8px}
+.pgbld .rev .rt{font-weight:800;color:var(--ink);font-size:15px;margin-bottom:6px}
+.pgbld .rev p{margin:0 0 10px;font-size:13.5px}
+.pgbld .rev .who{font-size:12.5px;color:var(--muted);font-weight:700}
+/* transform trio */
+.pgbld .trio{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;padding:20px 0}
+.pgbld .tcard{text-align:center;padding:24px 18px;border:1px solid var(--line);border-radius:16px;background:var(--paper)}
+.pgbld .tcard .lab{font-size:12px;font-weight:800;letter-spacing:.05em;text-transform:uppercase;color:var(--accent)}
+.pgbld .tcard h3{font-size:18px;font-weight:800;color:var(--ink);margin:8px 0 6px}
+.pgbld .tcard p{margin:0;font-size:14px}
+/* transform gradient band */
+.pgbld .transband{background:var(--grad);color:#fff;padding:56px 0;margin:26px 0}
+.pgbld .transband .in{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
+.pgbld .transband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 20px;text-align:left}
+.pgbld .transband h2 .hl{color:#fff;font-style:italic;opacity:.9}
+.pgbld .tlist{display:flex;flex-direction:column;gap:4px}
+.pgbld .titem{padding:16px 0;border-top:1px solid rgba(255,255,255,.2)}
+.pgbld .titem:first-child{border-top:0}
+.pgbld .titem .tlab{display:inline-block;background:#fff;color:var(--ink);font-size:12px;font-weight:800;padding:3px 12px;border-radius:100px;margin-bottom:8px}
+.pgbld .titem h3{font-size:19px;font-weight:800;color:#fff;margin:0 0 4px}
+.pgbld .titem p{margin:0;font-size:14.5px;color:rgba(255,255,255,.9)}
+.pgbld .timg,.pgbld .timg.ph{border-radius:20px;aspect-ratio:1/1;object-fit:cover;width:100%}
+/* faq accordion (numbered) */
+.pgbld .faqacc{max-width:820px;margin:0 auto;padding:8px 0;display:flex;flex-direction:column;gap:12px}
+.pgbld .fq{background:var(--paper);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pgbld .fq summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:14px;padding:18px 20px;font-weight:700;color:var(--ink);font-size:16px}
+.pgbld .fq summary::-webkit-details-marker{display:none}
+.pgbld .fq summary::after{content:"+";margin-left:auto;font-size:22px;font-weight:700;color:var(--muted)}
+.pgbld .fq[open] summary::after{content:"\2013"}
+.pgbld .fq .fn{width:28px;height:28px;border-radius:50%;background:#fff;border:1px solid var(--line);display:grid;place-items:center;font-weight:800;font-size:13px;color:var(--ink);flex:none}
+.pgbld .fq .fqa{padding:0 20px 18px 62px;color:var(--body);font-size:14.5px}
+/* float bar */
+.pgbld .floatcta{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -10px rgba(0,0,0,.2);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(18px,calc((100% - 1160px)/2 + 22px));transition:transform .28s ease}
+.pgbld .floatcta.hide{transform:translateY(115%)}
+.pgbld .fc-info{display:flex;align-items:center;gap:12px;min-width:0}
+.pgbld .fc-thumb{width:44px;height:44px;border-radius:9px;flex:none;object-fit:cover}
+.pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
+.pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
+@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}.pgbld .stats .sin{grid-template-columns:1fr;gap:26px}}
+@media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
+</style></head><body>
+  <div class="pgbld">
+  <div class="wrap">
+    <div class="hero">
+      <div class="gallery">
+        <div class="gwrap">
+          <div class="gtrack" id="gtrack">
+            <div class="gslide"><img class="gimg" src="https://picsum.photos/seed/serum-main/900/900" alt="Lumière Glow Serum"></div><div class="gslide"><img class="gimg" src="https://picsum.photos/seed/serum-2/900/900" alt="Lumière Glow Serum"></div><div class="gslide"><img class="gimg" src="https://picsum.photos/seed/serum-3/900/900" alt="Lumière Glow Serum"></div><div class="gslide"><img class="gimg" src="https://picsum.photos/seed/serum-lifestyle/900/900" alt="Lumière Glow Serum"></div>
+          </div>
+          <button class="garr gprev" id="gprev" aria-label="Previous">‹</button>
+          <button class="garr gnext" id="gnext" aria-label="Next">›</button>
+        </div>
+        <div class="gdots" id="gdots"><span class="gdot on"></span><span class="gdot"></span><span class="gdot"></span><span class="gdot"></span></div>
+        <div class="thumbs" id="gthumbs"><button class="gthumb on" data-i="0"><img class="" src="https://picsum.photos/seed/serum-main/900/900" alt="Lumière Glow Serum"></button><button class="gthumb" data-i="1"><img class="" src="https://picsum.photos/seed/serum-2/900/900" alt="Lumière Glow Serum"></button><button class="gthumb" data-i="2"><img class="" src="https://picsum.photos/seed/serum-3/900/900" alt="Lumière Glow Serum"></button><button class="gthumb" data-i="3"><img class="" src="https://picsum.photos/seed/serum-lifestyle/900/900" alt="Lumière Glow Serum"></button></div>
+      </div>
+      <div class="buybox">
+        <div class="rpill"><span class="st">★★★★★</span> 4.8 | 11,204 Customers</div>
+        <h1 class="ptitle">Vitamin C Glow Serum for Brighter, Even Skin</h1>
+        <div class="newline">NEW: Visibly brighter skin in 14 days</div>
+        <div class="priceRow"><span class="now">$39</span><span class="was">$60</span><span class="save">35% off · Save $21</span></div>
+        <div class="pills"><div class="pill">Brightens dullness</div><div class="pill">Evens skin tone</div><div class="pill">Boosts collagen</div><div class="pill">Deep hydration</div></div>
+        <div class="buyopt">
+          <div class="opt on">
+            <div class="ohead">Subscribe &amp; Save 20% <span class="otag">BEST VALUE</span></div>
+            <div class="osub">Delivered every 30 days · cancel anytime</div>
+            <ul class="obul"><li>Free shipping</li><li>Cancel anytime</li><li>Save 20% always</li><li>Member rewards</li></ul>
+          </div>
+          <div class="opt">
+            <div class="ohead">One-time purchase</div>
+            <div class="osub">Get it once</div>
+          </div>
+        </div>
+        <a class="buy grad" href="#">Add to cart</a>
+        <div class="pay">
+<svg viewBox="0 0 48 30"><text x="24" y="20" text-anchor="middle" font-family="Arial" font-weight="bold" font-style="italic" font-size="13" fill="#1a1f71">VISA</text></svg>
+<svg viewBox="0 0 48 30"><circle cx="21" cy="15" r="8" fill="#eb001b"/><circle cx="28" cy="15" r="8" fill="#f79e1b" fill-opacity=".85"/></svg>
+<svg viewBox="0 0 48 30"><rect width="48" height="30" fill="#1f72cd"/><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">AMEX</text></svg>
+<svg viewBox="0 0 48 30"><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9.5" fill="#003087">PayPal</text></svg>
+<svg viewBox="0 0 48 30"><rect width="48" height="30" rx="4" fill="#5a31f4"/><text x="24" y="19" text-anchor="middle" font-family="Arial" font-weight="bold" font-size="9" fill="#fff">Pay</text></svg></div>
+        <div class="social">Priya and 312 people bought this today</div>
+        <div class="trust"><div class="ti">✓ Safe checkout</div><div class="ti">✓ Free shipping</div><div class="ti">✓ Fast delivery</div></div>
+        <div class="ugc">
+          <div class="top"><h2>What our customers think</h2><div class="socials">📷 🎵 ▶️ 📌</div></div>
+          <div class="wall">
+            <div class="vc"><img class="" src="https://picsum.photos/seed/ugc1/900/900" alt="Lumière Glow Serum"><div class="play"><span>▶</span></div></div><div class="vc"><img class="" src="https://picsum.photos/seed/ugc2/900/900" alt="Lumière Glow Serum"><div class="play"><span>▶</span></div></div><div class="vc"><img class="" src="https://picsum.photos/seed/ugc3/900/900" alt="Lumière Glow Serum"><div class="play"><span>▶</span></div></div><div class="vc"><img class="" src="https://picsum.photos/seed/ugc4/900/900" alt="Lumière Glow Serum"><div class="play"><span>▶</span></div></div><div class="vc"><img class="" src="https://picsum.photos/seed/ugc5/900/900" alt="Lumière Glow Serum"><div class="play"><span>▶</span></div></div>
+          </div>
+          <div class="frev">
+            <div class="who">
+              <div class="av"><img class="" src="https://picsum.photos/seed/rev1/900/900" alt="Priya S."></div>
+              <div><div class="nm">Priya S. <span class="chk">✓</span></div><div class="loc">Actually faded my spots</div><div class="st">★★★★★</div></div>
+            </div>
+            <div class="q">Two weeks in and the dark spots on my cheeks are noticeably lighter. It sinks in instantly and my skin just looks brighter.</div>
+          </div>
+        </div>
+        <div class="acc">
+          <details open><summary>How to use</summary><div class="body">Apply 3–4 drops to clean, dry skin each morning before moisturizer and SPF. A little goes a long way.</div></details>
+          <details><summary>Shipping &amp; delivery</summary><div class="body">Free tracked shipping on all orders. Dispatched within 24 hours; delivery times vary by location.</div></details>
+          <details><summary>Returns &amp; refunds</summary><div class="body">30-day money-back guarantee. If you don’t love it, contact us for a full refund — no questions asked.</div></details>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="marq"><div class="marq-track"><span>🔥 Limited stock — shop now</span><span>⭐ Loved by 11,000+ customers</span><span>💎 Dermatologist tested</span><span>✨ Visible glow in 2 weeks</span><span>🔥 Limited stock — shop now</span><span>⭐ Loved by 11,000+ customers</span><span>💎 Dermatologist tested</span><span>✨ Visible glow in 2 weeks</span></div></div>
+
+  <div class="wrap"><section class="feat">
+    <img class="fimg" src="https://picsum.photos/seed/serum-feat1/900/900" alt="Lumière Glow Serum">
+    <div><h2>Wake up to skin that looks <span class="hl">lit from within</span></h2><p>A lightweight, fast-absorbing serum with <strong>15% stabilized vitamin C</strong> that fades dark spots and brings back your natural radiance — without any sticky residue.</p><ul class="fbul"><li><strong>Fades dark spots</strong> — visibly evens tone over weeks</li><li><strong>Non-sticky</strong> — absorbs in seconds</li><li><strong>Everyday glow</strong> — brighter skin you can see</li></ul></div>
+  </section></div>
+
+  <div class="seenband"><div class="wrap">
+    <h2>As seen in</h2>
+    <div class="logos"><span>Forbes</span><span>Vogue</span><span>Elle</span><span>Allure</span><span>Bazaar</span></div>
+  </div></div>
+
+  <div class="wrap"><section class="feat rev">
+    <img class="fimg" src="https://picsum.photos/seed/serum-feat2/900/900" alt="Lumière Glow Serum">
+    <div><h2>The confidence of skin you don’t want to hide</h2><p>When your skin looks healthy and even, makeup becomes optional. <strong>A few drops each morning</strong> is all it takes.</p><ul class="fbul"><li><strong>Brightens</strong> — reduces dullness fast</li><li><strong>Hydrates</strong> — plump, dewy finish</li><li><strong>Protects</strong> — antioxidant shield</li><li><strong>Smooths</strong> — softer texture</li></ul></div>
+  </section></div>
+
+  <div class="pinkband"><div class="wrap">
+    <h2>Confidence that starts <span class="hl">within</span></h2>
+    <p>When your skin feels healthy and even, everything else feels easier — your glow, your mood, and the way you show up.</p>
+    <a class="bag" href="#">Add to cart</a>
+    <div class="pcards"><div class="pcard">Fades dark spots for a clearer, even tone</div><div class="pcard">Deep hydration that lasts all day</div><div class="pcard">Brightens dullness in about 2 weeks</div><div class="pcard">Antioxidant shield against daily stress</div></div>
+  </div></div>
+
+  <div class="stats"><div class="wrap"><div class="sin">
+    <div class="scol">
+      <h2 class="sec" style="text-align:left;margin-bottom:12px">The results customers <span class="hl">come back for</span></h2>
+      <p style="color:var(--muted);font-size:16px;margin:0 0 18px">In an 8-week consumer study of 120 users.</p>
+      <div class="scard"><img class="simg" src="https://picsum.photos/seed/serum-main/900/900" alt="Lumière Glow Serum"><div><div class="sct">Glow serum</div><div class="scs">For brighter, even skin</div></div></div>
+    </div>
+    <div class="smid"><img class="simg2" src="https://picsum.photos/seed/stats-life/900/900" alt="Lumière Glow Serum"></div>
+    <div class="scol srows">
+      <div class="srow"><div class="n">92%</div><div><div class="t">Saw brighter skin</div><div class="s">within the first 2 weeks</div></div></div><div class="srow"><div class="n">87%</div><div><div class="t">Smoother texture</div><div class="s">more even, refined tone</div></div></div><div class="srow"><div class="n">94%</div><div><div class="t">Felt more confident</div><div class="s">after 4 weeks of use</div></div></div>
+    </div>
+  </div></div></div>
+
+  <div class="wrap">
+    <h2 class="sec" style="margin-top:48px">Benefits you’ll love</h2>
+    <div class="bgrid"><div class="bcard"><div class="ic">✦</div><div class="bt">Worldwide shipping</div></div><div class="bcard"><div class="ic">✦</div><div class="bt">24/7 support</div></div><div class="bcard"><div class="ic">✦</div><div class="bt">Cruelty-free</div></div><div class="bcard"><div class="ic">✦</div><div class="bt">Easy returns</div></div></div>
+  </div>
+
+  <div class="cmpband"><div class="wrap"><div class="in">
+    <div>
+      <h2>What makes us <span class="hl">different</span></h2>
+      <p>Clean, effective actives — none of the filler other serums hide behind.</p>
+      <a class="bag" href="#">Add to cart</a>
+    </div>
+    <div class="ctab">
+      <div class="usbox"></div>
+      <div class="ch2"><div>&nbsp;</div><div>Lumière</div><div>Others</div></div>
+      <div class="cr2"><div class="lab">15% stabilized Vitamin C</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Hyaluronic acid</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Fragrance-free</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Non-comedogenic</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div><div class="cr2"><div class="lab">Vegan</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div>
+    </div>
+  </div></div></div>
+
+  <div class="wrap">
+    <h2 class="sec" style="margin-top:20px">Join 11,000+ <span class="hl">glowing customers</span></h2>
+    <div class="gwrap">
+      <div class="gcar" id="rcar"><div class="rcard"><img class="rimg" src="https://picsum.photos/seed/rev1/900/900" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">Actually faded my spots</div><p>Two weeks in and the dark spots on my cheeks are noticeably lighter. It sinks in instantly and my skin just looks brighter.</p><div class="rwho">Priya S.</div></div></div><div class="rcard"><img class="rimg" src="https://picsum.photos/seed/rev2/900/900" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">My morning must-have</div><p>A few drops before moisturizer and my skin glows all day. I’ve stopped wearing foundation most days.</p><div class="rwho">Maya R.</div></div></div><div class="rcard"><img class="rimg" src="https://picsum.photos/seed/rev3/900/900" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">Gentle but works</div><p>I have sensitive skin and this didn’t sting at all. Even tone, no breakouts, just glow.</p><div class="rwho">Aisha K.</div></div></div><div class="rcard"><img class="rimg" src="https://picsum.photos/seed/rev4/900/900" alt="Lumière Glow Serum"><div class="rov"><div class="st">★★★★★</div><div class="rtt">Wish I found it sooner</div><p>Tried every vitamin C serum out there. This is the first that actually made a visible difference.</p><div class="rwho">Lena T.</div></div></div></div>
+      <button class="garr gprev" id="rprev" aria-label="Previous">‹</button>
+      <button class="garr gnext" id="rnext" aria-label="Next">›</button>
+    </div>
+  </div>
+
+  <div class="transband"><div class="wrap"><div class="in">
+    <div>
+      <h2>How it fits <span class="hl">your day</span></h2>
+      <div class="tlist">
+        <div class="titem"><span class="tlab">Morning</span><h3>Brighten</h3><p>A few drops wake up dull skin and even your tone.</p></div><div class="titem"><span class="tlab">Midday</span><h3>Protect</h3><p>Antioxidants shield against pollution and stress.</p></div><div class="titem"><span class="tlab">Night</span><h3>Repair</h3><p>Supports collagen so skin looks firmer over time.</p></div>
+      </div>
+    </div>
+    <img class="timg" src="https://picsum.photos/seed/transform/900/900" alt="Lumière Glow Serum">
+  </div></div></div>
+
+  <div class="wrap">
+    <h2 class="sec" style="margin-top:44px">Frequently asked <span class="hl">questions</span></h2>
+    <p class="seclead">Quick answers to the most common questions.</p>
+    <div class="faqacc"><details class="fq"><summary><span class="fn">1</span><span class="fqq">How soon will I see results?</span></summary><div class="fqa">Most people notice brighter skin within 2 weeks, with dark spots fading over 4–8 weeks of daily use.</div></details><details class="fq"><summary><span class="fn">2</span><span class="fqq">Is it safe for sensitive skin?</span></summary><div class="fqa">Yes — it’s fragrance-free, non-comedogenic and dermatologist tested. Patch test if you’re very reactive.</div></details><details class="fq"><summary><span class="fn">3</span><span class="fqq">When should I apply it?</span></summary><div class="fqa">Morning, after cleansing and before moisturizer and SPF. A few drops is enough.</div></details><details class="fq"><summary><span class="fn">4</span><span class="fqq">Can I use it with retinol?</span></summary><div class="fqa">Yes — use vitamin C in the morning and retinol at night for best results.</div></details><details class="fq"><summary><span class="fn">5</span><span class="fqq">What’s your return policy?</span></summary><div class="fqa">30-day money-back guarantee. If you don’t love it, we’ll refund you.</div></details></div>
+
+    <a class="buy grad big" style="margin-top:34px" href="#">Get Lumière Glow Serum</a>
+  </div>
+
+  <div class="floatcta" id="floatcta">
+    <div class="fc-info"><img class="fc-thumb" src="https://picsum.photos/seed/serum-main/900/900" alt="Lumière Glow Serum"><span class="fc-name">Lumière Glow Serum · <b>$39</b></span></div>
+    <a class="fc-btn" href="#">Add to cart</a>
+  </div>
+  </div>
+  <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<560)}window.addEventListener('scroll',t,{passive:true});t();
+  var tr=document.getElementById('gtrack');if(tr){var dots=[].slice.call(document.querySelectorAll('#gdots .gdot')),ths=[].slice.call(document.querySelectorAll('#gthumbs .gthumb'));function u(){var i=Math.round(tr.scrollLeft/tr.clientWidth);dots.forEach(function(d,j){d.classList.toggle('on',j===i)});ths.forEach(function(x,j){x.classList.toggle('on',j===i)})}tr.addEventListener('scroll',function(){window.requestAnimationFrame(u)},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'})})});var pv=document.getElementById('gprev'),nx=document.getElementById('gnext');function go(d){var n=tr.children.length,i=((Math.round(tr.scrollLeft/tr.clientWidth)+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'})}if(pv)pv.addEventListener('click',function(){go(-1)});if(nx)nx.addEventListener('click',function(){go(1)})}
+  var rc=document.getElementById('rcar');if(rc){var rp=document.getElementById('rprev'),rn=document.getElementById('rnext');function rgo(d){var w=(rc.firstElementChild?rc.firstElementChild.offsetWidth:320)+16;rc.scrollBy({left:d*w,behavior:'smooth'})}if(rp)rp.addEventListener('click',function(){rgo(-1)});if(rn)rn.addEventListener('click',function(){rgo(1)})}
+  })();</script></body></html>
