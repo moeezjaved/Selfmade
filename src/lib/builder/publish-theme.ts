@@ -46,7 +46,10 @@ export async function publishToTheme(store: StoreRow, opts: {
   if (!theme?.id) throw new Error('Could not find a theme to publish to.')
 
   const suffix = `sf-${opts.pageId.replace(/[^a-z0-9]/gi, '').slice(0, 10)}`
-  const assets = buildThemeAssets({ pageId: opts.pageId, kind: opts.kind, css: opts.css, body: opts.body, templateSuffix: suffix })
+  // 'all products' → each product renders its own title/price/image (full dynamic); single-product keeps
+  // the tailored copy/images but still gets a working Add-to-Cart form (cart).
+  const dynamic = opts.kind === 'product' ? (opts.target === 'store' ? 'full' : 'cart') : 'none'
+  const assets = buildThemeAssets({ pageId: opts.pageId, kind: opts.kind, css: opts.css, body: opts.body, templateSuffix: suffix, dynamic })
 
   // 'store' product publish → become the DEFAULT product template so every product uses it (no per-product suffix).
   const templateKey = (opts.kind === 'product' && opts.target === 'store') ? 'templates/product.json' : assets.templateKey
