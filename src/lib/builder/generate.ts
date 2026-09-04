@@ -202,7 +202,12 @@ function coerce(slot: SlotDef, v: any): SlotValue {
     case 'list':
     case 'costs':
     case 'timeline': {
-      const items = takeArr(v).map((i: any) => ({ label: str(i?.label), body: str(i?.body) }))
+      // "Label only" lists make the model emit plain strings (or use an alt key like title/name/text);
+      // fall back through those so a single-field list never collapses to empty rows.
+      const items = takeArr(v).map((i: any) =>
+        typeof i === 'string'
+          ? { label: i, body: '' }
+          : { label: str(i?.label ?? i?.title ?? i?.name ?? i?.text ?? i?.feature), body: str(i?.body ?? i?.desc ?? i?.value) })
       return capItems(items, n)
     }
     case 'reasons': {
