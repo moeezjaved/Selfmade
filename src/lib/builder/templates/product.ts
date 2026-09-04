@@ -144,6 +144,7 @@ const CSS = `
 .pgbld .seenband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0}
 .pgbld .logos{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px 48px;margin-top:26px}
 .pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase}
+.pgbld .logos img.plogo{height:34px;width:auto;max-width:150px;object-fit:contain;filter:grayscale(1);opacity:.72}
 /* pink gradient CTA band */
 .pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
 .pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}
@@ -345,7 +346,7 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <div class="seenband"><div class="wrap">
     <h2>${esc(c.as_seen_on || 'As seen on')}</h2>
-    <div class="logos">${(arr(c.seen_logos).length ? arr(c.seen_logos).map((l) => `<span>${escp(l.label)}</span>`) : ['Forbes', 'Vogue', 'Elle', 'Allure', 'Bazaar'].map((n) => `<span>${n}</span>`)).join('')}</div>
+    <div class="logos">${(arr(c.seen_logos).length ? arr(c.seen_logos) : ['Forbes', 'Vogue', 'Elle', 'Allure', 'Bazaar'].map((n) => ({ label: n }))).map((l: any) => l.image ? `<img class="plogo" src="${l.image}" alt="${escp(l.label || '')}">` : `<span class="plogo">${escp(l.label)}</span>`).join('')}</div>
   </div></div>
 
   <div class="wrap"><section class="feat rev">
