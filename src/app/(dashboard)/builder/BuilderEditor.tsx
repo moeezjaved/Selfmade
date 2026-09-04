@@ -22,6 +22,8 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
   onPublish: () => void
 }) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null)
+  const canvasRef = useRef<HTMLDivElement | null>(null)
+  const [tour, setTour] = useState(false)   // one-time coach marks on first open
   const [doc, setDoc] = useState<string>('')
   const [productImage, setProductImage] = useState<string | null>(productImageProp || null)
   const [device, setDevice] = useState<'desktop' | 'mobile'>('desktop')
@@ -51,6 +53,15 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
     })()
     return () => { on = false }
   }, [pageId])
+
+  // Show the coach tour the first time someone opens the editor (per browser).
+  useEffect(() => {
+    if (!doc) return
+    let seen = false
+    try { seen = localStorage.getItem('sf_builder_editor_tour_v1') === '1' } catch {}
+    if (!seen) { const t = setTimeout(() => setTour(true), 500); return () => clearTimeout(t) }
+  }, [doc])
+  const endTour = useCallback(() => { setTour(false); try { localStorage.setItem('sf_builder_editor_tour_v1', '1') } catch {} }, [])
 
   const send = useCallback((m: any) => {
     iframeRef.current?.contentWindow?.postMessage({ __pgbldCmd: 1, ...m }, '*')
@@ -126,7 +137,7 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
 
       {/* canvas + composer */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) 320px', gap: 16, flex: 1, minHeight: 0 }}>
-        <div style={{ background: INSET, border: `1px solid ${LINE}`, borderRadius: 16, padding: device === 'mobile' ? '18px 0' : 10, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
+        <div ref={canvasRef} style={{ background: INSET, border: `1px solid ${LINE}`, borderRadius: 16, padding: device === 'mobile' ? '18px 0' : 10, display: 'flex', justifyContent: 'center', overflow: 'hidden' }}>
           {loadErr ? (
             <div style={{ margin: 'auto', textAlign: 'center', color: SUB }}>{loadErr}</div>
           ) : (
@@ -158,6 +169,66 @@ export default function BuilderEditor({ pageId, productImage: productImageProp, 
           onPick={(url) => { send({ t: 'setImage', id: imgTarget.id, src: url }); setImgTarget(null); setDirty(true) }}
         />
       )}
+
+      {tour && <EditorTour canvasRef={canvasRef} composerRef={composerRef} onDone={endTour} />}
+    </div>
+  )
+}
+
+/* ─────────────────────────  first-open coach tour (spotlight)  ───────────────────────── */
+const TOUR_STEPS = [
+  { target: 'canvas' as const, icon: '✍️', title: 'Click anything to edit', body: 'Tap any headline or paragraph to type right on the page. Click any image to upload or generate a new one.' },
+  { target: 'canvas' as const, icon: '⠿', title: 'Move & manage sections', body: 'Hover a section for its toolbar — drag the ⠿ handle to reorder, or use ↑ ↓, duplicate, and delete.' },
+  { target: 'composer' as const, icon: '✨', title: 'Add anything with AI', body: 'Describe a section — or drop a screenshot to match — and it writes on-brand copy and drops it in.' },
+]
+function EditorTour({ canvasRef, composerRef, onDone }: { canvasRef: React.RefObject<HTMLElement | null>; composerRef: React.RefObject<HTMLElement | null>; onDone: () => void }) {
+  const [i, setI] = useState(0)
+  const [rect, setRect] = useState<{ top: number; left: number; width: number; height: number } | null>(null)
+  const step = TOUR_STEPS[i]
+
+  useEffect(() => {
+    const measure = () => {
+      const el = (step.target === 'canvas' ? canvasRef.current : composerRef.current)
+      if (!el) return setRect(null)
+      const r = el.getBoundingClientRect()
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+    }
+    measure()
+    window.addEventListener('resize', measure); window.addEventListener('scroll', measure, true)
+    return () => { window.removeEventListener('resize', measure); window.removeEventListener('scroll', measure, true) }
+  }, [i, step.target, canvasRef, composerRef])
+
+  const last = i === TOUR_STEPS.length - 1
+  // card sits just inside the spotlight — below the top for a tall canvas, centered horizontally on the target
+  const card = rect ? {
+    top: Math.min(rect.top + (step.target === 'canvas' ? 24 : rect.height / 2 - 90), window.innerHeight - 220),
+    left: step.target === 'composer' ? Math.max(16, rect.left - 320) : Math.max(16, Math.min(rect.left + rect.width / 2 - 165, window.innerWidth - 346)),
+  } : { top: 120, left: 120 }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 130 }}>
+      <style>{`@keyframes edtour{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}`}</style>
+      {/* spotlight hole around the target */}
+      {rect && (
+        <div style={{ position: 'fixed', top: rect.top - 4, left: rect.left - 4, width: rect.width + 8, height: rect.height + 8, borderRadius: 18, boxShadow: '0 0 0 9999px rgba(20,18,15,.62)', transition: 'all .28s cubic-bezier(.2,.8,.2,1)', pointerEvents: 'none', outline: `2px solid ${ORANGE}`, outlineOffset: -1 }} />
+      )}
+      {/* tip card */}
+      <div style={{ position: 'fixed', top: card.top, left: card.left, width: 330, maxWidth: 'calc(100vw - 32px)', background: '#fff', borderRadius: 16, boxShadow: '0 24px 60px -20px rgba(20,18,15,.5)', padding: 18, animation: 'edtour .25s ease' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: WASH, display: 'grid', placeItems: 'center', fontSize: 18 }}>{step.icon}</div>
+          <div style={{ fontWeight: 800, color: INK, fontSize: 15.5 }}>{step.title}</div>
+        </div>
+        <div style={{ fontSize: 13.5, color: SUB, lineHeight: 1.55 }}>{step.body}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            {TOUR_STEPS.map((_, k) => <span key={k} style={{ width: k === i ? 18 : 6, height: 6, borderRadius: 999, background: k === i ? ORANGE : LINE, transition: 'all .2s' }} />)}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {!last && <button onClick={onDone} style={{ border: 0, background: 'none', color: SUB, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>Skip</button>}
+            <button onClick={() => (last ? onDone() : setI(i + 1))} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13.5, cursor: 'pointer' }}>{last ? 'Start editing' : 'Next'}</button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
