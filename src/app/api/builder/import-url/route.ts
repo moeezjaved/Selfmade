@@ -10,6 +10,7 @@
  * Returns the best product we could assemble; 422 only if we can't even get a title.
  */
 import { NextRequest, NextResponse } from 'next/server'
+import { ProxyAgent } from 'undici'
 import { createClient } from '@/lib/supabase/server'
 import type { ImportedProduct } from '@/lib/builder/types'
 
@@ -18,6 +19,19 @@ export const runtime = 'nodejs'
 export const maxDuration = 30
 
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36'
+
+// Residential-proxy (IPRoyal) fallback for bot-blocked sites (Amazon, some marketplaces). It is used
+// ONLY for the HTML page fetch below — NEVER to download images or video (metered residential bandwidth):
+// imported media is kept as plain URLs the shopper's own browser loads directly.
+const PROXY_URL = (() => {
+  if (process.env.BUILDER_SCRAPER_PROXY) return process.env.BUILDER_SCRAPER_PROXY
+  const host = process.env.WORKER_PROXY_HOST, port = process.env.WORKER_PROXY_PORT || '12321'
+  const user = process.env.WORKER_PROXY_USER, pass = process.env.WORKER_PROXY_PASS
+  const country = (process.env.WORKER_PROXY_COUNTRY || 'us').toLowerCase()
+  if (!host || !user || !pass) return ''
+  const p = /country-/.test(pass) ? pass : `${pass}_country-${country}` // IPRoyal embeds geo in the password
+  return `http://${encodeURIComponent(user)}:${encodeURIComponent(p)}@${host}:${port}`
+})()
 
 export async function POST(req: NextRequest) {
   const supabase = await createClient()
@@ -35,32 +49,44 @@ export async function POST(req: NextRequest) {
     const shopify = await tryShopifyJson(url)
     if (shopify) return NextResponse.json({ product: shopify })
 
-    const html = await fetchText(url.toString())
+    // Direct first (fast, free); if the site blocks datacenter IPs, retry the HTML through IPRoyal.
+    let html = await fetchText(url.toString())
+    let viaProxy = false
+    if (!html && PROXY_URL) { html = await fetchText(url.toString(), true); viaProxy = true }
     if (!html) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
 
     const fromLd = fromJsonLd(html, url)
     const fromMeta = fromMetaTags(html, url)
-    // Merge: JSON-LD is richest; fill gaps from meta.
+    // Merge: JSON-LD is richest; fill gaps from meta + heuristic bullets.
     const product: ImportedProduct = {
       title: fromLd?.title || fromMeta.title || '',
       price: fromLd?.price || fromMeta.price || undefined,
+      compareAtPrice: fromLd?.compareAtPrice || undefined,
       description: fromLd?.description || fromMeta.description || undefined,
       images: dedupe([...(fromLd?.images || []), ...(fromMeta.images || [])]).slice(0, 9),
       handle: '',
       sku: fromLd?.sku || null,
+      brand: fromLd?.brand || fromMeta.brand || undefined,
+      rating: fromLd?.rating,
+      ratingCount: fromLd?.ratingCount,
+      features: (fromLd?.features && fromLd.features.length ? fromLd.features : featureBullets(html)).slice(0, 8),
+      reviews: (fromLd?.reviews || []).slice(0, 8),
       sourceUrl: url.toString(),
     }
     product.image = product.images?.[0] || null
     if (!product.title) return NextResponse.json({ error: 'Could not read a product from that page. Try a direct product URL.' }, { status: 422 })
-    return NextResponse.json({ product })
+    return NextResponse.json({ product, viaProxy })
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'Import failed — try again.' }, { status: 502 })
   }
 }
 
-async function fetchText(u: string): Promise<string | null> {
+async function fetchText(u: string, viaProxy = false): Promise<string | null> {
   try {
-    const r = await fetch(u, { headers: { 'user-agent': UA, accept: 'text/html,application/xhtml+xml' }, redirect: 'follow' })
+    const opts: any = { headers: { 'user-agent': UA, accept: 'text/html,application/xhtml+xml' }, redirect: 'follow' }
+    // Proxy is applied ONLY to this HTML fetch — never to any image/video (see PROXY_URL note).
+    if (viaProxy && PROXY_URL) opts.dispatcher = new ProxyAgent(PROXY_URL)
+    const r = await fetch(u, opts)
     if (!r.ok) return null
     return (await r.text()).slice(0, 2_500_000)
   } catch { return null }
@@ -92,8 +118,13 @@ async function tryShopifyJson(url: URL): Promise<ImportedProduct | null> {
   } catch { return null }
 }
 
-/** Pull a Product from any JSON-LD block on the page. */
-function fromJsonLd(html: string, base: URL): { title?: string; price?: string; description?: string; images?: string[]; sku?: string | null } | null {
+interface LdResult {
+  title?: string; price?: string; compareAtPrice?: string; description?: string; images?: string[]; sku?: string | null
+  brand?: string; rating?: number; ratingCount?: number; features?: string[]; reviews?: { name?: string; rating?: number; body: string }[]
+}
+
+/** Pull a Product (and its real rating/reviews/brand/features) from any JSON-LD block on the page. */
+function fromJsonLd(html: string, base: URL): LdResult | null {
   const blocks = Array.from(html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi))
   for (const m of blocks) {
     let data: any
@@ -104,18 +135,41 @@ function fromJsonLd(html: string, base: URL): { title?: string; price?: string; 
     const offers = Array.isArray(prod.offers) ? prod.offers[0] : prod.offers
     const price = offers?.price ?? offers?.lowPrice ?? offers?.highPrice
     const imgs = ([] as string[]).concat(prod.image || []).map((i: any) => absolutize(typeof i === 'string' ? i : i?.url, base)).filter(Boolean) as string[]
+    const agg = prod.aggregateRating || {}
+    const rating = Number(agg.ratingValue)
+    const ratingCount = Number(agg.reviewCount ?? agg.ratingCount)
+    const reviews = ([] as any[]).concat(prod.review || []).map((r: any) => ({
+      name: typeof r?.author === 'string' ? r.author : (r?.author?.name || undefined),
+      rating: r?.reviewRating?.ratingValue != null ? Number(r.reviewRating.ratingValue) : undefined,
+      body: stripHtml(String(r?.reviewBody || r?.description || '')).slice(0, 320),
+    })).filter((r) => r.body)
+    const brand = typeof prod.brand === 'string' ? prod.brand : (prod.brand?.name || undefined)
     return {
       title: typeof prod.name === 'string' ? prod.name : undefined,
       price: price != null ? String(price) : undefined,
+      compareAtPrice: offers?.priceSpecification?.price && Number(offers.priceSpecification.price) > Number(price) ? String(offers.priceSpecification.price) : undefined,
       description: typeof prod.description === 'string' ? stripHtml(prod.description).slice(0, 1200) : undefined,
       images: dedupe(imgs),
       sku: prod.sku ? String(prod.sku) : null,
+      brand: brand ? String(brand).slice(0, 80) : undefined,
+      rating: Number.isFinite(rating) && rating > 0 ? Math.round(rating * 10) / 10 : undefined,
+      ratingCount: Number.isFinite(ratingCount) && ratingCount > 0 ? ratingCount : undefined,
+      features: Array.isArray(prod.additionalProperty) ? prod.additionalProperty.map((p: any) => `${p?.name ? p.name + ': ' : ''}${p?.value || ''}`.trim()).filter(Boolean).slice(0, 8) : undefined,
+      reviews,
     }
   }
   return null
 }
 
-function fromMetaTags(html: string, base: URL): { title?: string; price?: string; description?: string; images?: string[] } {
+/** Heuristic feature bullets when there's no structured list — the first meaty <li>s on the page. */
+function featureBullets(html: string): string[] {
+  const lis = Array.from(html.matchAll(/<li[^>]*>([\s\S]*?)<\/li>/gi))
+    .map((m) => stripHtml(m[1]))
+    .filter((t) => t.length >= 18 && t.length <= 160 && /[a-z]/i.test(t) && !/^\s*(home|shop|menu|cart|account|search|©|privacy|terms)/i.test(t))
+  return dedupe(lis).slice(0, 8)
+}
+
+function fromMetaTags(html: string, base: URL): { title?: string; price?: string; description?: string; images?: string[]; brand?: string } {
   const meta = (prop: string) => {
     const re = new RegExp(`<meta[^>]+(?:property|name)=["']${prop}["'][^>]*content=["']([^"']+)["']`, 'i')
     const m = html.match(re) || html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${prop}["']`, 'i'))
@@ -129,6 +183,7 @@ function fromMetaTags(html: string, base: URL): { title?: string; price?: string
     price: meta('product:price:amount') || meta('og:price:amount'),
     description: (meta('og:description') || meta('description'))?.slice(0, 1200),
     images: dedupe(ogImages).slice(0, 9),
+    brand: meta('og:brand') || meta('product:brand') || meta('og:site_name'),
   }
 }
 

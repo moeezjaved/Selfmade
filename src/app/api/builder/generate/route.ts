@@ -36,10 +36,16 @@ export async function POST(req: NextRequest) {
     title: String(ip.title).slice(0, 300),
     handle: ip.handle ? String(ip.handle).slice(0, 200) : '',
     price: ip.price ? String(ip.price).slice(0, 40) : undefined,
+    compareAtPrice: ip.compareAtPrice ? String(ip.compareAtPrice).slice(0, 40) : undefined,
     image: ip.image ? String(ip.image).slice(0, 2000) : null,
     images: Array.isArray(ip.images) ? ip.images.map((x: any) => String(x).slice(0, 2000)).filter(Boolean).slice(0, 9) : [],
     description: ip.description ? String(ip.description).slice(0, 1600) : undefined,
     sku: ip.sku ? String(ip.sku).slice(0, 80) : null,
+    brand: ip.brand ? String(ip.brand).slice(0, 80) : undefined,
+    rating: Number.isFinite(Number(ip.rating)) && Number(ip.rating) > 0 ? Number(ip.rating) : undefined,
+    ratingCount: Number.isFinite(Number(ip.ratingCount)) && Number(ip.ratingCount) > 0 ? Math.round(Number(ip.ratingCount)) : undefined,
+    features: Array.isArray(ip.features) ? ip.features.map((x: any) => String(x).slice(0, 200)).filter(Boolean).slice(0, 8) : undefined,
+    reviews: Array.isArray(ip.reviews) ? ip.reviews.slice(0, 8).map((r: any) => ({ name: r?.name ? String(r.name).slice(0, 60) : undefined, rating: Number.isFinite(Number(r?.rating)) ? Number(r.rating) : undefined, body: String(r?.body || '').slice(0, 320) })).filter((r: any) => r.body) : undefined,
     sourceUrl: ip.sourceUrl ? String(ip.sourceUrl).slice(0, 2000) : undefined,
   } : null
   if (!templateId || (!productId && !importedProduct)) return NextResponse.json({ error: 'templateId and a product (or imported product URL) are required' }, { status: 400 })

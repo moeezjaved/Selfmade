@@ -50,10 +50,21 @@ export interface ImportedProduct {
   title: string
   handle?: string
   price?: string
+  /** original / "was" price, for a real discount pill */
+  compareAtPrice?: string
   image?: string | null
   images?: string[]
   description?: string
   sku?: string | null
+  /** the seller/brand name → wordmark + voice */
+  brand?: string
+  /** real average rating + how many reviews → an honest buy-box rating */
+  rating?: number
+  ratingCount?: number
+  /** real feature/highlight bullets pulled off the page → grounds benefit copy */
+  features?: string[]
+  /** real customer review snippets → seeds testimonials with genuine sentiment */
+  reviews?: { name?: string; rating?: number; body: string }[]
   sourceUrl?: string
 }
 
