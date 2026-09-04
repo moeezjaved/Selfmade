@@ -87,9 +87,9 @@ const CSS = `
 .pgbld .buyopt .obul{list-style:none;padding:0;margin:12px 0 0;display:grid;grid-template-columns:1fr 1fr;gap:6px}
 .pgbld .buyopt .obul li{font-size:12.5px;color:var(--body);position:relative;padding-left:18px}
 .pgbld .buyopt .obul li::before{content:"\\2713";position:absolute;left:0;color:var(--good);font-weight:800}
-.pgbld a.buy{display:block;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
-.pgbld a.buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
-.pgbld a.buy.big{max-width:520px;margin:8px auto 0}
+.pgbld .buy{display:block;width:100%;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
+.pgbld .buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
+.pgbld .buy.big{max-width:520px;margin:8px auto 0}
 .pgbld .social{text-align:center;font-size:13px;color:var(--muted);margin-top:12px}
 /* payment icons */
 .pgbld .pay{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
@@ -257,7 +257,7 @@ const CSS = `
 .pgbld .fc-info{display:flex;align-items:center;gap:12px;min-width:0}
 .pgbld .fc-thumb{width:44px;height:44px;border-radius:9px;flex:none;object-fit:cover}
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
-.pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
+.pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;border:0;cursor:pointer;font-family:inherit;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
 @media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}.pgbld .stats .sin{grid-template-columns:1fr;gap:26px}}
 @media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
 `

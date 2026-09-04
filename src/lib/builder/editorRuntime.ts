@@ -45,6 +45,8 @@ export const EDITOR_CSS = `
   .ed-toolbar .ed-linkbox input{all:unset;background:#fff;color:#181720;border-radius:6px;padding:5px 9px;font-size:13px;width:170px;height:auto}
   .ed-toolbar .ed-linkbox button{background:var(--accent,#d6248f);min-width:auto;padding:0 12px;height:26px}
   .ed-toolbar .ed-linkbox button:hover{filter:brightness(1.1);background:var(--accent,#d6248f)}
+  .ed-toolbar .ed-iconbox{display:none;position:absolute;top:34px;left:0;flex-wrap:wrap;gap:2px;width:236px;max-height:180px;overflow:auto;background:#111;border-radius:9px;padding:6px;box-shadow:0 8px 24px -6px rgba(0,0,0,.55)}
+  .ed-toolbar .ed-iconbox button{min-width:30px;height:30px;font-size:17px;font-weight:400}
   .ed-img-badge{position:absolute;inset:0;display:none;place-items:center;pointer-events:none}
   .pgbld [data-ed-imgwrap]{position:relative}
 `
@@ -132,17 +134,22 @@ export const EDITOR_JS = `
   function toolbar(){
     if(tb) return tb;
     tb=document.createElement('div'); tb.className='ed-toolbar';
+    var ICONS='✓ ✔ ★ ☆ ✦ ✧ ❤ ♥ ⚡ ✨ 🌿 🌱 💧 🔥 🛡️ ♻️ ⏱️ 🚚 🎁 💬 👍 🏆 🔒 ✅ 🌎 ⭐ 💯 ✂️ 🧴 💆 💊 🌸 🍯 🥇 📦 ➜ → ✱'.split(' ');
     tb.innerHTML='<button data-cmd="bold" title="Bold / accent">B</button>'
       +'<button data-cmd="italic" title="Italic" style="font-style:italic;font-weight:600">i</button>'
       +'<span class="ed-tsep"></span>'
+      +'<button data-cmd="icon" title="Insert an icon">☆</button>'
       +'<button data-cmd="link" title="Add link">🔗</button>'
       +'<button data-cmd="unlink" title="Remove link">✗</button>'
-      +'<span class="ed-linkbox"><input type="url" placeholder="https://… or /pages/…"><button data-cmd="applylink">Add</button></span>';
+      +'<span class="ed-linkbox"><input type="url" placeholder="https://… or /pages/…"><button data-cmd="applylink">Add</button></span>'
+      +'<span class="ed-iconbox">'+ICONS.map(function(ch){ return '<button data-cmd="ins" data-ch="'+ch+'">'+ch+'</button>'; }).join('')+'</span>';
     tb.addEventListener('mousedown', function(ev){
       var btn=ev.target.closest && ev.target.closest('button'); if(!btn) return;
       var c=btn.getAttribute('data-cmd');
       if(c==='applylink'){ ev.preventDefault(); applyLink(); return; }
       if(c==='link'){ ev.preventDefault(); openLinkBox(); return; }
+      if(c==='icon'){ ev.preventDefault(); toggleIconBox(); return; }
+      if(c==='ins'){ ev.preventDefault(); restoreRange(); document.execCommand('insertText',false,btn.getAttribute('data-ch')); markDirty(); closeIconBox(); return; }
       ev.preventDefault();
       if(c==='bold'||c==='italic'||c==='unlink'){ document.execCommand(c==='unlink'?'unlink':c,false,null); markDirty(); }
     });
@@ -150,6 +157,8 @@ export const EDITOR_JS = `
     tbInput.addEventListener('keydown', function(ev){ ev.stopPropagation(); if(ev.key==='Enter'){ ev.preventDefault(); applyLink(); } else if(ev.key==='Escape'){ ev.preventDefault(); closeLinkBox(); } });
     document.body.appendChild(tb); return tb;
   }
+  function toggleIconBox(){ var box=tb.querySelector('.ed-iconbox'); if(box.style.display==='flex'){ closeIconBox(); return; } saveRange(); box.style.display='flex'; }
+  function closeIconBox(){ if(tb){ tb.querySelector('.ed-iconbox').style.display='none'; } }
   function openLinkBox(){ saveRange(); var box=tb.querySelector('.ed-linkbox'); box.style.display='inline-flex'; tbInput.value=currentHref(); setTimeout(function(){ tbInput.focus(); tbInput.select(); },0); }
   function closeLinkBox(){ if(tb){ tb.querySelector('.ed-linkbox').style.display='none'; tbInput.value=''; } if(editing) editing.focus(); }
   function applyLink(){
@@ -162,7 +171,7 @@ export const EDITOR_JS = `
     }
     closeLinkBox();
   }
-  function showToolbar(el){ var t=toolbar(); t.querySelector('.ed-linkbox').style.display='none'; var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-42)+'px'; }
+  function showToolbar(el){ var t=toolbar(); t.querySelector('.ed-linkbox').style.display='none'; t.querySelector('.ed-iconbox').style.display='none'; var r=el.getBoundingClientRect(); t.style.display='flex'; t.style.left=Math.max(8,r.left)+'px'; t.style.top=Math.max(8,r.top-42)+'px'; }
   function hideToolbar(){ if(tb) tb.style.display='none'; }
 
   // ── sections: wrap every top-level section so we can hover a rail + insert ＋ between them ──
@@ -270,10 +279,17 @@ export const EDITOR_JS = `
     clone.querySelectorAll('[data-ed-hover]').forEach(function(x){ x.removeAttribute('data-ed-hover'); });
     clone.querySelectorAll('[data-ed-img]').forEach(function(x){ x.removeAttribute('data-ed-img'); });
     clone.querySelectorAll('[data-eid]').forEach(function(x){ x.removeAttribute('data-eid'); });
+    clone.querySelectorAll('details[data-ed-forceopen]').forEach(function(x){ x.removeAttribute('open'); x.removeAttribute('data-ed-forceopen'); });
     clone.querySelectorAll('[data-ed-sechover]').forEach(function(x){ x.removeAttribute('data-ed-sechover'); });
     clone.querySelectorAll('.ed-secwrap').forEach(function(x){ x.classList.remove('ed-secwrap'); });
     return clone.outerHTML;
   }
+
+  // FAQ / accordion answers live inside <details> — force them open so the answer text is visible and
+  // editable, and keep them open (clicking a question to edit it must not collapse the answer).
+  function openAllDetails(){ document.querySelectorAll('details').forEach(function(d){ if(!d.open){ d.setAttribute('data-ed-forceopen',''); d.open=true; } }); }
+  openAllDetails();
+  document.addEventListener('toggle', function(e){ if(e.target&&e.target.tagName==='DETAILS'&&!e.target.open) e.target.open=true; }, true);
 
   buildSections();
   post({t:'ready'});
