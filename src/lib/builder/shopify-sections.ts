@@ -130,13 +130,20 @@ const productForm = (label: string, cls: string, withOptions = true): string => 
   const qty = withOptions
     ? `<label class="sf-qty" style="display:flex;align-items:center;gap:12px;margin:0 0 12px;font-size:13px;font-weight:700;color:#181720"><span>Quantity</span><input type="number" name="quantity" value="1" min="1" style="width:78px;text-align:center;${iStyle}"></label>`
     : `<input type="hidden" name="quantity" value="1">`
-  return `<form method="post" action="/cart/add" style="margin:0" data-sf-cart>` +
+  // Shopify's NATIVE product form ({% form 'product' %}) — so the theme's cart JS / cart drawer picks up
+  // the add-to-cart (name="add"), and we get a real dynamic-checkout button (Shop Pay / "Buy it now")
+  // via {{ form | payment_button }}. Our option pickers + resolver still set the hidden variant id.
+  const dynamicCheckout = withOptions
+    ? `<div class="sf-dyncheckout" style="margin-top:10px">{{ form | payment_button }}</div>`
+    : ''
+  return `{% form 'product', product, class: 'sf-cart-form' %}` +
     pickers +
     `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" data-sf-vid>` +
     qty +
-    `<button type="submit" class="${cls}">${label.trim() || 'Add to cart'}</button>` +
+    `<button type="submit" name="add" class="${cls}">${label.trim() || 'Add to cart'}</button>` +
+    dynamicCheckout +
     (withOptions ? FORM_JS : '') +
-    `</form>`
+    `{% endform %}`
 }
 
 // Replace the inner content of the first element carrying `cls` with a Liquid expression.
