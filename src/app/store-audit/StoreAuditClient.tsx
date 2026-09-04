@@ -321,6 +321,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   const [tpls, setTpls] = useState<Tpl[] | null>(null)
   const [kit, setKit] = useState<any>(null)
   const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
+  const [productsReady, setProductsReady] = useState(false)   // catalog crawl finished (empty ⇒ service/SaaS, not "still loading")
   const [needCredits, setNeedCredits] = useState(false)
   const kicked = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -356,6 +357,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
       if (on && !hasImg(p)) p = await read(true)
       if (!on) return
       setProducts(Array.isArray(p.products) ? p.products.map((x: any) => ({ title: x.title || '', image: x.image || (x.images || [])[0] || null })) : [])
+      setProductsReady(true)   // crawl done — even if empty (a service/SaaS site with no product catalog)
     })()
     return () => { on = false }
   }, [domain])
@@ -390,18 +392,20 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: true } : x))
   }
 
-  // Auto-render the FIRST 5 (free) — 2 at a time — once we have the concepts AND at least one REAL product
-  // photo (the ad must show the store's actual product, never a fabricated one). The brand-kit stays
-  // OPTIONAL (colors/fonts/logo only). The other 5 wait for a tap (they cost credits).
+  // Auto-render the FIRST 5 (free) — 2 at a time — once we have the concepts AND the catalog crawl has
+  // FINISHED. We wait for `productsReady` (not just "has a photo") so we can tell the store's TYPE:
+  //  • products found  → PHYSICAL store: the ad shows the store's real product (never a fabricated one).
+  //  • none found      → SERVICE / SaaS / app: no physical product exists, so we render a concept-led ad
+  //    (the render engine auto-detects the empty-product case). The brand-kit stays optional.
   useEffect(() => {
-    if (kicked.current || !tpls || !withImg.length) return
+    if (kicked.current || !tpls || !productsReady) return
     const todo = tpls.slice(0, FREE).map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
     if (!todo.length) return
     kicked.current = true
     let cursor = 0
     const worker = async () => { while (cursor < todo.length) await genOne(todo[cursor++].i) }
     worker(); worker()
-  }, [tpls])   // eslint-disable-line react-hooks/exhaustive-deps
+  }, [tpls, productsReady])   // eslint-disable-line react-hooks/exhaustive-deps
 
   if (tpls !== null && tpls.length === 0) return null
   const cards = tpls || Array.from({ length: FREE }, () => null)
