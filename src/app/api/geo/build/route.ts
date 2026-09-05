@@ -40,8 +40,11 @@ export async function POST(req: NextRequest) {
     if ((await getPlanId(admin as any, owner).catch(() => 'free' as const)) === 'free') {
       return NextResponse.json({ error: 'upgrade_required', reason: 'Applying to your live store is a paid feature — drafting stays free. Upgrade to apply.' }, { status: 402 })
     }
-    const { data: asset } = await admin.from('geo_assets').select('*').eq('id', id).eq('user_id', user.id).maybeSingle()
-    if (!asset) return NextResponse.json({ error: 'Asset not found' }, { status: 404 })
+    // Scope the lookup to the active BRAND (matching the list query in listAnswerPages) rather than strictly
+    // the caller's user_id — an asset built by a teammate or the billing owner still belongs to this brand,
+    // and a strict user_id match would 404 and surface only the dead-end generic "Couldn't apply".
+    const { data: asset } = await admin.from('geo_assets').select('*').eq('id', id).eq('brand_id', brandId).maybeSingle()
+    if (!asset) return NextResponse.json({ error: 'not_found', reason: 'That draft wasn’t found — it may have been rebuilt. Regenerate the asset and apply again.' }, { status: 404 })
     try {
       if (asset.kind === 'llms_txt') {
         return NextResponse.json({ error: 'unsupported', reason: 'llms.txt must live at your site root (yourstore.com/llms.txt). Shopify can’t serve a root file via the API — copy it in from your theme/hosting, or ask your dev to add it.' }, { status: 400 })
