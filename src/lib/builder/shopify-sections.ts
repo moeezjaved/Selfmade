@@ -550,6 +550,7 @@ function fieldize(html: string, prefix = ''): { template: string; settings: any[
   })
   // 2) IMAGES — <img> → image_picker (choose a file) + a per-block URL text carrying the generated image.
   s = s.replace(/<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi, (_m, a, src, b) => {
+    if (/{{|{%/.test(src)) return _m   // already templatized (e.g. an icon image from step 1) — don't re-process
     imgN++; const pid = P(`img${imgN}`), uid = P(`img${imgN}u`)
     settings.push({ type: 'image_picker', id: pid, label: `Image ${imgN}` })
     settings.push({ type: 'text', id: uid, label: `Image ${imgN} URL`, info: 'Used until you choose an image above' })
