@@ -61,8 +61,45 @@ export const EDITOR_CSS = `
   .ed-stylepop b{min-width:32px;text-align:center;font-variant-numeric:tabular-nums}
 `
 
+/**
+ * A tiny standalone watchdog injected as its OWN <script> BEFORE the runtime.
+ * It must be separate: if EDITOR_JS ever fails to *parse* (e.g. a cooked
+ * backslash-regex, the class of bug that silently killed the whole editor),
+ * an inner try/catch can't catch a parse error — but this script has already
+ * run and installed the fallback. If the runtime doesn't signal ready in time,
+ * or throws during init, the user sees a clear "refresh" banner instead of a
+ * silently dead, uneditable page — and the parent app is told via postMessage.
+ */
+export const EDITOR_GUARD = `
+(function(){
+  var MSG='The editor failed to load. Please refresh the page (Cmd/Ctrl + Shift + R).';
+  function banner(){
+    if(document.getElementById('pgbld-fatal')) return;
+    var host=document.body||document.documentElement; if(!host) return;
+    var b=document.createElement('div'); b.id='pgbld-fatal';
+    b.setAttribute('style','position:fixed;left:0;right:0;top:0;z-index:2147483647;background:#b3261e;color:#fff;font:600 13px/1.45 -apple-system,BlinkMacSystemFont,system-ui,sans-serif;padding:10px 16px;text-align:center;box-shadow:0 2px 10px rgba(0,0,0,.25)');
+    b.textContent='\\u26A0 '+MSG;
+    host.appendChild(b);
+    try{ parent.postMessage({__pgbld:1,t:'error',fatal:true,message:MSG},'*'); }catch(e){}
+  }
+  window.__pgbldBanner=banner;
+  // Faster path: a script parse/runtime error before the runtime is ready.
+  // Ignore benign resource (image/link/media) load failures and any error after
+  // the runtime has already booted (those are edit-time hiccups, not a dead editor).
+  window.addEventListener('error', function(e){
+    if(window.__pgbldReady) return;
+    var t=e&&e.target;
+    if(t&&t!==window&&t.tagName&&t.tagName!=='SCRIPT') return;
+    banner();
+  }, true);
+  // Reliable path: the runtime always posts ready; if it never does, it died.
+  window.__pgbldWatchdog=setTimeout(function(){ if(!window.__pgbldReady) banner(); }, 3000);
+})();
+`
+
 export const EDITOR_JS = `
 (function(){
+ try {
   var EDITABLE_TEXT = 'H1,H2,H3,H4,H5,H6,P,LI,A,SPAN,SUMMARY,BUTTON,STRONG,EM,DIV,BLOCKQUOTE,FIGCAPTION';
   var dirty=false, uid=0;
   function post(m){ try{ parent.postMessage(Object.assign({__pgbld:1}, m),'*'); }catch(e){} }
@@ -358,10 +395,18 @@ export const EDITOR_JS = `
 
   buildSections();
   post({t:'ready'});
+  // Runtime booted cleanly — disarm the watchdog so no false "failed to load" banner fires.
+  window.__pgbldReady=true;
+  if(window.__pgbldWatchdog){ clearTimeout(window.__pgbldWatchdog); }
+ } catch(err){
+  // An exception during init (not a parse error — those are caught by EDITOR_GUARD).
+  try{ if(window.__pgbldBanner) window.__pgbldBanner(); }catch(_){}
+  try{ parent.postMessage({__pgbld:1,t:'error',fatal:true,message:String((err&&err.message)||err)},'*'); }catch(_){}
+ }
 })();
 `
 
 /** The <style>+<script> to inject before </body> in the editor document (never in a published page). */
 export function editorChrome(): string {
-  return `<style>${EDITOR_CSS}</style><script>${EDITOR_JS}</script>`
+  return `<style>${EDITOR_CSS}</style><script>${EDITOR_GUARD}</script><script>${EDITOR_JS}</script>`
 }
