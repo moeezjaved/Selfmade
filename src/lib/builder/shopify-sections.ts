@@ -523,7 +523,8 @@ function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): 
   const itemSettings: any[] = []
   const imgRe = /<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi
   const txtRe = new RegExp(`(<(?:${ITEM_TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${ITEM_TEXT_TAGS})>)`, 'gi')
-  const editableText = (t: string) => { const c = t.trim(); return !!c && !/{{|{%/.test(t) && /[a-zA-Z0-9]/.test(c) }
+  // Skip pure short-number leaves (the FAQ "1"/"2" badge, list ordinals) — they're decoration, not content.
+  const editableText = (t: string) => { const c = t.trim(); return !!c && !/{{|{%/.test(t) && /[a-zA-Z0-9]/.test(c) && !/^\d{1,2}$/.test(c) }
   // Template + schema from the first item.
   let template = items[0]
     .replace(imgRe, (_m, a, _src, b) => {
