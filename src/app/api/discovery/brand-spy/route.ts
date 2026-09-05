@@ -16,6 +16,7 @@ import { getUserOrg, resolveBillingOwner } from '@/lib/org'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { logActivity } from '@/lib/activity'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
+import { fetchLiveAdsByPage } from '@/lib/ads-studio/adlibrary'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
 async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
@@ -28,7 +29,7 @@ async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
 }
 
 export const dynamic = 'force-dynamic'
-export const maxDuration = 20
+export const maxDuration = 60   // a pull fetches this brand's live ads on the droplet (~30s) + stores them
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -281,8 +282,35 @@ export async function POST(req: NextRequest) {
       const gate = await requireUnder(admin, billingOwner, 'expressPulls', pullsToday || 0)
       if (gate) return NextResponse.json(gate, { status: 402 })
       await ensureTracked(admin, pageId, name, true)
+      // The ad corpus is no longer bulk-crawled into Supabase, so enqueuing alone leaves the spy page
+      // empty forever. Fetch THIS brand's live creatives now (droplet Meta Ad Library — the same reliable
+      // source "Spy their ads" uses) and store them straight into discovery_ads_index so the page fills on
+      // this click. A later full crawl (if re-enabled) backfills complete history + R2 creatives + ad-DNA.
+      let pulled = 0
+      try {
+        const live = await fetchLiveAdsByPage(pageId, 40)
+        if (live.length) {
+          const nowIso = new Date().toISOString()
+          const rows = live.map((a) => ({
+            ad_id: a.adId, page_id: pageId, page_name: a.pageName || name,
+            body: a.body || null, title: a.title || null,
+            is_active: a.isActive, format: a.videos.length ? 'video' : 'image',
+            link_url: a.link || null, snapshot_url: `https://www.facebook.com/ads/library/?id=${a.adId}`,
+            raw_image_urls: a.images.length ? a.images : null,
+            raw_video_urls: a.videos.length ? a.videos : null,
+            raw_video_preview_urls: a.videoPreviews.length ? a.videoPreviews : null,
+            last_seen: nowIso,
+          }))
+          const { error } = await admin.from('discovery_ads_index').upsert(rows, { onConflict: 'ad_id' })
+          if (!error) {
+            pulled = rows.length
+            // Mark it just-crawled so the 12h freshness guard stops casual re-opens from re-pulling.
+            await admin.from('discovery_crawl_terms').update({ last_crawled_at: nowIso }).eq('page_id', pageId)
+          }
+        }
+      } catch { /* live pull is best-effort; the enqueue still stands for a later full crawl */ }
       await logActivity(admin, user.id, 'BRAND_PULLED', `Pulled ads for ${name}`, 'brand', activeBrandId)
-      return NextResponse.json({ pageId, crawlOnly: true, pullsToday: (pullsToday || 0) + 1 })
+      return NextResponse.json({ pageId, crawlOnly: true, pulled, pullsToday: (pullsToday || 0) + 1 })
     }
 
     // Already SPYING this brand? Re-open is a no-op (refresh the crawl, keep the follow). A plain
