@@ -274,6 +274,19 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
+  // TEXT pass 3 — paragraphs / list items that carry INLINE markup (a bold <strong>, a link, an accent
+  // <span>). Pass 1 only matched pure-text leaves, so these copy blocks had NO editable setting (QA: "no
+  // input to change existing text"). Lift them as PLAIN editable text; skip anything with block/media
+  // children (that's a container, not a copy block).
+  s = s.replace(/<(p|li|blockquote|figcaption)\b([^>]*)>([\s\S]*?)<\/\1>/gi, (m, tag, attrs, inner) => {
+    if (hasLiquid(inner) || tn >= 20) return m
+    if (!/<(?:strong|em|b|i|a|span|br|mark|u)\b/i.test(inner)) return m                               // pure text → pass 1 already handled it
+    if (/<(?:div|ul|ol|table|section|h[1-6]|img|svg|button|input|details|video|iframe)\b/i.test(inner)) return m  // container → leave alone
+    const clean = stripMd(inner.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' '))
+    if (!clean || !isRealText(clean)) return m
+    return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
+  })
+
   // VIDEO pass (before images) — video slots become uploadable: a Shopify `video` setting (upload to
   // Content → Files, then pick it). Covers real <video> and the poster+▶ placeholder cards (mediaCard).
   //  (a) real <video src="…">…</video>
@@ -302,6 +315,12 @@ function editablize(html: string): { html: string; settings: Setting[] } {
 // Scoped via the section's own `.pgbld` wrapper, so duplicating the section keeps each gallery independent.
 const GALLERY_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var tr=(root&&root.querySelector('.gtrack'))||document.querySelector('.gtrack');if(!tr)return;var scope=tr.closest('.pgbld')||root||document;var dots=[].slice.call(scope.querySelectorAll('.gdots .gdot'));var ths=[].slice.call(scope.querySelectorAll('.thumbs .gthumb'));var n=tr.children.length;if(n<2)return;function cur(){return Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth));}function u(){var i=cur();dots.forEach(function(d,j){d.classList.toggle('on',j===i);});ths.forEach(function(x,j){x.classList.toggle('on',j===i);});}tr.addEventListener('scroll',function(){requestAnimationFrame(u);},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'});});});var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function go(d){var i=((cur()+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});}if(pv)pv.addEventListener('click',function(){go(-1);});if(nx)nx.addEventListener('click',function(){go(1);});var t=setInterval(function(){go(1);},4500);var h=scope.querySelector('.gallery')||tr;h.addEventListener('mouseenter',function(){clearInterval(t);});})();</script>`
 const withGalleryDriver = (html: string): string => (/\bgtrack\b/.test(html) ? html + GALLERY_SCRIPT : html)
+
+// Review / testimonial carousels (.gcar with .gprev/.gnext arrows) are a horizontal scroller, not a
+// full-width slider — the page-level script that drove their arrows is dropped when we split into sections,
+// so the arrows did nothing. This self-contained, section-scoped driver scrolls by one card per click.
+const CAROUSEL_SCRIPT = `<script>(function(){var s=document.currentScript;var scope=(s&&s.closest('.pgbld'))||document;var car=scope.querySelector('.gcar');if(!car)return;var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function step(){var c=car.children[0];return (c?c.getBoundingClientRect().width+16:car.clientWidth*0.85);}function go(d){car.scrollBy({left:d*step(),behavior:'smooth'});}if(pv)pv.addEventListener('click',function(e){e.preventDefault();go(-1);});if(nx)nx.addEventListener('click',function(e){e.preventDefault();go(1);});})();</script>`
+const withCarouselDriver = (html: string): string => (/\bgcar\b/.test(html) ? html + CAROUSEL_SCRIPT : html)
 
 // Every section gets a native "Section style" settings group — background, text colour, alignment,
 // spacing and text size — editable in Shopify's theme editor like a real theme. Applied via a scoped
@@ -633,7 +652,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
     const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: bl.itemSettings || [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withCarouselDriver(withGalleryDriver(html)), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
   // Product templates get a native "You may also like" recommendations section at the end.
