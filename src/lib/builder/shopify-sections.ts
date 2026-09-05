@@ -518,7 +518,7 @@ const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[
 // `div` is included because item sub-fields are often leaf divs (.q, .bt, .rtt, .rwho); the `[^<]` guard in
 // the regex means only TEXT-ONLY divs match, never container divs.
 const ITEM_TEXT_TAGS = 'h1|h2|h3|h4|h5|h6|p|span|strong|em|li|summary|blockquote|figcaption|b|i|div|a'
-function structuredItem(items: string[]): { itemSettings: any[]; blocks: Record<string, any>; blockOrder: string[]; template: string } | null {
+function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): { itemSettings: any[]; blocks: Record<string, any>; blockOrder: string[]; template: string } | null {
   let imgN = 0, txtN = 0
   const itemSettings: any[] = []
   const imgRe = /<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi
@@ -550,7 +550,13 @@ function structuredItem(items: string[]): { itemSettings: any[]; blocks: Record<
   const blocks: Record<string, any> = {}, order: string[] = []
   items.forEach((it, i) => { const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: extract(it) }; order.push(id) })
   // Give the item's outer tag a shopify_attributes hook so the block is selectable in the editor.
-  const templateWithAttrs = template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
+  let templateWithAttrs = template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
+  // Logos ("As seen on") default to a wordmark, but merchants want to drop in a press LOGO IMAGE. Add an
+  // optional image_picker per block that renders as the logo when set, falling back to the text otherwise.
+  if (opts.logoImgClass) {
+    itemSettings.unshift({ type: 'image_picker', id: 'logo_image', label: 'Logo image', info: 'Overrides the text logo below' })
+    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 300 }}" alt="" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
+  }
   return { itemSettings, blocks, blockOrder: order, template: templateWithAttrs }
 }
 
@@ -567,7 +573,9 @@ function blockifyList(html: string): { html: string; blocks: Record<string, any>
     const uniform = items.every((it) => { const m = /^<(\w+)([^>]*)>/.exec(it); return !!m && m[1] === itemTag && firstClass(m[2]) === c0 })
     if (!uniform) continue
     // Preferred: typed settings (text inputs + image pickers). Fallback: the raw-HTML `content` box.
-    const structured = structuredItem(items)
+    // Logo strips ("As seen on") also get an optional per-block logo image that overrides the wordmark.
+    const isLogo = cc === 'logos' || /\blogo|plogo\b/i.test(itemClass)
+    const structured = structuredItem(items, isLogo ? { logoImgClass: itemClass } : {})
     if (structured) {
       const loop = `{% for block in section.blocks %}{% case block.type %}{% when '@app' %}{% render block %}{% else %}${structured.template}{% endcase %}{% endfor %}`
       return { html: html.slice(0, inner.start) + loop + html.slice(inner.end), blocks: structured.blocks, blockOrder: structured.blockOrder, itemName, itemSettings: structured.itemSettings }
