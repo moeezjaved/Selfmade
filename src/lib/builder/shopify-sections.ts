@@ -490,7 +490,52 @@ const LIST_CONTAINERS: Array<[string, string]> = [
   ['blurbs', 'Benefit'], ['tlist', 'Step'], ['gcar', 'Review'], ['svc', 'Service'], ['faq', 'Question'],
 ]
 const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[1] || '').trim().split(/\s+/)[0]
-function blockifyList(html: string): { html: string; blocks: Record<string, any>; blockOrder: string[]; itemName: string } | null {
+
+// Turn a uniform list item into TYPED block settings — real text inputs + an image picker per <img> — instead
+// of one raw-HTML `content` box (which showed markup like `<div class="ic">✦</div>…` in the theme editor).
+// The render template + field schema come from item[0] (all items are uniform, so they share it); each item
+// then supplies its own values. Images get an image_picker (choose a file) plus a per-block URL text that
+// carries the generated image as the fallback — so every card keeps its own photo AND can be swapped.
+// `div` is included because item sub-fields are often leaf divs (.q, .bt, .rtt, .rwho); the `[^<]` guard in
+// the regex means only TEXT-ONLY divs match, never container divs.
+const ITEM_TEXT_TAGS = 'h1|h2|h3|h4|h5|h6|p|span|strong|em|li|summary|blockquote|figcaption|b|i|div|a'
+function structuredItem(items: string[]): { itemSettings: any[]; blocks: Record<string, any>; blockOrder: string[]; template: string } | null {
+  let imgN = 0, txtN = 0
+  const itemSettings: any[] = []
+  const imgRe = /<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi
+  const txtRe = new RegExp(`(<(?:${ITEM_TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${ITEM_TEXT_TAGS})>)`, 'gi')
+  const editableText = (t: string) => { const c = t.trim(); return !!c && !/{{|{%/.test(t) && /[a-zA-Z0-9]/.test(c) }
+  // Template + schema from the first item.
+  let template = items[0]
+    .replace(imgRe, (_m, a, _src, b) => {
+      imgN++; const pid = `img${imgN}`, uid = `img${imgN}u`
+      itemSettings.push({ type: 'image_picker', id: pid, label: `Image ${imgN}` })
+      itemSettings.push({ type: 'text', id: uid, label: `Image ${imgN} URL`, info: 'Used until you choose an image above' })
+      const attrs = `${a}${b}`.replace(/\ssrcset=["'][^"']*["']/i, '')
+      return `{% if block.settings.${pid} != blank %}<img${attrs} src="{{ block.settings.${pid} | image_url: width: 1000 }}">{% else %}<img${attrs} src="{{ block.settings.${uid} }}">{% endif %}`
+    })
+  template = template.replace(txtRe, (m, open, text, close) => {
+    if (!editableText(text)) return m
+    txtN++; const id = `f${txtN}`
+    itemSettings.push({ type: text.trim().length > 60 ? 'textarea' : 'text', id, label: text.trim().slice(0, 32) })
+    return `${open}{{ block.settings.${id} }}${close}`
+  })
+  if (itemSettings.length === 0) return null   // nothing structured → caller keeps the raw-content fallback
+  // Per-item values, extracted with the SAME ordered passes so ids line up.
+  const extract = (html: string): Record<string, any> => {
+    const v: Record<string, any> = {}; let ii = 0, ti = 0
+    html.replace(imgRe, (_m, _a, src) => { ii++; v[`img${ii}u`] = src; return _m })
+    html.replace(txtRe, (m, _o, text) => { if (editableText(text)) { ti++; v[`f${ti}`] = text.trim() } return m })
+    return v
+  }
+  const blocks: Record<string, any> = {}, order: string[] = []
+  items.forEach((it, i) => { const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: extract(it) }; order.push(id) })
+  // Give the item's outer tag a shopify_attributes hook so the block is selectable in the editor.
+  const templateWithAttrs = template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
+  return { itemSettings, blocks, blockOrder: order, template: templateWithAttrs }
+}
+
+function blockifyList(html: string): { html: string; blocks: Record<string, any>; blockOrder: string[]; itemName: string; itemSettings?: any[] } | null {
   for (const [cc, itemName] of LIST_CONTAINERS) {
     const inner = innerOf(html, cc); if (!inner) continue
     const items = topLevelChildren(inner.inner).map((s) => s.trim()).filter((s) => /^<\w/.test(s))
@@ -502,6 +547,12 @@ function blockifyList(html: string): { html: string; blocks: Record<string, any>
     // require a UNIFORM list (same tag + same lead class) so we don't mangle mixed containers
     const uniform = items.every((it) => { const m = /^<(\w+)([^>]*)>/.exec(it); return !!m && m[1] === itemTag && firstClass(m[2]) === c0 })
     if (!uniform) continue
+    // Preferred: typed settings (text inputs + image pickers). Fallback: the raw-HTML `content` box.
+    const structured = structuredItem(items)
+    if (structured) {
+      const loop = `{% for block in section.blocks %}{% case block.type %}{% when '@app' %}{% render block %}{% else %}${structured.template}{% endcase %}{% endfor %}`
+      return { html: html.slice(0, inner.start) + loop + html.slice(inner.end), blocks: structured.blocks, blockOrder: structured.blockOrder, itemName, itemSettings: structured.itemSettings }
+    }
     const blocks: Record<string, any> = {}, order: string[] = []
     items.forEach((it, i) => {
       const content = it.replace(/^<\w+[^>]*>/, '').replace(/<\/\w+>\s*$/, '')
@@ -581,7 +632,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const bl = blockifyList(p.html)
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
-    const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
+    const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: bl.itemSettings || [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
     return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
