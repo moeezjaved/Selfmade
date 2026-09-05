@@ -96,6 +96,7 @@ const CSS = `
 .pgbld .buy{display:block;width:100%;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
 .pgbld .buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
 .pgbld .buy.big{max-width:520px;margin:8px auto 0}
+.pgbld .sf-iconimg{width:1.35em;height:1.35em;object-fit:contain;vertical-align:middle;display:inline-block}
 /* Shopify's dynamic-checkout button ({{ form | payment_button }} — "Buy it now" / Shop Pay). Without this
    it renders at the theme's tiny default; force it full-width and match the Add-to-cart button. */
 .pgbld .sf-dyncheckout{margin-top:10px;width:100%}

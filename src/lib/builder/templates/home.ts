@@ -32,6 +32,7 @@ const CSS = `
 .pgbld .wrap{max-width:1160px;margin:0 auto;padding:0 22px}
 .main-page-title,.shopify-page-title,.template-page .page-title{display:none!important}
 .pgbld .rpill{display:inline-flex;align-items:center;gap:8px;background:var(--grad);color:#fff;border-radius:100px;padding:6px 14px;font-size:13px;font-weight:700}
+.pgbld .sf-iconimg{width:1.35em;height:1.35em;object-fit:contain;vertical-align:middle;display:inline-block}
 .pgbld a.cta{display:inline-block;background:var(--grad);color:#fff;text-decoration:none;border-radius:100px;padding:15px 34px;font-weight:800;font-size:16.5px;box-shadow:0 14px 32px -16px rgba(214,36,143,.7)}
 .pgbld a.cta.dark{background:var(--dark)}
 /* hero */
