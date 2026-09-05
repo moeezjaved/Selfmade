@@ -58,32 +58,39 @@ export async function POST(req: NextRequest) {
     // Core product data: Shopify's `.json` is the cleanest source when present.
     const shopify = await tryShopifyJson(url)
 
-    // Always fetch the page HTML too — it carries the rich signals (rating, reviews, brand, video)
-    // that the Shopify `.json` endpoint omits. Direct first; IPRoyal fallback for bot-blocked sites.
-    // Amazon is special: a bare fetch just returns the captcha/robot page (HTTP 200), so we skip straight
-    // to the droplet's real browser, which rewrites to the mobile product page and extracts the product.
-    // Bot-protected marketplaces (Amazon, Etsy, eBay, AliExpress, Alibaba, …) return an HTTP-200 bot/JS
-    // shell to a plain fetch — non-empty but with NO product data — so we'd never fall through to the
-    // browser. Route them straight to the droplet's real browser (renders JS, IPRoyal + stealth), exactly
-    // like Amazon; the rendered DOM then yields JSON-LD / OpenGraph product data.
-    const forceBrowser = isAmazon(url) || isMarketplace(url)
+    // Fetch strategy (the page HTML carries the rich signals — rating, reviews, brand, video — that the
+    // Shopify `.json` omits): try a REAL fetch first (direct, then the IPRoyal residential proxy), extract,
+    // and only spend the droplet's real browser when that still yields no product. Etsy / eBay / AliExpress /
+    // Alibaba serve usable JSON-LD/OpenGraph to a residential fetch, so force-routing them to the (slower,
+    // flakier) droplet-only path was the bug that surfaced as "Could not read a product from that page."
+    // Amazon stays the exception: any fetch of it is a captcha/JS shell and only its mobile DOM (extracted on
+    // the droplet) is reliable, so it goes straight to the browser.
+    const forceBrowser = isAmazon(url)
     let html: string | null = null
     let viaProxy = false
     let dropletProduct: DropletProduct | undefined
+    const emptyMeta = { title: undefined as string | undefined, price: undefined as string | undefined, description: undefined as string | undefined, images: [] as string[], brand: undefined as string | undefined, videos: [] as string[] }
+    let fromLd: ReturnType<typeof fromJsonLd> | null = null
+    let fromMeta: ReturnType<typeof fromMetaTags> = emptyMeta
+    const haveTitle = () => !!(dropletProduct?.title || shopify?.title || fromLd?.title || fromMeta.title)
+
     if (!forceBrowser) {
       html = await fetchText(url.toString())
-      if (!html && PROXY_CONFIGURED) { html = await fetchText(url.toString(), true); viaProxy = true }
+      if (html) { fromLd = fromJsonLd(html, url); fromMeta = fromMetaTags(html, url) }
+      // Direct fetch blocked or returned a JS shell (no product) → retry through the residential proxy.
+      if (!haveTitle() && PROXY_CONFIGURED) {
+        const ph = await fetchText(url.toString(), true)
+        if (ph) { html = ph; viaProxy = true; fromLd = fromJsonLd(html, url); fromMeta = fromMetaTags(html, url) }
+      }
     }
-    // Render in a real browser on the droplet (Playwright + IPRoyal). HTML only — images/video are never
-    // fetched there; Amazon also returns a structured product from its mobile DOM.
-    if (forceBrowser || (!html && !shopify)) {
+    // Last resort (and Amazon's only path): render in the droplet's real browser (Playwright + IPRoyal +
+    // stealth) and re-extract from the post-JS DOM. HTML only — images/video are never fetched there.
+    if (forceBrowser || !haveTitle()) {
       const d = await fetchViaDroplet(url.toString())
-      html = d.html; dropletProduct = d.product; if (html) viaProxy = true
+      if (d.html) { html = d.html; viaProxy = true; fromLd = fromJsonLd(html, url); fromMeta = fromMetaTags(html, url) }
+      if (d.product) dropletProduct = d.product
     }
     if (!shopify && !html && !dropletProduct?.title) return NextResponse.json({ error: 'Could not load that page — check the link and try again.' }, { status: 502 })
-
-    const fromLd = html ? fromJsonLd(html, url) : null
-    const fromMeta = html ? fromMetaTags(html, url) : { title: undefined, price: undefined, description: undefined, images: [], brand: undefined, videos: [] }
 
     // Merge: Shopify core (if any) for title/price/images/description; page JSON-LD/meta for the
     // rich signals (rating, reviews, brand, video) that make the page land.
@@ -133,20 +140,6 @@ async function fetchViaDroplet(target: string): Promise<{ html: string | null; p
 }
 
 function isAmazon(u: URL): boolean { return /(^|\.)amazon\.[a-z.]+$/i.test(u.hostname) }
-
-// Marketplaces whose product pages are JS-rendered and/or bot-protected — a plain fetch gets a shell,
-// so they must go through the droplet's real browser. (Amazon is handled separately above.)
-function isMarketplace(u: URL): boolean {
-  const h = u.hostname.toLowerCase()
-  return (
-    /(^|\.)etsy\.com$/.test(h) ||
-    /(^|\.)ebay\.[a-z.]+$/.test(h) ||           // ebay.com, ebay.co.uk, ebay.de, …
-    /(^|\.)aliexpress\.[a-z.]+$/.test(h) ||     // aliexpress.com, aliexpress.us, …
-    /(^|\.)alibaba\.com$/.test(h) ||            // www./m./spanish. alibaba.com
-    /(^|\.)walmart\.com$/.test(h) ||
-    /(^|\.)temu\.com$/.test(h)
-  )
-}
 
 async function fetchText(u: string, viaProxy = false): Promise<string | null> {
   try {
