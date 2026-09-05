@@ -192,7 +192,7 @@ const CSS = `
 .pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
 .pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}
 .pgbld .pinkband p{font-size:17px;color:rgba(255,255,255,.92);max-width:660px;margin:0 auto 26px}
-.pgbld .pinkband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:16px 40px;font-weight:800;font-size:17px}
+.pgbld .pinkband .bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:16px 40px;font-weight:800;font-size:17px}
 .pgbld .pcards{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-top:36px}
 .pgbld .pcard{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.28);border-radius:16px;padding:24px 18px;font-size:15px;font-weight:600;text-align:center;color:#fff}
 /* comparison on a gradient band (Atlas 'what makes us different') */
@@ -201,7 +201,7 @@ const CSS = `
 .pgbld .cmpband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 14px;text-align:left}
 .pgbld .cmpband h2 .hl{color:#fff;font-style:italic;opacity:.85}
 .pgbld .cmpband p{color:rgba(255,255,255,.9);font-size:16px;margin:0 0 22px}
-.pgbld .cmpband a.bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border-radius:12px;padding:15px 40px;font-weight:800;font-size:16px}
+.pgbld .cmpband .bag{display:inline-block;background:var(--dark);color:#fff;text-decoration:none;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:15px 40px;font-weight:800;font-size:16px}
 .pgbld .ctab{position:relative}
 .pgbld .ctab .ch2{display:grid;grid-template-columns:1fr 96px 96px;margin-bottom:4px}
 .pgbld .ctab .ch2>div{text-align:center;font-weight:800;font-size:15px;padding:6px 0}
