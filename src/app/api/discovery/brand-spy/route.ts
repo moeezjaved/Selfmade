@@ -16,7 +16,7 @@ import { getUserOrg, resolveBillingOwner } from '@/lib/org'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { logActivity } from '@/lib/activity'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
-import { fetchLiveAdsByPage, searchAdLibrary } from '@/lib/ads-studio/adlibrary'
+import { fetchLiveAdsByPage, searchAdLibrary, type LiveAd } from '@/lib/ads-studio/adlibrary'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
 async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
@@ -306,7 +306,15 @@ export async function POST(req: NextRequest) {
           // cta_style) for the pulled ads — the SAME dimensions the crawler's classifier produces — so Brand
           // Spy's Hooks / Personas / Angles aren't empty. One gpt-4o-mini batch call, in ad order; best-effort.
           let dna: Record<string, any>[] = []
-          try { const { classifyLiveOwnAds } = await import('@/lib/dna/classify-live'); dna = await classifyLiveOwnAds(live, name, null) } catch { /* DNA best-effort — raw ads still store */ }
+          try {
+            const { classifyLiveOwnAds } = await import('@/lib/dna/classify-live')
+            // Classify in chunks of 12 — one 2000-token response can't hold DNA for 30 ads (the tail comes
+            // back "none"), so batch it so every ad gets tagged. Chunks run in parallel, concatenated in order.
+            const CHUNK = 12
+            const chunks: LiveAd[][] = []
+            for (let i = 0; i < live.length; i += CHUNK) chunks.push(live.slice(i, i + CHUNK))
+            dna = (await Promise.all(chunks.map((c) => classifyLiveOwnAds(c, name, null).catch(() => [])))).flat()
+          } catch { /* DNA best-effort — raw ads still store */ }
           const rows = live.map((a, i) => {
             const d = dna[i] || {}
             return {
