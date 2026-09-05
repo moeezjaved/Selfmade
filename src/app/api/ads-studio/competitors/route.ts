@@ -10,6 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 import { discoverCompetitors, type DiscoveryResult } from '@/lib/ads-studio/competitors'
+import { fetchLiveAdsByPage } from '@/lib/ads-studio/adlibrary'
 import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
 import { waitUntil } from '@vercel/functions'
@@ -152,11 +153,22 @@ export async function GET(req: NextRequest) {
             admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pageId),
           ])
           const list = ads || []
+          let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
+          let adCount = count ?? list.length
+          let adsSource: 'corpus' | 'live' = 'corpus'
+          // A freshly-spied brand isn't in the crawler's index yet — showing "0 ads in our index" while the
+          // Ad Library clearly has ads reads as broken. Fetch their LIVE creatives on the spot (same source
+          // the "Spy their ads" button uses); the async crawl backfills the index + ad-DNA afterwards.
+          if (list.length === 0) {
+            const live = await fetchLiveAdsByPage(pageId, 8).catch(() => [])
+            const mapped = live.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
+            if (mapped.length) { cardAds = mapped; adCount = mapped.length; adsSource = 'live' }
+          }
           return {
             source: 'spied', pageId, domain: null,
             name: nameMap.get(pageId) || (follows || []).find((f: any) => String(f.page_id) === pageId)?.brand_name || 'Competitor',
-            reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource: 'corpus', spyable: false,
-            adCount: count ?? list.length, ads: list.map(cleanAd).filter((a: any) => a.thumb),
+            reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource, spyable: false,
+            adCount, ads: cardAds,
             dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) },
           }
         }))
