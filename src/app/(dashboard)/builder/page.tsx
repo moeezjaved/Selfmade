@@ -949,11 +949,11 @@ export default function BuilderPage() {
               <h2 style={{ ...cardTitle, fontSize: 26 }}>Published!</h2>
               <p style={{ fontSize: 14.5, color: SUB, marginTop: 8, lineHeight: 1.55 }}>Your page is now a native Shopify page.{previewUrl ? ' Use the theme preview link to see it staged under your chosen theme before it goes live.' : ' You can edit it any time inside Shopify.'}</p>
               <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 22, flexWrap: 'wrap' }}>
-                {previewUrl && (
-                  <a href={previewUrl} target="_blank" rel="noopener noreferrer" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>Preview under theme →</a>
-                )}
-                {publishedUrl && (
-                  <a href={publishedUrl} target="_blank" rel="noopener noreferrer" style={{ background: previewUrl ? '#fff' : ORANGE, color: previewUrl ? INK : '#fff', border: previewUrl ? `1px solid ${LINE}` : 'none', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>View page →</a>
+                {/* One contextual link: on a DRAFT-theme publish the live URL doesn't carry the new page yet,
+                    so "Preview under theme" is the only link that shows the work; on a LIVE publish it IS the
+                    page. Two near-identical buttons (QA: "both land on the same page") collapse to one. */}
+                {(previewUrl || publishedUrl) && (
+                  <a href={previewUrl || publishedUrl} target="_blank" rel="noopener noreferrer" style={{ background: ORANGE, color: '#fff', textDecoration: 'none', padding: '11px 24px', borderRadius: 999, fontSize: 14, fontWeight: 700 }}>{previewUrl ? 'Preview under theme →' : 'View page →'}</a>
                 )}
                 <button onClick={() => { loadPages(); setStep('list') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>My pages</button>
                 <button onClick={startNew} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}>Build another</button>
