@@ -302,7 +302,14 @@ export async function POST(req: NextRequest) {
         }
         if (live.length) {
           const nowIso = new Date().toISOString()
-          const rows = live.map((a) => ({
+          // Generate ad-DNA (hook / angle / persona / desire / emotion / themes / usp / problem / offer /
+          // cta_style) for the pulled ads — the SAME dimensions the crawler's classifier produces — so Brand
+          // Spy's Hooks / Personas / Angles aren't empty. One gpt-4o-mini batch call, in ad order; best-effort.
+          let dna: Record<string, any>[] = []
+          try { const { classifyLiveOwnAds } = await import('@/lib/dna/classify-live'); dna = await classifyLiveOwnAds(live, name, null) } catch { /* DNA best-effort — raw ads still store */ }
+          const rows = live.map((a, i) => {
+            const d = dna[i] || {}
+            return {
             ad_id: a.adId, page_id: pageId, page_name: a.pageName || name,
             body: a.body || null, title: a.title || null,
             is_active: a.isActive, format: a.videos.length ? 'video' : 'image',
@@ -310,8 +317,13 @@ export async function POST(req: NextRequest) {
             raw_image_urls: a.images.length ? a.images : null,
             raw_video_urls: a.videos.length ? a.videos : null,
             raw_video_preview_urls: a.videoPreviews.length ? a.videoPreviews : null,
+            hook_type: d.hook_type || null, angle: d.angle || null, persona: d.persona || null,
+            desire: d.desire || null, emotion: Array.isArray(d.emotion) ? d.emotion : null,
+            themes: Array.isArray(d.themes) ? d.themes : null, usp: d.usp || null,
+            problem: d.problem || null, offer: d.offer || null, cta_style: d.cta_style || null,
             last_seen: nowIso,
-          }))
+            }
+          })
           const { error } = await admin.from('discovery_ads_index').upsert(rows, { onConflict: 'ad_id' })
           if (!error) {
             pulled = rows.length
