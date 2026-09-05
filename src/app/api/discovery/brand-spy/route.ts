@@ -16,7 +16,7 @@ import { getUserOrg, resolveBillingOwner } from '@/lib/org'
 import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 import { logActivity } from '@/lib/activity'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
-import { fetchLiveAdsByPage } from '@/lib/ads-studio/adlibrary'
+import { fetchLiveAdsByPage, searchAdLibrary } from '@/lib/ads-studio/adlibrary'
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
 async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
@@ -288,7 +288,18 @@ export async function POST(req: NextRequest) {
       // this click. A later full crawl (if re-enabled) backfills complete history + R2 creatives + ad-DNA.
       let pulled = 0
       try {
-        const live = await fetchLiveAdsByPage(pageId, 40)
+        // Primary: the deterministic per-page fetch. Fallback: the keyword SEARCH returns the advertiser
+        // WITH their ads and reliably surfaces pages where the direct /preview yields nothing (e.g. Füm →
+        // fetchLiveAdsByPage=0 but searchAdLibrary=8). Same two-source approach as the "Spy their ads" card.
+        let live = await fetchLiveAdsByPage(pageId, 40)
+        if (live.length === 0 && name && !/^\d+$/.test(name)) {
+          const found = await searchAdLibrary(name, 'ALL', 6).catch(() => [])
+          const norm = (s: string) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '')
+          const m = found.find((a) => String(a.pageId) === String(pageId))
+            || found.find((a) => a.pageName && norm(a.pageName).includes(norm(name).slice(0, 8)))
+            || (found.length === 1 ? found[0] : null)
+          if (m?.ads?.length) live = m.ads
+        }
         if (live.length) {
           const nowIso = new Date().toISOString()
           const rows = live.map((a) => ({
