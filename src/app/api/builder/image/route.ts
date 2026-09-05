@@ -5,10 +5,11 @@
  * Returns { url }. Reuses the same R2 + Gemini bridge the builder pipeline uses.
  */
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { uploadBufferToR2, isR2Configured } from '@/lib/r2'
 import { generateAndHost, fetchImageInput } from '@/lib/builder/context'
 import { generateImage, geminiEnabled } from '@/lib/gemini/image'
+import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError } from '@/lib/credits'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -47,18 +48,30 @@ export async function POST(req: NextRequest) {
     if (!prompt) return NextResponse.json({ error: 'Describe the image you want.' }, { status: 400 })
     const referenceUrl = String(b?.referenceUrl || '').trim()
     const aspect = String(b?.aspectRatio || '1:1')
+    const admin = createAdminClient()
+    // AI image generation is metered like every other image render (15 credits — the image_edit rate).
+    // Reserve up front; refund if the model fails to produce/host an image so a miss never charges.
+    let txId: string
+    try { txId = (await reserveCredits(admin as any, user.id, 'image_edit')).id }
+    catch (e) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating an image costs 15 credits — top up or upgrade.' }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+    }
     try {
       // Prefer the builder's generate+host bridge (default tier, hosts to R2).
       const ref = referenceUrl ? await fetchImageInput(referenceUrl) : null
       const url = await generateAndHost(prompt, ref, `edit-${user.id}-${Date.now()}`, { aspectRatio: aspect })
       if (!url) {
+        await refundCredits(admin as any, txId).catch(() => {})
         // Surface a clearer message when the model itself refused/was busy.
         const probe = await generateImage(prompt, ref ? [ref] : [], 'default', { aspectRatio: aspect })
         if (!probe.ok) return NextResponse.json({ error: probe.error === 'pro_model_busy' ? 'The image model is busy — try again in a moment.' : 'Could not generate that image.' }, { status: 502 })
         return NextResponse.json({ error: 'Could not host the generated image.' }, { status: 502 })
       }
+      await commitCredits(admin as any, txId, { kind: 'builder_image_generate' }).catch(() => {})
       return NextResponse.json({ url })
     } catch (e: any) {
+      await refundCredits(admin as any, txId).catch(() => {})
       return NextResponse.json({ error: e?.message || 'Could not generate that image.' }, { status: 502 })
     }
   }
