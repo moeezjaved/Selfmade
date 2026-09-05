@@ -116,6 +116,18 @@ const CSS = `
 .pgbld .pdetails[open] summary::after{content:"\\2212"}
 .pgbld .pdesc{padding:0 0 16px;color:var(--body);font-size:14px;line-height:1.65}
 .pgbld .pdesc:empty{display:none}
+/* recommendations */
+.pgbld .sf-recs{padding:8px 0}
+.pgbld .sf-recs-h{font-size:clamp(22px,3vw,32px);font-weight:800;letter-spacing:-.02em;color:var(--ink);text-align:center;margin:0 0 22px}
+.pgbld .sf-recs-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+.pgbld .sf-rec{display:flex;flex-direction:column;text-decoration:none;color:inherit}
+.pgbld .sf-rec-img{aspect-ratio:1/1;border-radius:14px;overflow:hidden;background:var(--paper);display:block;margin-bottom:10px}
+.pgbld .sf-rec-img img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .3s}
+.pgbld .sf-rec:hover .sf-rec-img img{transform:scale(1.04)}
+.pgbld .sf-rec-t{font-size:14px;font-weight:700;color:var(--ink);line-height:1.3}
+.pgbld .sf-rec-p{font-size:14px;color:var(--body);margin-top:3px}
+.pgbld .sf-rec-p del{color:var(--muted);margin-right:4px}
+@media(max-width:880px){.pgbld .sf-recs-grid{grid-template-columns:1fr 1fr}}
 /* payment icons */
 .pgbld .pay{display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin:12px 0 2px}
 .pgbld .pay svg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff}
