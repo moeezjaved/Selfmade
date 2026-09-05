@@ -408,6 +408,58 @@ ${JSON.stringify({
   return { value, blocks, blockOrder: ['title', 'price', 'highlights', 'buy_buttons', 'trust', 'description'] }
 }
 
+// Home HERO → a native theme section composed of BLOCKS (eyebrow / heading / text / button / image + @app),
+// the same model Shopify's own themes use (Horizon's home hero is text + button blocks with a block_order).
+// The merchant can add / remove / reorder each block and edit its content in the theme editor; the generated
+// copy is baked into the template-JSON block settings, and the hero image renders from an image_picker with
+// the original as fallback (identical to editablize's image handling).
+function homeHeroSection(hero: string, cssKey: string, name: string): { value: string; blocks: Record<string, any>; blockOrder: string[] } {
+  const cssHandle = cssKey.replace(/^assets\//, '')
+  const nm = (name || 'Hero').slice(0, 25)
+  const strip = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+  const eyebrow = strip(innerOf(hero, 'rpill')?.inner || '')
+  const heading = strip(/<h1\b[^>]*>([\s\S]*?)<\/h1>/i.exec(hero)?.[1] || '') || 'Your headline'
+  const lead = strip(innerOf(hero, 'lead')?.inner || '')
+  const ctaM = /<a\b[^>]*\bclass=["'][^"']*\bcta\b[^"']*["'][^>]*>([\s\S]*?)<\/a>/i.exec(hero)
+  const ctaLabel = strip(ctaM?.[1] || '')
+  const ctaHref = (ctaM ? (/\shref=["']([^"']*)["']/i.exec(ctaM[0])?.[1] || '') : '') || '#'
+  const imgM = /<img\b[^>]*\bclass=["'][^"']*\bhimg\b[^"']*["'][^>]*>/i.exec(hero)
+  const bakedImg = (imgM ? (/\ssrc=["']([^"']*)["']/i.exec(imgM[0])?.[1] || '') : '').replace(/"/g, '&quot;')
+
+  const blockDefs: any[] = []
+  const blocks: Record<string, any> = {}
+  const order: string[] = []
+  const presetBlocks: any[] = []
+  const add = (type: string, def: any, settings: Record<string, any>) => { blockDefs.push(def); blocks[type] = { type, settings }; order.push(type); presetBlocks.push({ type }) }
+
+  if (eyebrow) add('eyebrow', { type: 'eyebrow', name: 'Eyebrow', settings: [{ type: 'text', id: 'text', label: 'Text' }] }, { text: eyebrow })
+  add('heading', { type: 'heading', name: 'Heading', settings: [{ type: 'text', id: 'text', label: 'Heading' }] }, { text: heading })
+  if (lead) add('text', { type: 'text', name: 'Text', settings: [{ type: 'textarea', id: 'text', label: 'Text' }] }, { text: lead })
+  if (ctaLabel) add('button', { type: 'button', name: 'Button', settings: [{ type: 'text', id: 'label', label: 'Label' }, { type: 'url', id: 'url', label: 'Link' }] }, { label: ctaLabel, url: ctaHref })
+  if (bakedImg) add('image', { type: 'image', name: 'Image', settings: [{ type: 'image_picker', id: 'image', label: 'Image' }] }, {})
+  blockDefs.push({ type: '@app' })
+
+  const value = `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
+${sectionStyleCss}
+<div class="pgbld"><section class="hero">
+<div class="herocol">
+{% for block in section.blocks %}{% case block.type %}
+{% when 'eyebrow' %}<div class="rpill" {{ block.shopify_attributes }}>{{ block.settings.text }}</div>
+{% when 'heading' %}<h1 {{ block.shopify_attributes }}>{{ block.settings.text }}</h1>
+{% when 'text' %}<p class="lead" {{ block.shopify_attributes }}>{{ block.settings.text }}</p>
+{% when 'button' %}<a class="cta" href="{{ block.settings.url | default: '#' }}" {{ block.shopify_attributes }}>{{ block.settings.label }}</a>
+{% when '@app' %}{% render block %}
+{% endcase %}{% endfor %}
+</div>
+{% for block in section.blocks %}{% if block.type == 'image' %}{% if block.settings.image %}<img class="himg" src="{{ block.settings.image | image_url: width: 1400 }}" alt="{{ block.settings.image.alt | escape }}" {{ block.shopify_attributes }}>{% else %}<img class="himg" src="${bakedImg}" alt="" {{ block.shopify_attributes }}>{% endif %}{% endif %}{% endfor %}
+</section></div>
+{% schema %}
+${JSON.stringify({ name: nm, tag: 'section', settings: SECTION_STYLE_SETTINGS, blocks: blockDefs, presets: [{ name: nm, blocks: presetBlocks }] })}
+{% endschema %}`
+
+  return { value, blocks, blockOrder: order }
+}
+
 // Phase 4 — block-ify marketing list sections. A section whose main content is a uniform list (review
 // cards, FAQ items, feature/benefit cards, …) becomes a native section with one BLOCK per item, so the
 // merchant can add / remove / reorder items in the theme editor. Each item's markup is preserved as an
@@ -496,6 +548,13 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     if (isBuyBox) {
       const mp = mainProductSection(p.html, cssKey, p.name)
       return { id: key, key: `sections/${key}.liquid`, value: mp.value, blocks: mp.blocks, blockOrder: mp.blockOrder }
+    }
+    // The home HERO slice → a native section built from add/remove/reorder blocks (heading/text/button/
+    // image/@app), matching how Shopify's own themes compose the home hero.
+    const isHomeHero = opts.kind === 'home' && /\bclass=["'][^"']*\bhero\b/.test(p.html) && /<h1\b/i.test(p.html)
+    if (isHomeHero) {
+      const hh = homeHeroSection(p.html, cssKey, p.name)
+      return { id: key, key: `sections/${key}.liquid`, value: hh.value, blocks: hh.blocks, blockOrder: hh.blockOrder }
     }
     // Phase 4: turn a uniform list section (reviews / FAQ / feature cards / …) into add/remove/reorder blocks.
     const bl = blockifyList(p.html)
