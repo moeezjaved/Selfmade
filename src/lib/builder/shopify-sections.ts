@@ -125,7 +125,10 @@ export type DynamicMode = 'none' | 'cart' | 'full'
 // switches the gallery to that variant's image. No-JS-safe (hidden id defaults to the first available variant).
 const FORM_JS = `<script>(function(){var f=document.currentScript.closest('form');if(!f)return;var vid=f.querySelector('[data-sf-vid]');var dataEl=f.querySelector('[data-sf-vdata]');if(!vid||!dataEl)return;var variants;try{variants=JSON.parse(dataEl.textContent);}catch(e){return;}var rows=[].slice.call(f.querySelectorAll('.sf-optrow'));var priceEl=document.querySelector('[data-sf-price]');var btn=f.querySelector('button[name=add]');var cur=(window.Shopify&&Shopify.currency&&Shopify.currency.active)||'USD';function chosen(){return rows.map(function(r){var on=r.querySelector('.sf-pill.on');return on?on.getAttribute('data-value'):null;});}function fits(v,c){var o=v.options||[];for(var i=0;i<c.length;i++){if(c[i]!=null&&o[i]!==c[i])return false;}return true;}function match(){var c=chosen();return variants.filter(function(v){return fits(v,c);})[0]||variants[0];}function switchImg(v){if(!v||!v.featured_image||!v.featured_image.src)return;var tr=document.querySelector('.gtrack');if(!tr)return;var t=v.featured_image.src.split('?')[0].split('/').pop();var s=tr.children;for(var i=0;i<s.length;i++){var im=s[i].querySelector('img');if(im){var fn=(im.getAttribute('src')||'').split('?')[0].split('/').pop();if(fn===t){tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});break;}}}}function refreshAvail(){var c=chosen();rows.forEach(function(r,ri){[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(p){var t=c.slice();t[ri]=p.getAttribute('data-value');var ok=variants.some(function(v){return v.available&&fits(v,t);});p.classList.toggle('sf-soldout',!ok);});});}function fillSwatches(){[].slice.call(f.querySelectorAll('.sf-dot[data-sw]')).forEach(function(d){if(d.style.backgroundImage)return;var val=d.getAttribute('data-sw');var vv=variants.filter(function(v){return (v.options||[]).indexOf(val)>=0&&v.featured_image&&v.featured_image.src;})[0];if(vv){d.style.backgroundImage='url('+vv.featured_image.src+')';d.style.backgroundSize='cover';d.style.backgroundPosition='center';}});}function apply(){var v=match();if(!v)return;vid.value=v.id;if(priceEl&&v.price!=null){try{priceEl.textContent=(v.price/100).toLocaleString(undefined,{style:'currency',currency:cur});}catch(e){}}if(btn){if(v.available===false){btn.setAttribute('disabled','');if(!btn.dataset.label)btn.dataset.label=btn.textContent;btn.textContent='Sold out';}else{btn.removeAttribute('disabled');if(btn.dataset.label)btn.textContent=btn.dataset.label;}}switchImg(v);try{var u=new URL(location.href);u.searchParams.set('variant',v.id);history.replaceState({},'',u);}catch(e){}refreshAvail();}rows.forEach(function(r){r.addEventListener('click',function(e){var p=e.target.closest('.sf-pill');if(!p||!r.contains(p))return;e.preventDefault();[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(x){x.classList.remove('on');});p.classList.add('on');var lbl=r.querySelector('.sf-optval');if(lbl)lbl.textContent=p.getAttribute('data-value');apply();});});fillSwatches();apply();})();</script>`
 
-const productForm = (label: string, cls: string, withOptions = true): string => {
+// opts (block path only): labelLiquid = a Liquid expr for the button text (so a `cta_label` block setting
+// can override it); dynamicCond = a Liquid condition gating the "Buy it now" dynamic-checkout button (so a
+// `show_dynamic` block setting can hide it). Both default to the plain baked behaviour when omitted.
+const productForm = (label: string, cls: string, withOptions = true, opts: { labelLiquid?: string; dynamicCond?: string } = {}): string => {
   const iStyle = 'padding:12px 14px;border:1px solid #e7e4ee;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#181720'
   const pickers = withOptions
     ? `{% unless product.has_only_default_variant %}<div class="sf-variants" style="margin:0 0 14px">{% for opt in product.options_with_values %}{% assign sfcolor = false %}{% if opt.name contains 'olor' or opt.name contains 'olour' %}{% assign sfcolor = true %}{% endif %}<div class="sf-optrow" data-opt="{{ forloop.index0 }}"><div class="sf-optname">{{ opt.name }}: <b class="sf-optval">{{ opt.selected_value }}</b></div><div class="sf-optvals">{% for val in opt.values %}{% assign vv = val.name | default: val %}<button type="button" class="sf-pill{% if sfcolor %} sf-color{% endif %}{% if opt.selected_value == vv %} on{% endif %}" data-value="{{ vv | escape }}">{% if sfcolor %}<span class="sf-dot" data-sw="{{ vv | escape }}"{% if val.swatch.image %} style="background-image:url({{ val.swatch.image | image_url: width: 64 }});background-size:cover;background-position:center"{% elsif val.swatch.color %} style="background:{{ val.swatch.color }}"{% else %} style="background:{{ vv | downcase | replace: ' ','' | replace: '/','' }}"{% endif %}></span>{% endif %}{{ vv }}</button>{% endfor %}</div></div>{% endfor %}</div><script type="application/json" data-sf-vdata>{{ product.variants | json }}</script>{% endunless %}`
@@ -136,14 +139,16 @@ const productForm = (label: string, cls: string, withOptions = true): string => 
   // Shopify's NATIVE product form ({% form 'product' %}) — so the theme's cart JS / cart drawer picks up
   // the add-to-cart (name="add"), and we get a real dynamic-checkout button (Shop Pay / "Buy it now")
   // via {{ form | payment_button }}. Our option pickers + resolver still set the hidden variant id.
+  const dynBtn = `<div class="sf-dyncheckout">{{ form | payment_button }}</div>`
   const dynamicCheckout = withOptions
-    ? `<div class="sf-dyncheckout" style="margin-top:10px">{{ form | payment_button }}</div>`
+    ? (opts.dynamicCond ? `{% if ${opts.dynamicCond} %}${dynBtn}{% endif %}` : dynBtn)
     : ''
+  const btnLabel = opts.labelLiquid || (label.trim() || 'Add to cart')
   return `{% form 'product', product, class: 'sf-cart-form' %}` +
     pickers +
     `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" data-sf-vid>` +
     qty +
-    `<button type="submit" name="add" class="${cls}">${label.trim() || 'Add to cart'}</button>` +
+    `<button type="submit" name="add" class="${cls}">${btnLabel}</button>` +
     dynamicCheckout +
     (withOptions ? FORM_JS : '') +
     `{% endform %}`
@@ -315,11 +320,16 @@ const SECTION_STYLE_SETTINGS: any[] = [
 const sectionStyleCss = `{% style %}
 #shopify-section-{{ section.id }} > .pgbld{
 {% if section.settings.sf_bg != blank %}background:{{ section.settings.sf_bg }} !important;{% endif %}
-{% if section.settings.sf_text != blank %}color:{{ section.settings.sf_text }};{% endif %}
 {% if section.settings.sf_align != 'default' %}text-align:{{ section.settings.sf_align }};{% endif %}
 {% if section.settings.sf_space != 'default' %}padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important;{% endif %}
 {% unless section.settings.sf_scale == '100' %}font-size:{{ section.settings.sf_scale }}%;{% endunless %}
 }
+{% if section.settings.sf_text != blank %}
+/* Text colour must beat the template's own per-element colours (headings, marquee spans, …), hence the
+   descendant list + !important. Buttons/links keep their own colour so CTAs stay legible. */
+#shopify-section-{{ section.id }} > .pgbld,
+#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6,p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
+{% endif %}
 {% endstyle %}`
 
 // ── Phase 1: native theme-blocks product section ────────────────────────────────────────────────
@@ -361,7 +371,12 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
   const strip = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   const eyebrow = strip(innerOf(hero, 'rpill')?.inner || '').replace(/[★☆]+/g, '').replace(/\s+/g, ' ').trim()
   const tagline = strip(innerOf(hero, 'newline')?.inner || '')
-  const form = productForm(ctaLabel, 'buy grad', true)
+  // Buy-buttons block is editable: `cta_label` overrides the Add-to-cart text, `show_dynamic` toggles the
+  // "Buy it now" dynamic-checkout button. Both read from block.settings (in scope inside the block case).
+  const form = productForm(ctaLabel, 'buy grad', true, {
+    labelLiquid: `{{ block.settings.cta_label | default: '${ctaLabel.replace(/'/g, '')}' }}`,
+    dynamicCond: 'block.settings.show_dynamic',
+  })
 
   const value = `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
 ${sectionStyleCss}
@@ -388,7 +403,10 @@ ${JSON.stringify({
       { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }] },
       { type: 'price', name: 'Price', settings: [] },
       { type: 'highlights', name: 'Highlights', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
-      { type: 'buy_buttons', name: 'Buy buttons', settings: [] },
+      { type: 'buy_buttons', name: 'Buy buttons', settings: [
+        { type: 'text', id: 'cta_label', label: 'Add-to-cart text' },
+        { type: 'checkbox', id: 'show_dynamic', label: 'Show “Buy it now” button', default: true },
+      ] },
       { type: 'trust', name: 'Trust & payment', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
       { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }] },
       { type: '@app' },
@@ -401,7 +419,7 @@ ${JSON.stringify({
     title: { type: 'title', settings: { eyebrow, tagline } },
     price: { type: 'price', settings: {} },
     highlights: { type: 'highlights', settings: { content: highlightsHtml } },
-    buy_buttons: { type: 'buy_buttons', settings: {} },
+    buy_buttons: { type: 'buy_buttons', settings: { cta_label: ctaLabel, show_dynamic: true } },
     trust: { type: 'trust', settings: { content: trustHtml } },
     description: { type: 'description', settings: { label: 'Product details' } },
   }

@@ -96,6 +96,12 @@ const CSS = `
 .pgbld .buy{display:block;width:100%;background:var(--dark);color:#fff;text-decoration:none;text-align:center;border:0;cursor:pointer;font-family:inherit;border-radius:12px;padding:17px;font-weight:800;font-size:17px}
 .pgbld .buy.grad{background:var(--grad);box-shadow:0 14px 30px -14px rgba(214,36,143,.6)}
 .pgbld .buy.big{max-width:520px;margin:8px auto 0}
+/* Shopify's dynamic-checkout button ({{ form | payment_button }} — "Buy it now" / Shop Pay). Without this
+   it renders at the theme's tiny default; force it full-width and match the Add-to-cart button. */
+.pgbld .sf-dyncheckout{margin-top:10px;width:100%}
+.pgbld .sf-dyncheckout .shopify-payment-button{width:100%}
+.pgbld .sf-dyncheckout .shopify-payment-button__button,.pgbld .sf-dyncheckout .shopify-payment-button__button--unbranded,.pgbld .sf-dyncheckout [role=button]{width:100%!important;min-height:54px!important;height:auto!important;border-radius:12px!important;font-family:inherit!important;font-weight:800!important;font-size:16.5px!important}
+.pgbld .sf-dyncheckout .shopify-payment-button__more-options{margin-top:6px;font-size:13px}
 /* native-style variant picker (pills + colour swatches) */
 .pgbld .sf-optrow{margin:0 0 13px}
 .pgbld .sf-optname{font-size:13px;font-weight:700;color:var(--ink);margin:0 0 7px}
