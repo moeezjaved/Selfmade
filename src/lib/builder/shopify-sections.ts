@@ -319,8 +319,13 @@ const withGalleryDriver = (html: string): string => (/\bgtrack\b/.test(html) ? h
 // Review / testimonial carousels (.gcar with .gprev/.gnext arrows) are a horizontal scroller, not a
 // full-width slider — the page-level script that drove their arrows is dropped when we split into sections,
 // so the arrows did nothing. This self-contained, section-scoped driver scrolls by one card per click.
-const CAROUSEL_SCRIPT = `<script>(function(){var s=document.currentScript;var scope=(s&&s.closest('.pgbld'))||document;var car=scope.querySelector('.gcar');if(!car)return;var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function step(){var c=car.children[0];return (c?c.getBoundingClientRect().width+16:car.clientWidth*0.85);}function go(d){car.scrollBy({left:d*step(),behavior:'smooth'});}if(pv)pv.addEventListener('click',function(e){e.preventDefault();go(-1);});if(nx)nx.addEventListener('click',function(e){e.preventDefault();go(1);});})();</script>`
+const CAROUSEL_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var car=(root&&root.querySelector('.gcar'))||document.querySelector('.gcar');if(!car)return;var scope=car.closest('.pgbld')||root||document;var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function step(){var c=car.children[0];return (c?c.getBoundingClientRect().width+16:car.clientWidth*0.85);}function go(d){car.scrollBy({left:d*step(),behavior:'smooth'});}if(pv)pv.addEventListener('click',function(e){e.preventDefault();go(-1);});if(nx)nx.addEventListener('click',function(e){e.preventDefault();go(1);});})();</script>`
 const withCarouselDriver = (html: string): string => (/\bgcar\b/.test(html) ? html + CAROUSEL_SCRIPT : html)
+
+// The floating buy bar is position:fixed;bottom:0 — great on a standalone page, but on a real PDP it sits
+// over the theme's FOOTER forever (QA: "footer completely hidden"). Hide it once the footer scrolls into view.
+const FLOATCTA_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var bar=(root&&root.querySelector('.floatcta'))||document.querySelector('.floatcta');if(!bar)return;var ft=document.querySelector('footer,[class*="footer"],[id*="footer"],[class*="Footer"]');function upd(){var hide;if(ft){hide=ft.getBoundingClientRect().top < window.innerHeight - 4;}else{hide=(window.innerHeight+window.scrollY)>=(document.documentElement.scrollHeight-170);}bar.style.transform=hide?'translateY(130%)':'translateY(0)';}window.addEventListener('scroll',function(){window.requestAnimationFrame(upd);},{passive:true});window.addEventListener('resize',upd);setTimeout(upd,300);upd();})();</script>`
+const withFloatctaDriver = (html: string): string => (/\bfloatcta\b/.test(html) ? html + FLOATCTA_SCRIPT : html)
 
 // Every section gets a native "Section style" settings group — background, text colour, alignment,
 // spacing and text size — editable in Shopify's theme editor like a real theme. Applied via a scoped
@@ -384,8 +389,10 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
   const cssHandle = cssKey.replace(/^assets\//, '')
   const nm = (name || 'Product').slice(0, 25)
   const galleryLiquid = mediaGallery(outerEl(hero, 'gallery'))
-  const highlightsHtml = ['pills', 'buyopt'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
-  const trustHtml = ['pay', 'social', 'trust'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n')
+  // Highlights (benefit pills + subscribe options) and Trust (payment + social + guarantees) become TYPED
+  // blocks — real text inputs + icon/image pickers via fieldize — never a raw-HTML box (QA #6, #8).
+  const hl = fieldize(['pills', 'buyopt'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n'), 'h')
+  const tr = fieldize(['pay', 'social', 'trust'].map((c) => outerEl(hero, c)).filter(Boolean).join('\n'), 't')
   const ctaLabel = (/(<a[^>]*\bclass=["'][^"']*\bbuy\b[^"']*["'][^>]*>)([^<]{1,60})<\/a>/i.exec(hero)?.[2] || 'Add to cart').trim()
   const strip = (s: string) => s.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
   const eyebrow = strip(innerOf(hero, 'rpill')?.inner || '').replace(/[★☆]+/g, '').replace(/\s+/g, ' ').trim()
@@ -405,9 +412,9 @@ ${sectionStyleCss}
 {% for block in section.blocks %}{% case block.type %}
 {% when 'title' %}<div {{ block.shopify_attributes }}>{% if block.settings.eyebrow != blank %}<div class="rpill">{{ block.settings.eyebrow }}</div>{% endif %}<h1 class="ptitle">{{ product.title }}</h1>{% if block.settings.tagline != blank %}<div class="newline">{{ block.settings.tagline }}</div>{% endif %}</div>
 {% when 'price' %}<div class="priceRow" {{ block.shopify_attributes }}><span class="now" data-sf-price>{{ product.price | money }}</span>{% if product.compare_at_price > product.price %}<span class="was">{{ product.compare_at_price | money }}</span>{% endif %}</div>
-{% when 'highlights' %}<div {{ block.shopify_attributes }}>{{ block.settings.content }}</div>
-{% when 'buy_buttons' %}<div {{ block.shopify_attributes }}>${form}</div>
-{% when 'trust' %}<div {{ block.shopify_attributes }}>{{ block.settings.content }}</div>
+{% when 'highlights' %}<div {{ block.shopify_attributes }}>${hl.template}</div>
+{% when 'buy_buttons' %}<div {{ block.shopify_attributes }}>{% if block.settings.btn_bg != blank or block.settings.btn_text != blank %}<style>#shopify-section-{{ section.id }} .buy{ {% if block.settings.btn_bg != blank %}background:{{ block.settings.btn_bg }} !important;{% endif %}{% if block.settings.btn_text != blank %}color:{{ block.settings.btn_text }} !important;{% endif %} }</style>{% endif %}${form}</div>
+{% when 'trust' %}<div {{ block.shopify_attributes }}>${tr.template}</div>
 {% when 'description' %}<details class="pdetails" {{ block.shopify_attributes }}><summary>{{ block.settings.label | default: 'Product details' }}</summary><div class="pdesc">{{ product.description }}</div></details>
 {% when '@app' %}{% render block %}
 {% endcase %}{% endfor %}
@@ -421,12 +428,15 @@ ${JSON.stringify({
     blocks: [
       { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }] },
       { type: 'price', name: 'Price', settings: [] },
-      { type: 'highlights', name: 'Highlights', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
+      { type: 'highlights', name: 'Highlights', settings: hl.settings },
       { type: 'buy_buttons', name: 'Buy buttons', settings: [
         { type: 'text', id: 'cta_label', label: 'Add-to-cart text' },
         { type: 'checkbox', id: 'show_dynamic', label: 'Show “Buy it now” button', default: true },
+        { type: 'header', content: 'Button style' },
+        { type: 'color', id: 'btn_bg', label: 'Button background' },
+        { type: 'color', id: 'btn_text', label: 'Button text' },
       ] },
-      { type: 'trust', name: 'Trust & payment', settings: [{ type: 'liquid', id: 'content', label: 'Content' }] },
+      { type: 'trust', name: 'Trust & payment', settings: tr.settings },
       { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }] },
       { type: '@app' },
     ],
@@ -437,9 +447,9 @@ ${JSON.stringify({
   const blocks: Record<string, any> = {
     title: { type: 'title', settings: { eyebrow, tagline } },
     price: { type: 'price', settings: {} },
-    highlights: { type: 'highlights', settings: { content: highlightsHtml } },
+    highlights: { type: 'highlights', settings: hl.values },
     buy_buttons: { type: 'buy_buttons', settings: { cta_label: ctaLabel, show_dynamic: true } },
-    trust: { type: 'trust', settings: { content: trustHtml } },
+    trust: { type: 'trust', settings: tr.values },
     description: { type: 'description', settings: { label: 'Product details' } },
   }
   return { value, blocks, blockOrder: ['title', 'price', 'highlights', 'buy_buttons', 'trust', 'description'] }
@@ -518,45 +528,61 @@ const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[
 // `div` is included because item sub-fields are often leaf divs (.q, .bt, .rtt, .rwho); the `[^<]` guard in
 // the regex means only TEXT-ONLY divs match, never container divs.
 const ITEM_TEXT_TAGS = 'h1|h2|h3|h4|h5|h6|p|span|strong|em|li|summary|blockquote|figcaption|b|i|div|a'
-function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): { itemSettings: any[]; blocks: Record<string, any>; blockOrder: string[]; template: string } | null {
-  let imgN = 0, txtN = 0
-  const itemSettings: any[] = []
-  const imgRe = /<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi
+const editableLeaf = (t: string) => { const c = t.trim(); return !!c && !/{{|{%/.test(t) && /[a-zA-Z0-9]/.test(c) && !/^\d{1,2}$/.test(c) }
+
+// Shared field extractor — the heart of "no HTML in any block". Turns an HTML fragment into a Liquid
+// template with `{{ block.settings.* }}` placeholders + the matching TYPED setting defs (icon / image / text)
+// + the extracted default values, so a block shows real inputs and never raw markup. Deterministic order
+// (icons → images → text) means the same fragment always produces the same setting ids.
+function fieldize(html: string, prefix = ''): { template: string; settings: any[]; values: Record<string, any> } {
+  let iconN = 0, imgN = 0, txtN = 0
+  const settings: any[] = []; const values: Record<string, any> = {}
+  const P = (s: string) => `${prefix}${s}`
+  let s = html
+  // 1) ICONS — a small glyph/emoji in an .ic/.icon wrapper → an editable emoji field + an optional icon image.
+  s = s.replace(/(<(div|span|i)\b[^>]*\bclass=["'][^"']*\b(?:ic|icon|iconw|emoji)\b[^"']*["'][^>]*>)([^<]{1,12})(<\/\2>)/gi, (m, open, _tag, glyph, close) => {
+    if (/{{|{%/.test(glyph) || !glyph.trim()) return m
+    iconN++; const tid = P(`icon${iconN}`), iid = P(`icon${iconN}img`)
+    settings.push({ type: 'text', id: tid, label: `Icon ${iconN} (emoji)` })
+    settings.push({ type: 'image_picker', id: iid, label: `Icon ${iconN} image` })
+    values[tid] = glyph.trim()
+    return `${open}{% if block.settings.${iid} != blank %}<img class="sf-iconimg" src="{{ block.settings.${iid} | image_url: width: 120 }}" alt="">{% else %}{{ block.settings.${tid} }}{% endif %}${close}`
+  })
+  // 2) IMAGES — <img> → image_picker (choose a file) + a per-block URL text carrying the generated image.
+  s = s.replace(/<img\b([^>]*?)\ssrc=["']([^"']+)["']([^>]*)>/gi, (_m, a, src, b) => {
+    imgN++; const pid = P(`img${imgN}`), uid = P(`img${imgN}u`)
+    settings.push({ type: 'image_picker', id: pid, label: `Image ${imgN}` })
+    settings.push({ type: 'text', id: uid, label: `Image ${imgN} URL`, info: 'Used until you choose an image above' })
+    values[uid] = src
+    const attrs = `${a}${b}`.replace(/\ssrcset=["'][^"']*["']/i, '')
+    return `{% if block.settings.${pid} != blank %}<img${attrs} src="{{ block.settings.${pid} | image_url: width: 1000 }}">{% else %}<img${attrs} src="{{ block.settings.${uid} }}">{% endif %}`
+  })
+  // 3) TEXT — leaf text nodes → text/textarea inputs.
   const txtRe = new RegExp(`(<(?:${ITEM_TEXT_TAGS})\\b[^>]*>)([^<]{1,400}?)(</(?:${ITEM_TEXT_TAGS})>)`, 'gi')
-  // Skip pure short-number leaves (the FAQ "1"/"2" badge, list ordinals) — they're decoration, not content.
-  const editableText = (t: string) => { const c = t.trim(); return !!c && !/{{|{%/.test(t) && /[a-zA-Z0-9]/.test(c) && !/^\d{1,2}$/.test(c) }
-  // Template + schema from the first item.
-  let template = items[0]
-    .replace(imgRe, (_m, a, _src, b) => {
-      imgN++; const pid = `img${imgN}`, uid = `img${imgN}u`
-      itemSettings.push({ type: 'image_picker', id: pid, label: `Image ${imgN}` })
-      itemSettings.push({ type: 'text', id: uid, label: `Image ${imgN} URL`, info: 'Used until you choose an image above' })
-      const attrs = `${a}${b}`.replace(/\ssrcset=["'][^"']*["']/i, '')
-      return `{% if block.settings.${pid} != blank %}<img${attrs} src="{{ block.settings.${pid} | image_url: width: 1000 }}">{% else %}<img${attrs} src="{{ block.settings.${uid} }}">{% endif %}`
-    })
-  template = template.replace(txtRe, (m, open, text, close) => {
-    if (!editableText(text)) return m
-    txtN++; const id = `f${txtN}`
-    itemSettings.push({ type: text.trim().length > 60 ? 'textarea' : 'text', id, label: text.trim().slice(0, 32) })
+  s = s.replace(txtRe, (m, open, text, close) => {
+    if (!editableLeaf(text)) return m
+    txtN++; const id = P(`f${txtN}`)
+    settings.push({ type: text.trim().length > 60 ? 'textarea' : 'text', id, label: text.trim().slice(0, 32) })
+    values[id] = text.trim()
     return `${open}{{ block.settings.${id} }}${close}`
   })
-  if (itemSettings.length === 0) return null   // nothing structured → caller keeps the raw-content fallback
-  // Per-item values, extracted with the SAME ordered passes so ids line up.
-  const extract = (html: string): Record<string, any> => {
-    const v: Record<string, any> = {}; let ii = 0, ti = 0
-    html.replace(imgRe, (_m, _a, src) => { ii++; v[`img${ii}u`] = src; return _m })
-    html.replace(txtRe, (m, _o, text) => { if (editableText(text)) { ti++; v[`f${ti}`] = text.trim() } return m })
-    return v
-  }
+  return { template: s, settings, values }
+}
+
+// One uniform list item → typed block. Schema/template from item[0]; each item runs fieldize for its own
+// values (uniform items yield the same ids). Falls back to a raw-content box only if nothing is extractable.
+function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): { itemSettings: any[]; blocks: Record<string, any>; blockOrder: string[]; template: string } | null {
+  const first = fieldize(items[0])
+  if (first.settings.length === 0) return null
   const blocks: Record<string, any> = {}, order: string[] = []
-  items.forEach((it, i) => { const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: extract(it) }; order.push(id) })
-  // Give the item's outer tag a shopify_attributes hook so the block is selectable in the editor.
-  let templateWithAttrs = template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
-  // Logos ("As seen on") default to a wordmark, but merchants want to drop in a press LOGO IMAGE. Add an
-  // optional image_picker per block that renders as the logo when set, falling back to the text otherwise.
+  items.forEach((it, i) => { const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: fieldize(it).values }; order.push(id) })
+  const itemSettings = first.settings
+  let templateWithAttrs = first.template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
+  // Logos ("As seen on") default to a wordmark, but merchants want a press LOGO IMAGE + control its size.
   if (opts.logoImgClass) {
+    itemSettings.unshift({ type: 'range', id: 'logo_h', label: 'Logo height', unit: 'px', min: 16, max: 120, step: 2, default: 40 })
     itemSettings.unshift({ type: 'image_picker', id: 'logo_image', label: 'Logo image', info: 'Overrides the text logo below' })
-    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 300 }}" alt="" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
+    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 400 }}" alt="" style="height:{{ block.settings.logo_h | default: 40 }}px;width:auto;max-width:100%;object-fit:contain" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
   }
   return { itemSettings, blocks, blockOrder: order, template: templateWithAttrs }
 }
@@ -661,7 +687,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
     const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: bl.itemSettings || [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withCarouselDriver(withGalleryDriver(html)), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withFloatctaDriver(withCarouselDriver(withGalleryDriver(html))), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
   // Product templates get a native "You may also like" recommendations section at the end.
