@@ -81,3 +81,48 @@ export async function publishToTheme(store: StoreRow, opts: {
   const previewUrl = (opts.themeLive === false) ? `${url}${path.includes('?') ? '&' : '?'}preview_theme_id=${theme.id}` : undefined
   return { url, previewUrl, sections: assets.sections.length, themeId: Number(theme.id) }
 }
+
+/**
+ * Reverse a theme publish when a page is deleted in Selfmade — otherwise its sections/templates linger in
+ * the merchant's theme ("Edit code" + the customizer). We don't record WHICH theme a page went to, so we
+ * clean every theme, deleting ONLY assets carrying this page's own `sf-<id>` slug (never other content):
+ *   • sections/<slug>-*.liquid + assets/<slug>.css
+ *   • product → templates/product.<suffix>.json, and reset template_suffix on the assigned product(s)
+ *   • home    → strip only our sections out of templates/index.json (leaves the rest of the home intact)
+ * Best-effort + idempotent: a missing asset / already-clean theme is a no-op.
+ */
+export async function unpublishFromThemes(store: StoreRow, pageId: string, kind: PageKind, opts: { productIds?: string[] } = {}): Promise<void> {
+  const token = tokenFor(store)
+  if (!hasThemeScopes((await fetchAccessScopes(store.shop_domain, token).catch(() => [])).join(','))) return
+  const slug = `sf-${pageId.replace(/[^a-z0-9]/gi, '').slice(0, 12)}`
+  const suffix = `sf-${pageId.replace(/[^a-z0-9]/gi, '').slice(0, 10)}`
+  const themes = (await shopifyRest(store.shop_domain, token, 'themes.json').catch(() => null))?.themes || []
+  const del = (themeId: number, key: string) => shopifyRest(store.shop_domain, token, `themes/${themeId}/assets.json?asset[key]=${encodeURIComponent(key)}`, { method: 'DELETE' }).catch(() => {})
+
+  for (const t of themes) {
+    const assets = (await shopifyRest(store.shop_domain, token, `themes/${t.id}/assets.json`).catch(() => null))?.assets || []
+    const keys: string[] = assets.map((a: any) => a.key)
+    for (const k of keys) {
+      if (k.startsWith(`sections/${slug}-`) || k === `assets/${slug}.css` || k === `templates/product.${suffix}.json`) { await del(Number(t.id), k); await sleep(140) }
+    }
+    // Home: our sections replaced index.json — pull only ours back out so the rest of the home survives.
+    if (kind === 'home' && keys.includes('templates/index.json')) {
+      const raw = (await shopifyRest(store.shop_domain, token, `themes/${t.id}/assets.json?asset[key]=templates/index.json`).catch(() => null))?.asset?.value
+      if (raw) {
+        try {
+          const idx = JSON.parse(raw); let changed = false
+          for (const id of Object.keys(idx.sections || {})) { if (id.startsWith(slug)) { delete idx.sections[id]; changed = true } }
+          if (Array.isArray(idx.order)) { const before = idx.order.length; idx.order = idx.order.filter((id: string) => !id.startsWith(slug)); if (idx.order.length !== before) changed = true }
+          if (changed) { await shopifyRest(store.shop_domain, token, `themes/${t.id}/assets.json`, { method: 'PUT', body: { asset: { key: 'templates/index.json', value: JSON.stringify(idx, null, 2) } } }).catch(() => {}); await sleep(140) }
+        } catch { /* leave index.json untouched if it doesn't parse */ }
+      }
+    }
+    // Product: un-assign the custom template from the product(s) so they fall back to the default template.
+    if (kind === 'product') {
+      for (const pid of (opts.productIds || []).map(numericId).filter(Boolean)) {
+        const p = await shopifyRest(store.shop_domain, token, `products/${pid}.json`).catch(() => null)
+        if (p?.product && p.product.template_suffix === suffix) { await shopifyRest(store.shop_domain, token, `products/${pid}.json`, { method: 'PUT', body: { product: { id: Number(pid), template_suffix: null } } }).catch(() => {}); await sleep(140) }
+      }
+    }
+  }
+}

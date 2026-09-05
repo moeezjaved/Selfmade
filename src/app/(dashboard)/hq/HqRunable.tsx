@@ -305,7 +305,7 @@ export default function HqRunable() {
           {journey === null ? (
             <div style={{ marginTop: 10, height: 40, borderRadius: 9, background: INSET }} />
           ) : journey.store ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 500 }}>🔗 {journey.store.name || journey.store.domain}{journey.store.name && journey.store.domain ? <span style={{ color: SUB, fontWeight: 400, fontSize: 12 }}>· {journey.store.domain}</span> : null}</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 13, fontWeight: 500 }}>🔗 {journey.brandName || journey.store.name || journey.store.domain}{journey.store.domain ? <span style={{ color: SUB, fontWeight: 400, fontSize: 12 }}>· {journey.store.domain}</span> : null}</div>
           ) : (
             <div style={{ marginTop: 10, background: INSET, border: `1px solid ${LINE}`, borderRadius: 9, padding: '9px 11px', fontSize: 12.5, color: SUB }}>No Shopify store connected for <b style={{ color: INK, textTransform: 'capitalize' }}>{brand}</b>. <Link href="/connect/shopify" style={{ color: ORANGE, fontWeight: 700 }}>Connect →</Link></div>
           )}
