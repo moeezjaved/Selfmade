@@ -183,7 +183,7 @@ function dynamizeProduct(html: string, mode: DynamicMode): string {
   let s = html
   // Primary CTA (a.buy) → a full product form (options + quantity + add-to-cart); sticky bar (a.fc-btn) → slim form.
   s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bbuy\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => productForm(label, cls, true))
-  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\bfc-btn\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => productForm(label, cls, false))
+  s = s.replace(/<a\b[^>]*\bclass=["']([^"']*\b(?:fc-btn|bag)\b[^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_m, cls, label) => productForm(label, cls, false))
   // The product form is ALWAYS live from the real Shopify product — in both 'this product' and 'all
   // products' modes — so title / price / description / gallery reflect the actual product, never static.
   s = replaceInner(s, 'ptitle', '{{ product.title }}')
