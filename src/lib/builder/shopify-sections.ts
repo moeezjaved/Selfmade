@@ -467,6 +467,9 @@ ${JSON.stringify({ name: nm, tag: 'section', settings: SECTION_STYLE_SETTINGS, b
 const LIST_CONTAINERS: Array<[string, string]> = [
   ['faqacc', 'Question'], ['revs', 'Review'], ['bgrid', 'Feature'], ['trio', 'Card'],
   ['wall', 'Media'], ['pcards', 'Card'], ['statgrid', 'Stat'], ['logos', 'Logo'],
+  // home template list containers (so its reviews / benefits / transformation / services / FAQ sections
+  // become add/remove/reorder blocks too, matching the product page). Item must carry a class (see below).
+  ['blurbs', 'Benefit'], ['tlist', 'Step'], ['gcar', 'Review'], ['svc', 'Service'], ['faq', 'Question'],
 ]
 const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[1] || '').trim().split(/\s+/)[0]
 function blockifyList(html: string): { html: string; blocks: Record<string, any>; blockOrder: string[]; itemName: string } | null {

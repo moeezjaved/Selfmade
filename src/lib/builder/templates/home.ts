@@ -161,7 +161,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   const revPhotos = [c.image_hero, c.image_feature, c.image_before, c.image_after]
   const revs = arr(c.testimonials).map((t, i) => `<div class="rcard">${img(revPhotos[i] || o.productImage, o.productName, 'rimg')}<div class="rov"><div class="st">${stars}</div><div class="rtt">${escp((t as any).title || t.city || 'Verified review')}</div><p>${esc(t.quote)}</p><div class="rwho">${esc(t.name)}</div></div></div>`).join('')
   const cmpRows = arr(c.compare_rows).map((r) => `<div class="cr2"><div class="lab">${escp(r.label)}</div><div class="yes">✓</div><div class="no" style="opacity:.55">✕</div></div>`).join('')
-  const faqs = arr(c.faqs).map((f) => `<div><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
+  const faqs = arr(c.faqs).map((f) => `<div class="fitem"><div class="q">${esc(f.q)}</div><p class="a">${esc(f.a)}</p></div>`).join('')
   const svc = arr(c.services).map((s) => `<div class="si">✓ ${escp(s.label)}</div>`).join('')
 
   return `
