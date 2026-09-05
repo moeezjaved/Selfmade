@@ -434,7 +434,7 @@ function blockifyList(html: string): { html: string; blocks: Record<string, any>
       const content = it.replace(/^<\w+[^>]*>/, '').replace(/<\/\w+>\s*$/, '')
       const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: { content } }; order.push(id)
     })
-    const loop = `{% for block in section.blocks %}<${itemTag} class="${itemClass}" {{ block.shopify_attributes }}>{{ block.settings.content }}</${itemTag}>{% endfor %}`
+    const loop = `{% for block in section.blocks %}{% case block.type %}{% when '@app' %}{% render block %}{% else %}<${itemTag} class="${itemClass}" {{ block.shopify_attributes }}>{{ block.settings.content }}</${itemTag}>{% endcase %}{% endfor %}`
     return { html: html.slice(0, inner.start) + loop + html.slice(inner.end), blocks, blockOrder: order, itemName }
   }
   return null
@@ -450,6 +450,32 @@ ${sectionStyleCss}
 ${html}
 {% schema %}
 ${JSON.stringify(schema)}
+{% endschema %}`
+}
+
+// Phase 5 — native "You may also like" recommendations, using Shopify's Product Recommendations API
+// (routes.product_recommendations_url + the Section Rendering API). Renders empty on first paint, then a
+// tiny script fetches the section rendered WITH recommendations and swaps it in — the stock-theme pattern.
+function recommendationsSection(cssKey: string): string {
+  const cssHandle = cssKey.replace(/^assets\//, '')
+  const nm = 'You may also like'
+  return `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
+${sectionStyleCss}
+<div class="pgbld"><div class="wrap"><section class="sf-recs" data-sf-recs data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.sf_count | default: 4 }}&intent={{ section.settings.sf_intent | default: 'related' }}">{% if recommendations.performed and recommendations.products_count > 0 %}<h2 class="sf-recs-h">{{ section.settings.sf_heading | default: 'You may also like' }}</h2><div class="sf-recs-grid">{% for product in recommendations.products %}<a class="sf-rec" href="{{ product.url }}"><span class="sf-rec-img">{% if product.featured_image %}<img src="{{ product.featured_image | image_url: width: 500 }}" alt="{{ product.title | escape }}" loading="lazy">{% endif %}</span><span class="sf-rec-t">{{ product.title }}</span><span class="sf-rec-p">{% if product.compare_at_price > product.price %}<del>{{ product.compare_at_price | money }}</del> {% endif %}{{ product.price | money }}</span></a>{% endfor %}</div>{% endif %}</section></div></div>
+<script>(function(){var el=document.querySelector('[data-sf-recs]');if(!el||el.querySelector('.sf-rec'))return;var url=el.getAttribute('data-url');if(!url)return;fetch(url).then(function(r){return r.text();}).then(function(t){var d=new DOMParser().parseFromString(t,'text/html');var f=d.querySelector('[data-sf-recs]');if(f&&f.querySelector('.sf-rec'))el.innerHTML=f.innerHTML;}).catch(function(){});})();</script>
+{% schema %}
+${JSON.stringify({
+    name: nm,
+    tag: 'section',
+    settings: [
+      { type: 'text', id: 'sf_heading', label: 'Heading', default: 'You may also like' },
+      { type: 'range', id: 'sf_count', label: 'Products to show', min: 2, max: 10, step: 1, default: 4 },
+      { type: 'select', id: 'sf_intent', label: 'Recommendation type', default: 'related', options: [{ value: 'related', label: 'Related' }, { value: 'complementary', label: 'Complementary' }] },
+      ...SECTION_STYLE_SETTINGS,
+    ],
+    blocks: [{ type: '@app' }],
+    presets: [{ name: nm }],
+  })}
 {% endschema %}`
 }
 
@@ -475,9 +501,15 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const bl = blockifyList(p.html)
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
-    const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: [{ type: 'liquid', id: 'content', label: 'Content' }] }] : undefined
+    const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
     return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withGalleryDriver(html), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
+
+  // Product templates get a native "You may also like" recommendations section at the end.
+  if (opts.kind === 'product' && dyn !== 'none') {
+    const rk = `${slug}-recs`
+    sections.push({ id: rk, key: `sections/${rk}.liquid`, value: recommendationsSection(cssKey), blocks: undefined as any, blockOrder: undefined as any })
+  }
 
   // JSON template: order + reference each section. Home replaces templates/index.json; product/page use a suffix.
   const order: Record<string, any> = {}
