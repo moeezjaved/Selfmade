@@ -17,6 +17,31 @@ import { reserveCredits, commitCredits, refundCredits, InsufficientCreditsError 
 import { logActivity } from '@/lib/activity'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 import { fetchLiveAdsByPage, searchAdLibrary, type LiveAd } from '@/lib/ads-studio/adlibrary'
+import { uploadBufferToR2, isR2Configured } from '@/lib/r2'
+import { waitUntil } from '@vercel/functions'
+
+// A spied brand's ads only surface in the Discovery FEED once they have a permanent creative (Discovery's
+// search_ads_v2 filters `has_creative`, which a discovery_creatives row flips on via trigger). So after a
+// pull we rehost each ad's first image (+ video) to R2 — DIRECT download, never through the metered IPRoyal
+// proxy — and insert the creative rows. Best-effort + capped; runs in the background so the pull stays fast.
+async function saveSpiedCreatives(admin: ReturnType<typeof createAdminClient>, ads: LiveAd[]): Promise<void> {
+  if (!isR2Configured()) return
+  const rehost = async (url: string, key: string, ct: string): Promise<string | null> => {
+    try {
+      const r = await fetch(url, { signal: AbortSignal.timeout(15_000) })
+      if (!r.ok) return null
+      const buf = Buffer.from(await r.arrayBuffer())
+      if (!buf.length || buf.length > 30 * 1024 * 1024) return null
+      return await uploadBufferToR2(buf, `discovery/spy/${key}`, ct)
+    } catch { return null }
+  }
+  for (const a of ads.slice(0, 40)) {
+    const img = a.images[0] || a.videoPreviews[0]
+    const vid = a.videos[0]
+    if (img) { const u = await rehost(img, `${a.adId}-0.jpg`, 'image/jpeg'); if (u) await admin.from('discovery_creatives').upsert({ ad_id: a.adId, position: 0, asset_type: 'image', r2_url: u }, { onConflict: 'ad_id,position,asset_type' }).then(() => {}, () => {}) }
+    if (vid) { const u = await rehost(vid, `${a.adId}-v.mp4`, 'video/mp4'); if (u) await admin.from('discovery_creatives').upsert({ ad_id: a.adId, position: 0, asset_type: 'video', r2_url: u }, { onConflict: 'ad_id,position,asset_type' }).then(() => {}, () => {}) }
+  }
+}
 
 // All user_ids in the requester's org — spied brands are shared across the org's one workspace.
 async function orgMemberIds(admin: any, userId: string): Promise<string[]> {
@@ -335,6 +360,8 @@ export async function POST(req: NextRequest) {
           const { error } = await admin.from('discovery_ads_index').upsert(rows, { onConflict: 'ad_id' })
           if (!error) {
             pulled = rows.length
+            // Rehost the pulled creatives to R2 in the background so they also show in the Discovery feed.
+            waitUntil(saveSpiedCreatives(admin, live))
             // Mark it just-crawled so the 12h freshness guard stops casual re-opens from re-pulling.
             await admin.from('discovery_crawl_terms').update({ last_crawled_at: nowIso }).eq('page_id', pageId)
           }
