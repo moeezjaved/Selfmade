@@ -94,13 +94,19 @@ export async function publishToTheme(store: StoreRow, opts: {
     // renders our sections. Create on first publish, reuse/update on re-publish (so the URL stays stable).
     let pid = opts.shopifyPageId ? numericId(String(opts.shopifyPageId)) : ''
     let handle = ''
+    // The Page is always published so it's visitable (an unpublished page 404s even under preview). Its
+    // body_html carries the full rendered content as a FALLBACK: on the live/main theme (which lacks our
+    // page.<suffix>.json) the default page template renders body_html instead of a blank page; under our
+    // theme our page.<suffix>.json renders the native, editable sections and ignores body_html.
+    const fallback = `<style>${opts.css}</style>${opts.body}`
+    const pageFields = { title: opts.title, body_html: fallback, template_suffix: suffix, published: true }
     if (pid) {
-      const upd = await shopifyRest(store.shop_domain, token, `pages/${pid}.json`, { method: 'PUT', body: { page: { id: Number(pid), title: opts.title, template_suffix: suffix, published: opts.themeLive !== false } } }).catch(() => null)
+      const upd = await shopifyRest(store.shop_domain, token, `pages/${pid}.json`, { method: 'PUT', body: { page: { id: Number(pid), ...pageFields } } }).catch(() => null)
       handle = upd?.page?.handle || ''
       if (!handle) pid = ''   // page was deleted — fall through to recreate
     }
     if (!pid) {
-      const cr = await shopifyRest(store.shop_domain, token, 'pages.json', { method: 'POST', body: { page: { title: opts.title, body_html: '', template_suffix: suffix, published: opts.themeLive !== false } } }).catch(() => null)
+      const cr = await shopifyRest(store.shop_domain, token, 'pages.json', { method: 'POST', body: { page: pageFields } }).catch(() => null)
       pid = cr?.page?.id ? String(cr.page.id) : ''
       handle = cr?.page?.handle || ''
     }
