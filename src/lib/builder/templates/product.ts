@@ -192,6 +192,12 @@ const CSS = `
 .pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase;white-space:nowrap}
 .pgbld .logos img.plogo{height:34px;width:auto;max-width:150px;object-fit:contain;filter:grayscale(1);opacity:.72}
 .pgbld .payimg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff;object-fit:contain}
+.pgbld .sf-subs{display:flex;flex-direction:column;gap:8px;margin:0 0 14px}
+.pgbld .sf-subrow{display:flex;align-items:center;gap:10px;border:1.5px solid var(--line);border-radius:12px;padding:12px 14px;cursor:pointer;font-size:14.5px;font-weight:600;color:var(--ink)}
+.pgbld .sf-subrow:has(input:checked){border-color:var(--accent);background:linear-gradient(100deg,#fbeaf5,#efe6ff)}
+.pgbld .sf-subrow input{accent-color:var(--accent);width:17px;height:17px;flex:none}
+.pgbld .sf-subrow .sf-subt{flex:1}
+.pgbld .sf-subrow .sf-subp{font-weight:800}
 /* pink gradient CTA band */
 .pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
 .pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}
