@@ -32,8 +32,8 @@ const CSS = `
 .pgbld .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
 .pgbld .count .lbl{opacity:.85;margin-right:8px}
 .pgbld .count b{color:#fff}
-.pgbld .grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:44px;padding:40px 0 70px}
-.pgbld .main>*{margin:0 0 20px}
+.pgbld .ad-grid{display:grid;grid-template-columns:minmax(0,1fr) 380px;gap:44px;padding:40px 0 70px}
+.pgbld .ad-main>*{margin:0 0 20px}
 .pgbld h1.head{font-size:40px;line-height:1.12;font-weight:800;color:var(--ink);letter-spacing:-.02em;margin:6px 0 14px}
 .pgbld h2.sec{font-size:26px;font-weight:800;color:var(--ink);letter-spacing:-.01em;margin:34px 0 10px}
 .pgbld h2.sec.brand{color:var(--green)}
@@ -96,7 +96,7 @@ const CSS = `
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;line-height:1.25;min-width:0}
 .pgbld .fc-name b{color:var(--red)}
 .pgbld .fc-btn{background:var(--red);color:#fff;text-decoration:none;font-weight:800;font-size:16px;padding:14px 26px;border-radius:9px;white-space:nowrap;flex:none}
-@media(max-width:900px){.pgbld .grid{grid-template-columns:1fr;gap:0}.pgbld h1.head{font-size:28px;line-height:1.15}.pgbld .offer{position:static;margin:18px 0}.pgbld .tests{grid-template-columns:1fr}.pgbld .tl .row{grid-template-columns:84px 1fr}}
+@media(max-width:900px){.pgbld .ad-grid{grid-template-columns:1fr;gap:0}.pgbld h1.head{font-size:28px;line-height:1.15}.pgbld .offer{position:static;margin:18px 0}.pgbld .tests{grid-template-columns:1fr}.pgbld .tl .row{grid-template-columns:84px 1fr}}
 @media(max-width:600px){.pgbld .fc-btn{padding:13px 18px;font-size:15px}.pgbld .fc-name{font-size:13.5px}}
 `
 
@@ -121,8 +121,8 @@ function render(c: FilledContent, o: RenderOpts): string {
   return `
   <div class="pgbld">
   <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
-  <div class="wrap"><div class="grid">
-    <div class="main">
+  <div class="wrap"><div class="ad-grid">
+    <div class="ad-main">
       <h1 class="head">${esc(c.headline)}</h1>
       <div class="byline"><div class="av">◍</div><div class="n"><b>By ${esc(c.author_name)}</b><span>${esc(c.author_tag || 'Verified Customer')}</span></div></div>
       <p class="lead">${esc(c.lead)}</p>
