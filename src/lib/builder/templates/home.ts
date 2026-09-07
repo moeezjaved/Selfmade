@@ -36,13 +36,22 @@ const CSS = `
 .pgbld a.cta{display:inline-block;background:var(--grad);color:#fff;text-decoration:none;border-radius:100px;padding:15px 34px;font-weight:800;font-size:16.5px;box-shadow:0 14px 32px -16px rgba(214,36,143,.7)}
 .pgbld a.cta.dark{background:var(--dark)}
 /* hero */
-.pgbld .hero{max-width:1160px;margin:0 auto;padding:48px 22px 34px;display:grid;grid-template-columns:1.05fr 1fr;gap:46px;align-items:center}
+/* generous top padding so a transparent/overlay theme header (Horizon overlays it on the home's first
+   section) doesn't sit on top of the hero content — QA: "hero overlapping with header". */
+.pgbld .hero{max-width:1160px;margin:0 auto;padding:88px 22px 34px;display:grid;grid-template-columns:1.05fr 1fr;gap:46px;align-items:center}
 .pgbld .hero h1{font-size:clamp(34px,5.4vw,58px);font-weight:800;line-height:1.03;letter-spacing:-.025em;color:var(--ink);margin:14px 0 14px}
 .pgbld .hero .lead{font-size:19px;color:var(--body);margin:0 0 24px;max-width:520px}
 .pgbld .himg,.pgbld .himg.ph{border-radius:22px;aspect-ratio:1/1;object-fit:cover;width:100%;background:radial-gradient(120% 120% at 55% 30%,#fde4f2,#e9d4ff)}
 .pgbld .seen{border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--paper)}
 .pgbld .seen .row{max-width:1160px;margin:0 auto;padding:16px 22px;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:14px 34px;font-weight:800;color:var(--muted);opacity:.7}
-.pgbld .seen .lbl{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);opacity:1}
+.pgbld .seen .lbl{font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink);opacity:1;margin:0}
+/* "As seen on" logos = an editable, swipeable scroll bar (each logo can be a wordmark OR an uploaded image). */
+.pgbld .logos{display:flex;flex-wrap:nowrap;align-items:center;gap:20px 34px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .logos::-webkit-scrollbar{display:none}
+.pgbld .logos>*{flex:0 0 auto;scroll-snap-align:center}
+.pgbld .logos .plogo{font-weight:800;font-size:20px;letter-spacing:.06em;color:var(--muted);text-transform:uppercase;white-space:nowrap;opacity:.72}
+.pgbld .logos img.plogo{height:30px;width:auto;max-width:150px;object-fit:contain;filter:grayscale(1);opacity:.72}
+.pgbld .sf-iconimg{height:1em;width:auto;vertical-align:middle}
 /* section shells */
 .pgbld h2.sec{font-size:clamp(24px,3vw,34px);font-weight:800;letter-spacing:-.02em;color:var(--ink);text-align:center;margin:0 0 8px}
 .pgbld .seclead{text-align:center;color:var(--muted);font-size:16px;max-width:640px;margin:0 auto 26px}
@@ -150,7 +159,7 @@ const CSS = `
 .pgbld .news{background:var(--dark);color:#fff;text-align:center;padding:54px 22px;margin-top:14px}
 .pgbld .news h2{color:#fff;font-size:clamp(24px,3vw,32px);font-weight:800;margin:0 0 10px;letter-spacing:-.02em}
 .pgbld .news p{color:#c9c5d2;font-size:16px;max-width:520px;margin:0 auto 22px}
-@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px;padding:34px 22px 24px}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:34px 0}.pgbld .blurbs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr 1fr}}
+@media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px;padding:72px 22px 24px}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:34px 0}.pgbld .blurbs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr 1fr}}
 @media(max-width:560px){.pgbld .blurbs{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .ba{grid-template-columns:1fr 1fr}}
 `
 
@@ -177,7 +186,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     ${img(c.image_hero || o.productImage, o.productName, 'himg', 'Hero')}
   </section>
 
-  <div class="seen"><div class="row"><span class="lbl">${esc(c.as_seen_on || 'As seen on')}</span><span>FORBES</span><span>VOGUE</span><span>ELLE</span><span>ALLURE</span></div></div>
+  <div class="seen"><div class="row"><h2 class="lbl">${esc(c.as_seen_on || 'As seen on')}</h2><div class="logos"><span class="plogo">FORBES</span><span class="plogo">VOGUE</span><span class="plogo">ELLE</span><span class="plogo">ALLURE</span></div></div></div>
 
   <div class="wrap">
     <section class="feat">
