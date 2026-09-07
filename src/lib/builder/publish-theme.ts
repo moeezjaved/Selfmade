@@ -57,6 +57,20 @@ export async function publishToTheme(store: StoreRow, opts: {
   for (const s of assets.sections) { await put(s.key, s.value); await sleep(140) }   // gentle on the 2 req/s theme limit
   await put(templateKey, assets.templateValue)
 
+  // Remove ORPHAN sections from a previous publish that produced MORE sections than this one — otherwise
+  // they linger as dead "Edit code" files (QA: re-publishing a home with fewer sections left sf-…-13 behind).
+  try {
+    const slug = `sf-${opts.pageId.replace(/[^a-z0-9]/gi, '').slice(0, 12)}`
+    const newKeys = new Set(assets.sections.map((s) => s.key))
+    const existing = (await shopifyRest(store.shop_domain, token, `themes/${theme.id}/assets.json`).catch(() => null))?.assets || []
+    for (const a of existing) {
+      if (typeof a.key === 'string' && a.key.startsWith(`sections/${slug}-`) && a.key.endsWith('.liquid') && !newKeys.has(a.key)) {
+        await shopifyRest(store.shop_domain, token, `themes/${theme.id}/assets.json?asset[key]=${encodeURIComponent(a.key)}`, { method: 'DELETE' }).catch(() => {})
+        await sleep(140)
+      }
+    }
+  } catch { /* orphan cleanup is best-effort */ }
+
   // Use the store's PRIMARY storefront domain for links — the myshopify domain 301-redirects to it and
   // drops ?preview_theme_id, which breaks draft-theme previews. shop.json's `domain` is the primary.
   let host = store.shop_domain
