@@ -186,9 +186,12 @@ const CSS = `
 /* as seen on band */
 .pgbld .seenband{padding:46px 0 34px;text-align:center}
 .pgbld .seenband h2{font-size:clamp(26px,3.4vw,40px);font-weight:800;letter-spacing:-.02em;color:var(--ink);margin:0}
-.pgbld .logos{display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:20px 48px;margin-top:26px}
-.pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase}
+.pgbld .logos{display:flex;flex-wrap:nowrap;align-items:center;justify-content:flex-start;gap:20px 48px;margin-top:26px;overflow-x:auto;scroll-snap-type:x proximity;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pgbld .logos::-webkit-scrollbar{display:none}
+.pgbld .logos>*{flex:0 0 auto;scroll-snap-align:center}
+.pgbld .logos span{font-weight:800;font-size:24px;letter-spacing:.06em;color:#c7c3cf;text-transform:uppercase;white-space:nowrap}
 .pgbld .logos img.plogo{height:34px;width:auto;max-width:150px;object-fit:contain;filter:grayscale(1);opacity:.72}
+.pgbld .payimg{height:24px;width:auto;border-radius:4px;border:1px solid var(--line);background:#fff;object-fit:contain}
 /* pink gradient CTA band */
 .pgbld .pinkband{background:var(--grad);color:#fff;padding:60px 0 64px;margin:26px 0;text-align:center}
 .pgbld .pinkband h2{font-size:clamp(28px,3.6vw,42px);font-weight:800;letter-spacing:-.02em;color:#fff;margin:0 0 12px}

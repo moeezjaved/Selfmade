@@ -93,11 +93,28 @@ export function splitPageIntoSections(body: string): PageSection[] {
   if (!pg) return [{ key: 'sf-1', name: 'Page', html: body }]   // fallback: whole thing as one section
   const kids = topLevelChildren(pg.inner)
   const slices: { html: string; contained: boolean }[] = []
+  const isHeading = (h: string) => /^<h[1-3]\b/i.test(h.trim())
+  const isScript = (h: string) => /^<script\b/i.test(h.trim())
+  // Group a bare .wrap's children so a heading stays with the content that follows it (a new group starts
+  // only at a heading that already has non-heading content before it). Without this, a section written as
+  // sibling <h2> + <p> + <div class="faqacc"> split into THREE Shopify sections (QA #13); grouping keeps
+  // "heading + subheading + content" as ONE editable section.
+  const groupChildren = (children: string[]): string[] => {
+    const groups: string[][] = []
+    for (const c of children) {
+      if (isScript(c)) continue   // page-level glue scripts are re-injected per section as scoped drivers
+      const cur = groups[groups.length - 1]
+      if (!cur || (isHeading(c) && cur.some((x) => !isHeading(x)))) groups.push([c])
+      else cur.push(c)
+    }
+    return groups.map((g) => g.join('\n')).filter((h) => h.trim())
+  }
   for (const kid of kids) {
+    if (isScript(kid)) continue
     const isWrap = /^<\w+[^>]*\bclass=["'][^"']*\bwrap\b/.test(kid)
     if (isWrap) {
       const wi = innerOf(kid, 'wrap')
-      if (wi) { for (const inner of topLevelChildren(wi.inner)) slices.push({ html: inner, contained: true }); continue }
+      if (wi) { for (const g of groupChildren(topLevelChildren(wi.inner))) slices.push({ html: g, contained: true }); continue }
     }
     slices.push({ html: kid, contained: false })
   }
@@ -324,37 +341,150 @@ const withCarouselDriver = (html: string): string => (/\bgcar\b/.test(html) ? ht
 
 // The floating buy bar is position:fixed;bottom:0 — great on a standalone page, but on a real PDP it sits
 // over the theme's FOOTER forever (QA: "footer completely hidden"). Hide it once the footer scrolls into view.
-const FLOATCTA_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var bar=(root&&root.querySelector('.floatcta'))||document.querySelector('.floatcta');if(!bar)return;var ft=document.querySelector('footer,[class*="footer"],[id*="footer"],[class*="Footer"]');function upd(){var hide;if(ft){hide=ft.getBoundingClientRect().top < window.innerHeight - 4;}else{hide=(window.innerHeight+window.scrollY)>=(document.documentElement.scrollHeight-170);}bar.style.transform=hide?'translateY(130%)':'translateY(0)';}window.addEventListener('scroll',function(){window.requestAnimationFrame(upd);},{passive:true});window.addEventListener('resize',upd);setTimeout(upd,300);upd();})();</script>`
+// It appears once the shopper has scrolled past the hero (so it doesn't cover the buy-box) and hides again
+// over the real footer. The footer match uses the LAST footer-ish element on the page (a Horizon PDP has
+// utility bars that match [class*="footer"] high up — picking the first hid the bar forever: QA #11).
+const FLOATCTA_SCRIPT = `<script>(function(){var bar=document.querySelector('.floatcta');if(!bar)return;var fts=[].slice.call(document.querySelectorAll('footer,[class*="footer"],[class*="Footer"],[id*="footer"]'));var ft=fts.length?fts[fts.length-1]:null;function upd(){var y=window.scrollY||window.pageYOffset||0;var show=y>420;var nearEnd;if(ft){nearEnd=ft.getBoundingClientRect().top < window.innerHeight - 4;}else{nearEnd=(window.innerHeight+y)>=(document.documentElement.scrollHeight-160);}bar.style.transform=(show&&!nearEnd)?'translateY(0)':'translateY(130%)';}window.addEventListener('scroll',function(){window.requestAnimationFrame(upd);},{passive:true});window.addEventListener('resize',upd);setTimeout(upd,300);upd();})();</script>`
 const withFloatctaDriver = (html: string): string => (/\bfloatcta\b/.test(html) ? html + FLOATCTA_SCRIPT : html)
+
+// "As seen on" press logos become a horizontal scrolling BAR (QA #6): the row auto-scrolls, loops, pauses
+// on hover, and stays swipeable. Scoped to the section's own .logos so duplicating it stays independent.
+const MARQUEE_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s&&s.parentElement?s.parentElement:document;var box=(root&&root.querySelector('.logos'))||document.querySelector('.logos');if(!box)return;var paused=false;box.addEventListener('mouseenter',function(){paused=true;});box.addEventListener('mouseleave',function(){paused=false;});box.addEventListener('touchstart',function(){paused=true;},{passive:true});function tick(){if(!paused&&box.scrollWidth>box.clientWidth+2){box.scrollLeft+=0.5;if(box.scrollLeft>=box.scrollWidth-box.clientWidth-1)box.scrollLeft=0;}requestAnimationFrame(tick);}requestAnimationFrame(tick);})();</script>`
+const withMarqueeDriver = (html: string): string => (/\blogos\b/.test(html) ? html + MARQUEE_SCRIPT : html)
 
 // Every section gets a native "Section style" settings group — background, text colour, alignment,
 // spacing and text size — editable in Shopify's theme editor like a real theme. Applied via a scoped
 // {% style %} block on the section's own `.pgbld` root so it can't leak into other sections.
+const WEIGHT_OPTS = [
+  { value: 'default', label: 'Default' }, { value: '300', label: 'Light' }, { value: '400', label: 'Regular' },
+  { value: '500', label: 'Medium' }, { value: '600', label: 'Semibold' }, { value: '700', label: 'Bold' }, { value: '800', label: 'Extra bold' }]
+const LH_OPTS = [
+  { value: 'default', label: 'Default' }, { value: '1', label: 'Tight' }, { value: '1.2', label: 'Snug' },
+  { value: '1.4', label: 'Normal' }, { value: '1.6', label: 'Relaxed' }, { value: '1.9', label: 'Loose' }]
+const ALIGN_OPTS = [
+  { value: 'default', label: 'Default' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }]
+
+// Full "professional theme" section panel: colours (bg / bg image / text / heading), typography (size /
+// weight / line-height), 4-side padding & margin, border + radius, gap between elements, and show/hide per
+// device — so a merchant can fully customise every section from Shopify with no code.
 const SECTION_STYLE_SETTINGS: any[] = [
-  { type: 'header', content: 'Section style' },
+  { type: 'header', content: 'Colours' },
   { type: 'color', id: 'sf_bg', label: 'Background' },
+  { type: 'color_background', id: 'sf_bg_grad', label: 'Background gradient' },
+  { type: 'image_picker', id: 'sf_bg_img', label: 'Background image' },
   { type: 'color', id: 'sf_text', label: 'Text colour' },
-  { type: 'select', id: 'sf_align', label: 'Text alignment', default: 'default', options: [
-    { value: 'default', label: 'Default' }, { value: 'left', label: 'Left' }, { value: 'center', label: 'Center' }, { value: 'right', label: 'Right' }] },
-  { type: 'select', id: 'sf_space', label: 'Spacing (top & bottom)', default: 'default', options: [
-    { value: 'default', label: 'Theme default' }, { value: '0', label: 'None' }, { value: '24', label: 'Small' }, { value: '48', label: 'Medium' }, { value: '80', label: 'Large' }, { value: '120', label: 'X-Large' }] },
+  { type: 'color', id: 'sf_heading', label: 'Heading colour' },
+  { type: 'header', content: 'Typography' },
   { type: 'select', id: 'sf_scale', label: 'Text size', default: '100', options: [
     { value: '85', label: 'Smaller' }, { value: '100', label: 'Default' }, { value: '115', label: 'Larger' }, { value: '130', label: 'Largest' }] },
+  { type: 'select', id: 'sf_weight', label: 'Font weight', default: 'default', options: WEIGHT_OPTS },
+  { type: 'select', id: 'sf_lh', label: 'Line height', default: 'default', options: LH_OPTS },
+  { type: 'select', id: 'sf_align', label: 'Text alignment', default: 'default', options: ALIGN_OPTS },
+  { type: 'header', content: 'Spacing' },
+  { type: 'select', id: 'sf_space', label: 'Quick vertical spacing', default: 'default', options: [
+    { value: 'default', label: 'Theme default' }, { value: '0', label: 'None' }, { value: '24', label: 'Small' }, { value: '48', label: 'Medium' }, { value: '80', label: 'Large' }, { value: '120', label: 'X-Large' }] },
+  { type: 'checkbox', id: 'sf_pad_on', label: 'Custom padding', default: false },
+  { type: 'range', id: 'sf_pt', label: 'Padding top', min: 0, max: 200, step: 4, unit: 'px', default: 48 },
+  { type: 'range', id: 'sf_pb', label: 'Padding bottom', min: 0, max: 200, step: 4, unit: 'px', default: 48 },
+  { type: 'range', id: 'sf_pl', label: 'Padding left', min: 0, max: 120, step: 4, unit: 'px', default: 20 },
+  { type: 'range', id: 'sf_pr', label: 'Padding right', min: 0, max: 120, step: 4, unit: 'px', default: 20 },
+  { type: 'checkbox', id: 'sf_mar_on', label: 'Custom margin (top & bottom)', default: false },
+  { type: 'range', id: 'sf_mt', label: 'Margin top', min: 0, max: 160, step: 4, unit: 'px', default: 0 },
+  { type: 'range', id: 'sf_mb', label: 'Margin bottom', min: 0, max: 160, step: 4, unit: 'px', default: 0 },
+  { type: 'range', id: 'sf_gap', label: 'Gap between elements', min: 0, max: 80, step: 2, unit: 'px', default: 0 },
+  { type: 'header', content: 'Border' },
+  { type: 'checkbox', id: 'sf_border_on', label: 'Show border', default: false },
+  { type: 'color', id: 'sf_border_color', label: 'Border colour', default: '#e5e5e5' },
+  { type: 'range', id: 'sf_border_w', label: 'Border width', min: 0, max: 12, step: 1, unit: 'px', default: 1 },
+  { type: 'range', id: 'sf_radius', label: 'Corner radius', min: 0, max: 60, step: 2, unit: 'px', default: 0 },
+  { type: 'header', content: 'Visibility' },
+  { type: 'checkbox', id: 'sf_hide_mobile', label: 'Hide on mobile', default: false },
+  { type: 'checkbox', id: 'sf_hide_desktop', label: 'Hide on desktop', default: false },
 ]
 const sectionStyleCss = `{% style %}
 #shopify-section-{{ section.id }} > .pgbld{
-{% if section.settings.sf_bg != blank %}background:{{ section.settings.sf_bg }} !important;{% endif %}
+{% if section.settings.sf_bg != blank %}background-color:{{ section.settings.sf_bg }} !important;{% endif %}
+{% if section.settings.sf_bg_grad != blank %}background-image:{{ section.settings.sf_bg_grad }} !important;{% endif %}
+{% if section.settings.sf_bg_img != blank %}background-image:url({{ section.settings.sf_bg_img | image_url: width: 2200 }}) !important;background-size:cover !important;background-position:center !important;{% endif %}
 {% if section.settings.sf_align != 'default' %}text-align:{{ section.settings.sf_align }};{% endif %}
-{% if section.settings.sf_space != 'default' %}padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important;{% endif %}
+{% if section.settings.sf_pad_on %}padding:{{ section.settings.sf_pt }}px {{ section.settings.sf_pr }}px {{ section.settings.sf_pb }}px {{ section.settings.sf_pl }}px !important;{% elsif section.settings.sf_space != 'default' %}padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important;{% endif %}
+{% if section.settings.sf_mar_on %}margin-top:{{ section.settings.sf_mt }}px !important;margin-bottom:{{ section.settings.sf_mb }}px !important;{% endif %}
 {% unless section.settings.sf_scale == '100' %}font-size:{{ section.settings.sf_scale }}%;{% endunless %}
+{% if section.settings.sf_weight != 'default' %}font-weight:{{ section.settings.sf_weight }};{% endif %}
+{% if section.settings.sf_lh != 'default' %}line-height:{{ section.settings.sf_lh }};{% endif %}
+{% if section.settings.sf_border_on %}border:{{ section.settings.sf_border_w }}px solid {{ section.settings.sf_border_color }} !important;{% endif %}
+{% if section.settings.sf_radius > 0 %}border-radius:{{ section.settings.sf_radius }}px;overflow:hidden;{% endif %}
 }
+{% if section.settings.sf_gap > 0 %}#shopify-section-{{ section.id }} > .pgbld .wrap,#shopify-section-{{ section.id }} > .pgbld > .wrap{display:flex;flex-direction:column;gap:{{ section.settings.sf_gap }}px}{% endif %}
+{% if section.settings.sf_weight != 'default' %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){font-weight:{{ section.settings.sf_weight }} !important}{% endif %}
 {% if section.settings.sf_text != blank %}
 /* Text colour must beat the template's own per-element colours (headings, marquee spans, …), hence the
    descendant list + !important. Buttons/links keep their own colour so CTAs stay legible. */
 #shopify-section-{{ section.id }} > .pgbld,
-#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6,p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
+#shopify-section-{{ section.id }} > .pgbld :where(p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
 {% endif %}
+{% if section.settings.sf_heading != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){color:{{ section.settings.sf_heading }} !important}{% endif %}
+{% if section.settings.sf_hide_mobile %}@media(max-width:749px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
+{% if section.settings.sf_hide_desktop %}@media(min-width:750px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% endstyle %}`
+
+// ── Per-BLOCK visual controls ───────────────────────────────────────────────────────────────────
+// The same idea as SECTION_STYLE_SETTINGS but scoped to ONE block (a buy-box block, a feature card, a
+// review, a logo …) via a unique `#sfb-<block.id>` wrapper, so a merchant can restyle each block on its
+// own — text colour, background, size, alignment — exactly like a professional theme. No HTML required.
+// Full "professional theme" per-block panel — the same control set as a section but scoped to one block
+// (#sfb-<block.id>): show/hide, colours, typography, background, 4-side padding, border + radius, gap
+// between items, image/icon size, and per-device visibility.
+const BLOCK_STYLE_SETTINGS: any[] = [
+  { type: 'header', content: 'Block style' },
+  { type: 'checkbox', id: 'b_show', label: 'Show this block', default: true },
+  { type: 'color', id: 'b_text', label: 'Text colour' },
+  { type: 'color', id: 'b_heading', label: 'Heading colour' },
+  { type: 'color', id: 'b_bg', label: 'Background' },
+  { type: 'select', id: 'b_size', label: 'Text size', default: '100', options: [
+    { value: '85', label: 'Smaller' }, { value: '100', label: 'Default' }, { value: '115', label: 'Larger' }, { value: '130', label: 'Largest' }] },
+  { type: 'select', id: 'b_weight', label: 'Font weight', default: 'default', options: WEIGHT_OPTS },
+  { type: 'select', id: 'b_lh', label: 'Line height', default: 'default', options: LH_OPTS },
+  { type: 'select', id: 'b_align', label: 'Alignment', default: 'default', options: ALIGN_OPTS },
+  { type: 'checkbox', id: 'b_pad_on', label: 'Custom padding', default: false },
+  { type: 'range', id: 'b_pt', label: 'Padding top', min: 0, max: 120, step: 2, unit: 'px', default: 0 },
+  { type: 'range', id: 'b_pb', label: 'Padding bottom', min: 0, max: 120, step: 2, unit: 'px', default: 0 },
+  { type: 'range', id: 'b_pl', label: 'Padding left', min: 0, max: 120, step: 2, unit: 'px', default: 0 },
+  { type: 'range', id: 'b_pr', label: 'Padding right', min: 0, max: 120, step: 2, unit: 'px', default: 0 },
+  { type: 'range', id: 'b_gap', label: 'Gap between items', min: 0, max: 60, step: 2, unit: 'px', default: 0 },
+  { type: 'range', id: 'b_img', label: 'Image / icon size', min: 0, max: 200, step: 4, unit: 'px', default: 0, info: '0 = theme default' },
+  { type: 'checkbox', id: 'b_border_on', label: 'Show border', default: false },
+  { type: 'color', id: 'b_border_color', label: 'Border colour', default: '#e5e5e5' },
+  { type: 'range', id: 'b_border_w', label: 'Border width', min: 0, max: 12, step: 1, unit: 'px', default: 1 },
+  { type: 'range', id: 'b_radius', label: 'Corner radius', min: 0, max: 60, step: 2, unit: 'px', default: 0 },
+  { type: 'checkbox', id: 'b_hide_mobile', label: 'Hide on mobile', default: false },
+  { type: 'checkbox', id: 'b_hide_desktop', label: 'Hide on desktop', default: false },
+]
+// The scoped {% style %} that applies the per-block controls. Buttons/links keep their own colour (excluded
+// from the text list) so CTAs stay legible. Emitted inside the block loop where `block` is in scope.
+const blockStyleCss = `{% style %}
+#sfb-{{ block.id }}{
+{% if block.settings.b_bg != blank %}background:{{ block.settings.b_bg }} !important;{% endif %}
+{% unless block.settings.b_size == '100' or block.settings.b_size == blank %}font-size:{{ block.settings.b_size }}%;{% endunless %}
+{% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}font-weight:{{ block.settings.b_weight }};{% endif %}
+{% if block.settings.b_lh != 'default' and block.settings.b_lh != blank %}line-height:{{ block.settings.b_lh }};{% endif %}
+{% if block.settings.b_align != 'default' and block.settings.b_align != blank %}text-align:{{ block.settings.b_align }};{% endif %}
+{% if block.settings.b_pad_on %}padding:{{ block.settings.b_pt }}px {{ block.settings.b_pr }}px {{ block.settings.b_pb }}px {{ block.settings.b_pl }}px !important;{% endif %}
+{% if block.settings.b_border_on %}border:{{ block.settings.b_border_w }}px solid {{ block.settings.b_border_color }} !important;{% endif %}
+{% if block.settings.b_radius > 0 %}border-radius:{{ block.settings.b_radius }}px;overflow:hidden;{% endif %}
+}
+{% if block.settings.b_gap > 0 %}#sfb-{{ block.id }}{display:flex;flex-wrap:wrap;gap:{{ block.settings.b_gap }}px}{% endif %}
+{% if block.settings.b_img > 0 %}#sfb-{{ block.id }} :where(img,svg){height:{{ block.settings.b_img }}px !important;width:auto !important}{% endif %}
+{% if block.settings.b_text != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
+{% if block.settings.b_heading != blank %}#sfb-{{ block.id }} :where(h1,h2,h3,h4,h5,h6){color:{{ block.settings.b_heading }} !important}{% endif %}
+{% if block.settings.b_hide_mobile %}@media(max-width:749px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
+{% if block.settings.b_hide_desktop %}@media(min-width:750px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
+{% endstyle %}`
+// Open/close a styled block. `b_show` (default true) gates the whole block so a merchant can hide any
+// element without deleting it. Unset (blank) counts as shown, so existing pages keep rendering.
+const blockOpen = (tag: string, cls = ''): string =>
+  `{% unless block.settings.b_show == false %}${blockStyleCss}<${tag} id="sfb-{{ block.id }}"${cls ? ` class="${cls}"` : ''} {{ block.shopify_attributes }}>`
+const blockClose = (tag: string): string => `</${tag}>{% endunless %}`
 
 // ── Phase 1: native theme-blocks product section ────────────────────────────────────────────────
 // The buy-box slice becomes a Shopify main-product-style section whose INFO column is composed of native
@@ -404,18 +534,40 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
     dynamicCond: 'block.settings.show_dynamic',
   })
 
+  // ── "Add more" slots — merchants asked to add extra benefit pills, extra trust text and NEW payment
+  // icons (QA #1, #3). fieldize only lifts the items that already exist, so we splice a few OPTIONAL slots
+  // inside the right container (blank = not rendered), giving real add-more without breaking the layout.
+  const injectExtras = (tpl: string, container: string, slot: (id: string) => string, ids: string[]): string => {
+    const pos = innerOf(tpl, container); if (!pos) return tpl
+    return tpl.slice(0, pos.end) + ids.map(slot).join('') + tpl.slice(pos.end)
+  }
+  const hlExtra = ['hx1', 'hx2', 'hx3', 'hx4']
+  const hlTemplate = injectExtras(hl.template, 'pills', (id) => `{% if block.settings.${id} != blank %}<div class="pill">{{ block.settings.${id} }}</div>{% endif %}`, hlExtra)
+  const payExtra = ['pay1', 'pay2', 'pay3', 'pay4']
+  const trustExtra = ['tx1', 'tx2', 'tx3']
+  let trTemplate = injectExtras(tr.template, /\bpay\b/.test(tr.template) ? 'pay' : 'trust',
+    (id) => `{% if block.settings.${id} != blank %}<img class="payimg" src="{{ block.settings.${id} | image_url: width: 120 }}" alt="">{% endif %}`, payExtra)
+  trTemplate = injectExtras(trTemplate, /\btrust\b/.test(trTemplate) ? 'trust' : 'social',
+    (id) => `{% if block.settings.${id} != blank %}<div class="ti">✓ {{ block.settings.${id} }}</div>{% endif %}`, trustExtra)
+  const hlExtraSettings = hlExtra.map((id, i) => ({ type: 'text', id, label: `Extra highlight ${i + 1}` }))
+  const payExtraSettings = payExtra.map((id, i) => ({ type: 'image_picker', id, label: `Payment icon ${i + 1}` }))
+  const trustExtraSettings = trustExtra.map((id, i) => ({ type: 'text', id, label: `Extra trust text ${i + 1}` }))
+
+  // The buy-button inline style now covers colour, corner radius and size (QA: button customization).
+  const btnStyle = `{% if block.settings.btn_bg != blank or block.settings.btn_text != blank or block.settings.btn_radius > 0 or block.settings.btn_size != 'default' %}<style>#shopify-section-{{ section.id }} .buy{ {% if block.settings.btn_bg != blank %}background:{{ block.settings.btn_bg }} !important;{% endif %}{% if block.settings.btn_text != blank %}color:{{ block.settings.btn_text }} !important;{% endif %}{% if block.settings.btn_radius > 0 %}border-radius:{{ block.settings.btn_radius }}px !important;{% endif %}{% if block.settings.btn_size == 'sm' %}padding:12px 18px !important;font-size:15px !important;{% elsif block.settings.btn_size == 'lg' %}padding:20px 26px !important;font-size:19px !important;{% endif %} }</style>{% endif %}`
+
   const value = `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
 ${sectionStyleCss}
 <div class="pgbld"><div class="wrap"><div class="hero">
 <div class="gallery">${galleryLiquid}</div>
 <div class="buybox">
 {% for block in section.blocks %}{% case block.type %}
-{% when 'title' %}<div {{ block.shopify_attributes }}>{% if block.settings.eyebrow != blank %}<div class="rpill">{{ block.settings.eyebrow }}</div>{% endif %}<h1 class="ptitle">{{ product.title }}</h1>{% if block.settings.tagline != blank %}<div class="newline">{{ block.settings.tagline }}</div>{% endif %}</div>
-{% when 'price' %}<div class="priceRow" {{ block.shopify_attributes }}><span class="now" data-sf-price>{{ product.price | money }}</span>{% if product.compare_at_price > product.price %}<span class="was">{{ product.compare_at_price | money }}</span>{% endif %}</div>
-{% when 'highlights' %}<div {{ block.shopify_attributes }}>${hl.template}</div>
-{% when 'buy_buttons' %}<div {{ block.shopify_attributes }}>{% if block.settings.btn_bg != blank or block.settings.btn_text != blank %}<style>#shopify-section-{{ section.id }} .buy{ {% if block.settings.btn_bg != blank %}background:{{ block.settings.btn_bg }} !important;{% endif %}{% if block.settings.btn_text != blank %}color:{{ block.settings.btn_text }} !important;{% endif %} }</style>{% endif %}${form}</div>
-{% when 'trust' %}<div {{ block.shopify_attributes }}>${tr.template}</div>
-{% when 'description' %}<details class="pdetails" {{ block.shopify_attributes }}><summary>{{ block.settings.label | default: 'Product details' }}</summary><div class="pdesc">{{ product.description }}</div></details>
+{% when 'title' %}${blockOpen('div')}{% if block.settings.eyebrow != blank %}<div class="rpill">{{ block.settings.eyebrow }}</div>{% endif %}<h1 class="ptitle">{{ product.title }}</h1>{% if block.settings.tagline != blank %}<div class="newline">{{ block.settings.tagline }}</div>{% endif %}${blockClose('div')}
+{% when 'price' %}${blockOpen('div', 'priceRow')}<span class="now" data-sf-price>{{ product.price | money }}</span>{% if product.compare_at_price > product.price %}<span class="was">{{ product.compare_at_price | money }}</span>{% endif %}${blockClose('div')}
+{% when 'highlights' %}${blockOpen('div')}${hlTemplate}${blockClose('div')}
+{% when 'buy_buttons' %}${blockOpen('div')}${btnStyle}${form}${blockClose('div')}
+{% when 'trust' %}${blockOpen('div')}${trTemplate}${blockClose('div')}
+{% when 'description' %}${blockOpen('details', 'pdetails')}<summary>{{ block.settings.label | default: 'Product details' }}</summary><div class="pdesc">{{ product.description }}</div>${blockClose('details')}
 {% when '@app' %}{% render block %}
 {% endcase %}{% endfor %}
 </div>
@@ -426,18 +578,22 @@ ${JSON.stringify({
     tag: 'section',
     settings: SECTION_STYLE_SETTINGS,
     blocks: [
-      { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }] },
-      { type: 'price', name: 'Price', settings: [] },
-      { type: 'highlights', name: 'Highlights', settings: hl.settings },
+      { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }, ...BLOCK_STYLE_SETTINGS] },
+      { type: 'price', name: 'Price', settings: [...BLOCK_STYLE_SETTINGS] },
+      { type: 'highlights', name: 'Highlights', settings: [...hl.settings, { type: 'header', content: 'Add more highlights' }, ...hlExtraSettings, ...BLOCK_STYLE_SETTINGS] },
       { type: 'buy_buttons', name: 'Buy buttons', settings: [
         { type: 'text', id: 'cta_label', label: 'Add-to-cart text' },
         { type: 'checkbox', id: 'show_dynamic', label: 'Show “Buy it now” button', default: true },
         { type: 'header', content: 'Button style' },
         { type: 'color', id: 'btn_bg', label: 'Button background' },
         { type: 'color', id: 'btn_text', label: 'Button text' },
+        { type: 'range', id: 'btn_radius', label: 'Button corner radius', min: 0, max: 60, step: 2, unit: 'px', default: 0 },
+        { type: 'select', id: 'btn_size', label: 'Button size', default: 'default', options: [
+          { value: 'default', label: 'Default' }, { value: 'sm', label: 'Small' }, { value: 'lg', label: 'Large' }] },
+        ...BLOCK_STYLE_SETTINGS,
       ] },
-      { type: 'trust', name: 'Trust & payment', settings: tr.settings },
-      { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }] },
+      { type: 'trust', name: 'Trust & payment', settings: [...tr.settings, { type: 'header', content: 'Add payment icons' }, ...payExtraSettings, { type: 'header', content: 'Add trust text' }, ...trustExtraSettings, ...BLOCK_STYLE_SETTINGS] },
+      { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }, ...BLOCK_STYLE_SETTINGS] },
       { type: '@app' },
     ],
     presets: [{ name: nm, blocks: [{ type: 'title' }, { type: 'price' }, { type: 'highlights' }, { type: 'buy_buttons' }, { type: 'trust' }, { type: 'description' }] }],
@@ -577,15 +733,19 @@ function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): 
   if (first.settings.length === 0) return null
   const blocks: Record<string, any> = {}, order: string[] = []
   items.forEach((it, i) => { const id = `item${i + 1}`; blocks[id] = { type: 'item', settings: fieldize(it).values }; order.push(id) })
-  const itemSettings = first.settings
-  let templateWithAttrs = first.template.replace(/^(<\w+)(\s|>)/, '$1 {{ block.shopify_attributes }}$2')
+  // Each item carries the #sfb-<id> hook + shopify_attributes so the per-block panel (colour, padding,
+  // border, show/hide …) styles it independently, like a real theme block.
+  const itemSettings = [...first.settings, ...BLOCK_STYLE_SETTINGS]
+  let templateWithAttrs = first.template.replace(/^(<\w+)(\s|>)/, '$1 id="sfb-{{ block.id }}" {{ block.shopify_attributes }}$2')
   // Logos ("As seen on") default to a wordmark, but merchants want a press LOGO IMAGE + control its size.
   if (opts.logoImgClass) {
     itemSettings.unshift({ type: 'range', id: 'logo_h', label: 'Logo height', unit: 'px', min: 16, max: 120, step: 2, default: 40 })
     itemSettings.unshift({ type: 'image_picker', id: 'logo_image', label: 'Logo image', info: 'Overrides the text logo below' })
-    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 400 }}" alt="" style="height:{{ block.settings.logo_h | default: 40 }}px;width:auto;max-width:100%;object-fit:contain" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
+    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img id="sfb-{{ block.id }}" class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 400 }}" alt="" style="height:{{ block.settings.logo_h | default: 40 }}px;width:auto;max-width:100%;object-fit:contain" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
   }
-  return { itemSettings, blocks, blockOrder: order, template: templateWithAttrs }
+  // Wrap in the scoped {% style %} + a show/hide gate so every list item is fully customisable.
+  const template = `${blockStyleCss}{% unless block.settings.b_show == false %}${templateWithAttrs}{% endunless %}`
+  return { itemSettings, blocks, blockOrder: order, template }
 }
 
 function blockifyList(html: string): { html: string; blocks: Record<string, any>; blockOrder: string[]; itemName: string; itemSettings?: any[] } | null {
@@ -640,7 +800,11 @@ function recommendationsSection(cssKey: string): string {
   const nm = 'You may also like'
   return `{{ '${cssHandle}' | asset_url | stylesheet_tag }}
 ${sectionStyleCss}
-<div class="pgbld"><div class="wrap"><section class="sf-recs" data-sf-recs data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.sf_count | default: 4 }}&intent={{ section.settings.sf_intent | default: 'related' }}">{% if recommendations.performed and recommendations.products_count > 0 %}<h2 class="sf-recs-h">{{ section.settings.sf_heading | default: 'You may also like' }}</h2><div class="sf-recs-grid">{% for product in recommendations.products %}<a class="sf-rec" href="{{ product.url }}"><span class="sf-rec-img">{% if product.featured_image %}<img src="{{ product.featured_image | image_url: width: 500 }}" alt="{{ product.title | escape }}" loading="lazy">{% endif %}</span><span class="sf-rec-t">{{ product.title }}</span><span class="sf-rec-p">{% if product.compare_at_price > product.price %}<del>{{ product.compare_at_price | money }}</del> {% endif %}{{ product.price | money }}</span></a>{% endfor %}</div>{% endif %}</section></div></div>
+<div class="pgbld"><div class="wrap"><section class="sf-recs" data-sf-recs data-url="{{ routes.product_recommendations_url }}?section_id={{ section.id }}&product_id={{ product.id }}&limit={{ section.settings.sf_count | default: 4 }}&intent={{ section.settings.sf_intent | default: 'related' }}">
+{%- assign sf_reclist = null -%}
+{%- if section.settings.sf_collection != blank -%}{%- assign sf_reclist = collections[section.settings.sf_collection].products -%}
+{%- elsif recommendations.performed and recommendations.products_count > 0 -%}{%- assign sf_reclist = recommendations.products -%}{%- endif -%}
+{%- if sf_reclist and sf_reclist.size > 0 -%}<h2 class="sf-recs-h">{{ section.settings.sf_heading | default: 'You may also like' }}</h2><div class="sf-recs-grid">{% for product in sf_reclist limit: section.settings.sf_count %}<a class="sf-rec" href="{{ product.url }}"><span class="sf-rec-img">{% if product.featured_image %}<img src="{{ product.featured_image | image_url: width: 500 }}" alt="{{ product.title | escape }}" loading="lazy">{% endif %}</span><span class="sf-rec-t">{{ product.title }}</span><span class="sf-rec-p">{% if product.compare_at_price > product.price %}<del>{{ product.compare_at_price | money }}</del> {% endif %}{{ product.price | money }}</span></a>{% endfor %}</div>{%- endif -%}</section></div></div>
 <script>(function(){var el=document.querySelector('[data-sf-recs]');if(!el||el.querySelector('.sf-rec'))return;var url=el.getAttribute('data-url');if(!url)return;fetch(url).then(function(r){return r.text();}).then(function(t){var d=new DOMParser().parseFromString(t,'text/html');var f=d.querySelector('[data-sf-recs]');if(f&&f.querySelector('.sf-rec'))el.innerHTML=f.innerHTML;}).catch(function(){});})();</script>
 {% schema %}
 ${JSON.stringify({
@@ -648,8 +812,9 @@ ${JSON.stringify({
     tag: 'section',
     settings: [
       { type: 'text', id: 'sf_heading', label: 'Heading', default: 'You may also like' },
-      { type: 'range', id: 'sf_count', label: 'Products to show', min: 2, max: 10, step: 1, default: 4 },
-      { type: 'select', id: 'sf_intent', label: 'Recommendation type', default: 'related', options: [{ value: 'related', label: 'Related' }, { value: 'complementary', label: 'Complementary' }] },
+      { type: 'collection', id: 'sf_collection', label: 'Products from collection', info: 'Optional — pick a collection to show. Leave empty to use automatic recommendations.' },
+      { type: 'range', id: 'sf_count', label: 'Products to show', min: 2, max: 12, step: 1, default: 4 },
+      { type: 'select', id: 'sf_intent', label: 'Automatic recommendation type', default: 'related', options: [{ value: 'related', label: 'Related' }, { value: 'complementary', label: 'Complementary' }] },
       ...SECTION_STYLE_SETTINGS,
     ],
     blocks: [{ type: '@app' }],
@@ -688,7 +853,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
     const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: bl.itemSettings || [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withFloatctaDriver(withCarouselDriver(withGalleryDriver(html))), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withMarqueeDriver(withFloatctaDriver(withCarouselDriver(withGalleryDriver(html)))), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
   // Product templates get a native "You may also like" recommendations section at the end.
