@@ -140,13 +140,19 @@ export type DynamicMode = 'none' | 'cart' | 'full'
 // Native-style variant picker: option values render as pills (colour options get a swatch dot). Clicking a
 // pill resolves the matching variant → sets the hidden id, updates the live price + sold-out state, and
 // switches the gallery to that variant's image. No-JS-safe (hidden id defaults to the first available variant).
-const FORM_JS = `<script>(function(){var f=document.currentScript.closest('form');if(!f)return;var vid=f.querySelector('[data-sf-vid]');var dataEl=f.querySelector('[data-sf-vdata]');if(!vid||!dataEl)return;var variants;try{variants=JSON.parse(dataEl.textContent);}catch(e){return;}var rows=[].slice.call(f.querySelectorAll('.sf-optrow'));var priceEl=document.querySelector('[data-sf-price]');var btn=f.querySelector('button[name=add]');var cur=(window.Shopify&&Shopify.currency&&Shopify.currency.active)||'USD';function chosen(){return rows.map(function(r){var on=r.querySelector('.sf-pill.on');return on?on.getAttribute('data-value'):null;});}function fits(v,c){var o=v.options||[];for(var i=0;i<c.length;i++){if(c[i]!=null&&o[i]!==c[i])return false;}return true;}function match(){var c=chosen();return variants.filter(function(v){return fits(v,c);})[0]||variants[0];}function switchImg(v){if(!v||!v.featured_image||!v.featured_image.src)return;var tr=document.querySelector('.gtrack');if(!tr)return;var t=v.featured_image.src.split('?')[0].split('/').pop();var s=tr.children;for(var i=0;i<s.length;i++){var im=s[i].querySelector('img');if(im){var fn=(im.getAttribute('src')||'').split('?')[0].split('/').pop();if(fn===t){tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});break;}}}}function refreshAvail(){var c=chosen();rows.forEach(function(r,ri){[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(p){var t=c.slice();t[ri]=p.getAttribute('data-value');var ok=variants.some(function(v){return v.available&&fits(v,t);});p.classList.toggle('sf-soldout',!ok);});});}function fillSwatches(){[].slice.call(f.querySelectorAll('.sf-dot[data-sw]')).forEach(function(d){if(d.style.backgroundImage)return;var val=d.getAttribute('data-sw');var vv=variants.filter(function(v){return (v.options||[]).indexOf(val)>=0&&v.featured_image&&v.featured_image.src;})[0];if(vv){d.style.backgroundImage='url('+vv.featured_image.src+')';d.style.backgroundSize='cover';d.style.backgroundPosition='center';}});}function apply(){var v=match();if(!v)return;vid.value=v.id;if(priceEl&&v.price!=null){try{priceEl.textContent=(v.price/100).toLocaleString(undefined,{style:'currency',currency:cur});}catch(e){}}if(btn){if(v.available===false){btn.setAttribute('disabled','');if(!btn.dataset.label)btn.dataset.label=btn.textContent;btn.textContent='Sold out';}else{btn.removeAttribute('disabled');if(btn.dataset.label)btn.textContent=btn.dataset.label;}}switchImg(v);try{var u=new URL(location.href);u.searchParams.set('variant',v.id);history.replaceState({},'',u);}catch(e){}refreshAvail();}rows.forEach(function(r){r.addEventListener('click',function(e){var p=e.target.closest('.sf-pill');if(!p||!r.contains(p))return;e.preventDefault();[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(x){x.classList.remove('on');});p.classList.add('on');var lbl=r.querySelector('.sf-optval');if(lbl)lbl.textContent=p.getAttribute('data-value');apply();});});fillSwatches();apply();})();</script>`
+const FORM_JS = `<script>(function(){var f=document.currentScript.closest('form');if(!f)return;var vid=f.querySelector('[data-sf-vid]');var dataEl=f.querySelector('[data-sf-vdata]');if(!vid||!dataEl)return;var variants;try{variants=JSON.parse(dataEl.textContent);}catch(e){return;}var rows=[].slice.call(f.querySelectorAll('.sf-optrow'));var priceEl=document.querySelector('[data-sf-price]');var btn=f.querySelector('button[name=add]');var cur=(window.Shopify&&Shopify.currency&&Shopify.currency.active)||'USD';function chosen(){return rows.map(function(r){var on=r.querySelector('.sf-pill.on');return on?on.getAttribute('data-value'):null;});}function fits(v,c){var o=v.options||[];for(var i=0;i<c.length;i++){if(c[i]!=null&&o[i]!==c[i])return false;}return true;}function match(){var c=chosen();return variants.filter(function(v){return fits(v,c);})[0]||variants[0];}function switchImg(v){if(!v||!v.featured_image||!v.featured_image.src)return;var tr=document.querySelector('.gtrack');if(!tr)return;var t=v.featured_image.src.split('?')[0].split('/').pop();var s=tr.children;for(var i=0;i<s.length;i++){var im=s[i].querySelector('img');if(im){var fn=(im.getAttribute('src')||'').split('?')[0].split('/').pop();if(fn===t){tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});break;}}}}function refreshAvail(){var c=chosen();rows.forEach(function(r,ri){[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(p){var t=c.slice();t[ri]=p.getAttribute('data-value');var ok=variants.some(function(v){return v.available&&fits(v,t);});p.classList.toggle('sf-soldout',!ok);});});}function fillSwatches(){[].slice.call(f.querySelectorAll('.sf-dot[data-sw]')).forEach(function(d){if(d.style.backgroundImage)return;var val=d.getAttribute('data-sw');var vv=variants.filter(function(v){return (v.options||[]).indexOf(val)>=0&&v.featured_image&&v.featured_image.src;})[0];if(vv){d.style.backgroundImage='url('+vv.featured_image.src+')';d.style.backgroundSize='cover';d.style.backgroundPosition='center';}});}function apply(){var v=match();if(!v)return;vid.value=v.id;if(priceEl&&v.price!=null){try{priceEl.textContent=(v.price/100).toLocaleString(undefined,{style:'currency',currency:cur});}catch(e){}}if(btn){if(v.available===false){btn.setAttribute('disabled','');if(!btn.dataset.label)btn.dataset.label=btn.textContent;btn.textContent='Sold out';}else{btn.removeAttribute('disabled');if(btn.dataset.label)btn.textContent=btn.dataset.label;}}switchImg(v);try{var u=new URL(location.href);u.searchParams.set('variant',v.id);history.replaceState({},'',u);}catch(e){}refreshAvail();}rows.forEach(function(r){r.addEventListener('click',function(e){var p=e.target.closest('.sf-pill');if(!p||!r.contains(p))return;e.preventDefault();[].slice.call(r.querySelectorAll('.sf-pill')).forEach(function(x){x.classList.remove('on');});p.classList.add('on');var lbl=r.querySelector('.sf-optval');if(lbl)lbl.textContent=p.getAttribute('data-value');apply();});});var sp=f.querySelector('[data-sf-sp]');if(sp){[].slice.call(f.querySelectorAll('input[name=sf_purchase]')).forEach(function(r){r.addEventListener('change',function(){sp.value=r.value;});});}fillSwatches();apply();})();</script>`
 
 // opts (block path only): labelLiquid = a Liquid expr for the button text (so a `cta_label` block setting
 // can override it); dynamicCond = a Liquid condition gating the "Buy it now" dynamic-checkout button (so a
 // `show_dynamic` block setting can hide it). Both default to the plain baked behaviour when omitted.
-const productForm = (label: string, cls: string, withOptions = true, opts: { labelLiquid?: string; dynamicCond?: string } = {}): string => {
+const productForm = (label: string, cls: string, withOptions = true, opts: { labelLiquid?: string; dynamicCond?: string; subsCond?: string } = {}): string => {
   const iStyle = 'padding:12px 14px;border:1px solid #e7e4ee;border-radius:10px;font-size:15px;font-family:inherit;background:#fff;color:#181720'
+  // REAL subscription: only renders when the product actually has selling plans (merchant set up Shopify
+  // Subscriptions / a selling-plan app), so the shopper can pick One-time vs a plan — the chosen plan id is
+  // posted as `selling_plan`, which Shopify processes as a genuine subscription. Gated by an optional toggle.
+  const subs = withOptions
+    ? `{% if product.selling_plan_groups.size > 0${opts.subsCond ? ` and ${opts.subsCond}` : ''} %}<div class="sf-subs"><label class="sf-subrow sf-suboff"><input type="radio" name="sf_purchase" value="" checked><span class="sf-subt">One-time purchase</span><span class="sf-subp">{{ product.price | money }}</span></label>{% for group in product.selling_plan_groups %}{% for plan in group.selling_plans %}<label class="sf-subrow"><input type="radio" name="sf_purchase" value="{{ plan.id }}"><span class="sf-subt">{{ plan.name }}</span></label>{% endfor %}{% endfor %}</div><input type="hidden" name="selling_plan" value="" data-sf-sp>{% endif %}`
+    : ''
   const pickers = withOptions
     ? `{% unless product.has_only_default_variant %}<div class="sf-variants" style="margin:0 0 14px">{% for opt in product.options_with_values %}{% assign sfcolor = false %}{% if opt.name contains 'olor' or opt.name contains 'olour' %}{% assign sfcolor = true %}{% endif %}<div class="sf-optrow" data-opt="{{ forloop.index0 }}"><div class="sf-optname">{{ opt.name }}: <b class="sf-optval">{{ opt.selected_value }}</b></div><div class="sf-optvals">{% for val in opt.values %}{% assign vv = val.name | default: val %}<button type="button" class="sf-pill{% if sfcolor %} sf-color{% endif %}{% if opt.selected_value == vv %} on{% endif %}" data-value="{{ vv | escape }}">{% if sfcolor %}<span class="sf-dot" data-sw="{{ vv | escape }}"{% if val.swatch.image %} style="background-image:url({{ val.swatch.image | image_url: width: 64 }});background-size:cover;background-position:center"{% elsif val.swatch.color %} style="background:{{ val.swatch.color }}"{% else %} style="background:{{ vv | downcase | replace: ' ','' | replace: '/','' }}"{% endif %}></span>{% endif %}{{ vv }}</button>{% endfor %}</div></div>{% endfor %}</div><script type="application/json" data-sf-vdata>{{ product.variants | json }}</script>{% endunless %}`
     : ''
@@ -164,6 +170,7 @@ const productForm = (label: string, cls: string, withOptions = true, opts: { lab
   return `{% form 'product', product, class: 'sf-cart-form' %}` +
     pickers +
     `<input type="hidden" name="id" value="{{ product.selected_or_first_available_variant.id }}" data-sf-vid>` +
+    subs +
     qty +
     `<button type="submit" name="add" class="${cls}">${btnLabel}</button>` +
     dynamicCheckout +
@@ -254,6 +261,22 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     const clean = stripMd(text)
     if (!clean || hasLiquid(text) || tn >= 40 || !isRealText(clean)) return m
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
+  })
+
+  // MARQUEE pass — the scroll bar (.marq-track) holds its promo <span>s TWICE for a seamless -50% loop, so
+  // editing them naively would create confusing duplicate fields (QA #5). Make the FIRST copy's spans
+  // editable and render that editable set twice — both copies read the SAME settings, so edits stay in sync
+  // and the animation still loops. (The emoji lives inside the text, so this edits the "icon" too.)
+  s = s.replace(/(<div class="marq-track">)([\s\S]*?)(<\/div>)/i, (m, open, inner, close) => {
+    const spans = inner.match(/<span\b[^>]*>[^<]*<\/span>/gi) || []
+    if (spans.length < 2 || hasLiquid(inner)) return m
+    const half = spans.slice(0, Math.ceil(spans.length / 2))
+    const editable = half.map((sp: string) => {
+      const txt = stripMd(sp.replace(/<[^>]+>/g, ''))
+      if (!isRealText(txt) || tn >= 48) return sp
+      return sp.replace(/>([^<]*)</, `>{{ section.settings.${addText(txt)} }}<`)
+    }).join('')
+    return `${open}${editable}${editable}${close}`
   })
 
   // BUTTON pass — CTA anchors (.buy/.cta/.fc-btn/.btn) get an editable label AND an editable link (a
@@ -552,6 +575,7 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
   const form = productForm(ctaLabel, 'buy grad', true, {
     labelLiquid: `{{ block.settings.cta_label | default: '${ctaLabel.replace(/'/g, '')}' }}`,
     dynamicCond: 'block.settings.show_dynamic',
+    subsCond: 'block.settings.show_subscription',
   })
 
   // ── "Add more" slots — merchants asked to add extra benefit pills, extra trust text and NEW payment
@@ -610,6 +634,7 @@ ${JSON.stringify({
       { type: 'buy_buttons', name: 'Buy buttons', settings: [
         { type: 'text', id: 'cta_label', label: 'Add-to-cart text' },
         { type: 'checkbox', id: 'show_dynamic', label: 'Show “Buy it now” button', default: true },
+        { type: 'checkbox', id: 'show_subscription', label: 'Show Subscribe & Save option', default: true, info: 'Only appears if the product has a subscription (selling plan) set up in Shopify' },
         { type: 'header', content: 'Button style' },
         { type: 'color', id: 'btn_bg', label: 'Button background' },
         { type: 'color', id: 'btn_text', label: 'Button text' },
@@ -630,7 +655,7 @@ ${JSON.stringify({
     title: { type: 'title', settings: { eyebrow, tagline } },
     price: { type: 'price', settings: {} },
     highlights: { type: 'highlights', settings: hl.values },
-    buy_buttons: { type: 'buy_buttons', settings: { cta_label: ctaLabel, show_dynamic: true } },
+    buy_buttons: { type: 'buy_buttons', settings: { cta_label: ctaLabel, show_dynamic: true, show_subscription: true } },
     trust: { type: 'trust', settings: tr.values },
     description: { type: 'description', settings: { label: 'Product details' } },
   }
