@@ -307,7 +307,9 @@ const CSS = `
 .pgbld .fc-name{font-weight:700;color:var(--ink);font-size:15px;min-width:0;line-height:1.25}
 .pgbld .fc-btn{background:var(--grad);color:#fff;text-decoration:none;border:0;cursor:pointer;font-family:inherit;font-weight:800;font-size:16px;padding:13px 26px;border-radius:10px;white-space:nowrap;flex:none}
 @media(max-width:880px){.pgbld .hero{grid-template-columns:1fr;gap:24px}.pgbld .gallery{position:static}.pgbld .feat{grid-template-columns:1fr;gap:22px;padding:32px 0}.pgbld .feat.rev .fimg{order:0}.pgbld .statgrid{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr 1fr}.pgbld .revs{grid-template-columns:1fr 1fr}.pgbld .trio{grid-template-columns:1fr}.pgbld .ugc .wall{grid-template-columns:repeat(3,1fr)}.pgbld .pcards{grid-template-columns:1fr 1fr}.pgbld .cmpband .in{grid-template-columns:1fr;gap:24px}.pgbld .transband .in{grid-template-columns:1fr;gap:24px}.pgbld .stats .sin{grid-template-columns:1fr;gap:26px}}
-@media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}}
+@media(max-width:560px){.pgbld .pills{grid-template-columns:1fr}.pgbld .bgrid{grid-template-columns:1fr}.pgbld .revs{grid-template-columns:1fr}.pgbld .cmp .ch,.pgbld .cmp .cr{grid-template-columns:1fr 70px 70px}.pgbld .fc-name{font-size:13.5px}.pgbld .fc-btn{padding:12px 18px;font-size:15px}
+/* tighter default vertical rhythm on mobile — less empty space out of the box (still reducible per-section) */
+.pgbld .feat{padding:28px 0}.pgbld .seenband{padding:26px 0 20px}.pgbld .pinkband{padding:32px 0;margin:16px 0}.pgbld .cmpband{padding:32px 0;margin:16px 0}.pgbld .transband{padding:32px 0;margin:16px 0}.pgbld .stats{padding:28px 0}.pgbld h2.sec{margin-top:18px}}
 `
 
 function render(c: FilledContent, o: RenderOpts): string {
@@ -422,7 +424,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div></div></div>
 
   <div class="wrap">
-    <h2 class="sec" style="margin-top:48px">${esc(c.benefits_head || 'Benefits you\'ll love')}</h2>
+    <h2 class="sec" style="margin-top:28px">${esc(c.benefits_head || 'Benefits you\'ll love')}</h2>
     <div class="bgrid">${bene}</div>
   </div>
 
@@ -459,11 +461,11 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div></div></div>
 
   <div class="wrap">
-    <h2 class="sec" style="margin-top:44px">${hl(c.faq_head || 'Frequently asked **questions**')}</h2>
+    <h2 class="sec" style="margin-top:28px">${hl(c.faq_head || 'Frequently asked **questions**')}</h2>
     <p class="seclead">${esc(c.faq_sub || 'Quick answers to the most common questions.')}</p>
     <div class="faqacc">${faqs}</div>
 
-    <a class="buy grad big" style="margin-top:34px" href="${esc(o.ctaHref)}">${esc(c.final_cta || `Get ${o.productName}`)}</a>
+    <a class="buy grad big" style="margin-top:24px" href="${esc(o.ctaHref)}">${esc(c.final_cta || `Get ${o.productName}`)}</a>
   </div>
 
   <div class="floatcta" id="floatcta">
