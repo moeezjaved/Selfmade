@@ -12,6 +12,10 @@ import { resolveActiveBrandId } from '@/lib/brand/active'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
+// DELETE cleans the page's assets out of EVERY theme (list + delete with 140ms rate-limit sleeps), which can
+// take longer than the default timeout — without this the cleanup was cut off mid-way, leaving theme code
+// behind (QA: "template still exists in Shopify theme after delete").
+export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
   const supabase = await createClient()

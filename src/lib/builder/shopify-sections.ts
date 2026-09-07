@@ -456,6 +456,9 @@ const sectionStyleCss = `{% style %}
 {% if section.settings.sf_pad_on %}#shopify-section-{{ section.id }} > .pgbld > :first-child{padding:{{ section.settings.sf_pt }}px {{ section.settings.sf_pr }}px {{ section.settings.sf_pb }}px {{ section.settings.sf_pl }}px !important}{% elsif section.settings.sf_space != 'default' %}#shopify-section-{{ section.id }} > .pgbld > :first-child{padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important}{% endif %}
 {% if section.settings.sf_pad_on or section.settings.sf_space != 'default' %}#shopify-section-{{ section.id }} > .pgbld > :first-child > :first-child,#shopify-section-{{ section.id }} > .pgbld > :first-child > .wrap > :first-child{margin-top:0 !important}{% endif %}
 {% if section.settings.sf_gap > 0 %}#shopify-section-{{ section.id }} > .pgbld .wrap,#shopify-section-{{ section.id }} > .pgbld > .wrap{display:flex;flex-direction:column;gap:{{ section.settings.sf_gap }}px}{% endif %}
+{% comment %}Background must also hit a full-bleed band child (marquee/pink/stats bands carry their own bg), else changing the colour did nothing to the visible bar — QA.{% endcomment %}
+{% if section.settings.sf_bg != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child{background-color:{{ section.settings.sf_bg }} !important}{% endif %}
+{% if section.settings.sf_bg_grad != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child{background-image:{{ section.settings.sf_bg_grad }} !important}{% endif %}
 {% if section.settings.sf_weight != 'default' %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){font-weight:{{ section.settings.sf_weight }} !important}{% endif %}
 {% if section.settings.sf_text != blank %}
 /* Text colour must beat the template's own per-element colours (headings, marquee spans, …), hence the
@@ -503,7 +506,7 @@ const BLOCK_STYLE_SETTINGS: any[] = [
 // The scoped {% style %} that applies the per-block controls. Buttons/links keep their own colour (excluded
 // from the text list) so CTAs stay legible. Emitted inside the block loop where `block` is in scope.
 const blockStyleCss = `{% style %}
-#sfb-{{ block.id }}{
+#sfb-{{ section.id }}-{{ block.id }}{
 {% if block.settings.b_bg != blank %}background:{{ block.settings.b_bg }} !important;{% endif %}
 {% if block.settings.b_lh != 'default' and block.settings.b_lh != blank %}line-height:{{ block.settings.b_lh }};{% endif %}
 {% if block.settings.b_align != 'default' and block.settings.b_align != blank %}text-align:{{ block.settings.b_align }};{% endif %}
@@ -511,22 +514,22 @@ const blockStyleCss = `{% style %}
 {% if block.settings.b_border_on %}border:{{ block.settings.b_border_w }}px solid {{ block.settings.b_border_color }} !important;{% endif %}
 {% if block.settings.b_radius > 0 %}border-radius:{{ block.settings.b_radius }}px;overflow:hidden;{% endif %}
 }
-{% if block.settings.b_gap > 0 %}#sfb-{{ block.id }}{display:flex;flex-wrap:wrap;gap:{{ block.settings.b_gap }}px}{% endif %}
-{% if block.settings.b_img > 0 %}#sfb-{{ block.id }} :where(img,svg){height:{{ block.settings.b_img }}px !important;width:auto !important}{% endif %}
+{% if block.settings.b_gap > 0 %}#sfb-{{ section.id }}-{{ block.id }}{display:flex;flex-wrap:wrap;gap:{{ block.settings.b_gap }}px}{% endif %}
+{% if block.settings.b_img > 0 %}#sfb-{{ section.id }}-{{ block.id }} :where(img,svg){height:{{ block.settings.b_img }}px !important;width:auto !important}{% endif %}
 /* Typography + colour must beat the template's own per-ELEMENT rules — cards/stats/reviews put their text in
    <div>s with explicit colour and px size, so the control has to hit those descendants (incl. div) with
    !important, and size must scale the descendants (a % on the wrapper never reaches a div with a px size). */
-{% unless block.settings.b_size == '100' or block.settings.b_size == blank %}#sfb-{{ block.id }} :where(p,span,div,li,strong,em,small,label,summary,b,i){font-size:{{ block.settings.b_size }}% !important}{% endunless %}
-{% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,p,span,div,li,strong,em,b){font-weight:{{ block.settings.b_weight }} !important}{% endif %}
-{% if block.settings.b_text != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
-{% if block.settings.b_heading != blank %}#sfb-{{ block.id }} :where(h1,h2,h3,h4,h5,h6){color:{{ block.settings.b_heading }} !important}{% endif %}
-{% if block.settings.b_hide_mobile %}@media(max-width:749px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
-{% if block.settings.b_hide_desktop %}@media(min-width:750px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
+{% unless block.settings.b_size == '100' or block.settings.b_size == blank %}#sfb-{{ section.id }}-{{ block.id }} :where(p,span,div,li,strong,em,small,label,summary,b,i){font-size:{{ block.settings.b_size }}% !important}{% endunless %}
+{% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,p,span,div,li,strong,em,b){font-weight:{{ block.settings.b_weight }} !important}{% endif %}
+{% if block.settings.b_text != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
+{% if block.settings.b_heading != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,summary){color:{{ block.settings.b_heading }} !important}{% endif %}
+{% if block.settings.b_hide_mobile %}@media(max-width:749px){#sfb-{{ section.id }}-{{ block.id }}{display:none !important}}{% endif %}
+{% if block.settings.b_hide_desktop %}@media(min-width:750px){#sfb-{{ section.id }}-{{ block.id }}{display:none !important}}{% endif %}
 {% endstyle %}`
 // Open/close a styled block. `b_show` (default true) gates the whole block so a merchant can hide any
 // element without deleting it. Unset (blank) counts as shown, so existing pages keep rendering.
 const blockOpen = (tag: string, cls = ''): string =>
-  `{% unless block.settings.b_show == false %}${blockStyleCss}<${tag} id="sfb-{{ block.id }}"${cls ? ` class="${cls}"` : ''} {{ block.shopify_attributes }}>`
+  `{% unless block.settings.b_show == false %}${blockStyleCss}<${tag} id="sfb-{{ section.id }}-{{ block.id }}"${cls ? ` class="${cls}"` : ''} {{ block.shopify_attributes }}>`
 const blockClose = (tag: string): string => `</${tag}>{% endunless %}`
 
 // ── Phase 1: native theme-blocks product section ────────────────────────────────────────────────
@@ -586,7 +589,15 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
     return tpl.slice(0, pos.end) + ids.map(slot).join('') + tpl.slice(pos.end)
   }
   const hlExtra = ['hx1', 'hx2', 'hx3', 'hx4']
-  const hlTemplate = injectExtras(hl.template, 'pills', (id) => `{% if block.settings.${id} != blank %}<div class="pill">{{ block.settings.${id} }}</div>{% endif %}`, hlExtra)
+  // Let merchants HIDE the decorative Subscribe/One-time cards (.buyopt) when they don't offer subscriptions
+  // (QA: "unable to disable subscribe option"). Wrap the whole `.buyopt` element in a toggle.
+  const wrapEl = (tpl: string, cls: string, cond: string): string => {
+    const f = innerOf(tpl, cls); if (!f) return tpl
+    const openStart = tpl.lastIndexOf('<', f.start - 1); const closeEnd = tpl.indexOf('>', f.end)
+    if (openStart < 0 || closeEnd < f.end) return tpl
+    return tpl.slice(0, openStart) + `{% unless ${cond} %}` + tpl.slice(openStart, closeEnd + 1) + '{% endunless %}' + tpl.slice(closeEnd + 1)
+  }
+  const hlTemplate = injectExtras(wrapEl(hl.template, 'buyopt', 'block.settings.hl_hide_subs'), 'pills', (id) => `{% if block.settings.${id} != blank %}<div class="pill">{{ block.settings.${id} }}</div>{% endif %}`, hlExtra)
   const payExtra = ['pay1', 'pay2', 'pay3', 'pay4']
   const trustExtra = ['tx1', 'tx2', 'tx3']
   // Let merchants HIDE the built-in payment SVGs so they can REPLACE them with their own uploads — QA #10:
@@ -630,7 +641,7 @@ ${JSON.stringify({
     blocks: [
       { type: 'title', name: 'Title', settings: [{ type: 'text', id: 'eyebrow', label: 'Eyebrow' }, { type: 'text', id: 'tagline', label: 'Tagline' }, ...BLOCK_STYLE_SETTINGS] },
       { type: 'price', name: 'Price', settings: [...BLOCK_STYLE_SETTINGS] },
-      { type: 'highlights', name: 'Highlights', settings: [...hl.settings, { type: 'header', content: 'Add more highlights' }, ...hlExtraSettings, ...BLOCK_STYLE_SETTINGS] },
+      { type: 'highlights', name: 'Highlights', settings: [...hl.settings, { type: 'checkbox', id: 'hl_hide_subs', label: 'Hide subscribe / one-time options', default: false }, { type: 'header', content: 'Add more highlights' }, ...hlExtraSettings, ...BLOCK_STYLE_SETTINGS] },
       { type: 'buy_buttons', name: 'Buy buttons', settings: [
         { type: 'text', id: 'cta_label', label: 'Add-to-cart text' },
         { type: 'checkbox', id: 'show_dynamic', label: 'Show “Buy it now” button', default: true },
@@ -787,12 +798,12 @@ function structuredItem(items: string[], opts: { logoImgClass?: string } = {}): 
   // Each item carries the #sfb-<id> hook + shopify_attributes so the per-block panel (colour, padding,
   // border, show/hide …) styles it independently, like a real theme block.
   const itemSettings = [...first.settings, ...BLOCK_STYLE_SETTINGS]
-  let templateWithAttrs = first.template.replace(/^(<\w+)(\s|>)/, '$1 id="sfb-{{ block.id }}" {{ block.shopify_attributes }}$2')
+  let templateWithAttrs = first.template.replace(/^(<\w+)(\s|>)/, '$1 id="sfb-{{ section.id }}-{{ block.id }}" {{ block.shopify_attributes }}$2')
   // Logos ("As seen on") default to a wordmark, but merchants want a press LOGO IMAGE + control its size.
   if (opts.logoImgClass) {
     itemSettings.unshift({ type: 'range', id: 'logo_h', label: 'Logo height', unit: 'px', min: 16, max: 120, step: 2, default: 40 })
     itemSettings.unshift({ type: 'image_picker', id: 'logo_image', label: 'Logo image', info: 'Overrides the text logo below' })
-    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img id="sfb-{{ block.id }}" class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 400 }}" alt="" style="height:{{ block.settings.logo_h | default: 40 }}px;width:auto;max-width:100%;object-fit:contain" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
+    templateWithAttrs = `{% if block.settings.logo_image != blank %}<img id="sfb-{{ section.id }}-{{ block.id }}" class="${opts.logoImgClass}" src="{{ block.settings.logo_image | image_url: width: 400 }}" alt="" style="height:{{ block.settings.logo_h | default: 40 }}px;width:auto;max-width:100%;object-fit:contain" {{ block.shopify_attributes }}>{% else %}${templateWithAttrs}{% endif %}`
   }
   // Wrap in the scoped {% style %} + a show/hide gate so every list item is fully customisable.
   const template = `${blockStyleCss}{% unless block.settings.b_show == false %}${templateWithAttrs}{% endunless %}`
