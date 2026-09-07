@@ -304,6 +304,16 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
+  // DIV leaf pass — stat rows (.n/.t/.s), comparison labels (.lab) and other copy the template puts in
+  // <div>s (not in TEXT_TAGS) were uneditable (QA: "unable to change text in highlighted area"). Lift pure
+  // TEXT-ONLY <div> leaves as editable text — the [^<] guard means layout/container divs never match, and
+  // isRealText skips symbol/number-only badges (✓ ✕ and lone digits).
+  s = s.replace(/<div\b([^>]*)>([^<]{1,300}?)<\/div>/gi, (m, attrs, text) => {
+    const clean = stripMd(text)
+    if (!clean || hasLiquid(text) || tn >= 48 || !isRealText(clean)) return m
+    return `<div${attrs}>{{ section.settings.${addText(clean)} }}</div>`
+  })
+
   // VIDEO pass (before images) — video slots become uploadable: a Shopify `video` setting (upload to
   // Content → Files, then pick it). Covers real <video> and the poster+▶ placeholder cards (mediaCard).
   //  (a) real <video src="…">…</video>
@@ -344,7 +354,10 @@ const withCarouselDriver = (html: string): string => (/\bgcar\b/.test(html) ? ht
 // It appears once the shopper has scrolled past the hero (so it doesn't cover the buy-box) and hides again
 // over the real footer. The footer match uses the LAST footer-ish element on the page (a Horizon PDP has
 // utility bars that match [class*="footer"] high up — picking the first hid the bar forever: QA #11).
-const FLOATCTA_SCRIPT = `<script>(function(){var bar=document.querySelector('.floatcta');if(!bar)return;var fts=[].slice.call(document.querySelectorAll('footer,[class*="footer"],[class*="Footer"],[id*="footer"]'));var ft=fts.length?fts[fts.length-1]:null;function upd(){var y=window.scrollY||window.pageYOffset||0;var show=y>420;var nearEnd;if(ft){nearEnd=ft.getBoundingClientRect().top < window.innerHeight - 4;}else{nearEnd=(window.innerHeight+y)>=(document.documentElement.scrollHeight-160);}bar.style.transform=(show&&!nearEnd)?'translateY(0)':'translateY(130%)';}window.addEventListener('scroll',function(){window.requestAnimationFrame(upd);},{passive:true});window.addEventListener('resize',upd);setTimeout(upd,300);upd();})();</script>`
+// It moves itself to <body> because a Shopify section wrapper can have transform/contain/container-type
+// (Horizon does on desktop), which traps position:fixed inside the section so the bar never appears on the
+// desktop storefront (QA #7). Re-parenting to <body> makes it fixed to the VIEWPORT everywhere.
+const FLOATCTA_SCRIPT = `<script>(function(){var bar=document.querySelector('.floatcta');if(!bar)return;if(bar.parentElement!==document.body){document.body.appendChild(bar);}var fts=[].slice.call(document.querySelectorAll('footer,[class*="footer"],[class*="Footer"],[id*="footer"]'));var ft=fts.length?fts[fts.length-1]:null;function upd(){var y=window.scrollY||window.pageYOffset||0;var show=y>420;var nearEnd;if(ft){nearEnd=ft.getBoundingClientRect().top < window.innerHeight - 4;}else{nearEnd=(window.innerHeight+y)>=(document.documentElement.scrollHeight-160);}bar.style.transform=(show&&!nearEnd)?'translateY(0)':'translateY(130%)';}window.addEventListener('scroll',function(){window.requestAnimationFrame(upd);},{passive:true});window.addEventListener('resize',upd);setTimeout(upd,300);upd();})();</script>`
 const withFloatctaDriver = (html: string): string => (/\bfloatcta\b/.test(html) ? html + FLOATCTA_SCRIPT : html)
 
 // "As seen on" press logos become a horizontal scrolling BAR (QA #6): the row auto-scrolls, loops, pauses
@@ -425,7 +438,7 @@ const sectionStyleCss = `{% style %}
 /* Text colour must beat the template's own per-element colours (headings, marquee spans, …), hence the
    descendant list + !important. Buttons/links keep their own colour so CTAs stay legible. */
 #shopify-section-{{ section.id }} > .pgbld,
-#shopify-section-{{ section.id }} > .pgbld :where(p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
+#shopify-section-{{ section.id }} > .pgbld :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
 {% endif %}
 {% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){color:{{ section.settings.sf_head_color }} !important}{% endif %}
 {% if section.settings.sf_hide_mobile %}@media(max-width:749px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
@@ -469,8 +482,6 @@ const BLOCK_STYLE_SETTINGS: any[] = [
 const blockStyleCss = `{% style %}
 #sfb-{{ block.id }}{
 {% if block.settings.b_bg != blank %}background:{{ block.settings.b_bg }} !important;{% endif %}
-{% unless block.settings.b_size == '100' or block.settings.b_size == blank %}font-size:{{ block.settings.b_size }}%;{% endunless %}
-{% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}font-weight:{{ block.settings.b_weight }};{% endif %}
 {% if block.settings.b_lh != 'default' and block.settings.b_lh != blank %}line-height:{{ block.settings.b_lh }};{% endif %}
 {% if block.settings.b_align != 'default' and block.settings.b_align != blank %}text-align:{{ block.settings.b_align }};{% endif %}
 {% if block.settings.b_pad_on %}padding:{{ block.settings.b_pt }}px {{ block.settings.b_pr }}px {{ block.settings.b_pb }}px {{ block.settings.b_pl }}px !important;{% endif %}
@@ -479,7 +490,12 @@ const blockStyleCss = `{% style %}
 }
 {% if block.settings.b_gap > 0 %}#sfb-{{ block.id }}{display:flex;flex-wrap:wrap;gap:{{ block.settings.b_gap }}px}{% endif %}
 {% if block.settings.b_img > 0 %}#sfb-{{ block.id }} :where(img,svg){height:{{ block.settings.b_img }}px !important;width:auto !important}{% endif %}
-{% if block.settings.b_text != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
+/* Typography + colour must beat the template's own per-ELEMENT rules — cards/stats/reviews put their text in
+   <div>s with explicit colour and px size, so the control has to hit those descendants (incl. div) with
+   !important, and size must scale the descendants (a % on the wrapper never reaches a div with a px size). */
+{% unless block.settings.b_size == '100' or block.settings.b_size == blank %}#sfb-{{ block.id }} :where(p,span,div,li,strong,em,small,label,summary,b,i){font-size:{{ block.settings.b_size }}% !important}{% endunless %}
+{% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,p,span,div,li,strong,em,b){font-weight:{{ block.settings.b_weight }} !important}{% endif %}
+{% if block.settings.b_text != blank %}#sfb-{{ block.id }},#sfb-{{ block.id }} :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
 {% if block.settings.b_heading != blank %}#sfb-{{ block.id }} :where(h1,h2,h3,h4,h5,h6){color:{{ block.settings.b_heading }} !important}{% endif %}
 {% if block.settings.b_hide_mobile %}@media(max-width:749px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
 {% if block.settings.b_hide_desktop %}@media(min-width:750px){#sfb-{{ block.id }}{display:none !important}}{% endif %}
@@ -549,7 +565,13 @@ function mainProductSection(hero: string, cssKey: string, name: string): { value
   const hlTemplate = injectExtras(hl.template, 'pills', (id) => `{% if block.settings.${id} != blank %}<div class="pill">{{ block.settings.${id} }}</div>{% endif %}`, hlExtra)
   const payExtra = ['pay1', 'pay2', 'pay3', 'pay4']
   const trustExtra = ['tx1', 'tx2', 'tx3']
-  let trTemplate = injectExtras(tr.template, /\bpay\b/.test(tr.template) ? 'pay' : 'trust',
+  // Let merchants HIDE the built-in payment SVGs so they can REPLACE them with their own uploads — QA #10:
+  // the existing icons weren't changeable, only additive. Wrap the original `.pay` contents in a toggle.
+  const wrapPayDefaults = (tpl: string): string => {
+    const p = innerOf(tpl, 'pay'); if (!p) return tpl
+    return tpl.slice(0, p.start) + '{% unless block.settings.pay_hide_default %}' + tpl.slice(p.start, p.end) + '{% endunless %}' + tpl.slice(p.end)
+  }
+  let trTemplate = injectExtras(wrapPayDefaults(tr.template), /\bpay\b/.test(tr.template) ? 'pay' : 'trust',
     (id) => `{% if block.settings.${id} != blank %}<img class="payimg" src="{{ block.settings.${id} | image_url: width: 120 }}" alt="">{% endif %}`, payExtra)
   trTemplate = injectExtras(trTemplate, /\btrust\b/.test(trTemplate) ? 'trust' : 'social',
     (id) => `{% if block.settings.${id} != blank %}<div class="ti">✓ {{ block.settings.${id} }}</div>{% endif %}`, trustExtra)
@@ -596,7 +618,7 @@ ${JSON.stringify({
           { value: 'default', label: 'Default' }, { value: 'sm', label: 'Small' }, { value: 'lg', label: 'Large' }] },
         ...BLOCK_STYLE_SETTINGS,
       ] },
-      { type: 'trust', name: 'Trust & payment', settings: [...tr.settings, { type: 'header', content: 'Add payment icons' }, ...payExtraSettings, { type: 'header', content: 'Add trust text' }, ...trustExtraSettings, ...BLOCK_STYLE_SETTINGS] },
+      { type: 'trust', name: 'Trust & payment', settings: [...tr.settings, { type: 'header', content: 'Payment icons' }, { type: 'checkbox', id: 'pay_hide_default', label: 'Hide built-in payment icons', default: false, info: 'Turn on to replace them with your own below' }, ...payExtraSettings, { type: 'header', content: 'Add trust text' }, ...trustExtraSettings, ...BLOCK_STYLE_SETTINGS] },
       { type: 'description', name: 'Description', settings: [{ type: 'text', id: 'label', label: 'Toggle label', default: 'Product details' }, ...BLOCK_STYLE_SETTINGS] },
       { type: '@app' },
     ],

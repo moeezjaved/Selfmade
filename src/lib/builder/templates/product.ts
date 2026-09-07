@@ -464,8 +464,10 @@ function render(c: FilledContent, o: RenderOpts): string {
     <h2 class="sec" style="margin-top:28px">${hl(c.faq_head || 'Frequently asked **questions**')}</h2>
     <p class="seclead">${esc(c.faq_sub || 'Quick answers to the most common questions.')}</p>
     <div class="faqacc">${faqs}</div>
+  </div>
 
-    <a class="buy grad big" style="margin-top:24px" href="${esc(o.ctaHref)}">${esc(c.final_cta || `Get ${o.productName}`)}</a>
+  <div class="wrap" style="text-align:center">
+    <a class="buy grad big" href="${esc(o.ctaHref)}">${esc(c.final_cta || `Get ${o.productName}`)}</a>
   </div>
 
   <div class="floatcta" id="floatcta">
