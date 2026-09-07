@@ -19,7 +19,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 const numericId = (id: string | number): string => String(id).replace(/^.*\/(\d+)$/, '$1').replace(/[^0-9]/g, '')
 
 export type ThemeTarget = 'this' | 'selected' | 'store'
-export type ThemePublishResult = { url: string; previewUrl?: string; sections: number; themeId: number; needsScopes?: boolean }
+export type ThemePublishResult = { url: string; previewUrl?: string; sections: number; themeId: number; needsScopes?: boolean; shopifyPageId?: string }
 
 export async function publishToTheme(store: StoreRow, opts: {
   pageId: string
@@ -29,6 +29,7 @@ export async function publishToTheme(store: StoreRow, opts: {
   body: string
   target: ThemeTarget
   productIds?: string[]            // products to assign the custom template to (this/selected)
+  shopifyPageId?: string | null    // existing Shopify Page to reuse (advertorial/listicle re-publish)
   themeId?: number | null          // which theme to write to (defaults to main/published)
   themeLive?: boolean
 }): Promise<ThemePublishResult> {
@@ -78,6 +79,7 @@ export async function publishToTheme(store: StoreRow, opts: {
 
   // Assign the template to the right products / surface, and compute a link back.
   let path = '/'
+  let resultPageId: string | undefined
   if (opts.kind === 'product') {
     if (opts.target !== 'store') {
       const ids = (opts.productIds || []).map(numericId).filter(Boolean)
@@ -87,13 +89,30 @@ export async function publishToTheme(store: StoreRow, opts: {
     } else {
       path = '/collections/all'
     }
+  } else if (opts.kind === 'advertorial' || opts.kind === 'listicle') {
+    // Native PAGE template: ensure a Shopify Page carries this template_suffix — our page.<suffix>.json then
+    // renders our sections. Create on first publish, reuse/update on re-publish (so the URL stays stable).
+    let pid = opts.shopifyPageId ? numericId(String(opts.shopifyPageId)) : ''
+    let handle = ''
+    if (pid) {
+      const upd = await shopifyRest(store.shop_domain, token, `pages/${pid}.json`, { method: 'PUT', body: { page: { id: Number(pid), title: opts.title, template_suffix: suffix, published: opts.themeLive !== false } } }).catch(() => null)
+      handle = upd?.page?.handle || ''
+      if (!handle) pid = ''   // page was deleted — fall through to recreate
+    }
+    if (!pid) {
+      const cr = await shopifyRest(store.shop_domain, token, 'pages.json', { method: 'POST', body: { page: { title: opts.title, body_html: '', template_suffix: suffix, published: opts.themeLive !== false } } }).catch(() => null)
+      pid = cr?.page?.id ? String(cr.page.id) : ''
+      handle = cr?.page?.handle || ''
+    }
+    resultPageId = pid || undefined
+    if (handle) path = `/pages/${handle}`
   }
 
   const url = `https://${host}${path}`
   // On a draft theme, hand back a preview link on the PRIMARY domain (survives the redirect) + a theme-
   // editor deep link as the always-reliable fallback (renders even for unpublished products).
   const previewUrl = (opts.themeLive === false) ? `${url}${path.includes('?') ? '&' : '?'}preview_theme_id=${theme.id}` : undefined
-  return { url, previewUrl, sections: assets.sections.length, themeId: Number(theme.id) }
+  return { url, previewUrl, sections: assets.sections.length, themeId: Number(theme.id), shopifyPageId: resultPageId }
 }
 
 /**
@@ -105,7 +124,7 @@ export async function publishToTheme(store: StoreRow, opts: {
  *   • home    → strip only our sections out of templates/index.json (leaves the rest of the home intact)
  * Best-effort + idempotent: a missing asset / already-clean theme is a no-op.
  */
-export async function unpublishFromThemes(store: StoreRow, pageId: string, kind: PageKind, opts: { productIds?: string[] } = {}): Promise<void> {
+export async function unpublishFromThemes(store: StoreRow, pageId: string, kind: PageKind, opts: { productIds?: string[]; shopifyPageId?: string | null } = {}): Promise<void> {
   const token = tokenFor(store)
   if (!hasThemeScopes((await fetchAccessScopes(store.shop_domain, token).catch(() => [])).join(','))) return
   const slug = `sf-${pageId.replace(/[^a-z0-9]/gi, '').slice(0, 12)}`
@@ -117,7 +136,7 @@ export async function unpublishFromThemes(store: StoreRow, pageId: string, kind:
     const assets = (await shopifyRest(store.shop_domain, token, `themes/${t.id}/assets.json`).catch(() => null))?.assets || []
     const keys: string[] = assets.map((a: any) => a.key)
     for (const k of keys) {
-      if (k.startsWith(`sections/${slug}-`) || k === `assets/${slug}.css` || k === `templates/product.${suffix}.json`) { await del(Number(t.id), k); await sleep(140) }
+      if (k.startsWith(`sections/${slug}-`) || k === `assets/${slug}.css` || k === `templates/product.${suffix}.json` || k === `templates/page.${suffix}.json`) { await del(Number(t.id), k); await sleep(140) }
     }
     // Home: our sections replaced index.json — pull only ours back out so the rest of the home survives.
     if (kind === 'home' && keys.includes('templates/index.json')) {
@@ -138,5 +157,11 @@ export async function unpublishFromThemes(store: StoreRow, pageId: string, kind:
         if (p?.product && p.product.template_suffix === suffix) { await shopifyRest(store.shop_domain, token, `products/${pid}.json`, { method: 'PUT', body: { product: { id: Number(pid), template_suffix: null } } }).catch(() => {}); await sleep(140) }
       }
     }
+  }
+
+  // Advertorial / listicle also created a Shopify Page carrying the template — delete it so nothing lingers.
+  if ((kind === 'advertorial' || kind === 'listicle') && opts.shopifyPageId) {
+    const pid = numericId(String(opts.shopifyPageId))
+    if (pid) await shopifyRest(store.shop_domain, token, `pages/${pid}.json`, { method: 'DELETE' }).catch(() => {})
   }
 }
