@@ -373,7 +373,7 @@ const SECTION_STYLE_SETTINGS: any[] = [
   { type: 'color_background', id: 'sf_bg_grad', label: 'Background gradient' },
   { type: 'image_picker', id: 'sf_bg_img', label: 'Background image' },
   { type: 'color', id: 'sf_text', label: 'Text colour' },
-  { type: 'color', id: 'sf_heading', label: 'Heading colour' },
+  { type: 'color', id: 'sf_head_color', label: 'Heading colour' },
   { type: 'header', content: 'Typography' },
   { type: 'select', id: 'sf_scale', label: 'Text size', default: '100', options: [
     { value: '85', label: 'Smaller' }, { value: '100', label: 'Default' }, { value: '115', label: 'Larger' }, { value: '130', label: 'Largest' }] },
@@ -423,7 +423,7 @@ const sectionStyleCss = `{% style %}
 #shopify-section-{{ section.id }} > .pgbld,
 #shopify-section-{{ section.id }} > .pgbld :where(p,span,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
 {% endif %}
-{% if section.settings.sf_heading != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){color:{{ section.settings.sf_heading }} !important}{% endif %}
+{% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){color:{{ section.settings.sf_head_color }} !important}{% endif %}
 {% if section.settings.sf_hide_mobile %}@media(max-width:749px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% if section.settings.sf_hide_desktop %}@media(min-width:750px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% endstyle %}`
