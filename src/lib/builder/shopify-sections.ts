@@ -407,7 +407,6 @@ const sectionStyleCss = `{% style %}
 {% if section.settings.sf_bg_grad != blank %}background-image:{{ section.settings.sf_bg_grad }} !important;{% endif %}
 {% if section.settings.sf_bg_img != blank %}background-image:url({{ section.settings.sf_bg_img | image_url: width: 2200 }}) !important;background-size:cover !important;background-position:center !important;{% endif %}
 {% if section.settings.sf_align != 'default' %}text-align:{{ section.settings.sf_align }};{% endif %}
-{% if section.settings.sf_pad_on %}padding:{{ section.settings.sf_pt }}px {{ section.settings.sf_pr }}px {{ section.settings.sf_pb }}px {{ section.settings.sf_pl }}px !important;{% elsif section.settings.sf_space != 'default' %}padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important;{% endif %}
 {% if section.settings.sf_mar_on %}margin-top:{{ section.settings.sf_mt }}px !important;margin-bottom:{{ section.settings.sf_mb }}px !important;{% endif %}
 {% unless section.settings.sf_scale == '100' %}font-size:{{ section.settings.sf_scale }}%;{% endunless %}
 {% if section.settings.sf_weight != 'default' %}font-weight:{{ section.settings.sf_weight }};{% endif %}
@@ -415,6 +414,11 @@ const sectionStyleCss = `{% style %}
 {% if section.settings.sf_border_on %}border:{{ section.settings.sf_border_w }}px solid {{ section.settings.sf_border_color }} !important;{% endif %}
 {% if section.settings.sf_radius > 0 %}border-radius:{{ section.settings.sf_radius }}px;overflow:hidden;{% endif %}
 }
+/* Padding/spacing governs the section's REAL content box — the .wrap OR a full-bleed band child (bands carry
+   their own padding, so overriding only .pgbld did nothing: QA "unable to reduce extra space"). And baked-in
+   heading top-margins are zeroed once custom spacing is set, so the controls can actually shrink the gap. */
+{% if section.settings.sf_pad_on %}#shopify-section-{{ section.id }} > .pgbld > :first-child{padding:{{ section.settings.sf_pt }}px {{ section.settings.sf_pr }}px {{ section.settings.sf_pb }}px {{ section.settings.sf_pl }}px !important}{% elsif section.settings.sf_space != 'default' %}#shopify-section-{{ section.id }} > .pgbld > :first-child{padding-top:{{ section.settings.sf_space }}px !important;padding-bottom:{{ section.settings.sf_space }}px !important}{% endif %}
+{% if section.settings.sf_pad_on or section.settings.sf_space != 'default' %}#shopify-section-{{ section.id }} > .pgbld > :first-child > :first-child,#shopify-section-{{ section.id }} > .pgbld > :first-child > .wrap > :first-child{margin-top:0 !important}{% endif %}
 {% if section.settings.sf_gap > 0 %}#shopify-section-{{ section.id }} > .pgbld .wrap,#shopify-section-{{ section.id }} > .pgbld > .wrap{display:flex;flex-direction:column;gap:{{ section.settings.sf_gap }}px}{% endif %}
 {% if section.settings.sf_weight != 'default' %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){font-weight:{{ section.settings.sf_weight }} !important}{% endif %}
 {% if section.settings.sf_text != blank %}
