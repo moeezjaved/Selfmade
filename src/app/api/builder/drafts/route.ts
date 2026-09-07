@@ -77,9 +77,9 @@ export async function DELETE(req: NextRequest) {
       const store = await resolveStore(admin as any, user.id, row.brand_id)
       if (store) {
         const kind = getTemplate(row.template_id)?.type
-        if (kind === 'product' || kind === 'home') {
+        if (kind === 'product' || kind === 'home' || kind === 'advertorial' || kind === 'listicle') {
           const { unpublishFromThemes } = await import('@/lib/builder/publish-theme')
-          await unpublishFromThemes(store as any, String(row.id), kind, { productIds: row.product_id ? [String(row.product_id)] : [] })
+          await unpublishFromThemes(store as any, String(row.id), kind, { productIds: row.product_id ? [String(row.product_id)] : [], shopifyPageId: row.shopify_page_id ? String(row.shopify_page_id) : null })
         } else if (row.shopify_page_id) {
           const { shopifyRest, tokenFor } = await import('@/lib/shopify/client')
           await shopifyRest((store as any).shop_domain, tokenFor(store as any), `pages/${row.shopify_page_id}.json`, { method: 'DELETE' }).catch(() => {})
