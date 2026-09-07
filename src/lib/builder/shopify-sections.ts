@@ -466,7 +466,7 @@ const sectionStyleCss = `{% style %}
 #shopify-section-{{ section.id }} > .pgbld,
 #shopify-section-{{ section.id }} > .pgbld :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
 {% endif %}
-{% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){color:{{ section.settings.sf_head_color }} !important}{% endif %}
+{% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6,summary,.bt,.rtt,.who,.q,.lab,.lbl,.tlab,.sct,.ptitle,.n,.t){color:{{ section.settings.sf_head_color }} !important}{% endif %}
 {% if section.settings.sf_hide_mobile %}@media(max-width:749px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% if section.settings.sf_hide_desktop %}@media(min-width:750px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% endstyle %}`
@@ -522,7 +522,7 @@ const blockStyleCss = `{% style %}
 {% unless block.settings.b_size == '100' or block.settings.b_size == blank %}#sfb-{{ section.id }}-{{ block.id }} :where(p,span,div,li,strong,em,small,label,summary,b,i){font-size:{{ block.settings.b_size }}% !important}{% endunless %}
 {% if block.settings.b_weight != 'default' and block.settings.b_weight != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,p,span,div,li,strong,em,b){font-weight:{{ block.settings.b_weight }} !important}{% endif %}
 {% if block.settings.b_text != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ block.settings.b_text }} !important}{% endif %}
-{% if block.settings.b_heading != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,summary){color:{{ block.settings.b_heading }} !important}{% endif %}
+{% if block.settings.b_heading != blank %}#sfb-{{ section.id }}-{{ block.id }},#sfb-{{ section.id }}-{{ block.id }} :where(h1,h2,h3,h4,h5,h6,summary,.bt,.rtt,.who,.q,.lab,.lbl,.tlab,.sct,.ptitle,.n,.t){color:{{ block.settings.b_heading }} !important}{% endif %}
 {% if block.settings.b_hide_mobile %}@media(max-width:749px){#sfb-{{ section.id }}-{{ block.id }}{display:none !important}}{% endif %}
 {% if block.settings.b_hide_desktop %}@media(min-width:750px){#sfb-{{ section.id }}-{{ block.id }}{display:none !important}}{% endif %}
 {% endstyle %}`
