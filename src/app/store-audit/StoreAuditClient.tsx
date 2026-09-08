@@ -714,6 +714,10 @@ function CampaignReveal({ domain, adsData, seoData }: { domain: string; adsData:
           <a href="/hq" style={{ background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 14.5, padding: '12px 22px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Make 5 more ads →</a>
         </div>
 
+        {/* the rivals we drew this from — real competitors found live (Google + Meta Ad Library), same
+            discovery Brand Hub uses (background + cached), polled here so it's never truncated. */}
+        <RivalsPane domain={domain} />
+
         <div style={{ marginTop: 48 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
             <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 400, margin: 0 }}>And here&rsquo;s what staying the same is costing you.</h2>
@@ -744,6 +748,64 @@ function CampaignReveal({ domain, adsData, seoData }: { domain: string; adsData:
           <div style={{ fontSize: 12, color: SUBINK, marginTop: 14, fontFamily: MONO }}>Every image, headline &amp; price is editable · publish to Shopify in one click</div>
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── RIVALS — the real competitors we drew the campaign from. Uses Brand Hub's own discovery endpoint
+ * (Google SERP + Meta Ad Library keyword search, run in the background + cached per brand), polled here
+ * until it lands, so it's never the truncated result the old in-scan cap produced. Hidden if none found. */
+function RivalsPane({ domain }: { domain: string }) {
+  const [rivals, setRivals] = useState<any[]>([])
+  const [done, setDone] = useState(false)
+  const INK = '#161c17', SUBINK = '#5f665c', LINE = '#e6e5dc'
+  const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
+  useEffect(() => {
+    let on = true, tries = 0
+    const enc = encodeURIComponent(domain.replace(/^www\./, ''))
+    const poll = async () => {
+      const j = await fetch(`/api/ads-studio/competitors?domain=${enc}`).then((r) => r.json()).catch(() => ({}))
+      if (!on) return
+      const disc = ((j.discovered || j.competitors || []) as any[]).filter((c) => c?.name)
+      if (disc.length) { setRivals(disc.slice(0, 4)); setDone(true); return }
+      if (j.discovering && tries < 18) { tries++; setTimeout(poll, 6000) } else setDone(true)   // background discovery still running → poll
+    }
+    poll()
+    return () => { on = false }
+  }, [domain])
+
+  if (done && !rivals.length) return null   // no rivals found → don't show an empty section
+
+  return (
+    <div style={{ marginTop: 44 }}>
+      <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE, marginBottom: 8 }}>Who you&rsquo;re up against</div>
+      <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 400, margin: '0 0 18px' }}>The rivals winning your niche — and the ads we learned from.</h2>
+      {rivals.length ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(240px,1fr))', gap: 14 }}>
+          {rivals.map((r, i) => (
+            <div key={i} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 15.5, color: INK, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.name}</div>
+                {r.adCount > 0 && <div style={{ fontFamily: MONO, fontSize: 10.5, color: SUBINK, whiteSpace: 'nowrap' }}>{r.adCount} ads</div>}
+              </div>
+              {r.reason && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, lineHeight: 1.4, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{r.reason}</div>}
+              {Array.isArray(r.ads) && r.ads.filter((a: any) => a.thumb).length > 0 && (
+                <div style={{ display: 'flex', gap: 6, marginTop: 12 }}>
+                  {r.ads.filter((a: any) => a.thumb).slice(0, 3).map((a: any, k: number) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img key={k} src={a.thumb} alt="" style={{ width: '33%', aspectRatio: '4/5', objectFit: 'cover', borderRadius: 8, border: `1px solid ${LINE}` }} />
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, color: SUBINK, padding: '8px 0' }}>
+          <div style={{ width: 22, height: 22, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+          <span style={{ fontSize: 13.5, fontFamily: MONO }}>Finding your real rivals — Google + Meta Ad Library…</span>
+        </div>
+      )}
     </div>
   )
 }

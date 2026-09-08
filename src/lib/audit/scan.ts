@@ -147,7 +147,6 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
   const productUrls = Array.from(new Set([...sm.productUrls, ...all.filter(isProduct)])).slice(0, 14)
   const prodSet = new Set(productUrls)
   const contentUrls = all.filter((u) => !prodSet.has(u)).slice(0, 10)
-  console.log(`[dbg-cat] domain=${domain} sitemapUrls=${sm.urls.length} productUrlsFromSitemap=${sm.productUrls.length} productUrls=${productUrls.length} sampleProduct=${productUrls[0] || '-'}`)
   const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 24)
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
   // Use the richer discovered set for the page-count total (Ryze shows the full crawl size, not just the sample).
@@ -155,7 +154,6 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
   // Use the product URLs we DISCOVERED (incl. from the product sub-sitemap, which don't contain
   // "/products/" on BigCommerce/Woo/Magento) — filtering by isProduct() alone dropped them → empty catalog.
   const productPages = pages.filter((p) => prodSet.has(p.url) || isProduct(p.url))
-  console.log(`[dbg-cat] domain=${domain} productPages=${productPages.length}`)
   // Derive buyer keywords + AI questions ONCE (product-grounded) and share across the Google + AI steps —
   // one LLM call, and the SERP searches and the AI questions stay consistent with each other.
   const productTitles = productPages.map((p) => strip(p.title).replace(/\s*[|–—-].*$/, '').trim()).filter((t) => t.length > 2)

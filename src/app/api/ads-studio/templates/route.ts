@@ -144,7 +144,6 @@ export async function POST(req: NextRequest) {
     const usedProduct = (body.productImages || []).filter(Boolean).length > 0
     const productUpgrade = !!body.force && !!tpls[index].image && (tpls[index] as any).hasProduct !== true && usedProduct
     const isFree = productUpgrade || (renderedLifetime || 0) < FREE_RENDERS
-    console.log(`[dbg-tpl] index=${index} force=${!!body.force} productImages=${(body.productImages || []).length} hasImagePrev=${!!tpls[index].image} hasProductPrev=${(tpls[index] as any).hasProduct} productUpgrade=${productUpgrade} isFree=${isFree} renderedLifetime=${renderedLifetime}`)
     let txId: string | null = null
     if (!isFree) {
       const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'image_studio_pro' })
@@ -168,7 +167,6 @@ export async function POST(req: NextRequest) {
     }
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
     const img = out.url || out.image
-    console.log(`[dbg-tpl] index=${index} RENDERED outOk=${!!(out?.url || out?.image)} usedProduct=${usedProduct}`)
     tpls[index] = { ...t, image: img, hasProduct: usedProduct }
     await writeCached(admin, brandId, tpls).catch(() => {})
     return NextResponse.json({ image: img })
