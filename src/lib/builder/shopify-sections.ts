@@ -457,8 +457,8 @@ const sectionStyleCss = `{% style %}
 {% if section.settings.sf_pad_on or section.settings.sf_space != 'default' %}#shopify-section-{{ section.id }} > .pgbld > :first-child > :first-child,#shopify-section-{{ section.id }} > .pgbld > :first-child > .wrap > :first-child{margin-top:0 !important}{% endif %}
 {% if section.settings.sf_gap > 0 %}#shopify-section-{{ section.id }} > .pgbld .wrap,#shopify-section-{{ section.id }} > .pgbld > .wrap{display:flex;flex-direction:column;gap:{{ section.settings.sf_gap }}px}{% endif %}
 {% comment %}Background must also hit a full-bleed band child (marquee/pink/stats bands carry their own bg), else changing the colour did nothing to the visible bar — QA.{% endcomment %}
-{% if section.settings.sf_bg != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child{background-color:{{ section.settings.sf_bg }} !important}{% endif %}
-{% if section.settings.sf_bg_grad != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child{background-image:{{ section.settings.sf_bg_grad }} !important}{% endif %}
+{% if section.settings.sf_bg != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child,#shopify-section-{{ section.id }} > .pgbld > .wrap > :first-child{background-color:{{ section.settings.sf_bg }} !important;{% if section.settings.sf_bg_img == blank and section.settings.sf_bg_grad == blank %}background-image:none !important;{% endif %}}{% endif %}
+{% if section.settings.sf_bg_grad != blank %}#shopify-section-{{ section.id }} > .pgbld > :first-child,#shopify-section-{{ section.id }} > .pgbld > .wrap > :first-child{background-image:{{ section.settings.sf_bg_grad }} !important}{% endif %}
 {% if section.settings.sf_weight != 'default' %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6){font-weight:{{ section.settings.sf_weight }} !important}{% endif %}
 {% if section.settings.sf_text != blank %}
 /* Text colour must beat the template's own per-element colours (headings, marquee spans, …), hence the
@@ -466,7 +466,7 @@ const sectionStyleCss = `{% style %}
 #shopify-section-{{ section.id }} > .pgbld,
 #shopify-section-{{ section.id }} > .pgbld :where(p,span,div,li,strong,em,blockquote,figcaption,small,label,dt,dd,summary){color:{{ section.settings.sf_text }} !important}
 {% endif %}
-{% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6,summary,.bt,.rtt,.who,.q,.lab,.lbl,.tlab,.sct,.ptitle,.n,.t){color:{{ section.settings.sf_head_color }} !important}{% endif %}
+{% if section.settings.sf_head_color != blank %}#shopify-section-{{ section.id }} > .pgbld :where(h1,h2,h3,h4,h5,h6,summary,.bt,.rtt,.who,.q,.lab,.lbl,.tlab,.sct,.ptitle,.n,.t,.rttl,.ihead,.isub,.pn,.summary-lab,.rlab){color:{{ section.settings.sf_head_color }} !important}{% endif %}
 {% if section.settings.sf_hide_mobile %}@media(max-width:749px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% if section.settings.sf_hide_desktop %}@media(min-width:750px){#shopify-section-{{ section.id }}{display:none !important}}{% endif %}
 {% endstyle %}`

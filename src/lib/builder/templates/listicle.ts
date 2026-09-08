@@ -151,21 +151,27 @@ function render(c: FilledContent, o: RenderOpts): string {
     </div>
 
     <div class="reasons">${restReasons}</div>
+  </div>
 
+  <div class="wrap">
     <div class="subscribe">
       <h2>${esc(c.subscribe_head || 'SUBSCRIBE & GET ' + (c.discount_label || '30%') + ' OFF')}</h2>
       <p>${esc(c.subscribe_body)}</p>
       <a class="cta-grad" href="${esc(o.ctaHref)}">Subscribe Now for Exclusive Discounts →</a>
     </div>
-    <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
+  </div>
 
+  <div class="wrap">
+    <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
     <div class="howto">
       <h2>${esc(c.howto_head || '🌟 How To Get The Best Results')}</h2>
       ${rt(c.howto_intro)}
       <ol>${howtoSteps}</ol>
       ${c.howto_hint ? `<div class="hint">💡 Helpful Hint: ${esc(c.howto_hint)}</div>` : ''}
     </div>
+  </div>
 
+  <div class="wrap">
     <div class="inline-offer">${offerCard(o)}</div>
 
     ${c.closing_line ? `<div class="lead">${rt(c.closing_line)}</div>` : ''}
