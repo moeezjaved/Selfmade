@@ -21,7 +21,6 @@ export type DiscoveryResult = {
   seed: { name: string; category: string; market: string; productForms?: string[]; queries: string[] }
   competitors: DiscoveredCompetitor[]
   configured: boolean
-  _debug?: Record<string, unknown>   // temporary: stage counts for diagnosing why 0 rivals surface
 }
 
 /** Market name → Meta Ad Library ISO-2 country (for local advertiser search). ALL = global fallback. */
@@ -197,13 +196,5 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
     seed: { name: ctx.siteName, category, market, productForms, queries },
     competitors: [...competitors, ...extra],
     configured,
-    _debug: {
-      dfsConfigured: configured, country, market, adQueries,
-      serpRows: serps.reduce((n, r) => n + r.length, 0), candidates: candidates.length,
-      rankedFromGoogle: competitors.length, adLibAdvertisers: advertisers.length,
-      unmatchedAdvertisers: unmatched.length, extraFromAdLib: extra.length,
-      advertiserSample: advertisers.slice(0, 6).map((a) => a.pageName || a.domain),
-      candidateSample: candidates.slice(0, 6).map((c) => c.domain),
-    },
   }
 }
