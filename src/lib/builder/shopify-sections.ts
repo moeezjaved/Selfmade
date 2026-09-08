@@ -388,6 +388,27 @@ const withFloatctaDriver = (html: string): string => (/\bfloatcta\b/.test(html) 
 const MARQUEE_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s&&s.parentElement?s.parentElement:document;var box=(root&&root.querySelector('.logos'))||document.querySelector('.logos');if(!box)return;var paused=false;box.addEventListener('mouseenter',function(){paused=true;});box.addEventListener('mouseleave',function(){paused=false;});box.addEventListener('touchstart',function(){paused=true;},{passive:true});function tick(){if(!paused&&box.scrollWidth>box.clientWidth+2){box.scrollLeft+=0.5;if(box.scrollLeft>=box.scrollWidth-box.clientWidth-1)box.scrollLeft=0;}requestAnimationFrame(tick);}requestAnimationFrame(tick);})();</script>`
 const withMarqueeDriver = (html: string): string => (/\blogos\b/.test(html) ? html + MARQUEE_SCRIPT : html)
 
+// Countdown timers (.count / .pill.count with .cd-h/.cd-m/.cd-s) were driven by a PAGE-LEVEL <script> in
+// the template — which the split drops (scripts are re-injected per section). So the published page showed
+// a FROZEN "24:00" (QA). This scoped driver re-animates every countdown in the section AND reads an optional
+// merchant-set end date/time from the section settings (`sf_countdown_to`, with an optional tz offset); blank
+// → a rolling 14h timer so it always looks live. Reached zero → shows 00 and stops. Liquid is inlined because
+// the section is a .liquid file. Format mirrors the template: the compact `.pill` shows digits only, the wide
+// `.count` band appends HRS/MINS/SECS.
+const COUNTDOWN_SCRIPT = `<script>(function(){var s=document.currentScript;var root=(s&&s.parentElement&&s.parentElement.closest('.pgbld'))||document;var els=[].slice.call(root.querySelectorAll('.count'));if(!els.length)return;var raw=('{{ section.settings.sf_countdown_to }}'||'').trim();var tz=('{{ section.settings.sf_countdown_tz }}'||'').trim();var end=0;if(raw){var iso=raw.replace(' ','T');if(tz&&/^[+-]\\d{2}:?\\d{2}$/.test(tz))iso+=tz;var t=Date.parse(iso);if(!isNaN(t))end=t;}if(!end){var hh=parseInt(((root.querySelector('.cd-h')||{}).textContent||'14'),10)||14;end=Date.now()+(hh*3600+33*60+7)*1000;}function p(n){return(n<10?'0':'')+n}function cd(){var d=Math.max(0,end-Date.now());var h=Math.floor(d/3600000),m=Math.floor(d%3600000/60000),sec=Math.floor(d%60000/1000);els.forEach(function(el){var pill=el.classList.contains('pill');var H=el.querySelector('.cd-h'),M=el.querySelector('.cd-m'),S=el.querySelector('.cd-s');if(H)H.textContent=p(h)+(pill?'':' HRS');if(M)M.textContent=p(m)+(pill?'':' MINS');if(S)S.textContent=p(sec)+(pill?'':' SECS');});if(d<=0&&iv){clearInterval(iv);}}var iv=setInterval(cd,1000);cd();})();</script>`
+const withCountdownDriver = (html: string): string => (/\bcd-h\b/.test(html) ? html + COUNTDOWN_SCRIPT : html)
+
+// Merchant-editable end time for any section that carries a countdown. Shopify has no native datetime
+// picker, so the end is a text field (YYYY-MM-DD HH:MM) + an optional timezone offset; blank = rolling timer.
+const COUNTDOWN_SETTINGS: any[] = [
+  { type: 'header', content: 'Countdown timer' },
+  { type: 'text', id: 'sf_countdown_to', label: 'Ends at', info: 'Format: YYYY-MM-DD HH:MM (e.g. 2026-12-31 23:59). Leave blank for a rolling 14-hour timer.' },
+  { type: 'select', id: 'sf_countdown_tz', label: 'Timezone', default: '', options: [
+    { value: '', label: 'Visitor’s local time' }, { value: '+00:00', label: 'UTC' }, { value: '-05:00', label: 'US Eastern' },
+    { value: '-06:00', label: 'US Central' }, { value: '-08:00', label: 'US Pacific' }, { value: '+00:00', label: 'UK' },
+    { value: '+01:00', label: 'Central Europe' }, { value: '+04:00', label: 'Gulf (GST)' }, { value: '+05:30', label: 'India (IST)' }, { value: '+08:00', label: 'Singapore/China' }] },
+]
+
 // Every section gets a native "Section style" settings group — background, text colour, alignment,
 // spacing and text size — editable in Shopify's theme editor like a real theme. Applied via a scoped
 // {% style %} block on the section's own `.pgbld` root so it can't leak into other sections.
@@ -915,7 +936,12 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     const dynamized = dynamizeProduct(bl ? bl.html : p.html, dyn)
     const { html, settings } = editablize(dynamized)
     const blockDefs = bl ? [{ type: 'item', name: bl.itemName, settings: bl.itemSettings || [{ type: 'liquid', id: 'content', label: 'Content' }] }, { type: '@app' }] : undefined
-    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, withMarqueeDriver(withFloatctaDriver(withCarouselDriver(withGalleryDriver(html)))), settings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
+    // A section with a countdown gets a merchant-editable end date/time + a scoped driver (the page-level
+    // countdown script is dropped by the split, so without this the published timer is frozen).
+    const withCountdown = /\bcd-h\b/.test(html)
+    const secSettings = withCountdown ? [...settings, ...COUNTDOWN_SETTINGS] : settings
+    const driven = withCountdownDriver(withMarqueeDriver(withFloatctaDriver(withCarouselDriver(withGalleryDriver(html)))))
+    return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, driven, secSettings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
   // Product templates get a native "You may also like" recommendations section at the end.

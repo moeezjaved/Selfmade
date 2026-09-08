@@ -26,10 +26,12 @@ const CSS = `
 .pgbld *{box-sizing:border-box}
 .pgbld img{max-width:100%;display:block}
 .pgbld b,.pgbld strong{color:var(--ink);font-weight:700}
-.pgbld .wrap{max-width:860px;margin:0 auto;padding:0 22px}
-.pgbld .wrap>*{margin:0 0 20px}
+.pgbld .wrap{max-width:1180px;margin:0 auto;padding:0 22px}
+.pgbld .ad-main>*{margin:0 0 20px}
 /* Hide the theme's auto page-title (Dawn/most themes) so it doesn't duplicate our headline. */
 .main-page-title,.shopify-page-title,.template-page .page-title{display:none!important}
+/* Dedicated-funnel page: hide the theme's header + footer so it reads like a standalone landing (Atlas). */
+.shopify-section-group-header-group,.shopify-section-group-footer-group,#shopify-section-header,#shopify-section-footer,.section-header,.section-footer{display:none!important}
 .pgbld .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
 .pgbld .count .lbl{opacity:.85;margin-right:8px}
 .pgbld .count b{color:#fff}
@@ -89,7 +91,7 @@ const CSS = `
 .pgbld .inline-offer{max-width:420px;margin:26px auto}
 .pgbld .inline-offer .offer{position:static;box-shadow:none}
 .pgbld .date{color:var(--muted);font-size:14px;margin-top:6px}
-.pgbld .floatcta{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(18px,calc((100% - 860px)/2 + 22px));transform:none;transition:transform .28s ease}
+.pgbld .floatcta{position:fixed;left:0;right:0;bottom:0;z-index:60;background:#fff;border-top:1px solid var(--line);box-shadow:0 -8px 24px -10px rgba(0,0,0,.28);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px max(18px,calc((100% - 1180px)/2 + 22px));transform:none;transition:transform .28s ease}
 .pgbld .floatcta.hide{transform:translateY(115%)}
 .pgbld .fc-info{display:flex;align-items:center;gap:12px;min-width:0}
 .pgbld .fc-thumb{width:46px;height:46px;border-radius:8px;flex:none;object-fit:cover;background:radial-gradient(120% 120% at 55% 30%, #fdf3d4, #f0d281)}
@@ -121,7 +123,8 @@ function render(c: FilledContent, o: RenderOpts): string {
   return `
   <div class="pgbld">
   <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
-  <div class="wrap">
+  <div class="wrap"><div class="ad-grid">
+    <div class="ad-main">
       <h1 class="head">${esc(c.headline)}</h1>
       <div class="byline"><div class="av">◍</div><div class="n"><b>By ${esc(c.author_name)}</b><span>${esc(c.author_tag || 'Verified Customer')}</span></div></div>
       <p class="lead">${esc(c.lead)}</p>
@@ -166,7 +169,9 @@ function render(c: FilledContent, o: RenderOpts): string {
       <h2 class="sec brand">${esc(c.closing_head)}</h2>
       ${rt(c.closing_body)}
       <a class="cta-big" href="${esc(o.ctaHref)}">👉 CHECK OUT ${esc(o.productName).toUpperCase()} →<small>⭐ ${o.rating?.stars || 4.8}/5 stars from 10,000+ verified users</small></a>
-  </div>
+    </div>
+    <div class="aside">${offerCard(c, o)}</div>
+  </div></div>
   <div class="floatcta" id="floatcta"><div class="fc-info">${img(o.productImage, o.productName, 'fc-thumb')}<span class="fc-name">${esc(o.productName)}${o.priceLabel ? ' · <b>' + esc(o.priceLabel) + '</b>' : ''}</span></div><a class="fc-btn" href="${esc(o.ctaHref)}">👉 Check Availability</a></div>
   </div>
   <script>(function(){var fc=document.getElementById('floatcta');function t(){if(fc)fc.classList.toggle('hide',window.scrollY<480)}window.addEventListener('scroll',t,{passive:true});t();

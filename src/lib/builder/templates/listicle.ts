@@ -32,6 +32,8 @@ const CSS = `
 .pgbld .wrap{max-width:920px;margin:0 auto;padding:0 22px}
 /* Hide the theme's auto page-title (Dawn/most themes) so it doesn't duplicate our headline. */
 .main-page-title,.shopify-page-title,.template-page .page-title{display:none!important}
+/* Dedicated-funnel page: hide the theme's header + footer so it reads like a standalone landing (Atlas). */
+.shopify-section-group-header-group,.shopify-section-group-footer-group,#shopify-section-header,#shopify-section-footer,.section-header,.section-footer{display:none!important}
 .pgbld .count{background:var(--dark);color:#fff;text-align:center;font-size:14px;letter-spacing:.06em;padding:13px 10px;font-weight:600}
 .pgbld .count .lbl{opacity:.85;margin-right:8px}
 .pgbld .count b{color:#fff}
@@ -138,7 +140,9 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="lead">${rt(String(c.summary || '').replace(/^\s*product\s*summary\s*:?\s*/i, ''))}</div>
 
     <div class="reasons">${firstReasons}</div>
+  </div>
 
+  <div class="wrap">
     <div class="count"><span class="lbl">LIMITED TIME :</span> <b class="cd-h">${hours} HRS</b> : <b class="cd-m">00 MINS</b> : <b class="cd-s">00 SECS</b></div>
     <div class="icard">
       ${img(o.productImage, o.productName, 'iimg', 'Product image')}
@@ -149,7 +153,9 @@ function render(c: FilledContent, o: RenderOpts): string {
         <a class="cta-grad" href="${esc(o.ctaHref)}">Get ${esc(c.discount_label || '30%')} Off + Free Shipping →</a>
       </div>
     </div>
+  </div>
 
+  <div class="wrap">
     <div class="reasons">${restReasons}</div>
   </div>
 
