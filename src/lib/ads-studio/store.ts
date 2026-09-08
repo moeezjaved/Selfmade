@@ -19,6 +19,58 @@ const strip = (h: string) => decode(h.replace(/<script[\s\S]*?<\/script>/gi, ' '
 const tag = (html: string, re: RegExp) => { const m = html.match(re); return m ? decode(m[1]).trim() : '' }
 const abs = (l: string, domain: string) => (l.startsWith('http') ? l : `https://${domain}${l.startsWith('/') ? '' : '/'}${l}`)
 
+const RAW_UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36'
+// fetchHtml() gates on content-type:text/html, so it returns null for robots.txt (text/plain) and XML
+// sitemaps — we need those to discover products on non-Shopify stores, so fetch their raw bodies here.
+async function fetchRaw(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { 'user-agent': RAW_UA, accept: '*/*' }, signal: AbortSignal.timeout(8000), redirect: 'follow' })
+    if (!r.ok) return null
+    return (await r.text()).slice(0, 600_000)
+  } catch { return null }
+}
+
+// Cross-platform product discovery via the store's sitemap — the Shopify-only `/products/` link scrape
+// finds nothing on BigCommerce / WooCommerce / Magento / custom builds, but nearly every real store
+// publishes a sitemap. Prefer a product-named sub-sitemap; return up to `cap` product page URLs.
+async function sitemapProductUrls(domain: string, cap = 14): Promise<string[]> {
+  const root = domain.replace(/^www\./, '')
+  const locs = (xml: string) => Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)).map((m) => decode(m[1]).trim())
+  const BADSM = /(categor|collection|blog|image|static|page|post|policy|policies|brand|author|tag)/i
+  // 1) Sitemap URLs: robots.txt `Sitemap:` lines win; else the conventional /sitemap.xml.
+  let sitemaps: string[] = []
+  const robots = await fetchRaw(`https://${domain}/robots.txt`)
+  if (robots) sitemaps = Array.from(robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)).map((m) => m[1].trim())
+  if (!sitemaps.length) sitemaps = [`https://${domain}/sitemap.xml`]
+  // 2) Expand any sitemap INDEX into the child sitemaps most likely to hold products.
+  const productSitemaps: string[] = []
+  for (const sm of sitemaps.slice(0, 3)) {
+    const xml = await fetchRaw(sm); if (!xml) continue
+    if (/<sitemapindex/i.test(xml)) {
+      const children = locs(xml)
+      const named = children.filter((c) => /product/i.test(c))
+      const good = named.length ? named : children.filter((c) => !BADSM.test(c))
+      ;(good.length ? good : children).slice(0, 3).forEach((c) => productSitemaps.push(c))
+    } else {
+      productSitemaps.push(sm)   // a flat <urlset> — use it directly
+    }
+  }
+  // 3) Collect product page URLs from those sitemaps (skip asset/non-page locs).
+  const urls: string[] = []
+  const seen = new Set<string>()
+  for (const psm of productSitemaps.slice(0, 4)) {
+    const xml = await fetchRaw(psm); if (!xml) continue
+    for (const u of locs(xml)) {
+      if (urls.length >= cap) break
+      if (!u.includes(root) || seen.has(u)) continue
+      if (/\.(xml|jpe?g|png|webp|gif|svg|pdf|css|js)(\?|#|$)/i.test(u)) continue
+      seen.add(u); urls.push(u)
+    }
+    if (urls.length >= cap) break
+  }
+  return urls
+}
+
 export type StoreProduct = { title: string; image: string | null; price: string | null; url: string }
 export type StoreContext = { domain: string; siteName: string; description: string; products: StoreProduct[]; signals: string[] }
 
@@ -33,13 +85,21 @@ function parseProduct(url: string, html: string): StoreProduct {
   const title = strip(tag(html, /<title[^>]*>([^<]{0,140})/i)).replace(/\s*[|–—-].*$/, '').trim() || slugName(url) || 'Product'
   let image = tag(html, /property=["']og:image["'][^>]+content=["']([^"']+)["']/i) || tag(html, /name=["']twitter:image["'][^>]+content=["']([^"']+)["']/i)
   if (image && image.startsWith('//')) image = 'https:' + image
-  // Shopify's JS money is integer CENTS (e.g. 994800 = 9948.00); JSON-LD / og:price is decimal major units.
-  // Heuristic: an integer with no decimal point is cents → divide by 100; a value with a "." is already major.
-  const priceRaw = tag(html, /"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)/i) || tag(html, /property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([0-9.]+)/i)
   const cur = tag(html, /"priceCurrency"\s*:\s*"([A-Z]{3})"/i)
+  // Prefer the JSON-LD offer price — it's authoritative and ALWAYS in major units, integer ("619" = ₹619)
+  // or decimal, so we must NOT treat its bare integers as cents. We match a "price" that sits with the
+  // priceCurrency in the same offers block (either order) so a stray Shopify cents value elsewhere on the
+  // page can't win. Only when there's no JSON-LD currency do we fall back to the Shopify JS-money reading,
+  // where an integer with no decimal point IS cents (e.g. 994800 = 9948.00).
+  const ld = html.match(/"priceCurrency"\s*:\s*"[A-Z]{3}"[\s\S]{0,240}?"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)/i)
+    || html.match(/"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)"?[\s\S]{0,240}?"priceCurrency"\s*:\s*"[A-Z]{3}"/i)
+  const priceRaw = ld?.[1]
+    || tag(html, /property=["'](?:og:price:amount|product:price:amount)["'][^>]+content=["']([0-9.]+)/i)
+    || tag(html, /"price"\s*:\s*"?([0-9]+(?:\.[0-9]+)?)/i)
+  const major = !!ld || /[.]/.test(priceRaw || '')   // JSON-LD or any decimal ⇒ already major units
   let price: string | null = null
   if (priceRaw) {
-    const val = priceRaw.includes('.') ? parseFloat(priceRaw) : parseInt(priceRaw, 10) / 100
+    const val = major ? parseFloat(priceRaw) : parseInt(priceRaw, 10) / 100
     const num = val % 1 === 0 ? String(val) : val.toFixed(2)
     price = `${cur ? cur + ' ' : ''}${num}`
   }
@@ -92,6 +152,9 @@ export async function crawlStore(domain: string): Promise<StoreContext> {
   const description = strip(tag(home, /<meta[^>]+name=["']description["'][^>]+content=["']([^"']*)["']/i))
   let purls = productLinks(home, domain)
   if (purls.length < 4) { const coll = await fetchHtml(`https://${domain}/collections/all`); if (coll) purls = Array.from(new Set([...purls, ...productLinks(coll, domain)])) }
+  // Non-Shopify stores (BigCommerce, WooCommerce, Magento, custom) expose no `/products/` links — fall
+  // back to the sitemap so their catalog (and the real product photos our ads need) still gets crawled.
+  if (purls.length < 4) { const sm = await sitemapProductUrls(domain); if (sm.length) purls = Array.from(new Set([...purls, ...sm])) }
   purls = purls.slice(0, 14)
   const extraPages = await Promise.all(['about', 'pages/about', 'pages/contact', 'contact', 'policies/shipping-policy'].map((p) => fetchHtml(`https://${domain}/${p}`).catch(() => null)))
   const productHtml = await Promise.all(purls.map(async (u) => ({ url: u, html: (await fetchHtml(u).catch(() => null)) || '' })))
