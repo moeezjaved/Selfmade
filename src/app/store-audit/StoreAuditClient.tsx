@@ -649,11 +649,13 @@ function CampaignReveal({ domain, adsData, seoData }: { domain: string; adsData:
 
   const label = (t: string) => <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE, marginBottom: 12 }}>{t}</div>
   const tile = (cap: string, val: React.ReactNode, sub: string, bad?: boolean) => (
-    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 18px' }}>
+    <a href="/hq" style={{ display: 'block', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 18px', textDecoration: 'none', color: 'inherit', cursor: 'pointer', transition: 'box-shadow .15s ease, border-color .15s ease' }}
+      onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px -16px rgba(0,0,0,.35)'; e.currentTarget.style.borderColor = ORANGE }}
+      onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = LINE }}>
       <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: SUBINK }}>{cap}</div>
       <div style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, lineHeight: 1, margin: '8px 0 6px', color: bad ? '#c23b12' : INK }}>{val}</div>
       <div style={{ fontSize: 12, color: SUBINK, lineHeight: 1.35 }}>{sub}</div>
-    </div>
+    </a>
   )
 
   return (
@@ -717,10 +719,15 @@ function CampaignReveal({ domain, adsData, seoData }: { domain: string; adsData:
           {top3.length > 0 && (
             <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
               {top3.map((f, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '14px 18px' }}>
+                <a key={i} href="/hq" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '14px 18px', textDecoration: 'none', color: 'inherit', cursor: 'pointer', transition: 'box-shadow .15s ease, border-color .15s ease' }}
+                  onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 24px -16px rgba(0,0,0,.35)'; e.currentTarget.style.borderColor = ORANGE }}
+                  onMouseLeave={(e) => { e.currentTarget.style.boxShadow = 'none'; e.currentTarget.style.borderColor = LINE }}>
                   <div style={{ fontSize: 14.5, fontWeight: 600 }}>{f.title}{f.sub ? <span style={{ color: SUBINK, fontWeight: 400 }}> — {f.sub}</span> : ''}</div>
-                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: SUBINK, whiteSpace: 'nowrap' }}>{f.section}</div>
-                </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, whiteSpace: 'nowrap' }}>
+                    <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: SUBINK }}>{f.section}</div>
+                    <span style={{ color: ORANGE, fontWeight: 800, fontSize: 13 }}>Fix →</span>
+                  </div>
+                </a>
               ))}
             </div>
           )}
