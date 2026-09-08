@@ -196,22 +196,27 @@ export async function POST(req: NextRequest) {
     // same path Brand Hub uses) and classify their live ads in-session, so "you vs the winners" is never
     // empty. Timeout-raced so it can't blow the function budget; best-effort so it never blocks the report.
     let competitorRows: Record<string, unknown>[] | undefined
+    console.log(`[dbg-scan] gate manual=${manualCompetitors.length} corpusPageIds=${competitorPageIds.length} storeDomain='${storeDomain}' niche='${niche}'`)
     if (!manualCompetitors.length && competitorPageIds.length < 3 && storeDomain.includes('.')) {
+      const t0 = Date.now()
       const discover = async () => {
         const [{ discoverCompetitors }, { classifyLiveOwnAds }] = await Promise.all([
           import('@/lib/ads-studio/competitors'), import('@/lib/dna/classify-live'),
         ])
         const disc = await discoverCompetitors(storeDomain)
         const rivals = disc.competitors.slice(0, 4)
+        console.log(`[dbg-scan] discovered=${disc.competitors.length} withPageId=${disc.competitors.filter((c) => c.pageId).length} withLiveAds=${disc.competitors.filter((c) => (c.liveAds || []).length).length} queries=${JSON.stringify(disc.seed?.queries || []).slice(0, 140)}`)
         // Rivals already in our corpus → the free corpus path; the rest get enriched from their live ads.
         push(rivals.map((c) => c.pageId).filter((p): p is string => !!p))
         competitorPageIds = competitorPageIds.slice(0, 12)
         const liveAds = rivals.flatMap((c) => c.liveAds || []).filter((a) => a.body || a.title).slice(0, 20)
         if (liveAds.length) { const cr = await classifyLiveOwnAds(liveAds, brandName, niche); if (cr.length) competitorRows = cr }
+        console.log(`[dbg-scan] liveAds=${liveAds.length} competitorRows=${competitorRows?.length || 0} ms=${Date.now() - t0}`)
       }
       // Cap discovery at 65s so the whole /api/scan/run response lands inside the client's 90s abort
       // (ScanTheater) — if the droplet Ad Library search runs long, we return with what we have.
-      try { await Promise.race([discover(), new Promise<void>((res) => setTimeout(res, 65_000))]) } catch { /* best-effort */ }
+      try { await Promise.race([discover(), new Promise<void>((res) => setTimeout(res, 65_000))]) } catch (e) { console.log(`[dbg-scan] discover ERROR ${String((e as any)?.message || e).slice(0, 220)}`) }
+      console.log(`[dbg-scan] DONE corpusPageIds=${competitorPageIds.length} competitorRows=${competitorRows?.length || 0} totalMs=${Date.now() - t0}`)
     }
 
     let result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche, competitorRows })
