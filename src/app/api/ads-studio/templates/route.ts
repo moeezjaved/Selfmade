@@ -21,7 +21,7 @@ export const maxDuration = 300
 
 const cleanDomain = (s: string) => s.replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
 
-type Tpl = { title: string; concept: string; headline: string; angle: string; image?: string | null }
+type Tpl = { title: string; concept: string; headline: string; angle: string; image?: string | null; hasProduct?: boolean }
 
 /**
  * The 10 template types, each with a LOCKED visual STYLE (so Social Story is always a vibrant
@@ -137,7 +137,13 @@ export async function POST(req: NextRequest) {
       .from('creative_generations')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', user.id).eq('type', 'inspired')
-    const isFree = (renderedLifetime || 0) < FREE_RENDERS
+    // One-time FREE "product upgrade": re-render an ad that was cached WITHOUT the store's product (the
+    // catalog crawl came up empty on the first render) now that we have the real product, so it finally
+    // appears in the ad. Gated by hasProduct!==true (set below) so each template claims this at most once —
+    // no unlimited-free hole. Ordinary force-regenerations still cost credits past the free 5.
+    const usedProduct = (body.productImages || []).filter(Boolean).length > 0
+    const productUpgrade = !!body.force && !!tpls[index].image && (tpls[index] as any).hasProduct !== true && usedProduct
+    const isFree = productUpgrade || (renderedLifetime || 0) < FREE_RENDERS
     let txId: string | null = null
     if (!isFree) {
       const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: 'image_studio_pro' })
@@ -161,7 +167,7 @@ export async function POST(req: NextRequest) {
     }
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
     const img = out.url || out.image
-    tpls[index] = { ...t, image: img }
+    tpls[index] = { ...t, image: img, hasProduct: usedProduct }
     await writeCached(admin, brandId, tpls).catch(() => {})
     return NextResponse.json({ image: img })
   } catch (e: any) {
