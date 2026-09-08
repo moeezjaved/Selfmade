@@ -110,7 +110,7 @@ export default function StoreAuditClient() {
           onError: if the ads pull blips out (after auto-retries), we STILL run the SEO/AI half + show the
           rest — a transient ads hiccup never dead-ends the whole audit. */}
       {(started.seed.pageId || started.seed.adLibraryUrl) && (
-        <ScanTheater embedded seed={started.seed} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
+        <ScanTheater embedded seed={started.seed} domain={started.domain} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
       )}
 
       {/* ✨ HEADLINE REVEAL — the ads we'd make you (5 free renders). Placed right after the ads audit so

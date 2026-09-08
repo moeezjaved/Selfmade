@@ -72,9 +72,10 @@ function Count({ n, dur = 900 }: { n: number; dur?: number }) {
   return <>{v.toLocaleString()}</>
 }
 
-export default function ScanTheater({ embedded = false, seed, onDone, onError }: {
+export default function ScanTheater({ embedded = false, seed, domain, onDone, onError }: {
   embedded?: boolean
   seed?: { pageId?: string; adLibraryUrl?: string; name?: string; competitors?: { pageId: string; name: string }[] }
+  domain?: string   // the store's website — forwarded to /api/scan/run so it can discover rivals live when the corpus has none
   onDone?: (res: any) => void
   onError?: () => void   // ads pull failed after retries — the combined audit continues with the SEO half
 } = {}) {
@@ -101,7 +102,7 @@ export default function ScanTheater({ embedded = false, seed, onDone, onError }:
   const [errMsg, setErrMsg] = useState('')
   const running = useRef(false)
   const debounce = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[] }>({})
+  const lastPayload = useRef<{ pageId?: string; adLibraryUrl?: string; competitors?: string[]; domain?: string }>({})
   const autoStarted = useRef(false)   // embedded mode: fire the seed-driven auto-run exactly once
   const retryCount = useRef(0)         // auto-retry a transient ads-scan blip before ever showing an error
   const mainRef = useRef<HTMLElement>(null)
@@ -133,17 +134,17 @@ export default function ScanTheater({ embedded = false, seed, onDone, onError }:
 
   const startAudit = useCallback(() => {
     if (!picked) return
-    const base = picked.pageId ? { pageId: picked.pageId } : { adLibraryUrl: picked.adLibraryUrl }
+    const base = { ...(picked.pageId ? { pageId: picked.pageId } : { adLibraryUrl: picked.adLibraryUrl }), ...(domain ? { domain } : {}) }
     const competitors = comps.map((c) => c.pageId)
     run(competitors.length ? { ...base, competitors } : base)
-  }, [picked, comps])
+  }, [picked, comps, domain])
 
   const setStep = useCallback((id: StepId, status: Step['status'], metric?: string) =>
     setSteps((s) => s.map((x) => (x.id === id ? { ...x, status, metric: metric ?? x.metric } : x))), [])
   const addFinding = useCallback((id: StepId, text: string, bad?: boolean) =>
     setSteps((s) => s.map((x) => (x.id === id ? { ...x, findings: [...x.findings, { text, bad }] } : x))), [])
 
-  const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string; competitors?: string[] }) => {
+  const run = useCallback(async (payload: { pageId?: string; adLibraryUrl?: string; competitors?: string[]; domain?: string }) => {
     if (running.current) return
     running.current = true
     lastPayload.current = payload
@@ -329,8 +330,8 @@ export default function ScanTheater({ embedded = false, seed, onDone, onError }:
     if (!(seed.pageId || seed.adLibraryUrl)) return
     if (phase !== 'idle') return
     autoStarted.current = true
-    run({ pageId: seed.pageId, adLibraryUrl: seed.adLibraryUrl, competitors: (seed.competitors || []).map((c) => c.pageId) })
-  }, [embedded, seed, phase, run])
+    run({ pageId: seed.pageId, adLibraryUrl: seed.adLibraryUrl, competitors: (seed.competitors || []).map((c) => c.pageId), domain })
+  }, [embedded, seed, phase, run, domain])
 
   // ── IDLE — audit framing + brand picker (or ad-library link) ──
   if (phase === 'idle') {
