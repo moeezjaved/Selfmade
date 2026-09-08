@@ -119,6 +119,9 @@ export default function StoreAuditClient() {
           it's the emotional peak, not buried at the very end. It starts rendering immediately and the
           rest of the audit (search & AI) continues below. */}
       {adsDone && brandId && <AuditAds domain={started.domain} headline />}
+      {/* ✨ THE PAGE IT OPENS — a REAL landing page we build for the store (no paid AI images; the visitor
+          upgrades those with credits after they join), shown scrollably, 3 designs to flip through. */}
+      {adsDone && brandId && <LandingPageReveal domain={started.domain} />}
       {adsDone && atCap && (
         <div style={{ padding: '10px 24px 0', display: 'flex', justifyContent: 'center' }}>
           <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUBINK, fontSize: 14 }}>
@@ -530,3 +533,118 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   )
 }
 const genBtn: React.CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 18px', fontSize: 13, fontWeight: 800, cursor: 'pointer', fontFamily: 'inherit' }
+
+/* ── THE PAGE IT OPENS — the landing page half of the reveal ──
+ * We generate a REAL page with the builder (advertorial / listicle / product), using the store's real
+ * product photo but NO paid AI images (noAiImages) so it's FREE — the visitor upgrades to AI imagery with
+ * credits after they join. Each page is saved as a draft they can open + edit in the builder. Shown in a
+ * scrollable browser frame, connected to the ad above ("↑ opens the page"), with 3 designs to flip. */
+const LP_DESIGNS = [
+  { id: 'advertorial', label: 'Advertorial' },
+  { id: 'listicle', label: 'Listicle' },
+  { id: 'product', label: 'Product page' },
+] as const
+type LpState = { html?: string; pageId?: string; generating?: boolean; failed?: boolean }
+
+function LandingPageReveal({ domain }: { domain: string }) {
+  const [designs, setDesigns] = useState<Record<string, LpState>>({})
+  const [active, setActive] = useState(0)
+  const [product, setProduct] = useState<{ title: string; image: string | null; price: string | null } | null>(null)
+  const [ready, setReady] = useState(false)
+  const genStarted = useRef<Set<string>>(new Set())   // dedup: one generation per design id (ref, not stale state)
+  const INK2 = '#161c17', SUBINK2 = '#5f665c', LINE2 = '#e6e5dc'
+  const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
+  const host = domain.replace(/^www\./, '')
+
+  // Load the store's top product so the page features a real product photo + name.
+  useEffect(() => {
+    let on = true
+    fetch(`/api/ads-studio/products?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((p) => {
+      if (!on) return
+      const withImg = (p.products || []).filter((x: any) => x.image || (x.images || [])[0])
+      const t = withImg[0]
+      setProduct(t ? { title: t.title || 'Product', image: t.image || (t.images || [])[0] || null, price: t.price || null } : null)
+      setReady(true)
+    }).catch(() => { if (on) setReady(true) })
+    return () => { on = false }
+  }, [domain])
+
+  const gen = async (i: number) => {
+    const d = LP_DESIGNS[i]
+    if (genStarted.current.has(d.id)) return   // already generating or generated
+    genStarted.current.add(d.id)
+    setDesigns((prev) => ({ ...prev, [d.id]: { generating: true } }))
+    const importedProduct = product ? { title: product.title, image: product.image, images: product.image ? [product.image] : [], price: product.price || undefined, sourceUrl: `https://${host}` } : null
+    try {
+      const r = await fetch('/api/builder/generate', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: d.id, noAiImages: true, importedProduct }),
+      })
+      const j = await r.json().catch(() => ({}))
+      if (j.previewHtml) { setDesigns((prev) => ({ ...prev, [d.id]: { html: j.previewHtml, pageId: j.pageId } })); return }
+      genStarted.current.delete(d.id); setDesigns((prev) => ({ ...prev, [d.id]: { failed: true } }))   // allow retry
+    } catch { genStarted.current.delete(d.id); setDesigns((prev) => ({ ...prev, [d.id]: { failed: true } })) }
+  }
+
+  // Build the active design once the product crawl is ready (active starts at 0 → first design), and build
+  // each other design the first time it's flipped to. The ref guard makes this idempotent.
+  useEffect(() => { if (ready) gen(active) }, [active, ready])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  const cur = designs[LP_DESIGNS[active].id]
+  const go = (dir: number) => setActive((a) => (a + dir + LP_DESIGNS.length) % LP_DESIGNS.length)
+
+  return (
+    <div style={{ padding: '8px 20px 44px', display: 'flex', justifyContent: 'center', fontFamily: "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
+      <div style={{ maxWidth: 760, width: '100%' }}>
+        {/* connective thread from the ad above */}
+        <div style={{ textAlign: 'center', marginBottom: 14 }}>
+          <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE }}>↑ opens the page</div>
+        </div>
+        <div style={{ background: '#fff', color: INK2, border: `1px solid ${LINE2}`, borderRadius: 22, padding: 'clamp(20px,4vw,34px)', boxShadow: '0 26px 64px -34px rgba(20,29,21,.5)' }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 4 }}>
+            <div style={{ fontFamily: MONO, fontSize: 12, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE }}>The page it opens</div>
+            <div style={{ fontFamily: MONO, fontSize: 10.5, color: SUBINK2 }}>{active + 1} of {LP_DESIGNS.length} designs · {LP_DESIGNS[active].label}</div>
+          </div>
+          <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(26px,4vw,40px)', fontWeight: 400, lineHeight: 1.05, margin: '0 0 14px' }}>A landing page, built to match.</h2>
+
+          {/* browser frame with the real, scrollable page */}
+          <div style={{ border: `1px solid ${LINE2}`, borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE2}`, background: '#f4f4ef' }}>
+              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e3675b' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e9b04e' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#5fb96a' }} />
+              <div style={{ flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 11, color: SUBINK2, background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 100, padding: '3px 10px', maxWidth: 340, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host}/{LP_DESIGNS[active].id === 'product' ? 'products/' : ''}{(product?.title || 'landing').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}</div>
+            </div>
+            <div style={{ position: 'relative', height: 520, background: '#faf9f5' }}>
+              {cur?.html ? (
+                <iframe title={`${LP_DESIGNS[active].label} landing page`} srcDoc={cur.html} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+              ) : cur?.failed ? (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
+                  <div style={{ fontSize: 13.5 }}>Couldn&rsquo;t build this one.</div>
+                  <button onClick={() => { setDesigns((s) => { const n = { ...s }; delete n[LP_DESIGNS[active].id]; return n }); setTimeout(() => gen(active), 0) }} style={genBtn}>↻ Retry</button>
+                </div>
+              ) : (
+                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
+                  <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+                  <div style={{ fontSize: 12.5, fontFamily: MONO }}>Building your {LP_DESIGNS[active].label.toLowerCase()}…</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* design flip */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 16 }}>
+            <button aria-label="Previous design" onClick={() => go(-1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&lsaquo;</button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {LP_DESIGNS.map((d, i) => (
+                <button key={d.id} onClick={() => setActive(i)} aria-label={d.label} style={{ padding: '6px 12px', borderRadius: 100, border: i === active ? `1px solid ${ORANGE}` : `1px solid ${LINE2}`, background: i === active ? ORANGE : '#fff', color: i === active ? '#fff' : SUBINK2, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{d.label}</button>
+              ))}
+            </div>
+            <button aria-label="Next design" onClick={() => go(1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&rsaquo;</button>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: 14, fontFamily: MONO, fontSize: 12.5, color: INK2 }}>
+            <span style={{ background: '#f3f6ec', border: '1px solid #d3e6b8', borderRadius: 100, padding: '7px 15px' }}><span style={{ color: SUBINK2, textDecoration: 'line-through' }}>~$2,000 page</span> <span style={{ color: ORANGE, fontWeight: 700 }}>→ built, yours</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}

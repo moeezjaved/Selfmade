@@ -30,6 +30,10 @@ export async function POST(req: NextRequest) {
   const research = b?.research ? String(b.research) : undefined
   const language = b?.language ? String(b.language).slice(0, 40) : undefined
   const paletteId = b?.paletteId ? String(b.paletteId).slice(0, 40) : undefined
+  // Free/audit mode: generate the page with the REAL product photo but NO paid AI images — the visitor
+  // upgrades to AI-generated imagery with their credits after they join. No AI images ⇒ nothing costly is
+  // generated ⇒ we skip the credit charge entirely (not an abuse hole: the charge is for the AI images).
+  const noAiImages = b?.noAiImages === true
   // An externally-imported product (pasted URL) can stand in for a Shopify productId.
   const ip = b?.importedProduct && typeof b.importedProduct === 'object' ? b.importedProduct : null
   const importedProduct = ip?.title ? {
@@ -57,17 +61,19 @@ export async function POST(req: NextRequest) {
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
 
   let txId: string | null = null
-  try {
-    txId = (await reserveCredits(admin, user.id, ACTION)).id
-  } catch (e: any) {
-    if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have }, { status: 402 })
-    return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+  if (!noAiImages) {
+    try {
+      txId = (await reserveCredits(admin, user.id, ACTION)).id
+    } catch (e: any) {
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have }, { status: 402 })
+      return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
+    }
   }
   const refund = async () => { if (txId) await refundCredits(admin, txId).then(() => {}, () => {}) }
 
   let gen
   try {
-    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId, importedProduct })
+    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId, importedProduct, skipAiImages: noAiImages })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: e?.message || 'Generation failed' }, { status: 502 })
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest) {
   }).select('id').single()
 
   if (error || !saved) { await refund(); return NextResponse.json({ error: 'save_failed' }, { status: 500 }) }
-  await commitCredits(admin, txId!, { page_id: saved.id, template: templateId }).then(() => {}, () => {})
+  if (txId) await commitCredits(admin, txId, { page_id: saved.id, template: templateId }).then(() => {}, () => {})
 
   return NextResponse.json({ pageId: saved.id, previewHtml })
 }
