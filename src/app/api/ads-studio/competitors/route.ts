@@ -145,7 +145,10 @@ export async function GET(req: NextRequest) {
     let spied: any[] = []
     if (user) {
       let q = admin.from('followed_brands').select('page_id, brand_name, brand_id').eq('user_id', user.id).eq('spied', true)
-      if (brandId) q = q.or(`brand_id.eq.${brandId},brand_id.is.null`)
+      // STRICT per-brand (matches the brand-spy GET route): a specific active brand shows ONLY the
+      // competitors linked to it. Old global spies (brand_id null) surface under "All brands" only — not
+      // under every brand — else unrelated brands (e.g. gummy brands under a portable-wudu store) leak in. QA.
+      if (brandId) q = q.eq('brand_id', brandId)
       const { data: follows } = await q.limit(30)
       const pageIds: string[] = Array.from(new Set((follows || []).map((f: any) => String(f.page_id)).filter(Boolean)))
       if (pageIds.length) {
