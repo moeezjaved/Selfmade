@@ -323,6 +323,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
   const [productsReady, setProductsReady] = useState(false)   // catalog crawl finished (empty ⇒ service/SaaS, not "still loading")
   const [needCredits, setNeedCredits] = useState(false)
+  const [idx, setIdx] = useState(0)   // which of the 5 free ads is open in the carousel
   const kicked = useRef(false)
   const rootRef = useRef<HTMLDivElement>(null)
   const scrolled = useRef(false)
@@ -343,9 +344,9 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
       fetch(`/api/ads-studio/brand-kit?domain=${enc}`).then((r) => r.json()).catch(() => null),
     ]).then(([t, k]) => {
       if (!on) return
-      // Only 5 concepts — image renders are expensive, so we never generate (or even offer) more than the
-      // 5 free ones in the audit.
-      setTpls((Array.isArray(t.templates) ? t.templates : []).slice(0, FREE).map((x: any) => ({ ...x })))
+      // 10 concepts: the first 5 auto-render FREE, the other 5 are offered as a "make more" upsell that
+      // spends the founder's credits (genOne handles the paid/402 path). We only ever AUTO-render the 5 free.
+      setTpls((Array.isArray(t.templates) ? t.templates : []).slice(0, 10).map((x: any) => ({ ...x })))
       setKit(k && !k.empty ? k : null)
     })
     // The ads MUST use the store's REAL product photos. Read the cached catalog first; if it comes back
@@ -409,55 +410,115 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
 
   if (tpls !== null && tpls.length === 0) return null
   const cards = tpls || Array.from({ length: FREE }, () => null)
+  const free = cards.slice(0, FREE)
+  const paidCards = cards.slice(FREE)                 // the 5 credit-upsell concepts (may be empty)
+  const cur = free[Math.min(idx, FREE - 1)] || null
+  const allReady = doneCount >= FREE
+  const go = (d: number) => setIdx((i) => (i + d + FREE) % FREE)
+
+  // White reveal band — deliberately breaks out of the dark audit page so it reads as THE moment.
+  const INK = '#161c17', LINE = '#e6e5dc', SUBINK = '#5f665c'
+  const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
+  const arrow = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: '50%', [side]: 8, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: `1px solid ${LINE}`, background: 'rgba(255,255,255,.95)', color: INK, fontSize: 21, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px -8px rgba(20,29,21,.55)', fontFamily: 'inherit' })
+
   return (
-    <div ref={rootRef} style={{ padding: headline ? '44px 24px 12px' : '20px 24px 0', display: 'flex', justifyContent: 'center', ...(headline ? { background: 'linear-gradient(180deg, rgba(224,47,6,.10), rgba(224,47,6,0) 70%)' } : {}) }}>
-      <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}@keyframes sfreveal{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}`}</style>
-      <div style={{ maxWidth: 1100, width: '100%', ...(headline ? { animation: 'sfreveal .5s ease both' } : {}) }}>
-        {headline && (
-          <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.16em', textTransform: 'uppercase', color: ORANGE, marginBottom: 10, textAlign: 'center' }}>
-            ✨ Here&rsquo;s what we&rsquo;d make you{doneCount > 0 ? ` · ${doneCount}/${FREE} ready` : ' · rendering now…'}
+    <div ref={rootRef} style={{ padding: headline ? '40px 20px 14px' : '20px 24px 0', display: 'flex', justifyContent: 'center' }}>
+      <style>{`
+        @keyframes sfspin{to{transform:rotate(360deg)}}
+        @keyframes sfrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
+        .sfrev-slide{animation:sfrise .34s ease both}
+        @media (prefers-reduced-motion: reduce){.sfrev,.sfrev-slide{animation:none!important}}
+      `}</style>
+      <div className="sfrev" style={{ maxWidth: 760, width: '100%', background: '#fff', color: INK, border: `1px solid ${LINE}`, borderRadius: 22, padding: 'clamp(22px,4vw,40px)', boxShadow: '0 26px 64px -34px rgba(20,29,21,.5)', fontFamily: "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif", animation: headline ? 'sfrise .5s ease both' : undefined }}>
+
+        {/* brand mark + live build progress (real render count = the "we're building it" feel) */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+          <svg viewBox="0 0 100 100" width="24" height="24" aria-hidden style={{ flex: '0 0 auto' }}>
+            <g stroke={ORANGE} strokeWidth="18" strokeLinecap="round"><line x1="34" y1="22" x2="18" y2="50" /><line x1="66" y1="22" x2="82" y2="50" /><line x1="34" y1="78" x2="66" y2="78" /></g>
+            <g fill={ORANGE}><circle cx="34" cy="22" r="15" /><circle cx="66" cy="22" r="15" /><circle cx="82" cy="50" r="15" /><circle cx="66" cy="78" r="15" /><circle cx="34" cy="78" r="15" /><circle cx="18" cy="50" r="15" /></g>
+          </svg>
+          <span style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.13em', textTransform: 'uppercase', color: allReady ? '#2f7d32' : SUBINK }}>
+            {allReady ? '● Campaign ready' : `Building your campaign · ${doneCount}/${FREE} ads rendered`}
+          </span>
+        </div>
+
+        <h2 style={{ fontFamily: SERIF, fontSize: headline ? 'clamp(30px,5vw,50px)' : 30, fontWeight: 400, lineHeight: 1.02, letterSpacing: '-.01em', margin: '0 0 10px' }}>We already built your next campaign.</h2>
+        <p style={{ fontSize: 15.5, color: SUBINK, lineHeight: 1.5, margin: '0 0 4px', maxWidth: 560 }}>Five ads, drawn from the winning DNA your rivals run — rendered live on <b style={{ color: INK }}>your real product</b>. Not mockups. Ready to launch.</p>
+
+        {/* value line */}
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 9, margin: '18px 0 26px', fontFamily: MONO, fontSize: 12.5, background: '#f3f6ec', border: '1px solid #d3e6b8', borderRadius: 100, padding: '8px 16px' }}>
+          <span style={{ color: SUBINK, textDecoration: 'line-through' }}>~$500 in ad creative</span>
+          <span style={{ color: ORANGE, fontWeight: 700 }}>→ yours, on us</span>
+        </div>
+
+        {/* ── the 5 real ads, browseable ── */}
+        <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
+          <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f4f4ef', border: `1px solid ${LINE}`, borderRadius: 18, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {cur?.image ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img key={cur.image} src={cur.image} alt={cur.title || ''} className="sfrev-slide" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : cur?.failed ? (
+              <button onClick={() => genOne(idx)} style={genBtn}>↻ Retry</button>
+            ) : (
+              <div style={{ textAlign: 'center', color: SUBINK }}>
+                <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', margin: '0 auto 10px', animation: 'sfspin .8s linear infinite' }} />
+                <div style={{ fontSize: 12.5, fontFamily: MONO }}>Rendering ad {idx + 1}…</div>
+              </div>
+            )}
+            <span style={{ position: 'absolute', top: 12, left: 12, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', color: '#fff', background: ORANGE, borderRadius: 100, padding: '3px 10px' }}>FREE</span>
+            <button aria-label="Previous ad" onClick={() => go(-1)} style={arrow('left')}>&lsaquo;</button>
+            <button aria-label="Next ad" onClick={() => go(1)} style={arrow('right')}>&rsaquo;</button>
+          </div>
+
+          {/* thumbnail rail — see all 5 at a glance, click to jump */}
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+            {free.map((t, i) => (
+              <button key={i} onClick={() => setIdx(i)} aria-label={`Ad ${i + 1}`} style={{ width: 44, height: 55, borderRadius: 8, overflow: 'hidden', padding: 0, cursor: 'pointer', border: i === idx ? `2px solid ${ORANGE}` : `1px solid ${LINE}`, background: '#f4f4ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {t?.image ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                ) : <span style={{ fontFamily: MONO, fontSize: 10, color: SUBINK }}>{i + 1}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* current ad copy */}
+          <div style={{ textAlign: 'center', marginTop: 14, minHeight: 44 }}>
+            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{cur?.headline || cur?.title || `Ad ${idx + 1}`}</div>
+            {cur?.angle && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, fontFamily: MONO }}>{cur.angle}</div>}
+          </div>
+        </div>
+
+        {/* ── make 5 more, from your credits ── */}
+        {paidCards.length > 0 && (
+          <div style={{ marginTop: 30, borderTop: `1px solid ${LINE}`, paddingTop: 24 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+              <div style={{ fontFamily: SERIF, fontSize: 22 }}>Want {paidCards.length} more? They&rsquo;re queued.</div>
+              <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: SUBINK }}>uses your credits</div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(140px,100%),1fr))', gap: 12 }}>
+              {paidCards.map((t, k) => {
+                const i = FREE + k
+                return (
+                  <div key={i} style={{ position: 'relative', aspectRatio: '4 / 5', borderRadius: 14, overflow: 'hidden', border: `1.5px dashed ${t?.image ? ORANGE + '88' : '#cdccc3'}`, background: '#faf9f5', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12, textAlign: 'center' }}>
+                    {t?.image ? (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img src={t.image} alt={t.title || ''} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                    ) : t?.generating ? (
+                      <div style={{ width: 22, height: 22, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+                    ) : (
+                      <div>
+                        <div style={{ fontFamily: MONO, fontSize: 10, letterSpacing: '.04em', textTransform: 'uppercase', color: SUBINK, marginBottom: 8 }}>{t?.title || `Concept ${i + 1}`}</div>
+                        <button onClick={() => genOne(i)} style={genBtn}>{t?.failed ? '↻ Retry' : 'Generate →'}</button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
           </div>
         )}
-        <h2 style={{ fontFamily: SERIF, fontSize: headline ? 42 : 30, fontWeight: 700, color: '#fff', margin: '0 0 4px', textAlign: headline ? 'center' : 'left', lineHeight: 1.05 }}>The ads we made you</h2>
-        <p style={{ fontSize: headline ? 16 : 15, color: SUB, margin: headline ? '0 auto 24px' : '0 0 20px', maxWidth: 640, lineHeight: 1.5, textAlign: headline ? 'center' : 'left' }}>Built from the winning DNA your rivals use, with <b style={{ color: '#fff' }}>your real product</b> — rendered live, just for your store. All 5 are on us.</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(min(210px,100%),1fr))', gap: 16 }}>
-          {cards.map((t, i) => {
-            const paid = i >= FREE
-            return (
-              <div key={i} style={{ background: '#0f150f', border: `1px solid ${t?.image ? ORANGE + '55' : 'rgba(255,255,255,.12)'}`, borderRadius: 16, overflow: 'hidden' }}>
-                <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#161d16', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  {t?.image ? (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img src={t.image} alt={t.title || ''} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                  ) : t?.generating ? (
-                    <div style={{ textAlign: 'center', color: SUB }}>
-                      <div style={{ width: 26, height: 26, border: '2.5px solid rgba(255,255,255,.2)', borderTopColor: ORANGE, borderRadius: '50%', margin: '0 auto 10px', animation: 'sfspin 0.8s linear infinite' }} />
-                      <div style={{ fontSize: 12.5 }}>Rendering…</div>
-                    </div>
-                  ) : (
-                    <div style={{ textAlign: 'center', padding: 18 }}>
-                      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(255,255,255,.5)', marginBottom: 8 }}>{t?.title || `Concept ${i + 1}`}</div>
-                      {t?.failed ? (
-                        <button onClick={() => genOne(i)} style={genBtn}>↻ Retry</button>
-                      ) : paid ? (
-                        <button onClick={() => genOne(i)} style={genBtn}>Generate →</button>
-                      ) : (
-                        <div style={{ fontSize: 12, color: SUB }}>Queued…</div>
-                      )}
-                      {paid && !t?.failed && <div style={{ fontSize: 10.5, color: 'rgba(255,255,255,.45)', marginTop: 8 }}>uses your credits</div>}
-                    </div>
-                  )}
-                  <span style={{ position: 'absolute', top: 10, left: 10, fontSize: 9.5, fontWeight: 800, letterSpacing: '.14em', color: '#fff', background: paid ? 'rgba(0,0,0,.5)' : ORANGE, borderRadius: 100, padding: '3px 9px' }}>{paid ? 'CREDITS' : 'FREE'}</span>
-                </div>
-                <div style={{ padding: '11px 13px 13px' }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 700, color: '#fff', lineHeight: 1.3 }}>{t?.headline || t?.title || `Ad concept ${i + 1}`}</div>
-                  {t?.title && <div style={{ fontSize: 11.5, color: SUB, marginTop: 3 }}>{t.title}</div>}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-        {needCredits && <div style={{ marginTop: 14, fontSize: 13, color: SUB }}>Out of credits for the extra renders — <a href="/pricing" style={{ color: '#fff', fontWeight: 700 }}>top up</a> to make the rest.</div>}
+        {needCredits && <div style={{ marginTop: 14, fontSize: 13, color: SUBINK }}>Out of credits for the extra renders — <a href="/pricing" style={{ color: ORANGE, fontWeight: 700 }}>top up</a> to make the rest.</div>}
       </div>
     </div>
   )
