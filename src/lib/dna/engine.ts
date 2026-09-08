@@ -143,7 +143,7 @@ export type WinnerDna = {
 }
 
 // ── L1: Winner DNA — the DNA of ads that survive (days_running ≥ 90) across these pages/niche ──
-export async function winnerDna(pageIds: string[], niche?: string | null, brandName?: string | null): Promise<WinnerDna> {
+export async function winnerDna(pageIds: string[], niche?: string | null, brandName?: string | null, extraRows?: AdRow[]): Promise<WinnerDna> {
   const db = createAdminClient()
   let rows: AdRow[] = []
 
@@ -154,13 +154,21 @@ export async function winnerDna(pageIds: string[], niche?: string | null, brandN
       .in('page_id', pageIds).eq('has_creative', true)
       .order('performance_score', { ascending: false, nullsFirst: false }).limit(1500)
     rows = (data as AdRow[]) || []
-  } else if (niche) {
+  } else if (niche && !(extraRows && extraRows.length)) {
+    // With live competitor rows in hand we DON'T widen to the whole niche — those rows ARE the rivals.
     const { data } = await db.from('discovery_ads_index').select(SELECT)
       .eq('niche', niche).eq('has_creative', true)
       .order('performance_score', { ascending: false, nullsFirst: false }).limit(1500)
     rows = (data as AdRow[]) || []
   }
+  // Live-discovered rivals (Google + Meta Ad Library, classified in-session) join the corpus pool — this is
+  // how a brand whose peers aren't in our 611K directory still gets a real "you vs winners" breakdown.
+  if (extraRows && extraRows.length) rows = [...rows, ...extraRows]
+  return winnerDnaFromRows(rows, brandName)
+}
 
+// Compute winner DNA from an in-hand row set — corpus rows, live-classified competitor rows, or both.
+export function winnerDnaFromRows(rows: AdRow[], brandName?: string | null): WinnerDna {
   // Relevance: keep rivals in the SAME writing system as the brand (a Cyrillic/CJK store is not a
   // believable peer for a Latin-script brand). Fall back to all rows if the same-language pool is thin.
   if (brandName) {
@@ -427,18 +435,22 @@ export type FullDnaResult = { winners: WinnerDna; own: OwnDna; gaps: Gap[]; repo
 
 export async function runDnaEngine(opts: {
   brandName: string; competitorPageIds: string[]; ownPageId?: string | null; niche?: string | null; force?: boolean
-  ownRows?: AdRow[]   // in-session own ads (live-pulled + classified) → complete report without the crawl
+  ownRows?: AdRow[]          // in-session own ads (live-pulled + classified) → complete report without the crawl
+  competitorRows?: AdRow[]   // in-session RIVAL ads (live-discovered + classified) → winners even when the corpus has no peers
 }): Promise<FullDnaResult> {
-  const { brandName, competitorPageIds, ownPageId = null, niche = null, force = false, ownRows } = opts
+  const { brandName, competitorPageIds, ownPageId = null, niche = null, force = false, ownRows, competitorRows } = opts
   const key = cacheKey(competitorPageIds, ownPageId)
+  // Injected in-session rows (own or competitor) aren't reflected in the cache key → never read/write cache
+  // for them, so a live-enriched run can't serve or freeze a stale corpus-only result.
+  const injected = !!(ownRows?.length || competitorRows?.length)
 
   // A cold brand's FIRST scan returns own.found=false (ads not crawled/drained yet). We must NOT let that
   // "not found" freeze in the cache — once the crawl + creative drain land, the next scan has to recompute
   // and see the ads. So: ignore a cached result whose own audit is empty, and only WRITE the cache once the
   // own audit is real. Brands with a genuine ownPage that stays empty just recompute cheaply each time.
   const publicUrl = r2PublicUrl(key)
-  // Injected in-session own ads → always recompute (never serve a stale/empty cached own).
-  if (!force && !ownRows && publicUrl) {
+  // Injected in-session rows → always recompute (never serve a stale/empty cached result).
+  if (!force && !injected && publicUrl) {
     try {
       const r = await fetch(publicUrl, { cache: 'no-store' })
       if (r.ok) {
@@ -449,7 +461,7 @@ export async function runDnaEngine(opts: {
   }
 
   const [winners, own] = await Promise.all([
-    winnerDna(competitorPageIds, niche, brandName),
+    winnerDna(competitorPageIds, niche, brandName, competitorRows),
     ownRows && ownRows.length ? Promise.resolve(ownDnaFromRows(ownRows)) : ownDna(ownPageId),
   ])
   const gaps = dnaDiff(own, winners)
@@ -458,8 +470,9 @@ export async function runDnaEngine(opts: {
   const cost = estimateCost(own, gaps, score)
   const result: FullDnaResult = { winners, own, gaps, report, score, cost, cached: false }
 
-  // Only persist a COMPLETE result — never freeze a pending "not found" own audit (see above).
-  if (!ownPageId || own.found) {
+  // Only persist a COMPLETE result — never freeze a pending "not found" own audit (see above), and never
+  // cache a run enriched with injected in-session rows (its key doesn't capture them).
+  if (!injected && (!ownPageId || own.found)) {
     try { await uploadBufferToR2(Buffer.from(JSON.stringify(result)), key, 'application/json') } catch { /* cache best-effort */ }
   }
   return result

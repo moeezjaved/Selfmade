@@ -11,7 +11,10 @@ import { creativeBriefs } from '@/lib/dna/creative'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 60
+// 180s ceiling (not added latency): the live competitor-discovery fallback runs Google + a Meta Ad Library
+// search on the droplet (Playwright) — same budget as the ads-studio competitors route. It's timeout-raced
+// below and only fires when the corpus has no peers, so ordinary scans are unaffected.
+export const maxDuration = 180
 
 // Best-effort in-memory IP limiter (no Redis in this stack). Per warm instance; fine for a top-of-funnel
 // audit — abuse is bounded and the heavy spend (LLM) is cached in R2 by the engine anyway.
@@ -103,7 +106,7 @@ export async function POST(req: NextRequest) {
   const ip = (req.headers.get('x-forwarded-for') || '').split(',')[0].trim() || 'anon'
   if (limited(ip)) return NextResponse.json({ error: 'Too many scans — try again in a bit.' }, { status: 429 })
 
-  let body: { pageId?: string; adLibraryUrl?: string; competitors?: string[] }
+  let body: { pageId?: string; adLibraryUrl?: string; competitors?: string[]; domain?: string }
   try { body = await req.json() } catch { return NextResponse.json({ error: 'Bad JSON' }, { status: 400 }) }
 
   const pageId = (body.pageId && /^\d{5,}$/.test(body.pageId)) ? body.pageId : extractPageId(body.adLibraryUrl || '')
@@ -122,7 +125,7 @@ export async function POST(req: NextRequest) {
     const admin = createAdminClient()
     // Resolve the brand + its niche. Prefer the directory; fall back to the brand's OWN crawled ads
     // (page_name + most-common niche) so a brand that's crawled but not in the 611K catalog still resolves.
-    const { data: brand } = await admin.from('brand_directory').select('name, industry, country').eq('page_id', pageId).maybeSingle()
+    const { data: brand } = await admin.from('brand_directory').select('name, industry, country, website').eq('page_id', pageId).maybeSingle()
     let brandName = (brand?.name as string) || ''
     let niche = (brand?.industry as string) || null
     let brandCountry = (brand?.country as string) || null
@@ -146,6 +149,11 @@ export async function POST(req: NextRequest) {
       for (const r of (mc || []) as { countries?: string[] }[]) for (const c of (r.countries || [])) { const k = String(c).trim().toUpperCase(); if (k) cc[k] = (cc[k] || 0) + 1 }
       brandCountry = Object.entries(cc).sort((a, b) => b[1] - a[1])[0]?.[0] || null
     }
+
+    // The store's website — needed to discover rivals live on the open web when the corpus has none. The
+    // user-typed domain (the combined /store-audit passes it) is ground truth; else the directory's website.
+    const normDom = (s: string) => (s || '').replace(/^https?:\/\//i, '').replace(/^www\./i, '').replace(/\/.*$/, '').trim().toLowerCase()
+    const storeDomain = normDom(String(body.domain || '')) || normDom(String(brand?.website || ''))
 
     // Rivals by CONTENT OVERLAP — the coarse niche ("Health & Wellness") lumps a nicotine brand in with
     // mattresses and period care. So we pull the brand's OWN distinctive ad keywords and rank same-niche
@@ -183,7 +191,28 @@ export async function POST(req: NextRequest) {
       competitorPageIds = competitorPageIds.slice(0, 12)
     }
 
-    let result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche })
+    // LIVE FALLBACK — the corpus still has no peers (a niche/region our 611K directory doesn't cover, e.g.
+    // Indian Ayurveda). Discover the store's REAL rivals on the open web (Google + Meta Ad Library — the
+    // same path Brand Hub uses) and classify their live ads in-session, so "you vs the winners" is never
+    // empty. Timeout-raced so it can't blow the function budget; best-effort so it never blocks the report.
+    let competitorRows: Record<string, unknown>[] | undefined
+    if (!manualCompetitors.length && competitorPageIds.length < 3 && storeDomain.includes('.')) {
+      const discover = async () => {
+        const [{ discoverCompetitors }, { classifyLiveOwnAds }] = await Promise.all([
+          import('@/lib/ads-studio/competitors'), import('@/lib/dna/classify-live'),
+        ])
+        const disc = await discoverCompetitors(storeDomain)
+        const rivals = disc.competitors.slice(0, 4)
+        // Rivals already in our corpus → the free corpus path; the rest get enriched from their live ads.
+        push(rivals.map((c) => c.pageId).filter((p): p is string => !!p))
+        competitorPageIds = competitorPageIds.slice(0, 12)
+        const liveAds = rivals.flatMap((c) => c.liveAds || []).filter((a) => a.body || a.title).slice(0, 20)
+        if (liveAds.length) { const cr = await classifyLiveOwnAds(liveAds, brandName, niche); if (cr.length) competitorRows = cr }
+      }
+      try { await Promise.race([discover(), new Promise<void>((res) => setTimeout(res, 90_000))]) } catch { /* best-effort */ }
+    }
+
+    let result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche, competitorRows })
 
     // Own ads not in the crawl index yet → DON'T defer the report. Pull their live ads on-demand (droplet,
     // ~seconds, no IPRoyal media download), classify them in-session, and re-run the DNA so the FULL audit —
