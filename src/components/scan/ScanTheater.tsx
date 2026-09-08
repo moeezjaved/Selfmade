@@ -9,8 +9,13 @@ import type { FullDnaResult, Tally } from '@/lib/dna/engine'
 import { videoShotList, remakeScript, type CreativeBrief } from '@/lib/dna/creative'
 import { useIsMobile } from '@/lib/useIsMobile'
 
-const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', ORANGE = '#ef4a1e', PAPER = '#fbf4e2'
-const DARK = '#1c1611', DARK2 = '#2a2016', CREAM = '#f3ece0', MUT = '#a99f92'
+// Design tokens aligned to the campaign-reveal / brand voice (voice.ts): white-paper, Instrument Serif,
+// action-orange #ff5a2c, forest-green dark rail — so the ads audit reads as one system with the reveal.
+const INK = '#161c17', SUB = '#5f665c', LINE = '#e6e5dc', ORANGE = '#ff5a2c', PAPER = '#faf9f5'
+// MUT is muted text used on BOTH the forest rail and the light pane — keep it a mid-grey legible on both.
+const DARK = '#141d15', DARK2 = '#1d2a1e', CREAM = '#f2f1ea', MUT = '#8b9189'
+const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
+const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
 
 type Brand = { pageId: string; name: string; adCount?: number; industry?: string | null }
 type StepId = 'ads' | 'rivals' | 'gaps' | 'score'
@@ -351,8 +356,8 @@ export default function ScanTheater({ embedded = false, seed, domain, onDone, on
         <div style={{ position: 'relative', zIndex: 2, width: '100%', maxWidth: 1040 }}>
           {/* the pitch + brand picker */}
           <div style={{ minWidth: 0, maxWidth: 560 }}>
-            <div style={{ fontFamily: 'Fraunces,serif', fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 90 seconds · no login</div>
-            <h1 style={{ fontFamily: 'Fraunces,Georgia,serif', fontSize: 'clamp(40px,6.4vw,64px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your ads.</h1>
+            <div style={{ fontFamily: SERIF, fontStyle: 'italic', color: 'rgba(255,255,255,.92)', fontSize: 20, marginBottom: 10 }}>free · 90 seconds · no login</div>
+            <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(40px,6.4vw,64px)', lineHeight: .98, letterSpacing: '-.02em', color: '#fff', margin: '0 0 16px' }}>Audit your ads.</h1>
             <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 18, lineHeight: 1.5, margin: '0 0 28px', maxWidth: 460 }}>See exactly where your ads stand — your presence, your gaps, and what your rivals are winning with.</p>
 
             {picked ? (
@@ -365,7 +370,7 @@ export default function ScanTheater({ embedded = false, seed, domain, onDone, on
                     ? <><b>{picked.name}</b> <span style={{ opacity: .7 }}>· your brand, added</span></>
                     : <><b>Your Meta page</b> <span style={{ opacity: .7 }}>· added from your Ad Library link</span></>}</span>
                 </div>
-                <div style={{ fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, color: '#fff', fontSize: 'clamp(24px,3.4vw,30px)', lineHeight: 1.05, margin: '0 0 8px' }}>Now — who do you compete with?</div>
+                <div style={{ fontFamily: SERIF, fontWeight: 700, color: '#fff', fontSize: 'clamp(24px,3.4vw,30px)', lineHeight: 1.05, margin: '0 0 8px' }}>Now — who do you compete with?</div>
                 <p style={{ color: 'rgba(255,255,255,.9)', fontSize: 16, lineHeight: 1.5, margin: '0 0 16px' }}>Add the rival brands you want to be measured against — or skip and we&rsquo;ll find them for you.</p>
                 <div style={{ position: 'relative' }}>
                   <input value={cq} onChange={(e) => setCq(e.target.value)} placeholder="Add a competitor — name or Ad Library link…" autoFocus
@@ -458,7 +463,7 @@ export default function ScanTheater({ embedded = false, seed, domain, onDone, on
       <aside style={{ background: DARK, color: CREAM, display: 'flex', ...(isMobile
         ? { flexDirection: 'row', alignItems: 'center', gap: 14, padding: '11px 16px', position: 'sticky', top: 0, zIndex: 5 }
         : { flexDirection: 'column', padding: '28px 24px', position: 'sticky', top: 0, alignSelf: 'start', height: '100dvh' }) }}>
-        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: isMobile ? 16 : 22, color: '#fff', flex: 'none' }}>{phase === 'done' ? (res?.building ? 'Crawling your ads…' : 'Audit complete') : 'Auditing your ads'}</div>
+        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: isMobile ? 16 : 22, color: '#fff', flex: 'none' }}>{phase === 'done' ? (res?.building ? 'Crawling your ads…' : 'Audit complete') : 'Auditing your ads'}</div>
         <div style={{ display: isMobile ? 'none' : 'block', color: MUT, fontSize: 13.5, margin: '6px 0 24px', lineHeight: 1.45 }}>{res?.brand?.name || 'Your brand'}{res?.brand?.niche ? ` · ${res.brand.niche}` : ''}</div>
         <div style={{ display: isMobile ? 'none' : 'block', flex: 1, overflowY: 'auto', minHeight: 0 }}>
           {steps.map((s) => (
@@ -587,7 +592,7 @@ function SlideFrame({ children }: { children: ReactNode }) {
   )
 }
 const slideEyebrow: CSSProperties = { fontSize: 'clamp(11px,1.4vw,13px)', fontWeight: 800, letterSpacing: '.12em', textTransform: 'uppercase', color: ORANGE, marginBottom: 8 }
-const slideH: CSSProperties = { fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, fontSize: 'clamp(26px,4.4vw,52px)', letterSpacing: '-.02em', lineHeight: 1.02, color: INK, margin: 0 }
+const slideH: CSSProperties = { fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(26px,4.4vw,52px)', letterSpacing: '-.02em', lineHeight: 1.02, color: INK, margin: 0 }
 const slideHead = (eyebrow: string, title: ReactNode) => (
   <div style={{ flex: 'none' }}><div style={slideEyebrow}>{eyebrow}</div><h2 style={slideH}>{title}</h2></div>
 )
@@ -636,7 +641,7 @@ function slideNoAds(brandName: string) {
 }
 
 // SLIDE — creative DNA, chunked 4 panels per slide (so 7 dims split 4+3, never scroll). Each panel leads
-// with its #1 move BIG (Fraunces + a share bar), then the runners-up as chips — editorial, not a flat list.
+// with its #1 move BIG (serif + a share bar), then the runners-up as chips — editorial, not a flat list.
 // Plain-English gloss for each DNA dimension — so "Emotion: trust" reads as "the feeling their ads lean on".
 const DNA_GLOSS: Record<string, string> = {
   emotion: 'the feeling their ads lean on',
@@ -665,7 +670,7 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
               {top && (
                 <div style={{ marginBottom: items.length > 1 ? 11 : 0 }}>
                   <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
-                    <span style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(17px,2.1vw,23px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{top.label}</span>
+                    <span style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(17px,2.1vw,23px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{top.label}</span>
                     <span style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 13, fontWeight: 700, color: ORANGE, flex: 'none' }}>{top.pct}%</span>
                   </div>
                   <div style={{ height: 6, borderRadius: 100, background: '#eee6d7', marginTop: 7, overflow: 'hidden' }}>
@@ -684,11 +689,11 @@ function slideDna(dist: Record<string, Tally[]>, title: string, chunk: number) {
   )
 }
 
-// A hero stat — one huge Fraunces number + a small caption. The theater's "big words" workhorse.
+// A hero stat — one huge serif number + a small caption. The theater's "big words" workhorse.
 function HeroStat({ n, label, suffix = '', color = INK }: { n: number; label: string; suffix?: string; color?: string }) {
   return (
     <div>
-      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,6.4vw,72px)', color, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={n} />{suffix}</div>
+      <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(40px,6.4vw,72px)', color, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={n} />{suffix}</div>
       <div style={{ fontSize: 'clamp(12px,1.5vw,14px)', color: SUB, fontWeight: 600, marginTop: 5 }}>{label}</div>
     </div>
   )
@@ -791,11 +796,11 @@ function slideFormula(winners: FullDnaResult['winners']) {
       <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch', justifyContent: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
         {parts.map(([dim, v], i) => (
           <div key={dim} style={{ display: 'flex', alignItems: 'center', gap: 'clamp(8px,1.2vw,14px)' }}>
-            {i > 0 && <span style={{ fontFamily: 'Fraunces,serif', fontSize: 'clamp(20px,3vw,34px)', color: MUT, fontWeight: 400 }}>×</span>}
+            {i > 0 && <span style={{ fontFamily: SERIF, fontSize: 'clamp(20px,3vw,34px)', color: MUT, fontWeight: 400 }}>×</span>}
             <div className="sf-rise" style={{ ...rise(i), background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: 'clamp(12px,1.8vw,20px) clamp(14px,2vw,24px)', minWidth: 'clamp(120px,15vw,180px)', maxWidth: 210, boxShadow: '0 10px 30px -18px rgba(26,20,16,.4)' }}>
               <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, marginBottom: 3 }}>{dim}</div>
               <div style={{ fontSize: 10.5, color: MUT, marginBottom: 8, lineHeight: 1.3 }}>{DIM_GLOSS[dim] || ''}</div>
-              <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(18px,2.4vw,28px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{v!.label}</div>
+              <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(18px,2.4vw,28px)', color: INK, lineHeight: 1.05, letterSpacing: '-.01em' }}>{v!.label}</div>
               <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 700, color: SUB, marginTop: 6 }}>{v!.pct}% of winners</div>
             </div>
           </div>
@@ -828,7 +833,7 @@ function slideVs(own: Record<string, Tally[]>, winners: Record<string, Tally[]>,
           <h2 style={{ ...slideH, fontSize: 'clamp(24px,3.6vw,42px)' }}>The moves you’re <span style={{ color: ORANGE }}>not</span> making</h2>
         </div>
         <div style={{ textAlign: 'right' }}>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(32px,5vw,54px)', color: ORANGE, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={missingTotal} /></div>
+          <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(32px,5vw,54px)', color: ORANGE, lineHeight: .88, letterSpacing: '-.03em' }}><Count n={missingTotal} /></div>
           <div style={{ fontSize: 12.5, color: SUB, fontWeight: 600 }}>winning moves you’re missing</div>
         </div>
       </div>
@@ -873,7 +878,7 @@ function ScoreGauge({ total }: { total: number }) {
         <circle className="sf-gauge" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="14" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - total / 100) : C} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
       </svg>
       <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(48px,8vw,64px)', color: INK, lineHeight: 1 }}><Count n={total} dur={1200} /></div>
+        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(48px,8vw,64px)', color: INK, lineHeight: 1 }}><Count n={total} dur={1200} /></div>
         <div style={{ fontSize: 12, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
       </div>
     </div>
@@ -994,7 +999,7 @@ function StageAct({ stage, res, own, winners }: { stage: StepId; res: ScanResult
             <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', margin: '20px 0 6px' }}>
               {([['Total ads', own.totalAds, ''], ['Active now', own.activeAds, ''], ['Video', vid, '%']] as [string, number, string][]).map(([l, v, suf], i) => (
                 <div key={l} className="sf-rise" style={{ ...rise(i), flex: '1 1 150px', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '20px 24px' }}>
-                  <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(40px,6.5vw,58px)', color: INK, lineHeight: .95, letterSpacing: '-.02em' }}><Count n={v} />{suf}</div>
+                  <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(40px,6.5vw,58px)', color: INK, lineHeight: .95, letterSpacing: '-.02em' }}><Count n={v} />{suf}</div>
                   <div style={{ fontSize: 13.5, color: SUB, marginTop: 6, fontWeight: 600 }}>{l}</div>
                 </div>
               ))}
@@ -1088,7 +1093,7 @@ function BenchSection({ bench, systemScore }: { bench: BenchAxis[]; systemScore:
   const verdict = systemScore >= 70 ? 'You&rsquo;re building a system.' : systemScore >= 40 ? 'You&rsquo;re starting to build a system.' : 'Right now, you&rsquo;re running ads.'
   return (
     <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: '26px 28px', margin: '0 0 28px' }}>
-      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 26, color: INK, lineHeight: 1.15 }}>$100k → $1M: are you running ads, or building a <span style={{ color: ORANGE }}>system</span>?</div>
+      <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 26, color: INK, lineHeight: 1.15 }}>$100k → $1M: are you running ads, or building a <span style={{ color: ORANGE }}>system</span>?</div>
       <p style={{ color: SUB, fontSize: 15, margin: '8px 0 2px' }} dangerouslySetInnerHTML={{ __html: `<b style="color:${INK}">${verdict}</b> A $100k brand runs ads; a $1M brand builds a creative + conversion system. Here&rsquo;s where you sit on each axis.` }} />
       <div style={{ display: 'grid', gap: 14, marginTop: 18 }}>
         {bench.map((a, i) => {
@@ -1149,7 +1154,7 @@ function ScoreAct({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
             <circle className="sf-gauge" cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" />
           </svg>
           <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
+            <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
             <div style={{ fontSize: 11, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
           </div>
         </div>
@@ -1167,7 +1172,7 @@ function ScoreAct({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
 
       {res.report.prescriptions.length > 0 && (
         <div style={{ background: DARK, borderRadius: 20, padding: '30px 30px', marginTop: 10, color: CREAM }}>
-          <h3 style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 24, color: '#fff', margin: '0 0 8px' }}>Your fix list — {res.report.prescriptions.length} ads to make</h3>
+          <h3 style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 24, color: '#fff', margin: '0 0 8px' }}>Your fix list — {res.report.prescriptions.length} ads to make</h3>
           <p style={{ color: MUT, fontSize: 14.5, margin: '0 0 18px' }}>Built from the winning DNA you&rsquo;re missing.</p>
           <div style={{ display: 'grid', gap: 10 }}>
             {res.report.prescriptions.map((p, i) => (
@@ -1207,7 +1212,7 @@ function FixCard({ brief, thumb, i }: { brief: CreativeBrief; thumb?: string | n
         <span style={{ position: 'absolute', top: 12, right: 12, fontSize: 9.5, fontWeight: 800, letterSpacing: '.18em', color: t.sub, border: `1px solid ${t.sub}`, borderRadius: 100, padding: '3px 9px' }}>TEMPLATE</span>
         <div style={{ fontFamily: "'Helvetica Neue', Helvetica, Arial, sans-serif", fontSize: 12, fontWeight: 800, letterSpacing: '.02em', color: t.sub }}>{brief.headline ? '' : ''}{/* brand */}</div>
         <div style={{ fontSize: 12.5, fontWeight: 800, color: t.sub, textTransform: 'uppercase', letterSpacing: '.06em' }}>Ad concept #{i + 1}</div>
-        <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(20px,2.9vw,28px)', color: t.ink, lineHeight: 1.08, letterSpacing: '-.01em', marginTop: 8 }}>{brief.headline}</div>
+        <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(20px,2.9vw,28px)', color: t.ink, lineHeight: 1.08, letterSpacing: '-.01em', marginTop: 8 }}>{brief.headline}</div>
         {brief.angle && <div style={{ fontSize: 13, color: t.sub, marginTop: 8, lineHeight: 1.4 }}>{brief.angle}</div>}
         <div style={{ marginTop: 'auto', display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 12 }}>
           <span style={{ background: t.accent, color: t.bg.includes('#fff') || i === 2 ? '#7a1e08' : '#fff', fontSize: 12.5, fontWeight: 800, borderRadius: 100, padding: '9px 16px', alignSelf: 'flex-end' }}>Shop Now →</span>
@@ -1244,7 +1249,7 @@ function TheFix({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
       </>}
 
       {/* Rival-video remake: play their proven winner, script it beat-by-beat for the user's product */}
-      <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>
+      <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 22, color: INK, margin: '34px 0 4px' }}>
         {rv ? <>Steal this winning video — <span style={{ color: ORANGE }}>remade as yours</span></> : <>Your {script.totalSeconds}-second video, scripted</>}
       </div>
       <p style={{ ...sub, fontSize: 15 }}>{rv ? `${rv.brand}'s video has run ${rv.daysRunning} days. Here's the same ${script.totalSeconds}s arc, shot for ${res.brand.name}.` : `${script.title} — beat by beat, ready to shoot.`}</p>
@@ -1286,7 +1291,7 @@ function TheFix({ res, embedded }: { res: ScanResult; embedded?: boolean }) {
       {/* Fallback image-remake teaser — only when there's no rival VIDEO to show above */}
       {!rv && rival && (
         <div style={{ marginTop: 36 }}>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 22, color: INK, margin: '0 0 4px' }}>Your rival&rsquo;s best ad — <span style={{ color: ORANGE }}>remade as yours</span></div>
+          <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 22, color: INK, margin: '0 0 4px' }}>Your rival&rsquo;s best ad — <span style={{ color: ORANGE }}>remade as yours</span></div>
           <p style={{ ...sub, fontSize: 15 }}>Running {rival.daysRunning} days for {rival.brand}. Here&rsquo;s the same idea in your brand.</p>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(min(220px,100%),1fr))', gap: 16, marginTop: 16 }}>
             <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
@@ -1336,7 +1341,7 @@ function ScanSummary({ res, onUnlock }: { res: ScanResult; onUnlock: () => void 
           <circle className="sf-gauge" cx="90" cy="90" r="78" fill="none" stroke={color} strokeWidth="12" strokeLinecap="round" strokeDasharray={C} strokeDashoffset={drawn ? C * (1 - s.total / 100) : C} transform="rotate(-90 90 90)" />
         </svg>
         <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}>
-          <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
+          <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 46, color: INK, lineHeight: 1 }}><Count n={s.total} dur={1200} /></div>
           <div style={{ fontSize: 11, color: SUB, letterSpacing: '.1em' }}>OF 100</div>
         </div>
       </div>
@@ -1457,7 +1462,7 @@ function UpsideTeaser({ cost, gaps, embedded }: { cost: ScanResult['cost']; gaps
       <div style={{ display: 'flex', alignItems: 'center', gap: 24, flexWrap: 'wrap', marginTop: 18 }}>
         {upside > 0 && (
           <div style={{ flex: 'none' }}>
-            <div style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(34px,6vw,52px)', color: '#0a7d4b', lineHeight: 1 }}>+$<Count n={upside} dur={1200} />/yr</div>
+            <div style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(34px,6vw,52px)', color: '#0a7d4b', lineHeight: 1 }}>+$<Count n={upside} dur={1200} />/yr</div>
             <div style={{ fontSize: 12, color: MUT, marginTop: 4 }}>estimated potential — from your ad volume + benchmarks</div>
           </div>
         )}
@@ -1477,14 +1482,14 @@ function ForwardCta({ brand }: { brand: { name: string; pageId: string } }) {
   const go = () => { try { localStorage.setItem('sf_scan', JSON.stringify({ pageId: brand.pageId, name: brand.name, at: Date.now() })) } catch { /* private mode */ } }
   return (
     <div style={{ background: DARK, borderRadius: 20, padding: '34px 32px', color: CREAM }}>
-      <h2 style={{ fontFamily: 'Fraunces,serif', fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', letterSpacing: '-.02em', lineHeight: 1.1, color: '#fff', margin: '0 0 10px' }}>Ready to run these?</h2>
+      <h2 style={{ fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(26px,4vw,34px)', letterSpacing: '-.02em', lineHeight: 1.1, color: '#fff', margin: '0 0 10px' }}>Ready to run these?</h2>
       <p style={{ color: MUT, fontSize: 15.5, margin: '0 0 22px', maxWidth: 560, lineHeight: 1.5 }}>Start free — we&rsquo;ll generate these ads to your account and you approve every one before it launches.</p>
       <a href={`/signup?ref=scan&brand=${encodeURIComponent(brand.pageId)}`} onClick={go} style={{ ...btn, display: 'inline-block', textDecoration: 'none', padding: '15px 32px', fontSize: 16 }}>Start free → unlock your ads</a>
     </div>
   )
 }
 
-const h2: CSSProperties = { fontFamily: 'Fraunces,Georgia,serif', fontWeight: 700, fontSize: 'clamp(28px,4vw,40px)', letterSpacing: '-.02em', lineHeight: 1.05, color: INK, margin: '0 0 10px' }
+const h2: CSSProperties = { fontFamily: SERIF, fontWeight: 700, fontSize: 'clamp(28px,4vw,40px)', letterSpacing: '-.02em', lineHeight: 1.05, color: INK, margin: '0 0 10px' }
 const sub: CSSProperties = { color: SUB, fontSize: 17, maxWidth: 620, margin: 0, lineHeight: 1.5 }
 const btn: CSSProperties = { background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '13px 26px', fontSize: 15, fontWeight: 800, cursor: 'pointer' }
 

@@ -16,6 +16,8 @@ import { useEffect, useRef, useState } from 'react'
 import { requireUpgrade } from '@/lib/ui/requireUpgrade'
 
 const FOREST = '#141d15', ORANGE = '#ff5a2c', SUB = 'rgba(255,255,255,.82)'
+// Light tokens (brand voice.ts) — the audit shell now matches the reveal + the restyled theaters.
+const INK = '#161c17', SUBINK = '#5f665c', LINE = '#e6e5dc', PAPER = '#faf9f5'
 const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
 
 type BrandRow = { pageId: string; name: string; adCount: number; crawled: boolean }
@@ -105,7 +107,7 @@ export default function StoreAuditClient() {
   if (!started) return <InputScreen onStart={setStarted} />
 
   return (
-    <div style={{ background: FOREST, minHeight: '100dvh' }}>
+    <div style={{ background: PAPER, minHeight: '100dvh' }}>
       {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then.
           onError: if the ads pull blips out (after auto-retries), we STILL run the SEO/AI half + show the
           rest — a transient ads hiccup never dead-ends the whole audit. */}
@@ -119,8 +121,8 @@ export default function StoreAuditClient() {
       {adsDone && brandId && <AuditAds domain={started.domain} headline />}
       {adsDone && atCap && (
         <div style={{ padding: '10px 24px 0', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUB, fontSize: 14 }}>
-            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: '#fff', fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll render your ads.
+          <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUBINK, fontSize: 14 }}>
+            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: ORANGE, fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll render your ads.
           </div>
         </div>
       )}
@@ -137,16 +139,16 @@ export default function StoreAuditClient() {
       {/* Signup-first: they're logged in, the full report is already shown above. Save it + open the app. */}
       {seoDone && (
         <div ref={ctaRef} style={{ padding: '48px 24px 90px', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#0f150f', border: `1px solid ${ORANGE}44`, borderRadius: 18, padding: '30px 28px', textAlign: 'center' }}>
+          <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '30px 28px', textAlign: 'center', boxShadow: '0 20px 50px -30px rgba(20,29,21,.4)' }}>
             <div style={{ fontSize: 13, fontStyle: 'italic', color: ORANGE, fontFamily: SERIF }}>your report is saved to your account</div>
-            <div style={{ fontFamily: SERIF, fontSize: 30, fontWeight: 700, color: '#fff', lineHeight: 1.1, marginTop: 8 }}>Now let&rsquo;s fix it — together.</div>
-            <div style={{ fontSize: 14.5, color: SUB, marginTop: 12, lineHeight: 1.55 }}>
+            <div style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: INK, lineHeight: 1.05, marginTop: 8 }}>Now let&rsquo;s fix it — together.</div>
+            <div style={{ fontSize: 14.5, color: SUBINK, marginTop: 12, lineHeight: 1.55 }}>
               Everything above is saved to your dashboard. Open it and Selfmade&rsquo;s AI marketing team starts on the highest-impact fixes — you approve every move.
             </div>
             <a href="/hq" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 34px', borderRadius: 3, textDecoration: 'none' }}>
               Open my dashboard →
             </a>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,.5)', marginTop: 12 }}>Your audit + the moves we drafted are waiting · you approve every move</div>
+            <div style={{ fontSize: 12, color: SUBINK, marginTop: 12 }}>Your audit + the moves we drafted are waiting · you approve every move</div>
           </div>
         </div>
       )}
@@ -159,8 +161,8 @@ function ActDivider({ n, label }: { n: number; label: string }) {
     <div style={{ padding: '34px 24px 6px', display: 'flex', justifyContent: 'center' }}>
       <div style={{ maxWidth: 1100, width: '100%', display: 'flex', alignItems: 'center', gap: 14 }}>
         <span style={{ width: 30, height: 30, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14, flex: 'none' }}>{n}</span>
-        <span style={{ fontFamily: SERIF, fontSize: 24, fontWeight: 700, color: '#fff' }}>{label}</span>
-        <span style={{ flex: 1, height: 1, background: 'rgba(255,255,255,.14)' }} />
+        <span style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: INK }}>{label}</span>
+        <span style={{ flex: 1, height: 1, background: LINE }} />
       </div>
     </div>
   )
