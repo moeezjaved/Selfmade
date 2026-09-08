@@ -117,7 +117,10 @@ export async function GET(req: NextRequest) {
     if (brandId && domain && !force) {
       const ads = await readAdsStudio(admin, brandId)
       const cached = readSection<{ discovered: any[]; seed: any; configured: boolean }>(ads, 'competitors', domain)
-      if (cached) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
+      // Serve the cache ONLY if it actually found rivals. An EMPTY cached result (a transient/early failed
+      // run — e.g. the Ad Library blipped) was being served forever, hiding real rivals; treat it as a miss
+      // so discovery re-runs and self-heals. `force` still forces a fresh run.
+      if (cached && (cached.discovered || []).length) { discovered = cached.discovered; seed = cached.seed; configured = cached.configured; discoveryDone = true }
       else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true; discovering = true }   // a background run is in-flight → serve spied-only, client polls
     }
     if (!discoveryDone && domain && domain.includes('.') && !isAppDomain(domain)) {
