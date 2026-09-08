@@ -209,7 +209,9 @@ export async function POST(req: NextRequest) {
         const liveAds = rivals.flatMap((c) => c.liveAds || []).filter((a) => a.body || a.title).slice(0, 20)
         if (liveAds.length) { const cr = await classifyLiveOwnAds(liveAds, brandName, niche); if (cr.length) competitorRows = cr }
       }
-      try { await Promise.race([discover(), new Promise<void>((res) => setTimeout(res, 90_000))]) } catch { /* best-effort */ }
+      // Cap discovery at 65s so the whole /api/scan/run response lands inside the client's 90s abort
+      // (ScanTheater) — if the droplet Ad Library search runs long, we return with what we have.
+      try { await Promise.race([discover(), new Promise<void>((res) => setTimeout(res, 65_000))]) } catch { /* best-effort */ }
     }
 
     let result = await runDnaEngine({ brandName, competitorPageIds, ownPageId: pageId, niche, competitorRows })

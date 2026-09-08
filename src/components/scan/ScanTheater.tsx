@@ -166,7 +166,10 @@ export default function ScanTheater({ embedded = false, seed, domain, onDone, on
       // Hard timeout: a hanging fetch (never resolves) used to freeze the whole audit. Abort at 30s so a
       // hang becomes a normal error → auto-retry → (embedded) degrade to the SEO half. Never spins forever.
       const ctrl = new AbortController()
-      const killT = setTimeout(() => ctrl.abort(), 30000)
+      // 90s (was 30s): when the corpus has no peers, /api/scan/run runs LIVE competitor discovery
+      // (Google + Meta Ad Library) before it returns — a 30s abort was killing the whole ads audit
+      // mid-flight and blanking the result. The theater keeps animating its slides during the wait.
+      const killT = setTimeout(() => ctrl.abort(), 90000)
       const r = await fetch('/api/scan/run', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(payload), signal: ctrl.signal }).finally(() => clearTimeout(killT))
       if (!r.ok) throw new Error((await r.json().catch(() => ({})))?.error || 'Scan failed')
       let data: ScanResult = await r.json()

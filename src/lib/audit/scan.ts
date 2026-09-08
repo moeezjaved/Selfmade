@@ -60,19 +60,35 @@ function analyze(url: string, html: string): Page {
   return { url, title, metaDesc, h1, imgs: imgTags.length, imgsNoAlt, words, schema, price: price && price > 0 ? price : null, image: image || null }
 }
 
-async function sitemap(domain: string): Promise<{ urls: string[]; byDay: Map<string, number> }> {
-  const urls = new Set<string>(); const byDay = new Map<string, number>()
-  async function ingest(xml: string, depth: number) {
+// Sitemaps + robots.txt are XML / text-plain, which fetchHtml() rejects (it gates on content-type:html) —
+// so we fetch their raw bodies here. Without this a non-Shopify store's whole catalog read as "0 URLs".
+async function fetchXml(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url, { headers: { 'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36', accept: '*/*' }, signal: AbortSignal.timeout(8000), redirect: 'follow' })
+    if (!r.ok) return null
+    return (await r.text()).slice(0, 600_000)
+  } catch { return null }
+}
+
+async function sitemap(domain: string): Promise<{ urls: string[]; byDay: Map<string, number>; productUrls: string[] }> {
+  const urls = new Set<string>(); const byDay = new Map<string, number>(); const productUrls = new Set<string>()
+  // Track whether we descended through a PRODUCT sub-sitemap so non-Shopify product URLs (which don't
+  // contain "/products/", e.g. BigCommerce's /category/slug/) are still recognised as products.
+  async function ingest(xml: string, depth: number, fromProductMap: boolean) {
     const locs = Array.from(xml.matchAll(/<loc>\s*([^<\s]+)\s*<\/loc>/gi)).map((m) => m[1])
     const mods = Array.from(xml.matchAll(/<lastmod>\s*([^<\s]+)/gi)).map((m) => m[1])
     if (/<sitemapindex/i.test(xml) && depth < 2) {
-      for (const child of locs.slice(0, 15)) { const t = await fetchHtml(child); if (t) await ingest(t, depth + 1); if (urls.size > 1500) break }
-    } else locs.forEach((u, i) => { urls.add(u); const d = (mods[i] || '').slice(0, 10); if (d) byDay.set(d, (byDay.get(d) || 0) + 1) })
+      for (const child of locs.slice(0, 15)) { const t = await fetchXml(child); if (t) await ingest(t, depth + 1, fromProductMap || /product/i.test(child)); if (urls.size > 1500) break }
+    } else locs.forEach((u, i) => { urls.add(u); if (fromProductMap) productUrls.add(u); const d = (mods[i] || '').slice(0, 10); if (d) byDay.set(d, (byDay.get(d) || 0) + 1) })
   }
-  for (const root of [`https://${domain}/sitemap.xml`, `https://${domain}/sitemap_index.xml`]) {
-    const t = await fetchHtml(root); if (t) { await ingest(t, 0); if (urls.size) break }
-  }
-  return { urls: Array.from(urls), byDay }
+  // Prefer sitemaps declared in robots.txt, then the conventional locations.
+  const robots = await fetchXml(`https://${domain}/robots.txt`)
+  const roots = [
+    ...(robots ? Array.from(robots.matchAll(/^\s*sitemap:\s*(\S+)/gim)).map((m) => m[1].trim()) : []),
+    `https://${domain}/sitemap.xml`, `https://${domain}/sitemap_index.xml`,
+  ]
+  for (const root of roots) { const t = await fetchXml(root); if (t) { await ingest(t, 0, false); if (urls.size) break } }
+  return { urls: Array.from(urls), byDay, productUrls: Array.from(productUrls) }
 }
 
 const scoreFrom = (fs: Finding[]) => Math.max(0, Math.min(100, fs.reduce((s, f) => s - (f.severity === 'high' ? 34 : f.severity === 'medium' ? 18 : 8), 100)))
@@ -106,7 +122,7 @@ Return ONLY JSON:
   } catch { return { keywords: [], questions: [] } }
 }
 
-type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number> }; pages: Page[]; productPages: Page[]; terms: { keywords: string[]; questions: string[] } }
+type Ctx = { domain: string; siteName: string; category: string; sm: { urls: string[]; byDay: Map<string, number>; productUrls: string[] }; pages: Page[]; productPages: Page[]; terms: { keywords: string[]; questions: string[] } }
 
 const isProduct = (u: string) => /\/products?\//i.test(u)
 function internalLinksFrom(html: string, domain: string): string[] {
@@ -126,12 +142,15 @@ async function buildContext(domain: string, home: string): Promise<Ctx> {
     if (coll) internalLinksFrom(coll, domain).forEach((u) => discovered.add(u))
   }
   const all = Array.from(discovered)
-  const productUrls = all.filter(isProduct).slice(0, 14)
-  const contentUrls = all.filter((u) => !isProduct(u)).slice(0, 10)
+  // Products = those tagged from the product sub-sitemap (works for non-Shopify URL schemes) PLUS anything
+  // that looks like a /products/ URL. Everything else is content.
+  const productUrls = Array.from(new Set([...sm.productUrls, ...all.filter(isProduct)])).slice(0, 14)
+  const prodSet = new Set(productUrls)
+  const contentUrls = all.filter((u) => !prodSet.has(u)).slice(0, 10)
   const sampleUrls = Array.from(new Set([`https://${domain}/`, ...productUrls, ...contentUrls])).slice(0, 24)
   const pages = (await Promise.all(sampleUrls.map(async (u) => { const h = await fetchHtml(u); return h ? analyze(u, h) : null }))).filter(Boolean) as Page[]
   // Use the richer discovered set for the page-count total (Ryze shows the full crawl size, not just the sample).
-  const richSm = { urls: all.length > sm.urls.length ? all : sm.urls, byDay: sm.byDay }
+  const richSm = { urls: all.length > sm.urls.length ? all : sm.urls, byDay: sm.byDay, productUrls: sm.productUrls }
   const productPages = pages.filter((p) => isProduct(p.url))
   // Derive buyer keywords + AI questions ONCE (product-grounded) and share across the Google + AI steps —
   // one LLM call, and the SERP searches and the AI questions stay consistent with each other.

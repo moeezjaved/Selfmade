@@ -318,7 +318,7 @@ function buildReport(adsData: any, seoData: any) {
  * the rest charge image_studio_pro. The prompt/brief for all 10 is written server-side; the founder just
  * watches the first 5 appear and taps Generate on any of the other 5. */
 const FREE = 5
-type Tpl = { title: string; concept?: string; headline?: string; angle?: string; image?: string | null; generating?: boolean; failed?: boolean; locked?: boolean }
+type Tpl = { title: string; concept?: string; headline?: string; angle?: string; image?: string | null; hasProduct?: boolean; generating?: boolean; failed?: boolean; locked?: boolean }
 function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) {
   const [tpls, setTpls] = useState<Tpl[] | null>(null)
   const [kit, setKit] = useState<any>(null)
@@ -378,15 +378,15 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
     }
     return best?.image ?? withImg[0]?.image ?? undefined
   }
-  const genOne = async (i: number) => {
+  const genOne = async (i: number, force?: boolean) => {
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: true, failed: false } : x))
     const prod = productFor(i)
-    const body = { domain, index: i, productImages: prod ? [prod] : [], colors: (kit?.colors || []).map((c: any) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] }
+    const body = { domain, index: i, force: !!force, productImages: prod ? [prod] : [], colors: (kit?.colors || []).map((c: any) => c.hex), fonts: kit?.fonts?.length ? { heading: kit.fonts[0], body: kit.fonts[1] || kit.fonts[0] } : undefined, logo: kit?.logo || undefined, brandName: kit?.siteName, productDesc: (kit?.facts || [])[0] }
     for (let attempt = 0; attempt < 3; attempt++) {
       try {
         const r = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
         const d = await r.json().catch(() => ({}))
-        if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false, failed: false, locked: false } : x)); return }
+        if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, hasProduct: !!prod, generating: false, failed: false, locked: false } : x)); return }
         // Out of free credits → send them to the upgrade wall (agreement → payment). Paid users see the note.
         if (r.status === 402 || d.error === 'insufficient_credits') { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, locked: true } : x)); if (!(await requireUpgrade())) setNeedCredits(true); return }
       } catch { /* retry */ }
@@ -402,11 +402,15 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   //    (the render engine auto-detects the empty-product case). The brand-kit stays optional.
   useEffect(() => {
     if (kicked.current || !tpls || !productsReady) return
-    const todo = tpls.slice(0, FREE).map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
+    // Render ads with no image yet, PLUS regenerate any free ad that was cached WITHOUT the real product
+    // back when the catalog crawl came up empty (pre product-crawler fix) — now that we have products, we
+    // force a one-time (server-side FREE) re-render so the store's real product actually appears in the ad.
+    const withProducts = products.some((p) => p.image)
+    const todo = tpls.slice(0, FREE).map((t, i) => ({ t, i })).filter(({ t }) => !t.image || (withProducts && !t.hasProduct))
     if (!todo.length) return
     kicked.current = true
     let cursor = 0
-    const worker = async () => { while (cursor < todo.length) await genOne(todo[cursor++].i) }
+    const worker = async () => { while (cursor < todo.length) { const { t, i } = todo[cursor++]; await genOne(i, !!t.image) } }
     worker(); worker()
   }, [tpls, productsReady])   // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -487,7 +491,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
           {/* current ad copy */}
           <div style={{ textAlign: 'center', marginTop: 14, minHeight: 44 }}>
             <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{cur?.headline || cur?.title || `Ad ${idx + 1}`}</div>
-            {cur?.angle && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, fontFamily: MONO }}>{cur.angle}</div>}
+            {cur?.title && cur?.headline && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, fontFamily: MONO }}>{cur.title}</div>}
           </div>
         </div>
 
