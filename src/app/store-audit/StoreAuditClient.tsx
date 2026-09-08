@@ -111,18 +111,15 @@ export default function StoreAuditClient() {
       {/* THE LIVE SCAN — the theaters run so the visitor watches their store get read (ads, then search &
           AI). We keep this "watching it work" moment, then REPLACE it with the clean campaign result the
           instant the scan finishes + the brand is saved (no verbose theater output lingers). */}
-      {!seoDone && (
-        <>
-          {(started.seed.pageId || started.seed.adLibraryUrl) && (
-            <ScanTheater embedded seed={started.seed} domain={started.domain} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
-          )}
-          {adsDone && (
-            <div ref={act2Ref}>
-              <ActDivider n={(started.seed.pageId || started.seed.adLibraryUrl) ? 2 : 1} label="Your search & AI visibility" />
-              <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
-            </div>
-          )}
-        </>
+      {/* Ads scan — unmount the MOMENT it finishes (adsDone) so its verbose result never shows; the SEO
+          scan takes over the "watching it work" screen, then the clean result replaces everything. */}
+      {!adsDone && (started.seed.pageId || started.seed.adLibraryUrl) && (
+        <ScanTheater embedded seed={started.seed} domain={started.domain} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
+      )}
+      {adsDone && !seoDone && (
+        <div ref={act2Ref}>
+          <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
+        </div>
       )}
 
       {/* ✨ THE RESULT — the clean campaign reveal (ad + the landing page it opens, side by side; the cost
@@ -140,18 +137,6 @@ export default function StoreAuditClient() {
           </div>
         </div>
       )}
-    </div>
-  )
-}
-
-function ActDivider({ n, label }: { n: number; label: string }) {
-  return (
-    <div style={{ padding: '34px 24px 6px', display: 'flex', justifyContent: 'center' }}>
-      <div style={{ maxWidth: 1100, width: '100%', display: 'flex', alignItems: 'center', gap: 14 }}>
-        <span style={{ width: 30, height: 30, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 800, fontSize: 14, flex: 'none' }}>{n}</span>
-        <span style={{ fontFamily: SERIF, fontSize: 26, fontWeight: 400, color: INK }}>{label}</span>
-        <span style={{ flex: 1, height: 1, background: LINE }} />
-      </div>
     </div>
   )
 }
@@ -766,7 +751,9 @@ function RivalsPane({ domain }: { domain: string }) {
     const poll = async () => {
       const j = await fetch(`/api/ads-studio/competitors?domain=${enc}`).then((r) => r.json()).catch(() => ({}))
       if (!on) return
-      const disc = ((j.discovered || j.competitors || []) as any[]).filter((c) => c?.name)
+      // Only the auto-DISCOVERED niche rivals — never the user's manually-spied brands (source:'spied'),
+      // which would otherwise float to the top of the merged list and show as "rivals".
+      const disc = ((j.competitors || []) as any[]).filter((c) => c?.name && c.source === 'discovered')
       if (disc.length) { setRivals(disc.slice(0, 4)); setDone(true); return }
       if (j.discovering && tries < 18) { tries++; setTimeout(poll, 6000) } else setDone(true)   // background discovery still running → poll
     }

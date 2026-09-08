@@ -144,8 +144,10 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   })
 
   // ── Meta Ad Library: keyword-search the niche → advertiser pool (live ads + BREADTH Google organic misses).
-  // Short keywords + country=ALL (the Ad Library search wants broad phrases, not full Google queries). ──
-  const country = 'ALL'
+  // Search the store's DETECTED market (e.g. India → IN) so a regional brand gets regional rivals — the old
+  // hardcoded ALL surfaced a Hungarian gummy brand + a US greens brand for an Indian Ayurvedic store. Falls
+  // back to ALL only when the market is unknown/global. Short keywords (the search wants broad phrases). ──
+  const country = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
   // One keyword per product line (up to 4) so each line's advertisers are found — not just the hero line.
   const adQueries = (adKeywords.length ? adKeywords : [category]).filter(Boolean).slice(0, 4)
   const advByPage = new Map<string, Advertiser>()
