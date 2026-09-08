@@ -91,6 +91,14 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
 export async function GET(req: NextRequest) {
   const domain = (req.nextUrl.searchParams.get('domain') || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '').trim()
   const force = req.nextUrl.searchParams.get('force') === '1'
+  // TEMP diagnostic: run discovery INLINE and return the per-stage counts, so we can see WHERE rivals get
+  // dropped (SERP config, candidates, Ad Library advertisers, rank-filter). Remove once diagnosed.
+  if (req.nextUrl.searchParams.get('debug') === '1' && domain && domain.includes('.')) {
+    try {
+      const res = await discoverCompetitors(domain)
+      return NextResponse.json({ _debug: res._debug, seed: res.seed, discoveredCount: res.competitors.length, sample: res.competitors.slice(0, 6).map((c) => c.name) })
+    } catch (e: any) { return NextResponse.json({ _debug: 'threw', error: String(e?.message || e).slice(0, 300) }) }
+  }
   try {
     const admin = createAdminClient() as any
 
