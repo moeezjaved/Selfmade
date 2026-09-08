@@ -108,50 +108,35 @@ export default function StoreAuditClient() {
 
   return (
     <div style={{ background: PAPER, minHeight: '100dvh' }}>
-      {/* Act 1 — your ads. Its own crawl-wait gate decides when ads are ready; onDone fires only then.
-          onError: if the ads pull blips out (after auto-retries), we STILL run the SEO/AI half + show the
-          rest — a transient ads hiccup never dead-ends the whole audit. */}
-      {(started.seed.pageId || started.seed.adLibraryUrl) && (
-        <ScanTheater embedded seed={started.seed} domain={started.domain} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
-      )}
-
-      {/* ✨ HEADLINE REVEAL — the ads we'd make you (5 free renders). Placed right after the ads audit so
-          it's the emotional peak, not buried at the very end. It starts rendering immediately and the
-          rest of the audit (search & AI) continues below. */}
-      {adsDone && brandId && <AuditAds domain={started.domain} headline />}
-      {/* ✨ THE PAGE IT OPENS — a REAL landing page we build for the store (no paid AI images; the visitor
-          upgrades those with credits after they join), shown scrollably, 3 designs to flip through. */}
-      {adsDone && brandId && <LandingPageReveal domain={started.domain} />}
-      {adsDone && atCap && (
-        <div style={{ padding: '10px 24px 0', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '20px 24px', textAlign: 'center', color: SUBINK, fontSize: 14 }}>
-            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: ORANGE, fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll render your ads.
-          </div>
-        </div>
-      )}
-
-      {/* Act 2 — your search & AI visibility. Mounts only after the ads act has truly finished (or was
-          skipped for a website-only scan). */}
-      {adsDone && (
-        <div ref={act2Ref}>
-          <ActDivider n={(started.seed.pageId || started.seed.adLibraryUrl) ? 2 : 1} label="Your search & AI visibility" />
-          <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
-        </div>
-      )}
-
-      {/* Signup-first: they're logged in, the full report is already shown above. Save it + open the app. */}
-      {seoDone && (
-        <div ref={ctaRef} style={{ padding: '48px 24px 90px', display: 'flex', justifyContent: 'center' }}>
-          <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: '30px 28px', textAlign: 'center', boxShadow: '0 20px 50px -30px rgba(20,29,21,.4)' }}>
-            <div style={{ fontSize: 13, fontStyle: 'italic', color: ORANGE, fontFamily: SERIF }}>your report is saved to your account</div>
-            <div style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, color: INK, lineHeight: 1.05, marginTop: 8 }}>Now let&rsquo;s fix it — together.</div>
-            <div style={{ fontSize: 14.5, color: SUBINK, marginTop: 12, lineHeight: 1.55 }}>
-              Everything above is saved to your dashboard. Open it and Selfmade&rsquo;s AI marketing team starts on the highest-impact fixes — you approve every move.
+      {/* THE LIVE SCAN — the theaters run so the visitor watches their store get read (ads, then search &
+          AI). We keep this "watching it work" moment, then REPLACE it with the clean campaign result the
+          instant the scan finishes + the brand is saved (no verbose theater output lingers). */}
+      {!seoDone && (
+        <>
+          {(started.seed.pageId || started.seed.adLibraryUrl) && (
+            <ScanTheater embedded seed={started.seed} domain={started.domain} onDone={(d: any) => { setAdsData(d); setAdsDone(true) }} onError={() => { setAdsData(null); setAdsDone(true) }} />
+          )}
+          {adsDone && (
+            <div ref={act2Ref}>
+              <ActDivider n={(started.seed.pageId || started.seed.adLibraryUrl) ? 2 : 1} label="Your search & AI visibility" />
+              <AuditTheater embedded seedDomain={started.domain} seedRival={started.rival} onDone={(d: any) => { setSeoData(d); setSeoDone(true) }} />
             </div>
-            <a href="/hq" style={{ display: 'inline-block', marginTop: 20, background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 34px', borderRadius: 3, textDecoration: 'none' }}>
-              Open my dashboard →
-            </a>
-            <div style={{ fontSize: 12, color: SUBINK, marginTop: 12 }}>Your audit + the moves we drafted are waiting · you approve every move</div>
+          )}
+        </>
+      )}
+
+      {/* ✨ THE RESULT — the clean campaign reveal (ad + the landing page it opens, side by side; the cost
+          framing; a condensed audit summary). Shown once scanning is done AND the brand is saved. */}
+      {seoDone && brandId && (
+        <div ref={ctaRef}><CampaignReveal domain={started.domain} adsData={adsData} seoData={seoData} /></div>
+      )}
+      {seoDone && !brandId && !atCap && (
+        <div style={{ padding: '90px 24px', textAlign: 'center', color: SUBINK, fontFamily: SERIF, fontSize: 24 }}>Assembling your campaign…</div>
+      )}
+      {seoDone && atCap && (
+        <div style={{ padding: '60px 24px', display: 'flex', justifyContent: 'center' }}>
+          <div style={{ maxWidth: 620, width: '100%', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '24px', textAlign: 'center', color: SUBINK, fontSize: 14 }}>
+            You&rsquo;re at your plan&rsquo;s brand limit, so we couldn&rsquo;t add this store. <a href="/pricing" style={{ color: ORANGE, fontWeight: 800 }}>Upgrade to add it</a> and we&rsquo;ll build your campaign.
           </div>
         </div>
       )}
@@ -322,7 +307,7 @@ function buildReport(adsData: any, seoData: any) {
  * watches the first 5 appear and taps Generate on any of the other 5. */
 const FREE = 5
 type Tpl = { title: string; concept?: string; headline?: string; angle?: string; image?: string | null; hasProduct?: boolean; generating?: boolean; failed?: boolean; locked?: boolean }
-function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) {
+function AuditAds({ domain, headline, pane }: { domain: string; headline?: boolean; pane?: boolean }) {
   const [tpls, setTpls] = useState<Tpl[] | null>(null)
   const [kit, setKit] = useState<any>(null)
   const [products, setProducts] = useState<{ title: string; image: string | null }[]>([])
@@ -430,6 +415,44 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
   const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
   const arrow = (side: 'left' | 'right'): React.CSSProperties => ({ position: 'absolute', top: '50%', [side]: 8, transform: 'translateY(-50%)', width: 36, height: 36, borderRadius: '50%', border: `1px solid ${LINE}`, background: 'rgba(255,255,255,.95)', color: INK, fontSize: 21, lineHeight: 1, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 6px 16px -8px rgba(20,29,21,.55)', fontFamily: 'inherit' })
 
+  // The browseable 5-ad carousel — shared by the standalone reveal and the side-by-side CampaignReveal pane.
+  const carousel = (
+    <div style={{ maxWidth: pane ? 460 : 360, margin: '0 auto', width: '100%' }}>
+      <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}@keyframes sfrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}.sfrev-slide{animation:sfrise .34s ease both}`}</style>
+      <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f4f4ef', border: `1px solid ${LINE}`, borderRadius: 18, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        {cur?.image ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img key={cur.image} src={cur.image} alt={cur.title || ''} className="sfrev-slide" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : cur?.failed ? (
+          <button onClick={() => genOne(idx)} style={genBtn}>↻ Retry</button>
+        ) : (
+          <div style={{ textAlign: 'center', color: SUBINK }}>
+            <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', margin: '0 auto 10px', animation: 'sfspin .8s linear infinite' }} />
+            <div style={{ fontSize: 12.5, fontFamily: MONO }}>Rendering ad {idx + 1}…</div>
+          </div>
+        )}
+        <span style={{ position: 'absolute', top: 12, left: 12, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', color: '#fff', background: ORANGE, borderRadius: 100, padding: '3px 10px' }}>FREE</span>
+        <button aria-label="Previous ad" onClick={() => go(-1)} style={arrow('left')}>&lsaquo;</button>
+        <button aria-label="Next ad" onClick={() => go(1)} style={arrow('right')}>&rsaquo;</button>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
+        {free.map((t, i) => (
+          <button key={i} onClick={() => setIdx(i)} aria-label={`Ad ${i + 1}`} style={{ width: 44, height: 55, borderRadius: 8, overflow: 'hidden', padding: 0, cursor: 'pointer', border: i === idx ? `2px solid ${ORANGE}` : `1px solid ${LINE}`, background: '#f4f4ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {t?.image ? (
+              /* eslint-disable-next-line @next/next/no-img-element */
+              <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            ) : <span style={{ fontFamily: MONO, fontSize: 10, color: SUBINK }}>{i + 1}</span>}
+          </button>
+        ))}
+      </div>
+      <div style={{ textAlign: 'center', marginTop: 14, minHeight: 44 }}>
+        <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{cur?.headline || cur?.title || `Ad ${idx + 1}`}</div>
+        {cur?.title && cur?.headline && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, fontFamily: MONO }}>{cur.title}</div>}
+      </div>
+    </div>
+  )
+  if (pane) return carousel
+
   return (
     <div ref={rootRef} style={{ padding: headline ? '40px 20px 14px' : '20px 24px 0', display: 'flex', justifyContent: 'center' }}>
       <style>{`
@@ -461,42 +484,7 @@ function AuditAds({ domain, headline }: { domain: string; headline?: boolean }) 
         </div>
 
         {/* ── the 5 real ads, browseable ── */}
-        <div style={{ maxWidth: 360, margin: '0 auto', width: '100%' }}>
-          <div style={{ position: 'relative', aspectRatio: '4 / 5', background: '#f4f4ef', border: `1px solid ${LINE}`, borderRadius: 18, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {cur?.image ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img key={cur.image} src={cur.image} alt={cur.title || ''} className="sfrev-slide" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-            ) : cur?.failed ? (
-              <button onClick={() => genOne(idx)} style={genBtn}>↻ Retry</button>
-            ) : (
-              <div style={{ textAlign: 'center', color: SUBINK }}>
-                <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', margin: '0 auto 10px', animation: 'sfspin .8s linear infinite' }} />
-                <div style={{ fontSize: 12.5, fontFamily: MONO }}>Rendering ad {idx + 1}…</div>
-              </div>
-            )}
-            <span style={{ position: 'absolute', top: 12, left: 12, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: '.14em', color: '#fff', background: ORANGE, borderRadius: 100, padding: '3px 10px' }}>FREE</span>
-            <button aria-label="Previous ad" onClick={() => go(-1)} style={arrow('left')}>&lsaquo;</button>
-            <button aria-label="Next ad" onClick={() => go(1)} style={arrow('right')}>&rsaquo;</button>
-          </div>
-
-          {/* thumbnail rail — see all 5 at a glance, click to jump */}
-          <div style={{ display: 'flex', justifyContent: 'center', gap: 8, marginTop: 14, flexWrap: 'wrap' }}>
-            {free.map((t, i) => (
-              <button key={i} onClick={() => setIdx(i)} aria-label={`Ad ${i + 1}`} style={{ width: 44, height: 55, borderRadius: 8, overflow: 'hidden', padding: 0, cursor: 'pointer', border: i === idx ? `2px solid ${ORANGE}` : `1px solid ${LINE}`, background: '#f4f4ef', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {t?.image ? (
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={t.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                ) : <span style={{ fontFamily: MONO, fontSize: 10, color: SUBINK }}>{i + 1}</span>}
-              </button>
-            ))}
-          </div>
-
-          {/* current ad copy */}
-          <div style={{ textAlign: 'center', marginTop: 14, minHeight: 44 }}>
-            <div style={{ fontSize: 16, fontWeight: 600, lineHeight: 1.3 }}>{cur?.headline || cur?.title || `Ad ${idx + 1}`}</div>
-            {cur?.title && cur?.headline && <div style={{ fontSize: 12.5, color: SUBINK, marginTop: 4, fontFamily: MONO }}>{cur.title}</div>}
-          </div>
-        </div>
+        {carousel}
 
         {/* ── make 5 more, from your credits ── */}
         {paidCards.length > 0 && (
@@ -546,7 +534,7 @@ const LP_DESIGNS = [
 ] as const
 type LpState = { html?: string; pageId?: string; generating?: boolean; failed?: boolean }
 
-function LandingPageReveal({ domain }: { domain: string }) {
+function LandingPageReveal({ domain, pane }: { domain: string; pane?: boolean }) {
   const [designs, setDesigns] = useState<Record<string, LpState>>({})
   const [active, setActive] = useState(0)
   const [product, setProduct] = useState<{ title: string; image: string | null; price: string | null } | null>(null)
@@ -593,6 +581,43 @@ function LandingPageReveal({ domain }: { domain: string }) {
   const cur = designs[LP_DESIGNS[active].id]
   const go = (dir: number) => setActive((a) => (a + dir + LP_DESIGNS.length) % LP_DESIGNS.length)
 
+  // Browser frame + design flip — shared by the standalone section and the CampaignReveal pane.
+  const frame = (
+    <>
+      <div style={{ border: `1px solid ${LINE2}`, borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE2}`, background: '#f4f4ef' }}>
+          <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e3675b' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e9b04e' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#5fb96a' }} />
+          <div style={{ flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 11, color: SUBINK2, background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 100, padding: '3px 10px', maxWidth: 340, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host}/{LP_DESIGNS[active].id === 'product_v1' ? 'products/' : ''}{(product?.title || 'landing').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}</div>
+        </div>
+        <div style={{ position: 'relative', height: pane ? 560 : 520, background: '#faf9f5' }}>
+          {cur?.html ? (
+            <iframe title={`${LP_DESIGNS[active].label} landing page`} srcDoc={cur.html} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
+          ) : cur?.failed ? (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
+              <div style={{ fontSize: 13.5 }}>Couldn&rsquo;t build this one.</div>
+              <button onClick={() => { setDesigns((s) => { const n = { ...s }; delete n[LP_DESIGNS[active].id]; return n }); setTimeout(() => gen(active), 0) }} style={genBtn}>↻ Retry</button>
+            </div>
+          ) : (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
+              <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
+              <div style={{ fontSize: 12.5, fontFamily: MONO }}>Building your {LP_DESIGNS[active].label.toLowerCase()}…</div>
+            </div>
+          )}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 16 }}>
+        <button aria-label="Previous design" onClick={() => go(-1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&lsaquo;</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {LP_DESIGNS.map((d, i) => (
+            <button key={d.id} onClick={() => setActive(i)} aria-label={d.label} style={{ padding: '6px 12px', borderRadius: 100, border: i === active ? `1px solid ${ORANGE}` : `1px solid ${LINE2}`, background: i === active ? ORANGE : '#fff', color: i === active ? '#fff' : SUBINK2, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{d.label}</button>
+          ))}
+        </div>
+        <button aria-label="Next design" onClick={() => go(1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&rsaquo;</button>
+      </div>
+    </>
+  )
+  if (pane) return frame
+
   return (
     <div style={{ padding: '8px 20px 44px', display: 'flex', justifyContent: 'center', fontFamily: "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif" }}>
       <div style={{ maxWidth: 760, width: '100%' }}>
@@ -607,42 +632,116 @@ function LandingPageReveal({ domain }: { domain: string }) {
           </div>
           <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(26px,4vw,40px)', fontWeight: 400, lineHeight: 1.05, margin: '0 0 14px' }}>A landing page, built to match.</h2>
 
-          {/* browser frame with the real, scrollable page */}
-          <div style={{ border: `1px solid ${LINE2}`, borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE2}`, background: '#f4f4ef' }}>
-              <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e3675b' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e9b04e' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#5fb96a' }} />
-              <div style={{ flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 11, color: SUBINK2, background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 100, padding: '3px 10px', maxWidth: 340, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host}/{LP_DESIGNS[active].id === 'product_v1' ? 'products/' : ''}{(product?.title || 'landing').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}</div>
-            </div>
-            <div style={{ position: 'relative', height: 520, background: '#faf9f5' }}>
-              {cur?.html ? (
-                <iframe title={`${LP_DESIGNS[active].label} landing page`} srcDoc={cur.html} style={{ width: '100%', height: '100%', border: 'none', display: 'block' }} />
-              ) : cur?.failed ? (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
-                  <div style={{ fontSize: 13.5 }}>Couldn&rsquo;t build this one.</div>
-                  <button onClick={() => { setDesigns((s) => { const n = { ...s }; delete n[LP_DESIGNS[active].id]; return n }); setTimeout(() => gen(active), 0) }} style={genBtn}>↻ Retry</button>
-                </div>
-              ) : (
-                <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: SUBINK2 }}>
-                  <div style={{ width: 26, height: 26, border: '2.5px solid rgba(20,29,21,.14)', borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
-                  <div style={{ fontSize: 12.5, fontFamily: MONO }}>Building your {LP_DESIGNS[active].label.toLowerCase()}…</div>
-                </div>
-              )}
-            </div>
-          </div>
+          {frame}
 
-          {/* design flip */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 14, marginTop: 16 }}>
-            <button aria-label="Previous design" onClick={() => go(-1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&lsaquo;</button>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {LP_DESIGNS.map((d, i) => (
-                <button key={d.id} onClick={() => setActive(i)} aria-label={d.label} style={{ padding: '6px 12px', borderRadius: 100, border: i === active ? `1px solid ${ORANGE}` : `1px solid ${LINE2}`, background: i === active ? ORANGE : '#fff', color: i === active ? '#fff' : SUBINK2, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' }}>{d.label}</button>
-              ))}
-            </div>
-            <button aria-label="Next design" onClick={() => go(1)} style={{ width: 34, height: 34, borderRadius: '50%', border: `1px solid ${LINE2}`, background: '#fff', color: INK2, fontSize: 19, cursor: 'pointer', fontFamily: 'inherit' }}>&rsaquo;</button>
-          </div>
           <div style={{ textAlign: 'center', marginTop: 14, fontFamily: MONO, fontSize: 12.5, color: INK2 }}>
             <span style={{ background: '#f3f6ec', border: '1px solid #d3e6b8', borderRadius: 100, padding: '7px 15px' }}><span style={{ color: SUBINK2, textDecoration: 'line-through' }}>~$2,000 page</span> <span style={{ color: ORANGE, fontWeight: 700 }}>→ built, yours</span></span>
           </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ── CAMPAIGN REVEAL — the CLEAN one-page result (the approved mockup) shown AFTER the live scan ──
+ * The ad and the landing page it opens, side by side; the cost framing; the "5 more" upsell; and a
+ * CONDENSED audit summary (4 tiles + top 3 problems) — instead of the verbose scanning theaters. */
+function CampaignReveal({ domain, adsData, seoData }: { domain: string; adsData: any; seoData: any }) {
+  const INK = '#161c17', SUBINK = '#5f665c', LINE = '#e6e5dc'
+  const MONO = "'Space Mono',ui-monospace,SFMono-Regular,Menlo,monospace"
+  const SANS = "Inter,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"
+  const host = domain.replace(/^www\./, '')
+  const cur = seoData?.currency || '$'
+  const revLost = Number(seoData?.revenueLostPerYear || 0)
+  const sections: any[] = Array.isArray(seoData?.sections) ? seoData.sections : []
+  const findings = sections.flatMap((s) => (s.findings || []).map((f: any) => ({ ...f, section: s.name })))
+  const health = sections.find((s) => s.key === 'health')?.score ?? seoData?.score ?? null
+  const aiScore = sections.find((s) => s.key === 'ai')?.score ?? null
+  const sev = (f: any) => (f?.severity === 'high' ? 0 : f?.severity === 'medium' ? 1 : 2)
+  const top3 = [...findings].sort((a, b) => sev(a) - sev(b)).slice(0, 3)
+  const fmt = (n: number) => n.toLocaleString()
+  void adsData
+
+  const label = (t: string) => <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.14em', textTransform: 'uppercase', color: ORANGE, marginBottom: 12 }}>{t}</div>
+  const tile = (cap: string, val: React.ReactNode, sub: string, bad?: boolean) => (
+    <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 18px' }}>
+      <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.1em', textTransform: 'uppercase', color: SUBINK }}>{cap}</div>
+      <div style={{ fontFamily: SERIF, fontSize: 34, fontWeight: 400, lineHeight: 1, margin: '8px 0 6px', color: bad ? '#c23b12' : INK }}>{val}</div>
+      <div style={{ fontSize: 12, color: SUBINK, lineHeight: 1.35 }}>{sub}</div>
+    </div>
+  )
+
+  return (
+    <div style={{ padding: '44px 20px 90px', display: 'flex', justifyContent: 'center', fontFamily: SANS, color: INK }}>
+      <style>{`@keyframes sfspin{to{transform:rotate(360deg)}}@keyframes sfrise{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}`}</style>
+      <div style={{ maxWidth: 1080, width: '100%', animation: 'sfrise .5s ease both' }}>
+
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <svg viewBox="0 0 100 100" width="22" height="22" aria-hidden><g stroke={ORANGE} strokeWidth="18" strokeLinecap="round"><line x1="34" y1="22" x2="18" y2="50" /><line x1="66" y1="22" x2="82" y2="50" /><line x1="34" y1="78" x2="66" y2="78" /></g><g fill={ORANGE}><circle cx="34" cy="22" r="15" /><circle cx="66" cy="22" r="15" /><circle cx="82" cy="50" r="15" /><circle cx="66" cy="78" r="15" /><circle cx="34" cy="78" r="15" /><circle cx="18" cy="50" r="15" /></g></svg>
+            <span style={{ fontFamily: SERIF, fontSize: 22 }}>Selfmade</span>
+          </div>
+          <div style={{ fontFamily: MONO, fontSize: 11, letterSpacing: '.1em', color: '#2f7d32', marginBottom: 14 }}>● Built from {host}</div>
+          <h1 style={{ fontFamily: SERIF, fontSize: 'clamp(34px,6vw,64px)', fontWeight: 400, lineHeight: 1.0, letterSpacing: '-.01em', margin: '0 0 12px' }}>We already built your <span style={{ color: ORANGE, fontStyle: 'italic' }}>next campaign.</span></h1>
+          <p style={{ fontSize: 16, color: SUBINK, lineHeight: 1.5, maxWidth: 560, margin: '0 auto' }}>Five scroll-stopping ads, and the landing page they open — made from your real product. No brief, no wait.</p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(320px,1fr))', gap: 'clamp(20px,3vw,40px)', alignItems: 'start' }}>
+          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: 'clamp(18px,2.5vw,28px)', boxShadow: '0 26px 64px -40px rgba(20,29,21,.5)' }}>
+            {label('01 · The ads we made')}
+            <AuditAds domain={domain} pane />
+          </div>
+          <div style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 20, padding: 'clamp(18px,2.5vw,28px)', boxShadow: '0 26px 64px -40px rgba(20,29,21,.5)' }}>
+            {label('02 · The page it opens')}
+            <LandingPageReveal domain={domain} pane />
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(300px,1fr))', gap: 20, alignItems: 'center', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 18, padding: 'clamp(20px,3vw,32px)', margin: '34px 0 0' }}>
+          <div style={{ fontFamily: SERIF, fontSize: 'clamp(22px,3vw,30px)', fontWeight: 400, lineHeight: 1.15 }}>A designer charges about <b>$2,000</b> for this page. An agency about <b>$500</b> for an ad. <span style={{ color: ORANGE, fontStyle: 'italic' }}>Yours is ready.</span></div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontFamily: MONO, fontSize: 12.5 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 14px', border: `1px solid ${LINE}`, borderRadius: 10 }}><span>Landing pages ×3</span><span><span style={{ color: SUBINK, textDecoration: 'line-through' }}>$2,000</span> <b style={{ color: '#2f7d32' }}>built</b></span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 14px', border: `1px solid ${LINE}`, borderRadius: 10 }}><span>Ad creatives ×5</span><span><span style={{ color: SUBINK, textDecoration: 'line-through' }}>$500</span> <b style={{ color: '#2f7d32' }}>built</b></span></div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, padding: '9px 14px', borderRadius: 10, background: '#f3f6ec', border: '1px solid #d3e6b8' }}><span>You paid</span><b style={{ color: ORANGE }}>$0</b></div>
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', background: '#faf9f5', border: `1px solid ${LINE}`, borderRadius: 16, padding: '18px 22px', marginTop: 16 }}>
+          <div>
+            <div style={{ fontWeight: 700, fontSize: 15 }}>Want more angles? 5 more ads are ready to generate.</div>
+            <div style={{ fontSize: 13, color: SUBINK }}>Spin up fresh variations from your competitors&rsquo; other winning ads — from your credits.</div>
+          </div>
+          <a href="/hq" style={{ background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 14.5, padding: '12px 22px', borderRadius: 100, textDecoration: 'none', whiteSpace: 'nowrap' }}>Make 5 more ads →</a>
+        </div>
+
+        <div style={{ marginTop: 48 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 18 }}>
+            <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(24px,3.4vw,34px)', fontWeight: 400, margin: 0 }}>And here&rsquo;s what staying the same is costing you.</h2>
+            {revLost > 0 && <div style={{ fontFamily: MONO, fontSize: 12, color: '#c23b12' }}>Revenue at stake · −{cur}{fmt(revLost)}/yr</div>}
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14 }}>
+            {tile('Revenue at stake', <>−{cur}{revLost >= 1000 ? (revLost / 1000).toFixed(1) + 'k' : fmt(revLost)}</>, 'per year, at current traffic', true)}
+            {tile('Website health', health != null ? <>{health}<span style={{ fontSize: 16, color: SUBINK }}>/100</span></> : '—', 'meta, headings, alt text')}
+            {tile('AI visibility', aiScore != null ? <>{aiScore}<span style={{ fontSize: 16, color: SUBINK }}>/100</span></> : '—', 'ChatGPT · Gemini · Perplexity')}
+            {tile('Problems found', String(findings.length), 'across catalog & search')}
+          </div>
+          {top3.length > 0 && (
+            <div style={{ marginTop: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {top3.map((f, i) => (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, padding: '14px 18px' }}>
+                  <div style={{ fontSize: 14.5, fontWeight: 600 }}>{f.title}{f.sub ? <span style={{ color: SUBINK, fontWeight: 400 }}> — {f.sub}</span> : ''}</div>
+                  <div style={{ fontFamily: MONO, fontSize: 10.5, letterSpacing: '.06em', textTransform: 'uppercase', color: SUBINK, whiteSpace: 'nowrap' }}>{f.section}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 56 }}>
+          <h2 style={{ fontFamily: SERIF, fontSize: 'clamp(30px,4.6vw,48px)', fontWeight: 400, margin: '0 0 12px' }}>Now let&rsquo;s <span style={{ color: ORANGE, fontStyle: 'italic' }}>fix it</span> — together.</h2>
+          <p style={{ fontSize: 15, color: SUBINK, maxWidth: 480, margin: '0 auto 22px', lineHeight: 1.5 }}>Your campaign is waiting in your dashboard. Edit any ad, tweak the page, and publish to Shopify in one click.</p>
+          <a href="/hq" style={{ display: 'inline-block', background: ORANGE, color: '#fff', fontWeight: 800, fontSize: 15.5, padding: '15px 34px', borderRadius: 3, textDecoration: 'none' }}>Open my dashboard →</a>
+          <div style={{ fontSize: 12, color: SUBINK, marginTop: 14, fontFamily: MONO }}>Every image, headline &amp; price is editable · publish to Shopify in one click</div>
         </div>
       </div>
     </div>
