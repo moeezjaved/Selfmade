@@ -540,9 +540,9 @@ const genBtn: React.CSSProperties = { background: ORANGE, color: '#fff', border:
  * credits after they join. Each page is saved as a draft they can open + edit in the builder. Shown in a
  * scrollable browser frame, connected to the ad above ("↑ opens the page"), with 3 designs to flip. */
 const LP_DESIGNS = [
-  { id: 'advertorial', label: 'Advertorial' },
-  { id: 'listicle', label: 'Listicle' },
-  { id: 'product', label: 'Product page' },
+  { id: 'advertorial_v1', label: 'Advertorial' },
+  { id: 'listicle_v1', label: 'Listicle' },
+  { id: 'product_v1', label: 'Product page' },
 ] as const
 type LpState = { html?: string; pageId?: string; generating?: boolean; failed?: boolean }
 
@@ -611,7 +611,7 @@ function LandingPageReveal({ domain }: { domain: string }) {
           <div style={{ border: `1px solid ${LINE2}`, borderRadius: 14, overflow: 'hidden', background: '#fff' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 12px', borderBottom: `1px solid ${LINE2}`, background: '#f4f4ef' }}>
               <span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e3675b' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#e9b04e' }} /><span style={{ width: 9, height: 9, borderRadius: '50%', background: '#5fb96a' }} />
-              <div style={{ flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 11, color: SUBINK2, background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 100, padding: '3px 10px', maxWidth: 340, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host}/{LP_DESIGNS[active].id === 'product' ? 'products/' : ''}{(product?.title || 'landing').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}</div>
+              <div style={{ flex: 1, textAlign: 'center', fontFamily: MONO, fontSize: 11, color: SUBINK2, background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 100, padding: '3px 10px', maxWidth: 340, margin: '0 auto', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{host}/{LP_DESIGNS[active].id === 'product_v1' ? 'products/' : ''}{(product?.title || 'landing').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 28)}</div>
             </div>
             <div style={{ position: 'relative', height: 520, background: '#faf9f5' }}>
               {cur?.html ? (
