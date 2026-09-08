@@ -10,10 +10,11 @@ import { useIsMobile } from '@/lib/useIsMobile'
 import { MarkDecode } from '@/components/brand/Mark'
 import AuditLanding from '@/components/audit/AuditLanding'
 
-// Matches the ads audit: orange accent, cream paper, dark sidebar, Fraunces serif headings, /hero.mp4 entry.
-const INK = '#1a1410', SUB = '#6f665a', LINE = 'rgba(26,20,16,.12)', GOOD = '#1f8f4e', RED = '#e5484d', LIME = '#ef4a1e', PAPER = '#fbf4e2', DARK = '#1c1611'
-const ENTRY_BG = '#e02f06'
-const SERIF = 'Fraunces, Georgia, serif'
+// Matches the ads audit + the campaign reveal (brand voice.ts): white-paper, Instrument Serif, action-
+// orange #ff5a2c, forest-green dark rail, /hero.mp4 entry — the whole /store-audit reads as one system.
+const INK = '#161c17', SUB = '#5f665c', LINE = '#e6e5dc', GOOD = '#2f7d32', RED = '#e5484d', LIME = '#ff5a2c', PAPER = '#faf9f5', DARK = '#141d15'
+const ENTRY_BG = '#ff5a2c'
+const SERIF = "'Instrument Serif','Iowan Old Style',Georgia,serif"
 
 type Finding = { id: string; title: string; detail: string; severity: 'high' | 'medium' | 'low'; sample?: string[]; fixable: boolean }
 type LadderRow = { keyword: string; volume: number | null; yourPosition: number | null; top: { domain: string; position: number }[] }
