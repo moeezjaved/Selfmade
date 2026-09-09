@@ -404,8 +404,8 @@ const COUNTDOWN_SETTINGS: any[] = [
   { type: 'header', content: 'Countdown timer' },
   { type: 'text', id: 'sf_countdown_to', label: 'Ends at', info: 'Format: YYYY-MM-DD HH:MM (e.g. 2026-12-31 23:59). Leave blank for a rolling 14-hour timer.' },
   { type: 'select', id: 'sf_countdown_tz', label: 'Timezone', default: '', options: [
-    { value: '', label: 'Visitor’s local time' }, { value: '+00:00', label: 'UTC' }, { value: '-05:00', label: 'US Eastern' },
-    { value: '-06:00', label: 'US Central' }, { value: '-08:00', label: 'US Pacific' }, { value: '+00:00', label: 'UK' },
+    { value: '', label: 'Visitor’s local time' }, { value: '+00:00', label: 'UTC / UK' }, { value: '-05:00', label: 'US Eastern' },
+    { value: '-06:00', label: 'US Central' }, { value: '-08:00', label: 'US Pacific' },
     { value: '+01:00', label: 'Central Europe' }, { value: '+04:00', label: 'Gulf (GST)' }, { value: '+05:30', label: 'India (IST)' }, { value: '+08:00', label: 'Singapore/China' }] },
 ]
 
