@@ -154,7 +154,15 @@ export async function resolveStore(admin: any, userId: string, explicitBrand?: s
     const { data } = await admin.from('shopify_stores')
       .select('*').eq('user_id', userId).eq('brand_id', brandId).eq('status', 'active')
       .order('connected_at', { ascending: false }).limit(1)
-    return (data && data[0]) || null
+    if (data && data[0]) return data[0]
+    // No store linked to THIS brand → fall back to a store connected under "All brands" (brand_id null):
+    // the user's default/global store, usable from any brand. Without this a brand couldn't publish or
+    // detect themes even though the store + write_themes scope clearly exist (QA: Hair ResQ / hair-lift
+    // was connected globally). We NEVER fall back to ANOTHER brand's store — only the null-brand default.
+    const { data: g } = await admin.from('shopify_stores')
+      .select('*').eq('user_id', userId).is('brand_id', null).eq('status', 'active')
+      .order('connected_at', { ascending: false }).limit(1)
+    return (g && g[0]) || null
   }
   const { data } = await admin.from('shopify_stores')
     .select('*').eq('user_id', userId).eq('status', 'active')
