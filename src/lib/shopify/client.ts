@@ -156,13 +156,19 @@ export async function resolveStore(admin: any, userId: string, explicitBrand?: s
       .order('connected_at', { ascending: false }).limit(1)
     if (data && data[0]) return data[0]
     // No store linked to THIS brand → fall back to a store connected under "All brands" (brand_id null):
-    // the user's default/global store, usable from any brand. Without this a brand couldn't publish or
-    // detect themes even though the store + write_themes scope clearly exist (QA: Hair ResQ / hair-lift
-    // was connected globally). We NEVER fall back to ANOTHER brand's store — only the null-brand default.
+    // the user's default/global store.
     const { data: g } = await admin.from('shopify_stores')
       .select('*').eq('user_id', userId).is('brand_id', null).eq('status', 'active')
       .order('connected_at', { ascending: false }).limit(1)
-    return (g && g[0]) || null
+    if (g && g[0]) return g[0]
+    // Still none → fall back to the user's most-recent active store regardless of which brand it was
+    // connected under. A store is the user's own credential; a brand with none of its own should use it
+    // rather than hard-block publish/theme-detection. (QA: Hair ResQ's hair-lift store was connected while
+    // a different brand was active, so its brand_id matched neither Hair ResQ nor null.)
+    const { data: fb } = await admin.from('shopify_stores')
+      .select('*').eq('user_id', userId).eq('status', 'active')
+      .order('connected_at', { ascending: false }).limit(1)
+    return (fb && fb[0]) || null
   }
   const { data } = await admin.from('shopify_stores')
     .select('*').eq('user_id', userId).eq('status', 'active')
