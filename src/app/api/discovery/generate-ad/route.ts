@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime, verifyClonedAd } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNiche, getNicheInsights } from '@/lib/studio/insights'
 import { pickInspirations } from '@/lib/studio/inspiration'
 import { inferNiche } from '@/lib/gemini/vision'
@@ -56,6 +57,10 @@ async function handle(req: NextRequest) {
   const imageSize = body.imageSize === '4K' ? '4K' : '2K'
   const action = imageSize === '4K' ? 'image_studio_4k' : 'image_studio_pro'
   const admin = createAdminClient()
+  // Save under the ACTIVE brand: explicit body.brandId → the sf_brand cookie brand. Without this, fresh
+  // chat generations (the client didn't send brandId) saved with a NULL brand and never appeared in the
+  // active brand's My Creatives.
+  const effBrandId = (typeof brandId === 'string' && brandId) ? brandId : await resolveActiveBrandId(admin as any, user.id).catch(() => null)
 
   const { data: tx, error: rErr } = await admin.rpc('reserve_credits', { p_user: user.id, p_action: action })
   if (rErr) {
@@ -192,7 +197,7 @@ async function handle(req: NextRequest) {
 
     const saved = await saveGeneration({
       userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', model: best.model,
-      brandId: brandId || null, prompt: newHeadline || null,
+      brandId: effBrandId || null, prompt: newHeadline || null,
     })
 
     return NextResponse.json({

@@ -135,7 +135,12 @@ function Generations() {
     if (!g.image_url) return
     const ext = g.media_type === 'video' ? 'mp4' : ((g.image_url.match(/\.(jpg|jpeg|webp|png)(\?|$)/i)?.[1]) || 'png')
     const name = creativeFilename({ brand: g.brand_name, ext, kind: g.type, date: new Date(g.created_at) })
-    window.location.href = `/api/creatives/download?url=${encodeURIComponent(g.image_url)}&name=${encodeURIComponent(name)}`
+    // Use a real <a download> click — NOT window.location.href, which only fires once, so downloading
+    // several ads in a row silently did nothing after the first. The same-origin proxy sets the attachment.
+    const a = document.createElement('a')
+    a.href = `/api/creatives/download?url=${encodeURIComponent(g.image_url)}&name=${encodeURIComponent(name)}`
+    a.download = name; a.rel = 'noopener'
+    document.body.appendChild(a); a.click(); a.remove()
   }
 
   return (
