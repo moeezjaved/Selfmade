@@ -139,7 +139,7 @@ const LANGS = ['English', 'Urdu', 'Hindi', 'Bengali', 'Arabic', 'Spanish', 'Fren
 const CHANNELS: AdFormat[] = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
 type AdFormat = 'Banner Ad' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'LinkedIn'
 type PlanPick = { angle: string; caption: string; aspect: string; productImages: string[]; useCompose: boolean; refTags: string[]; baseProduct: string[]; colors: string[]; fonts?: { heading?: string | null; body?: string | null } }
-type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat; headlines?: string[]; pick?: PlanPick }
+type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat; headlines?: string[]; pick?: PlanPick; build?: { headline: string; angle: string } }
 type HomeTag = StudioTag
 type BrandKitLite = { siteName?: string; logo?: string | null; colors?: { hex: string }[]; fonts?: string[]; facts?: string[]; voice?: any }
 
@@ -174,9 +174,35 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     reader.readAsDataURL(f); setOpen('')
   }
 
-  const send = async (text?: string) => {
+  const send = async (text?: string, forceBuild?: boolean, directHeadline?: string) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
+    // A QUESTION / strategy ask (persona, angle, "is this right?", "suggest ideas") — with no reference
+    // or product attached — goes to the STRATEGIST brain: a real, brand-grounded, conversational answer
+    // (with memory of the thread), which can also propose an ad to build. `forceBuild` (the "Build this
+    // ad" button) bypasses this so a concept goes straight to the generator. Ad briefs fall through to
+    // the plan → headline-directions → generate flow below.
+    const hasBuildTag = tags.some((t) => ['discover', 'element', 'product', 'upload', 'template'].includes(t.kind))
+    const looksLikeQuestion = (() => {
+      const t = message.toLowerCase()
+      const buildVerb = /\b(make|create|generate|design|build|remake|new ad|an ad|banner|write .*ad)\b/.test(t)
+      const questiony = t.endsWith('?') || /^(what|which|who|why|how|when|should|can|could|is|are|does|do|would|any)\b/.test(t)
+      const advice = /\b(persona|audience|target|strateg|angle|recommend|suggest|idea|advice|position|competitor)\b/.test(t)
+      return (questiony || advice) && !buildVerb
+    })()
+    if (!forceBuild && !hasBuildTag && looksLikeQuestion) {
+      const fmt0 = format
+      const history = msgs.filter((m) => m.text).slice(-8).map((m) => ({ role: m.role, text: m.text }))
+      setBusy(true); setInput('')
+      setMsgs((m) => [...m, { role: 'user', text: message, format: fmt0 }, { role: 'assistant', loading: true, format: fmt0 }])
+      try {
+        const r = await fetch('/api/ads-studio/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history, format: fmt0, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json())
+        setMsgs((m) => replaceLast(m, { role: 'assistant', text: r?.answer || "I couldn't answer that just now — tell me the ad you want and I'll build it.", build: r?.build || undefined, format: fmt0 }))
+      } catch {
+        setMsgs((m) => replaceLast(m, { role: 'assistant', text: "I couldn't answer that just now — try again.", format: fmt0 }))
+      } finally { setBusy(false) }
+      return
+    }
     // Pre-flight: a remake spends credits, so if the balance can't cover it, show the upgrade modal and
     // do NOT start the "designing…" animation — the fix for "it processed, THEN said out of credits".
     const willRemake = !!tags.find((t) => t.kind === 'discover')?.image && !tags.some((t) => t.kind === 'element')
@@ -256,12 +282,13 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const headlines: string[] = Array.isArray(plan.headlines) && plan.headlines.length ? plan.headlines : (plan.headline ? [plan.headline] : [])
       // Higgsfield-style: offer the improved headline DIRECTIONS to pick from before spending a
       // generation. Multiple options → show the chooser; one (or none) → just generate.
-      if (headlines.length > 1) {
+      // A concept already chosen (the strategist's "Build this ad") → generate directly, no picker.
+      if (!directHeadline && headlines.length > 1) {
         setMsgs((m) => replaceLast(m, { role: 'assistant', headlines, pick, format: fmt }))
         setTags([]); setBusy(false)
         return
       }
-      await runGeneration(headlines[0] || plan.headline || message, pick, fmt)
+      await runGeneration(directHeadline || headlines[0] || plan.headline || message, pick, fmt)
       setTags([])
     } catch {
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Couldn’t generate — make sure your store has product images.', format: fmt }))
@@ -356,6 +383,11 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
           ))}
         </div>
       )}
+      {tags.some((t) => t.kind === 'discover') && (
+        <div style={{ fontSize: 12, color: SUB, margin: '-2px 0 10px', lineHeight: 1.4 }}>
+          Remaking their ad with your product — <b style={{ color: INK, fontWeight: 700 }}>send as-is</b>, or edit the prompt to change the headline, offer, product or language.
+        </div>
+      )}
       <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send() } }} placeholder={started ? 'Describe changes or a new ad…' : `Describe your ${format} ad…`} rows={started ? 1 : 2} style={{ width: '100%', border: 'none', outline: 'none', resize: 'none', fontSize: 15.5, color: INK, fontFamily: SANS, background: 'transparent', lineHeight: 1.5 }} />
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
         <input ref={fileRef} type="file" accept="image/*" onChange={onFile} style={{ display: 'none' }} />
@@ -420,6 +452,15 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
             <div key={i} style={{ flexBasis: '100%', padding: '4px 0' }}><GeneratingCard format={m.format || 'ad'} /></div>
           ) : m.error ? (
             <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 14, padding: '12px 16px', fontSize: 14, color: '#b23', background: '#fff5f2', maxWidth: 420 }}>{m.error}</div>
+          ) : m.text ? (
+            <div key={i} style={{ flexBasis: '100%', border: `1px solid ${LINE}`, borderRadius: 14, padding: '13px 16px', fontSize: 14.5, color: INK, background: '#fff', maxWidth: 560, lineHeight: 1.55, whiteSpace: 'pre-wrap' }}>
+              {m.text}
+              {m.build && (
+                <div>
+                  <button onClick={() => send(`Make a ${m.format || format} ad — headline: "${m.build!.headline}". Angle: ${m.build!.angle}`, true, m.build!.headline)} disabled={busy} style={{ ...primaryBtn, display: 'inline-flex', marginTop: 12, padding: '9px 15px', fontSize: 13, borderRadius: 10, cursor: busy ? 'default' : 'pointer' }}>✨ Build this ad →</button>
+                </div>
+              )}
+            </div>
           ) : (
             <div key={i} style={{ width: 236, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', background: '#fff' }}>
               <div className="sf-thumb" style={{ aspectRatio: '4 / 5', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
@@ -680,14 +721,23 @@ function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   return (
     <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
-        <div key={a.id} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', minHeight: 140 }}>
-          {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
-          <div className="sf-disc-over" style={overlayBtn}>
-            <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
-            <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
+        // Lapis-style card: big serif index on top, image below in a clean white card.
+        <div key={a.id} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -20px rgba(0,0,0,.2)' }}>
+          <div style={{ padding: '13px 16px 9px', fontFamily: SERIF, fontSize: 30, fontWeight: 600, color: INK, letterSpacing: '-.01em', lineHeight: 1 }}>{String(i + 1).padStart(2, '0')}</div>
+          <div className="sf-thumb" style={{ position: 'relative', margin: '0 12px 12px', borderRadius: 12, overflow: 'hidden', aspectRatio: '4 / 5' }}>
+            {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+            <div className="sf-disc-over" style={overlayBtn}>
+              <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
+              <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
+            </div>
           </div>
         </div>
-      ) : <div key={i} style={{ width: 212, flex: 'none', aspectRatio: '4/5', borderRadius: 12, background: PAPER }} />)}
+      ) : (
+        <div key={i} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px 9px', fontFamily: SERIF, fontSize: 30, fontWeight: 600, color: LINE, lineHeight: 1 }}>{String(i + 1).padStart(2, '0')}</div>
+          <div style={{ margin: '0 12px 12px', borderRadius: 12, aspectRatio: '4 / 5', background: PAPER }} />
+        </div>
+      ))}
     </HomeCarousel>
   )
 }
@@ -724,9 +774,20 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
             fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
           ))
           // Image ads only for now (video later): keep creatives whose asset_type isn't video.
+          const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 90)
           const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
-            .map((a: any) => { const cr = a.creatives?.[0]; const thumb = cr && cr.asset_type !== 'video' ? cr.r2_url : ''; return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string } })
-            .filter((x) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+            // IMAGE ads only. Dedup by brand + ad COPY: the same creative re-run as several Meta ad
+            // versions shares identical text but has byte-different images (so hashes/urls differ and
+            // slip past hash/url dedup). Collapsing on normalized body/title kills those repeats while
+            // keeping genuinely distinct creatives. `thumbnailUrl` already resolves the best image thumb.
+            .map((a: any) => {
+              const isVideo = !!(a.videoUrl || a.video_hash) || /video/i.test(a.format || '')
+              const thumb = !isVideo ? (a.thumbnailUrl || '') : ''
+              const sig = norm(a.body || a.title || a.caption || a.description || '')
+              const key = `${a.pageId || a.brand || ''}|${sig || a.image_hash || a.id || thumb}`
+              return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string, key }
+            })
+            .filter((x) => x.thumb && !seen.has(x.key) && seen.add(x.key))
             .slice(0, 24)
           if (flat.length) { if (on) setAds(flat); return }
         }
