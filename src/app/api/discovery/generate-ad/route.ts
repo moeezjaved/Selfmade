@@ -200,12 +200,15 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ error: errRaw }, { status: 502 })
     }
 
-    // PRODUCT COMPOSITE PASS — the QA still can't confirm the product (common when a scene has people
-    // holding small devices). Run ONE reference-anchored EDIT: feed the finished ad + the user's REAL
-    // product photo(s) back into the pro model and swap ONLY the product(s) to the exact reference, keeping
-    // everyone/background/text/logo/layout identical. Generic — works for ANY product(s), and for several
-    // different products in one scene. Only fires on a confirmed mismatch, so the clean 80% pay nothing.
-    if (best && !isService && products.length && productMatch === false && !outOfTime()) {
+    // PRODUCT COMPOSITE PASS — one reference-anchored EDIT that swaps ONLY the product(s) in the finished
+    // ad to the user's EXACT real photo(s), keeping people/background/text/logo/layout identical. Generic:
+    // any product(s), several different products in one scene. It runs when the QA couldn't confirm the
+    // product OR — critically — whenever the scene has PEOPLE: group/lifestyle ads render the device small
+    // in several hands and the QA often loosely accepts a look-alike, so we always re-lock those to the
+    // exact product. Product-hero ads (no people) stay fast — composite only on a confirmed mismatch.
+    const sceneHasPeople = /\b(persons?|people|friends?|man|men|woman|women|guys?|girls?|models?|family|families|couple|kids?|children|customers?|users?|holding|using|wearing|hands?|lifestyle|crowd|group|selfie|portrait)\b/i
+      .test([brief, artDirection, angle].filter((s) => typeof s === 'string').join(' '))
+    if (best && !isService && products.length && (productMatch === false || sceneHasPeople) && !outOfTime()) {
       const refinePrompt = [
         `Image 1 is a FINISHED advertisement. Image${products.length > 1 ? `s 2-${products.length + 1} are` : ` 2 is`} the EXACT real product(s) it must feature.`,
         `Edit image 1 so EVERY product a person is holding, using or displaying becomes the EXACT product from the reference photo(s): identical silhouette, materials, colour, label/branding and proportions. Match the existing hand grip, angle, size and lighting so it looks natural.${products.length > 1 ? ' If several different products are shown, match each to the reference it most resembles.' : ''}`,
