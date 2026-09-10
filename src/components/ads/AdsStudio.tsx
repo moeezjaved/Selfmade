@@ -97,7 +97,7 @@ export default function AdsStudio({ embedded = false, section, domainOverride, a
   return (
     <StudioCtx.Provider value={{ addToChat }}>
     <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', minHeight: embedded ? 'auto' : '100dvh', background: '#fff', fontFamily: SANS, color: INK }}>
-      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-thumb:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}@keyframes sfShimmer{0%{background-position:150% center}100%{background-position:-150% center}}.sf-scroll-wrap:hover .sf-scroll-btn{opacity:1}`}</style>
+      <style>{`@keyframes asFade{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}@keyframes sfspin{to{transform:rotate(360deg)}}.sf-fact:hover .sf-fact-actions{opacity:1!important}.sf-thumb:hover .sf-disc-over{opacity:1!important}.sf-hrow{scrollbar-width:thin}.sf-hrow::-webkit-scrollbar{height:8px}.sf-hrow::-webkit-scrollbar-thumb{background:rgba(26,20,16,.14);border-radius:8px}.sf-hrow::-webkit-scrollbar-track{background:transparent}@keyframes sfShimmer{0%{background-position:150% center}100%{background-position:-150% center}}.sf-scroll-wrap:hover .sf-scroll-btn{opacity:1}.sf-formula{transition:border-color .15s,box-shadow .15s,transform .15s}.sf-formula:hover{border-color:rgba(224,47,6,.45)!important;box-shadow:0 10px 30px rgba(26,20,16,.09);transform:translateY(-2px)}.sf-formula:hover .sf-formula-go{gap:9px}`}</style>
       {!embedded && Sidebar}
       <main style={{ flex: 1, minWidth: 0, display: 'flex' }}>
         <div style={{ flex: 1, minWidth: 0, padding: isMobile ? '24px 18px 60px' : '40px 44px 60px', animation: 'asFade .4s ease' }} key={active}>
@@ -616,39 +616,47 @@ function GeneratingCard({ format }: { format: string }) {
    plan → generate flow, which fuses the formula with THIS brand's real product
    + facts from the Brand Kit and writes brand-specific copy. The founder never
    writes the formula — they just pick the angle and Mello builds it for them. */
-type AdFormula = { key: string; emoji: string; title: string; example: string; tint: string; prompt: string }
+type AdFormula = { key: string; title: string; example: string; prompt: string }
 const AD_FORMULAS: AdFormula[] = [
-  { key: 'outcome', emoji: '✨', title: 'Sell the outcome', example: '“Olive oil that makes dinner taste like Italy.”', tint: '#eef6ec',
+  { key: 'outcome', title: 'Sell the outcome', example: '“Olive oil that makes dinner taste like Italy.”',
     prompt: 'Make an ad that sells the OUTCOME, not the product. Give it one big headline that names the felt result my customer actually wants — the feeling, the transformation, the payoff my product delivers (in the spirit of "olive oil that makes dinner taste like Italy"). Ground that promise in what my product genuinely does. Warm, aspirational, editorial styling; the product supports the promise rather than being the headline.' },
-  { key: 'scene', emoji: '🌊', title: 'Product is the scene', example: 'Make the product massive — the whole world.', tint: '#eef1fb',
+  { key: 'scene', title: 'Product is the scene', example: 'Make the product massive — the whole world.',
     prompt: 'Make an ad where my PRODUCT is the entire scene — render it large and hero, and build the whole visual world around the feeling it creates (in the spirit of a giant can pouring out into a dreamy world people relax in). Bold, surreal, product-forward, with one short evocative line of copy about the feeling.' },
-  { key: 'usecase', emoji: '🎯', title: 'Show the use case', example: '“Cracked one before my long run — didn’t cramp once.”', tint: '#fdf3e8',
+  { key: 'usecase', title: 'Show the use case', example: '“Cracked one before my long run — didn’t cramp once.”',
     prompt: 'Make an ad showing a specific USE CASE — a real moment with a testimonial-style line about exactly when and why someone reaches for my product (in the spirit of "cracked one before my long run, didn\'t even cramp once"). Authentic UGC feel with a handwritten highlight; make the when and the why instantly obvious.' },
-  { key: 'replace', emoji: '🚫', title: 'Replace the bad habit', example: '“Your desk drawer is not a meal plan.”', tint: '#fbeef0',
+  { key: 'replace', title: 'Replace the bad habit', example: '“Your desk drawer is not a meal plan.”',
     prompt: 'Make an ad that calls out the bad habit my product replaces — name the old behaviour bluntly (in the spirit of "your desk drawer is not a meal plan") — then present my product as the obvious better solution. Punchy, contrarian, big confident type.' },
-  { key: 'problem', emoji: '😣', title: 'Lead with the problem', example: '“Still bloated. Still backed up.”', tint: '#f0f6ec',
+  { key: 'problem', title: 'Lead with the problem', example: '“Still bloated. Still backed up.”',
     prompt: 'Make an ad that leads with the uncomfortable, specific problem my customer has — say it plainly (in the spirit of "still bloated, still backed up") so they instantly know the ad is for them — then make my product the relief. Big blunt headline, product clearly shown, a touch of playful visual.' },
-  { key: 'metaphor', emoji: '🐆', title: 'Turn it into a metaphor', example: 'One striking image for the benefit.', tint: '#fdf6e3',
+  { key: 'metaphor', title: 'Turn it into a metaphor', example: 'One striking image for the benefit.',
     prompt: 'Make an ad that turns my product\'s #1 benefit into ONE striking visual metaphor the eye understands in a second (in the spirit of a cheetah for speed, or clear water for hydration). Make the metaphor the hero of the image, product featured or held, one bold benefit headline.' },
 ]
+// Single-colour line icons (currentColor), matching the studio's format-tab style — premium, monochrome.
+function formulaIcon(key: string) {
+  const p = { width: 22, height: 22, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 1.7, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+  switch (key) {
+    case 'outcome':  return <svg {...p}><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" /><path d="M19 4v3M20.5 5.5h-3" /></svg>
+    case 'scene':    return <svg {...p}><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" /></svg>
+    case 'usecase':  return <svg {...p}><circle cx="12" cy="12" r="9" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" fill="currentColor" stroke="none" /></svg>
+    case 'replace':  return <svg {...p}><path d="M17 2l4 4-4 4M3 11V9a4 4 0 0 1 4-4h14M7 22l-4-4 4-4M21 13v2a4 4 0 0 1-4 4H3" /></svg>
+    case 'problem':  return <svg {...p}><circle cx="12" cy="12" r="9" /><path d="M12 7.5v5.5" /><circle cx="12" cy="16.3" r="1" fill="currentColor" stroke="none" /></svg>
+    case 'metaphor': return <svg {...p}><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z" /><circle cx="12" cy="12" r="3" /></svg>
+    default:         return null
+  }
+}
 function AdFormulasRow({ isMobile, onUse }: { isMobile: boolean; onUse: (f: AdFormula) => void }) {
   return (
     <div style={{ marginTop: 48 }}>
-      <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Proven ad formulas" sub="Six viral creative structures — written for your product. Tap one and Mello builds it in the chat.">
+      <HScroll gap={14} titleSize={isMobile ? 24 : 30} title="Proven ad formulas" sub="Six viral creative structures — written for your product. Tap one and Mello builds it in the chat.">
         {AD_FORMULAS.map((f, i) => (
-          <button key={f.key} onClick={() => onUse(f)} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: 'pointer', fontFamily: SANS, padding: 0, display: 'flex', flexDirection: 'column' }}>
-            <div style={{ background: f.tint, padding: '16px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 150 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
-                <span style={{ fontSize: 22, lineHeight: 1 }}>{f.emoji}</span>
-                <span style={{ fontSize: 12, fontWeight: 800, color: SUB, letterSpacing: '.06em' }}>{String(i + 1).padStart(2, '0')}</span>
-              </div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: INK, lineHeight: 1.15 }}>{f.title}</div>
-              <div style={{ fontSize: 13, color: '#5a564e', lineHeight: 1.4, fontStyle: 'italic' }}>{f.example}</div>
+          <button key={f.key} className="sf-formula" onClick={() => onUse(f)} style={{ position: 'relative', width: 248, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', cursor: 'pointer', fontFamily: SANS, padding: '18px 18px 15px', display: 'flex', flexDirection: 'column', gap: 11, minHeight: 176 }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: ORANGE, display: 'flex' }}>{formulaIcon(f.key)}</span>
+              <span style={{ fontSize: 12, fontWeight: 800, color: '#cbc3b6', letterSpacing: '.1em', fontVariantNumeric: 'tabular-nums' }}>{String(i + 1).padStart(2, '0')}</span>
             </div>
-            <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `1px solid ${LINE}` }}>
-              <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>For your product</span>
-              <span style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Build →</span>
-            </div>
+            <div style={{ fontSize: 17, fontWeight: 800, color: INK, lineHeight: 1.2, letterSpacing: '-0.01em' }}>{f.title}</div>
+            <div style={{ fontSize: 13, color: SUB, lineHeight: 1.5 }}>{f.example}</div>
+            <div className="sf-formula-go" style={{ marginTop: 'auto', paddingTop: 4, display: 'flex', alignItems: 'center', gap: 6, color: ORANGE, fontSize: 13, fontWeight: 800, transition: 'gap .15s' }}>Build <span style={{ fontSize: 15, lineHeight: 1 }}>→</span></div>
           </button>
         ))}
       </HScroll>
