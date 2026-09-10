@@ -359,8 +359,15 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       : JSON.stringify({ productImages: pick.productImages, newHeadline: headline, angle: pick.angle, artDirection: pick.artDirection, brief: pick.brief, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, imageSize: '2K' })
     let res: Response, d: any
     for (let attempt = 0; ; attempt++) {
-      res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
-      d = await res.json()
+      try {
+        res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
+        d = await res.json()
+      } catch (e) {
+        // A transient network/gateway hiccup or a non-JSON 504 on a long render — don't fail the user on the
+        // first blip: wait and retry a couple of times before giving up.
+        if (attempt < 2) { await new Promise((r) => setTimeout(r, 6000)); continue }
+        throw e
+      }
       if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
       await new Promise((r) => setTimeout(r, 5000))
     }
