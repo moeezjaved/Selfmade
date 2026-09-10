@@ -105,16 +105,22 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
+const MAX_LIVE_TOPUPS = 6   // bound the background job: at most this many rivals get an on-the-fly live pull
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
-  return Promise.all(res.competitors.map(async (c) => {
+  // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
+  const base = await Promise.all(res.competitors.map(async (c) => {
     const dna = await adDnaFor(admin, c.name, c.domain)
-    let liveAds = (!dna && c.liveAds?.length) ? liveToCards(c.liveAds) : []
-    // A discovered rival matched to a Meta page but carrying no ads is a dead "spyable" shell — the reason
-    // a store sees only one competitor with ads. Pull its live ads now so MORE rivals surface WITH real
-    // image creatives (this runs in the background/cached path, so the extra Ad Library calls are fine).
-    if (!dna && !liveAds.length && c.pageId) {
-      liveAds = liveToCards(await fetchLiveAdsByPage(String(c.pageId), 60).catch(() => []))
-    }
+    const liveAds = (!dna && c.liveAds?.length) ? liveToCards(c.liveAds) : []
+    return { c, dna, liveAds, needsTopup: !dna && !liveAds.length && !!c.pageId }
+  }))
+  // Pass 2: live top-up ONLY for the first few empty rivals (a matched Meta page with no ads = a dead
+  // "spyable" shell). Bounded in count + depth so the 180s background job always finishes and caches —
+  // an unbounded pull here was risking a timeout that left discovery spinning.
+  const targets = base.filter((b) => b.needsTopup).slice(0, MAX_LIVE_TOPUPS)
+  await Promise.all(targets.map(async (b) => {
+    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 30).catch(() => []))
+  }))
+  return base.map(({ c, dna, liveAds }) => {
     const ads = imagesFirst(dna?.ads ?? liveAds)
     return {
       source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
@@ -122,7 +128,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
       spyable: ads.length === 0,
       adCount: dna?.adCount ?? liveAds.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
     }
-  }))
+  })
 }
 
 export async function GET(req: NextRequest) {
