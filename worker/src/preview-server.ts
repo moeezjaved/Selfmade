@@ -311,7 +311,7 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'page_id required (numeric)' }))
       return
     }
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 150)
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 300)
 
     console.log(`[preview] ${pageId} (limit=${limit})`)
     const data = await fetchPreview(pageId, limit)

@@ -67,7 +67,7 @@ const uniqueByImage = (ads: any[]): any[] => {
   }
   return out.slice(0, AD_CARD_CAP)
 }
-const AD_CARD_CAP = 100   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
+const AD_CARD_CAP = 200   // safety cap on unique creatives kept per competitor (dedup handles the repeats)
 const DISCOVERY_COOLDOWN_MS = 30 * 60 * 1000   // don't re-run open-web discovery more than every 30 min per brand
 const SPIED_TTL_MS = 30 * 60 * 1000            // re-pull a spied brand's live ads at most every 30 min (deep scrape is slow)
 const SPIED_REFRESH_MAX = 4                    // deep-pull at most this many spied brands per background run (droplet budget)
@@ -247,7 +247,7 @@ export async function GET(req: NextRequest) {
                 let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
                 let adCount = count
                 let adsSource: 'corpus' | 'live' = 'corpus'
-                const live = liveToCards(await fetchLiveAdsByPage(pid, 150).catch(() => []))   // deep pull
+                const live = liveToCards(await fetchLiveAdsByPage(pid, 250).catch(() => []))   // deep pull
                 if (live.length) {
                   const seen = new Set(cardAds.map((a: any) => a.id))
                   for (const a of live) if (a.id && !seen.has(a.id)) { cardAds.push(a); seen.add(a.id) }
