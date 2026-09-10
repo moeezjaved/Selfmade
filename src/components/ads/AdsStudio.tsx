@@ -178,21 +178,12 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   // pakistani" or "bigger logo" EDITS this ad rather than re-planning a brand-new one.
   const lastBuildRef = useRef<{ headline: string; pick: PlanPick; fmt: AdFormat } | null>(null)
 
-  // When a formula is tapped on a MULTI-product store, ask which product to feature before building
-  // (otherwise the planner just guesses). Single-product stores skip this and build immediately.
-  const [pickProduct, setPickProduct] = useState<{ prompt: string; title: string } | null>(null)
-  const startFormula = (prompt: string, title: string) => {
-    if (products.length > 1) setPickProduct({ prompt, title })
-    else send(prompt)
-  }
-  const buildFormulaWith = (p: { title: string; image: string | null }) => {
-    setPickProduct(null)
-    if (p.image) setTags((x) => [...x, { label: p.title.slice(0, 24), image: p.image!, kind: 'product' }])
-    const chosen = pickProduct?.prompt || ''
-    send(`${chosen}\n\nUse this exact product: "${p.title}".`)
-  }
+  // On a MULTI-product store, ALWAYS confirm which product to feature before building — for formulas,
+  // Discover/Competitor "Create Similar", elements, or a plain brief. `onPick` resumes the exact build
+  // with the chosen product. Single-product stores skip this and build immediately.
+  const [pickProduct, setPickProduct] = useState<{ onPick: (p: { title: string; image: string | null }) => void } | null>(null)
 
-  const send = async (text?: string, forceBuild?: boolean, directHeadline?: string) => {
+  const send = async (text?: string, forceBuild?: boolean, directHeadline?: string, productOverride?: { title: string; image: string | null }) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
 
@@ -300,6 +291,14 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     const refImg = tags.find((t) => t.kind === 'discover')?.image || (wantsRemake && uploadImg ? uploadImg : undefined)
     // A person/look change ("make the person Pakistani-looking") → pass as `look` so the clone recasts.
     const recastLook = /\b(person|man|woman|model|face|guy|girl|people|ethnic|pakistani|indian|asian|african|arab|hispanic|latina|older|younger|male|female)\b/i.test(message) ? message.slice(0, 200) : undefined
+    // MULTI-PRODUCT — this is a confirmed build; if the store has >1 product and none is attached (a
+    // product/upload tag) or already chosen, ASK which product to feature first, then resume this exact
+    // build with it. Covers formulas, Discover/Competitor remakes, elements and plain briefs alike.
+    const hasProductRef = tags.some((t) => t.kind === 'product' || t.kind === 'upload')
+    if (products.length > 1 && !hasProductRef && !productOverride) {
+      setPickProduct({ onPick: (p) => { setPickProduct(null); send(message, forceBuild, directHeadline, p) } })
+      return
+    }
     // Pre-flight: a remake spends credits, so if the balance can't cover it, show the upgrade modal and
     // do NOT start the "designing…" animation — the fix for "it processed, THEN said out of credits".
     const willRemake = !!refImg && !tags.some((t) => t.kind === 'element')
@@ -322,7 +321,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       try {
         // The uploaded image is the REFERENCE here (not the product), so the product must be a real
         // synced product — never the upload we're remaking.
-        const productImg = tags.find((t) => t.kind === 'product')?.image || (refAdRaw !== uploadImg ? uploadImg : undefined) || products.find((p) => p.image)?.image
+        const productImg = productOverride?.image || tags.find((t) => t.kind === 'product')?.image || (refAdRaw !== uploadImg ? uploadImg : undefined) || products.find((p) => p.image)?.image
         if (!productImg) throw new Error('no-product')
         const refAd = refAdRaw.startsWith('/') ? window.location.origin + refAdRaw : refAdRaw   // server fetch needs absolute
         const brandId = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
@@ -369,7 +368,8 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const productTags = tags.filter((t) => t.kind === 'product' || t.kind === 'upload').map((t) => t.image).filter(Boolean) as string[]
       const refTags = tags.filter((t) => t.kind === 'element' || t.kind === 'discover' || t.kind === 'template').map((t) => t.image).filter(Boolean) as string[]
       const planned = plan.productIndex >= 0 ? products[plan.productIndex]?.image : products[0]?.image
-      const baseProduct = productTags.length ? productTags : [planned].filter(Boolean) as string[]
+      // The user explicitly chose this product in the picker → it wins over the planner's guess.
+      const baseProduct = productOverride?.image ? [productOverride.image] : productTags.length ? productTags : [planned].filter(Boolean) as string[]
       const productImages = Array.from(new Set([...baseProduct, ...refTags])).slice(0, 3)
       if (!productImages.length) throw new Error('no-product')
       const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
@@ -612,7 +612,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         </div>
       )}
 
-      {!started && <AdFormulasRow isMobile={isMobile} onUse={(f) => startFormula(f.prompt, f.title)} />}
+      {!started && <AdFormulasRow isMobile={isMobile} onUse={(f) => send(f.prompt)} />}
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
       {!started && <HomeDiscoverRow domain={domain} onTag={primeFromReference} />}
       {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
@@ -627,10 +627,10 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
               <div style={{ fontSize: 19, fontWeight: 800, color: INK }}>Which product for this ad?</div>
               <button onClick={() => setPickProduct(null)} style={{ border: 'none', background: 'none', fontSize: 22, lineHeight: 1, color: SUB, cursor: 'pointer', padding: 0 }}>×</button>
             </div>
-            <div style={{ fontSize: 13.5, color: SUB, marginBottom: 16 }}>“{pickProduct.title}” — pick the product Mello should feature.</div>
+            <div style={{ fontSize: 13.5, color: SUB, marginBottom: 16 }}>Pick the product Mello should feature in this ad.</div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
               {products.map((p, i) => (
-                <button key={i} onClick={() => buildFormulaWith(p)} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 13, background: '#fff', overflow: 'hidden', cursor: 'pointer', fontFamily: SANS, padding: 0 }}>
+                <button key={i} onClick={() => pickProduct.onPick(p)} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 13, background: '#fff', overflow: 'hidden', cursor: 'pointer', fontFamily: SANS, padding: 0 }}>
                   <div className="sf-thumb" style={{ aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: CREAM }}>
                     {p.image /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img contain" /> : <span style={{ fontSize: 22, color: '#cbc3b6' }}>▢</span>}
                   </div>
