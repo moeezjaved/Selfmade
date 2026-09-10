@@ -203,9 +203,17 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       } finally { setBusy(false) }
       return
     }
+    // A remake reference = a "Create Similar" tag (kind 'discover'), OR an UPLOADED ad when the user asks
+    // to "make one similar / like this / recreate" — so uploading an ad and asking to copy it REMAKES it
+    // (your product swapped in) instead of treating the upload as a product and asking for a headline.
+    const uploadImg = tags.find((t) => t.kind === 'upload')?.image
+    const wantsRemake = /\b(similar|like this|recreate|remake|same (?:style|layout|ad|thing|vibe)|version of this|inspired by|copy this)\b/i.test(message)
+    const refImg = tags.find((t) => t.kind === 'discover')?.image || (wantsRemake && uploadImg ? uploadImg : undefined)
+    // A person/look change ("make the person Pakistani-looking") → pass as `look` so the clone recasts.
+    const recastLook = /\b(person|man|woman|model|face|guy|girl|people|ethnic|pakistani|indian|asian|african|arab|hispanic|latina|older|younger|male|female)\b/i.test(message) ? message.slice(0, 200) : undefined
     // Pre-flight: a remake spends credits, so if the balance can't cover it, show the upgrade modal and
     // do NOT start the "designing…" animation — the fix for "it processed, THEN said out of credits".
-    const willRemake = !!tags.find((t) => t.kind === 'discover')?.image && !tags.some((t) => t.kind === 'element')
+    const willRemake = !!refImg && !tags.some((t) => t.kind === 'element')
     if (willRemake) {
       try {
         const b = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json())
@@ -219,11 +227,13 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     // REMAKE / "Create Similar": a Discover/Competitor ad is attached → use the OLD STUDIO's proven clone
     // engine (reproduces the reference's exact winning layout with the user's product, then vision-verifies
     // and auto-regenerates). Same async path as the Discovery "Remake", so results are consistently good.
-    const refAdRaw = tags.find((t) => t.kind === 'discover')?.image
+    const refAdRaw = refImg
     const hasElement = tags.some((t) => t.kind === 'element')
     if (refAdRaw && !hasElement) {
       try {
-        const productImg = tags.find((t) => t.kind === 'product' || t.kind === 'upload')?.image || products.find((p) => p.image)?.image
+        // The uploaded image is the REFERENCE here (not the product), so the product must be a real
+        // synced product — never the upload we're remaking.
+        const productImg = tags.find((t) => t.kind === 'product')?.image || (refAdRaw !== uploadImg ? uploadImg : undefined) || products.find((p) => p.image)?.image
         if (!productImg) throw new Error('no-product')
         const refAd = refAdRaw.startsWith('/') ? window.location.origin + refAdRaw : refAdRaw   // server fetch needs absolute
         const brandId = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
@@ -240,7 +250,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         }
         const enq = await fetch('/api/discovery/clone-image', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K', newHeadline }),
+          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K', look: recastLook, newHeadline }),
         }).then((r) => r.json())
         if (!enq?.jobId) throw new Error(enq?.error === 'insufficient_credits' ? 'credits' : 'no-job')
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
