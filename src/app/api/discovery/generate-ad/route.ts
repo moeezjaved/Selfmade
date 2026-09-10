@@ -164,6 +164,7 @@ async function handle(req: NextRequest) {
     const MAX_GENS = 3
     let gen: Awaited<ReturnType<typeof generateImage>> | null = null
     let best: { mimeType: string; dataB64: string; model: string } | null = null
+    let productMatch: boolean | null = null   // null = n/a (service/no product) or couldn't verify; reflects the SHIPPED render
     const verdictLog: string[] = []
     for (let i = 0; i < MAX_GENS; i++) {
       if (i > 0 && outOfTime()) { verdictLog.push('deadline'); break }
@@ -175,8 +176,9 @@ async function handle(req: NextRequest) {
       const v = await verifyClonedAd({ mimeType: best.mimeType, dataB64: best.dataB64 }, products[0], brandNm).catch(() => null)
       // errored = the verifier couldn't actually check (failed open). Don't loop pointlessly on an
       // unchecked render — log it distinctly so we can see how often the safety net didn't run.
-      if (!v || v.errored) { verdictLog.push('verify-errored'); break }
-      if (v.pass) { verdictLog.push('pass'); break }
+      if (!v || v.errored) { productMatch = null; verdictLog.push('verify-errored'); break }
+      if (v.pass) { productMatch = true; verdictLog.push('pass'); break }
+      productMatch = v.productMatches !== false   // this render (which becomes `best` if we stop here) failed product-match
       const fix = v.fix || [
         !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
         !v.brandingClean && `Every logo and brand name shown must belong to ${brandNm ? `"${brandNm}"` : "the user's brand"} only.`,
@@ -211,6 +213,7 @@ async function handle(req: NextRequest) {
 
     return NextResponse.json({
       image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null, generationId: saved?.id || null,
+      productVerified: productMatch !== false,   // false = the QA could not confirm the product matches → client warns
       niche, inspirations: inspImgs.length, insightsUsed: { hooks: insights.topHooks, angles: insights.topAngles },
       // Which references were used + why (for the transparency panel).
       references: usedRefs.map((r) => ({

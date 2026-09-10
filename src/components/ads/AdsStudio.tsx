@@ -352,31 +352,52 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
 
   // The actual image generation for a chosen headline (used by both the direct path and the chooser).
   // The last chat message must already be a loading placeholder; this replaces it with the result.
+  // When a generation request times out at the edge, the server may still have finished + saved the ad.
+  // Poll My Creatives for a generation created in this window and return its image — so we recover the ad
+  // the user already paid for instead of showing a false failure (or regenerating and double-charging).
+  const recoverGeneration = async (sinceMs: number): Promise<string | null> => {
+    const brand = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
+    const url = `/api/creatives${brand ? `?brandId=${encodeURIComponent(decodeURIComponent(brand))}` : ''}`
+    for (let i = 0; i < 12; i++) {
+      await new Promise((r) => setTimeout(r, 6000))
+      const list = await fetch(url, { cache: 'no-store' }).then((r) => r.json()).then((j) => j?.creatives || []).catch(() => [])
+      const hit = list.find((c: any) => (c?.image_url || c?.url) && c?.created_at && new Date(c.created_at).getTime() >= sinceMs - 8000)
+      if (hit) return hit.image_url || hit.url
+    }
+    return null
+  }
   const runGeneration = async (headline: string, pick: PlanPick, fmt: AdFormat) => {
     const endpoint = pick.useCompose ? '/api/ads-studio/compose' : '/api/discovery/generate-ad'
     const reqBody = pick.useCompose
       ? JSON.stringify({ personImages: pick.refTags, productImages: pick.baseProduct, headline, angle: pick.angle, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, brandName: kit?.siteName })
       : JSON.stringify({ productImages: pick.productImages, newHeadline: headline, angle: pick.angle, artDirection: pick.artDirection, brief: pick.brief, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, imageSize: '2K' })
-    let res: Response, d: any
-    for (let attempt = 0; ; attempt++) {
-      try {
+    const startedAt = Date.now()
+    let res: Response | null = null, d: any = null
+    try {
+      for (let attempt = 0; ; attempt++) {
         res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
         d = await res.json()
-      } catch (e) {
-        // A transient network/gateway hiccup or a non-JSON 504 on a long render — don't fail the user on the
-        // first blip: wait and retry a couple of times before giving up.
-        if (attempt < 2) { await new Promise((r) => setTimeout(r, 6000)); continue }
-        throw e
+        if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
+        await new Promise((r) => setTimeout(r, 5000))
       }
-      if (res.ok || d.error !== 'pro_model_busy' || attempt >= 3) break
-      await new Promise((r) => setTimeout(r, 5000))
+    } catch {
+      // A long render can time out at the edge even though the server FINISHED and SAVED the ad — that's why
+      // it still shows up in My Creatives. RECOVER that saved ad instead of regenerating (regenerating would
+      // double-charge). Poll My Creatives for a generation made in this window.
+      const recovered = await recoverGeneration(startedAt)
+      if (recovered) { setMsgs((m) => replaceLast(m, { role: 'assistant', image: recovered, caption: pick.caption, format: fmt })); celebrate(adReady()); return }
+      setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'That render is taking a little long — it should appear in My Creatives shortly. Check there before regenerating (you won’t be charged twice).', format: fmt }))
+      return
     }
-    if (!res.ok) {
+    if (!res!.ok) {
       const err = d.error === 'insufficient_credits' ? 'You’re out of credits — top up to generate more ads.' : res.status === 401 ? 'Sign in from your ads audit to generate.' : d.error === 'pro_model_busy' ? 'The image model is busy right now — please try again in a moment.' : (d.error || 'Generation failed. Try again.')
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: err, format: fmt }))
       if (d.error === 'insufficient_credits') openCredits('buy', 'You’re out of credits — top up to generate more ads.')   // Free → auto-shows Upgrade
     } else {
-      setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: pick.caption, format: fmt }))
+      // If the product-fidelity QA couldn't confirm the product matches, say so up front (free to regenerate)
+      // instead of silently shipping a possibly-wrong product — this is common in busy multi-person scenes.
+      const warn = d.productVerified === false ? '⚠️ The product may not match your exact device — regenerate if so (re-tries are free). ' : ''
+      setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: warn + (pick.caption || ''), format: fmt }))
       if (d.url || d.image) celebrate(adReady())
     }
   }
