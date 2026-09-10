@@ -167,7 +167,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   const usedPages = new Set<string>()
   for (const c of competitors) {
     const match = advertisers.find((a) => (a.domain && domainRoot(a.domain) === c.domain) || nameMatch(a.pageName || '', c.name))
-    if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 6); usedPages.add(match.pageId) }
+    if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 24); usedPages.add(match.pageId) }
   }
 
   // BREADTH: advertisers we didn't already surface via Google. The keyword search is broad, so it also
@@ -188,7 +188,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
       .slice(0, Math.max(0, 12 - competitors.length))
       .map(({ a, r }): DiscoveredCompetitor => ({
         domain: a.domain || '', name: r.name || a.pageName, reason: r.reason || 'Active advertiser in your niche — found in the Meta Ad Library.',
-        foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 6),
+        foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 24),
       }))
   }
 

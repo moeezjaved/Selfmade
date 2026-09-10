@@ -10,7 +10,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
 import { discoverCompetitors, type DiscoveryResult } from '@/lib/ads-studio/competitors'
-import { fetchLiveAdsByPage } from '@/lib/ads-studio/adlibrary'
+import { fetchLiveAdsByPage, type LiveAd } from '@/lib/ads-studio/adlibrary'
 import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
 import { waitUntil } from '@vercel/functions'
@@ -35,6 +35,15 @@ const cleanAd = (a: any) => ({
 })
 // Live fbcdn media → permanent R2 cache (never hotlink fbcdn); corpus thumbs are already R2, left as-is.
 const mediaUrl = (u?: string | null) => (u ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : null)
+// A live Ad Library ad → a competitor card ad (one thumb per ad).
+const liveToCards = (live: LiveAd[]) => live.map((a) => ({
+  id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]),
+  copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive,
+})).filter((a) => a.thumb)
+// The competitor row shows IMAGE ads — float images to the front so they survive the display cap; videos tail.
+const imagesFirst = <T extends { format?: string | null }>(ads: T[]): T[] =>
+  [...ads].sort((a, b) => (a.format === 'image' ? 0 : 1) - (b.format === 'image' ? 0 : 1))
+const AD_CARD_CAP = 24   // ads kept per competitor (was 8) — FÜM & friends have far more image ads to show
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -49,13 +58,13 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
       const like = `*${d}*`
       const r = await admin.from('discovery_ads_index').select(AD_COLS)
         .or(`link_url.ilike.${like},landing.ilike.${like},website.ilike.${like}`)
-        .eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(6)
+        .eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(12)
       ads = r.data
     }
     if (!ads?.length && nameOk) {
       const r = await admin.from('discovery_ads_index').select(AD_COLS)
         .ilike('page_name', name).eq('has_creative', true)
-        .order('performance_score', { ascending: false, nullsFirst: false }).limit(6)
+        .order('performance_score', { ascending: false, nullsFirst: false }).limit(12)
       ads = r.data
     }
     if (!ads?.length) return null
@@ -75,15 +84,19 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   return Promise.all(res.competitors.map(async (c) => {
     const dna = await adDnaFor(admin, c.name, c.domain)
-    const liveAds = (!dna && c.liveAds?.length)
-      ? c.liveAds.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
-      : []
-    const ads = dna?.ads ?? liveAds
+    let liveAds = (!dna && c.liveAds?.length) ? liveToCards(c.liveAds) : []
+    // A discovered rival matched to a Meta page but carrying no ads is a dead "spyable" shell — the reason
+    // a store sees only one competitor with ads. Pull its live ads now so MORE rivals surface WITH real
+    // image creatives (this runs in the background/cached path, so the extra Ad Library calls are fine).
+    if (!dna && !liveAds.length && c.pageId) {
+      liveAds = liveToCards(await fetchLiveAdsByPage(String(c.pageId), 40).catch(() => []))
+    }
+    const ads = imagesFirst(dna?.ads ?? liveAds)
     return {
       source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
       hasAdDna: !!dna, adsSource: dna ? 'corpus' : (liveAds.length ? 'live' : null),
       spyable: ads.length === 0,
-      adCount: dna?.adCount ?? c.liveAds?.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
+      adCount: dna?.adCount ?? liveAds.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
     }
   }))
 }
@@ -155,21 +168,28 @@ export async function GET(req: NextRequest) {
         const nameMap = await resolveBrandNames(admin, pageIds).catch(() => new Map<string, string>())
         spied = await Promise.all(pageIds.slice(0, 12).map(async (pageId) => {
           const [{ data: ads }, { count }] = await Promise.all([
-            admin.from('discovery_ads_index').select(AD_COLS).eq('page_id', pageId).eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(6),
+            admin.from('discovery_ads_index').select(AD_COLS).eq('page_id', pageId).eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(AD_CARD_CAP),
             admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pageId),
           ])
           const list = ads || []
           let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
           let adCount = count ?? list.length
           let adsSource: 'corpus' | 'live' = 'corpus'
-          // A freshly-spied brand isn't in the crawler's index yet — showing "0 ads in our index" while the
-          // Ad Library clearly has ads reads as broken. Fetch their LIVE creatives on the spot (same source
-          // the "Spy their ads" button uses); the async crawl backfills the index + ad-DNA afterwards.
-          if (list.length === 0) {
-            const live = await fetchLiveAdsByPage(pageId, 8).catch(() => [])
-            const mapped = live.map((a) => ({ id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]), copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive })).filter((a) => a.thumb)
-            if (mapped.length) { cardAds = mapped; adCount = mapped.length; adsSource = 'live' }
+          // The row shows IMAGE ads. If our crawl index is THIN on this brand's images (a fresh spy not yet
+          // indexed, or a brand — like FÜM — whose Ad Library holds far more image ads than we've crawled),
+          // top up LIVE from Meta right now so the row is rich; the 6h re-crawl backfills index + ad-DNA after.
+          const corpusImages = cardAds.filter((a: any) => a.format === 'image').length
+          if (corpusImages < 8) {
+            const live = await fetchLiveAdsByPage(pageId, 40).catch(() => [])
+            const liveCards = liveToCards(live)
+            if (liveCards.length) {
+              const seen = new Set(cardAds.map((a: any) => a.id))
+              for (const a of liveCards) if (a.id && !seen.has(a.id)) { cardAds.push(a); seen.add(a.id) }
+              if (!list.length) adsSource = 'live'
+              adCount = Math.max(adCount, cardAds.length)
+            }
           }
+          cardAds = imagesFirst(cardAds)
           return {
             source: 'spied', pageId, domain: null,
             name: nameMap.get(pageId) || (follows || []).find((f: any) => String(f.page_id) === pageId)?.brand_name || 'Competitor',
@@ -194,7 +214,6 @@ export async function GET(req: NextRequest) {
       if (!cur) { byBrand.set(key, { ...c, ads: [...(c.ads || [])] }); continue }
       const seenAds = new Set(cur.ads.map((a: any) => a.id))
       for (const a of (c.ads || [])) { if (a?.id && !seenAds.has(a.id)) { cur.ads.push(a); seenAds.add(a.id) } }
-      cur.ads = cur.ads.slice(0, 8)
       cur.adCount = Math.max(cur.adCount || 0, c.adCount || 0, cur.ads.length)
       if (!cur.hasAdDna && c.hasAdDna) { cur.hasAdDna = true; cur.dna = c.dna; cur.adsSource = c.adsSource }
       cur.spyable = !!cur.spyable && !!c.spyable
@@ -202,6 +221,9 @@ export async function GET(req: NextRequest) {
       if (!cur.domain && c.domain) cur.domain = c.domain
     }
     const merged = Array.from(byBrand.values())
+    // Images to the front (the row shows images), then cap each card. Done once here so single-card brands
+    // (no merge) are capped too.
+    for (const c of merged) c.ads = imagesFirst(c.ads || []).slice(0, AD_CARD_CAP)
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
