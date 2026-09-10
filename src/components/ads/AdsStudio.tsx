@@ -241,7 +241,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       setBusy(true); setInput('')
       setMsgs((m) => [...m, { role: 'user', text: message, format: fmt0 }, { role: 'assistant', loading: true, format: fmt0 }])
       try {
-        const r = await fetch('/api/ads-studio/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history, format: fmt0, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title) }) }).then((r) => r.json())
+        const r = await fetch('/api/ads-studio/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message, history, format: fmt0, language: lang, siteName: kit?.siteName, facts: kit?.facts, voice: kit?.voice, productTitles: products.map((p) => p.title), domain }) }).then((r) => r.json())
         setMsgs((m) => replaceLast(m, { role: 'assistant', text: r?.answer || "I couldn't answer that just now — tell me the ad you want and I'll build it.", build: r?.build || undefined, format: fmt0 }))
       } catch {
         setMsgs((m) => replaceLast(m, { role: 'assistant', text: "I couldn't answer that just now — try again.", format: fmt0 }))
