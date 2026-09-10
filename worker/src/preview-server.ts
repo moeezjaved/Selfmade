@@ -311,7 +311,7 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'page_id required (numeric)' }))
       return
     }
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 30)
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 150)
 
     console.log(`[preview] ${pageId} (limit=${limit})`)
     const data = await fetchPreview(pageId, limit)
@@ -398,7 +398,19 @@ async function fetchPreview(pageId: string, limit: number) {
 
     const url = `https://www.facebook.com/ads/library/?active_status=all&ad_type=all&country=ALL&view_all_page_id=${encodeURIComponent(pageId)}`
     await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30_000 })
-    await new Promise(r => setTimeout(r, 8_000))
+    await new Promise(r => setTimeout(r, 5_000))   // first GraphQL batch (~30 ads) lands
+
+    // Meta lazy-loads more ad batches only as you scroll. Without this we saw just the first ~30 ads per
+    // page (a brand like FÜM runs far more). Scroll to the bottom repeatedly until we have `limit` ads or
+    // growth stalls, time-boxed so a big advertiser can't run the scrape past the caller's timeout.
+    const scrollDeadline = Date.now() + 55_000
+    let stale = 0
+    while (adObjects.length < limit && Date.now() < scrollDeadline && stale < 3) {
+      const before = adObjects.length
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
+      await new Promise(r => setTimeout(r, 1_800))   // let the next GraphQL page fire + parse
+      stale = adObjects.length > before ? 0 : stale + 1
+    }
 
     await context.close()
 

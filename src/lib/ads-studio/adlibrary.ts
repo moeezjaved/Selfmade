@@ -104,7 +104,7 @@ export async function fetchLiveAdsByPage(pageId: string, limit = 8): Promise<Liv
     try {
       const u = new URL('/preview', dropletUrl)
       u.searchParams.set('page_id', pageId); u.searchParams.set('limit', String(limit))
-      const r = await undiciFetch(u.toString(), { headers: { 'X-Preview-Secret': dropletSecret }, signal: AbortSignal.timeout(40_000) })
+      const r = await undiciFetch(u.toString(), { headers: { 'X-Preview-Secret': dropletSecret }, signal: AbortSignal.timeout(90_000) })
       if (r.ok) {
         const data: any = await r.json()
         const ads = Array.isArray(data?.ads) ? data.ads : []
