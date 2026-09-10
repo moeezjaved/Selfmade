@@ -41,7 +41,7 @@ Return ONLY JSON:
 {
  "headlines": ["3 DISTINCT punchy on-image headline options (each <= 8 words), in ${language}, matching the format's vibe — vary the angle across them (e.g. benefit-led, curiosity/hook, offer/urgency) so the founder can pick the direction they like"],
  "angle": "one sentence of creative direction for the image — composition, mood, and the platform vibe (${format}); this steers the visual, not the copy",
- "styleDirection": "the EXACT visual look/mood/lighting the founder explicitly asked for, in their intent — e.g. 'dark moody cinematic, single hard light, luxury fragrance-campaign' or 'flat-lay on a white studio background' or 'bright playful pop-art'. EMPTY STRING \"\" if they did not specify a look (do NOT invent one).",
+ "styleDirection": "the founder's explicit visual direction — capture BOTH (a) the look/mood/lighting/ERA and (b) any PEOPLE/casting direction: who is in the scene, their ETHNICITY/nationality, age, gender and wardrobe. Be specific and vivid so an image model nails it. Examples: 'dark moody cinematic, single hard light, luxury fragrance-campaign' · 'authentic 1980s aesthetic: neon-lit retro set, period wardrobe (bold colours, big hair), warm film grain — NOT modern; cast: Pakistani / South-Asian people (warm brown skin tone, clearly South-Asian features) in true 80s fashion'. If they named a nationality/ethnicity for the people, state it explicitly here. EMPTY STRING \"\" only if they specified no look AND no people.",
  "caption": "a short social caption to post with the ad, in ${language}",
  "productIndex": <the 0-based index of the product to feature, or -1 if none applies>
 }`
