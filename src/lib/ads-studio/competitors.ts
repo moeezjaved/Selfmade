@@ -64,7 +64,7 @@ Return ONLY JSON:
  "market":"the primary country the store sells to. ONLY name a country when the signals give an EXPLICIT, unambiguous cue (currency symbol/code, a shipping-country statement, or a physical address). A single weak hint (one price, a stray mention) is NOT enough — when in doubt return 'global'. Never guess a country from the language alone.",
  "productForms":["each distinct product line/form from Step 1 — 1-5 short phrases"],
  "queries":["8 Google queries that surface COMPETING BRANDS. COVER EVERY product line above — include at least one exact-form query per line ('<line> brands', 'buy <line>') plus a couple brand-level 'alternatives to <brand/category>' queries. Do NOT over-index on a single line."],
- "adKeywords":["one SHORT keyword phrase (1-3 words EACH) PER product line above, naming the core product noun as it appears in ad copy — e.g. 'testosterone gummies', 'testosterone tablets', 'shilajit supplement'. Short and broad for a Meta Ad Library search — NOT 'brands'/'buy'/'best' queries. Max 5."]
+ "adKeywords":["6-8 SHORT keyword phrases (1-3 words each) to find COMPETING ADVERTISERS in the Meta Ad Library. Include BOTH: (a) the core product noun per line (e.g. 'testosterone gummies'), AND (b) how rivals describe this product in their OWN ADS — the buyer-outcome / category language a competitor uses as a hook, NOT the literal device name (e.g. for a nicotine-free flavored-air device: 'quit smoking','nicotine free','smoking alternative','vape alternative','stop smoking'; for testosterone gummies: 'testosterone booster','low testosterone'). Short and broad — NOT 'brands'/'buy'/'best'. Max 8."]
 }`
   try {
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 900, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
@@ -75,7 +75,7 @@ Return ONLY JSON:
       market: String(j?.market || '').slice(0, 40),
       productForms: (Array.isArray(j?.productForms) ? j.productForms : []).map((q: any) => String(q).slice(0, 50)).filter(Boolean).slice(0, 5),
       queries: (Array.isArray(j?.queries) ? j.queries : []).map((q: any) => String(q).slice(0, 90)).filter(Boolean).slice(0, 10),
-      adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 5),
+      adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 8),
     }
   } catch { return { category: '', market: '', productForms: [], queries: [], adKeywords: [] } }
 }
@@ -154,12 +154,22 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
   // Search the store's DETECTED market (e.g. India → IN) so a regional brand gets regional rivals — the old
   // hardcoded ALL surfaced a Hungarian gummy brand + a US greens brand for an Indian Ayurvedic store. Falls
   // back to ALL only when the market is unknown/global. Short keywords (the search wants broad phrases). ──
-  const country = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
-  // One keyword per product line (up to 4) so each line's advertisers are found — not just the hero line.
-  const adQueries = (adKeywords.length ? adKeywords : [category]).filter(Boolean).slice(0, 4)
+  const marketCountry = MARKET_COUNTRY[market.trim().toLowerCase()] || 'ALL'
+  // Search the detected market AND globally (ALL). A store's biggest rivals are often global DTC brands
+  // that DON'T advertise in a small local market (e.g. FÜM never shows in a Pakistan-only Ad Library
+  // search), so a market-only search silently missed them. rankCompetitors filters the extra breadth
+  // back down to true niche rivals, so casting wider only helps.
+  const countries = Array.from(new Set([marketCountry, 'ALL']))
+  // Keywords cover the product lines AND the buyer-language rivals use in ad copy (from seedQueries).
+  // Cap the total Ad Library searches (keywords × countries) so the background job stays inside budget.
+  const maxKw = countries.length > 1 ? 4 : 6
+  const adQueries = (adKeywords.length ? adKeywords : [category, ...productForms]).filter(Boolean).slice(0, maxKw)
+  if (dbg) dbg.adSearch = { countries, adQueries }
   const advByPage = new Map<string, Advertiser>()
   try {
-    const found = (await Promise.all(adQueries.map((q) => searchAdLibrary(q, country).catch(() => [] as Advertiser[])))).flat()
+    const searches: Promise<Advertiser[]>[] = []
+    for (const q of adQueries) for (const cc of countries) searches.push(searchAdLibrary(q, cc).catch(() => [] as Advertiser[]))
+    const found = (await Promise.all(searches)).flat()
     for (const a of found) {
       if (!a.pageId || !a.ads.length) continue
       if (a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)) continue
@@ -169,7 +179,7 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
     }
   } catch { /* ad library best-effort */ }
   const advertisers = Array.from(advByPage.values())
-  if (dbg) dbg.adLibrary = { country, adQueries, advertisers: advertisers.map((a) => ({ name: a.pageName, domain: a.domain, ads: a.ads.length })) }
+  if (dbg) dbg.adLibrary = { countries, adQueries, advertisers: advertisers.map((a) => ({ name: a.pageName, domain: a.domain, ads: a.ads.length })) }
 
   // Attach live ads to the Google-ranked rivals (match by destination domain, else advertiser name).
   const usedPages = new Set<string>()
