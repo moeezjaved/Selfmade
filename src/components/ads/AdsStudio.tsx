@@ -948,11 +948,27 @@ function HomeCarousel({ title, sub, children }: { title: string; sub: string; ch
 
 const overlayBtn = { position: 'absolute' as const, inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: 9, opacity: 0, transition: 'opacity .15s' }
 
+// A friendly empty-state card so a row with no data yet stays visible (with a CTA) instead of vanishing.
+function RowEmpty({ icon, title, body, cta, href }: { icon: string; title: string; body: string; cta: string; href: string }) {
+  return (
+    <a href={href} style={{ width: 360, maxWidth: '86vw', flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 16, background: '#fff', padding: '24px 22px', display: 'flex', flexDirection: 'column', gap: 7, textDecoration: 'none', fontFamily: SANS, minHeight: 170, justifyContent: 'center' }}>
+      <span style={{ fontSize: 24 }}>{icon}</span>
+      <div style={{ fontSize: 16, fontWeight: 800, color: INK }}>{title}</div>
+      <div style={{ fontSize: 13, color: SUB, lineHeight: 1.5 }}>{body}</div>
+      <span style={{ fontSize: 13, fontWeight: 800, color: ORANGE, marginTop: 3 }}>{cta} →</span>
+    </a>
+  )
+}
+
 function HomeDiscoverRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<DiscoverAd[] | null>(null)
   // Image ads only for now (video comes later) — drop any video-format creatives.
   useEffect(() => { let on = true; const dq = domain ? `&domain=${encodeURIComponent(domain)}` : ''; fetch(`/api/ads-studio/discover?limit=100${dq}`).then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
-  if (ads && ads.length === 0) return null
+  if (ads && ads.length === 0) return (
+    <HomeCarousel title="Discover" sub="Your competitors' ads and trending creative — tap Create Similar and Mello builds your version.">
+      <RowEmpty icon="✦" title="Nothing to discover yet" body="Spy a competitor or two and their winning ads — plus trending creative — will appear here to remake." cta="Browse Discover" href="/discovery" />
+    </HomeCarousel>
+  )
   return (
     <HomeCarousel title="Discover" sub="Your competitors' ads and trending creative — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
@@ -1018,7 +1034,11 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
     load()
     return () => { on = false }
   }, [])
-  if (ads !== null && ads.length === 0) return null
+  if (ads !== null && ads.length === 0) return (
+    <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
+      <RowEmpty icon="🕵️" title="No competitor ads yet" body="Spy a competitor and their newest live ads land here — ready to remake into your own." cta="Spy a competitor" href="/ads-workspace/competitors" />
+    </HomeCarousel>
+  )
   return (
     <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
