@@ -606,7 +606,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
             <div className="sf-thumb" style={{ aspectRatio: '4/5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
               {t?.image ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={t.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />
+                <img src={t.image} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" />
               ) : t?.generating ? (
                 <>
                   <span style={{ width: 26, height: 26, border: `3px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .8s linear infinite' }} />
@@ -667,7 +667,7 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
         {els.map((e) => (
           <div key={e.id} className="sf-thumb" style={{ position: 'relative', width: 124, height: 124, flex: 'none', overflow: 'hidden', cursor: 'pointer' }} onClick={() => onUse(e)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={e.url} alt={e.label} loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />
+            <img src={e.url} alt={e.label} loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" />
             <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 55%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 7, opacity: 0, transition: 'opacity .15s' }}>
               <button onClick={(ev) => { ev.stopPropagation(); del(e.id) }} title="Remove" style={{ alignSelf: 'flex-end', border: 'none', background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: 100, width: 22, height: 22, cursor: 'pointer', fontSize: 13 }}>×</button>
               <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.label}</div>
@@ -735,7 +735,7 @@ function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
         <div key={a.id} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -20px rgba(0,0,0,.2)' }}>
           <div style={{ padding: '13px 16px 9px', fontFamily: SERIF, fontSize: 30, fontWeight: 600, color: INK, letterSpacing: '-.01em', lineHeight: 1 }}>{String(i + 1).padStart(2, '0')}</div>
           <div className="sf-thumb" style={{ position: 'relative', margin: '0 12px 12px', borderRadius: 12, overflow: 'hidden', aspectRatio: '4 / 5' }}>
-            {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+            {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
             <div className="sf-disc-over" style={overlayBtn}>
               <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
               <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -758,7 +758,7 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
     <HomeCarousel title="Products" sub="Straight from your store — tap one to build an ad around it.">
       {products.slice(0, 24).map((p, i) => (
         <button key={i} onClick={() => onTag({ label: p.title.slice(0, 24), image: p.image, kind: 'product' })} style={{ width: 150, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff', cursor: 'pointer', textAlign: 'left', fontFamily: SANS, padding: 0 }}>
-          <div className="sf-thumb" style={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" />}</div>
+          <div className="sf-thumb" style={{ aspectRatio: '1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>{p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" />}</div>
           <div style={{ padding: '8px 10px', fontSize: 12, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>
         </button>
       ))}
@@ -772,55 +772,21 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
     let on = true
     ;(async () => {
       try {
-        // SAVED competitors only (the brands you've spied) — no fresh discovery scan. Same source as
-        // the Brand-Spy "Feed": /api/follows (spied) → /api/discovery/db-search recent per brand.
+        if (!domain) { if (on) setAds([]); return }
+        // ONE rich source: /api/ads-studio/competitors already merges the brands you're spying (deep live
+        // pull) + web-discovered rivals, images-only, deduped BY IMAGE server-side. (The old db-search
+        // path is dead — its corpus is off Supabase — and it was short-circuiting on ~4 stale rows.)
         const c = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
-        const qs = new URLSearchParams({ spied: '1' }); if (c) qs.set('brand', decodeURIComponent(c))
-        const f = await fetch(`/api/follows?${qs}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
-        const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
+        const qs = new URLSearchParams({ domain }); if (c) qs.set('brand', decodeURIComponent(c))
+        const d = await fetch(`/api/ads-studio/competitors?${qs}`).then((r) => r.json()).catch(() => null)
+        const comps = Array.isArray(d?.competitors) ? d.competitors : []
         const seen = new Set<string>()
-        // Normalize ad copy → a stable dedup signature (both the spied and fallback paths use it).
-        const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 90)
-        if (pageIds.length) {
-          const perBrand = await Promise.all(pageIds.slice(0, 8).map((pid) =>
-            fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
-          ))
-          // Image ads only for now (video later): keep creatives whose asset_type isn't video.
-          const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
-            // IMAGE ads only. Dedup by brand + ad COPY: the same creative re-run as several Meta ad
-            // versions shares identical text but has byte-different images (so hashes/urls differ and
-            // slip past hash/url dedup). Collapsing on normalized body/title kills those repeats while
-            // keeping genuinely distinct creatives. `thumbnailUrl` already resolves the best image thumb.
-            .map((a: any) => {
-              const isVideo = !!(a.videoUrl || a.video_hash) || /video/i.test(a.format || '')
-              const thumb = !isVideo ? (a.thumbnailUrl || '') : ''
-              const sig = norm(a.body || a.title || a.caption || a.description || '')
-              const key = `${a.pageId || a.brand || ''}|${sig || a.image_hash || a.id || thumb}`
-              return { thumb: thumb as string, brand: (a.pageName || a.pageId) as string, key }
-            })
-            .filter((x) => x.thumb && !seen.has(x.key) && seen.add(x.key))
-            .slice(0, 24)
-          if (flat.length) { if (on) setAds(flat); return }
-        }
-        // Not spying anyone (or they had no image ads) → discover rivals from the user's website and
-        // show THEIR live ads, so the section is never empty once we know the store.
-        if (domain) {
-          const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => null)
-          const comps = Array.isArray(d?.competitors) ? d.competitors : []
-          // Same rules as the spied path: IMAGE ads only (drop video), dedup by brand + ad COPY so the
-          // same creative re-run as several versions collapses to one. (This is the path that actually
-          // serves the row now that the bulk corpus is off Supabase — db-search returns nothing.)
-          const flat2 = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : []).map((a: any) => {
-            const isVideo = a.format === 'video' || /video/i.test(a.format || '')
-            const sig = norm(a.copy || a.body || a.title || '')
-            return { thumb: (!isVideo ? a.thumb : '') as string, brand: cc.name as string, key: `${cc.name || ''}|${sig || a.id || a.thumb}` }
-          }))
-            .filter((x: any) => x.thumb && !seen.has(x.key) && seen.add(x.key))
-            .slice(0, 24)
-          if (on) setAds(flat2)
-          return
-        }
-        if (on) setAds([])
+        const flat = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : [])
+          .filter((a: any) => a.thumb && a.format !== 'video' && !/video/i.test(a.format || ''))
+          .map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
+          .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+          .slice(0, 60)
+        if (on) setAds(flat)
       } catch { if (on) setAds([]) }
     })()
     return () => { on = false }
@@ -831,7 +797,7 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
         <div key={i} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', minHeight: 140 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -964,7 +930,7 @@ function CompCard({ c, isMobile, onSpy, onRemake }: { c: Comp; isMobile: boolean
             return (
               <div key={a.id} style={{ width: isMobile ? 150 : 190, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 12, overflow: 'hidden', background: '#fff' }}>
                 <div className="sf-thumb" style={{ aspectRatio: '4 / 5', position: 'relative', cursor: canRemake ? 'pointer' : 'default' }} onClick={canRemake ? () => onRemake!(a.thumb!, c.name) : undefined}>
-                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                   {a.active && <span style={{ position: 'absolute', top: 8, left: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: '#1f8f4e', borderRadius: 100, padding: '2px 8px' }}>LIVE</span>}
                   {a.format === 'video' && <span style={{ position: 'absolute', top: 8, right: 8, fontSize: 10, fontWeight: 800, color: '#fff', background: 'rgba(0,0,0,.55)', borderRadius: 100, padding: '2px 8px' }}>▶ VIDEO</span>}
                   {canRemake && (
@@ -1197,7 +1163,7 @@ function Discover({ isMobile }: { isMobile: boolean }) {
             <div style={{ columnCount: isMobile ? 2 : 4, columnGap: 14, marginTop: 20 }}>
               {shown.map((a) => (
                 <div key={a.id} className="sf-thumb" style={{ position: 'relative', overflow: 'hidden', marginBottom: 14, breakInside: 'avoid' }}>
-                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                  {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                   <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', padding: 10, opacity: 0, transition: 'opacity .15s' }}>
                     <div style={{ color: '#fff', fontSize: 12, fontWeight: 700, marginBottom: 8, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
                     <button onClick={() => addToChat({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '7px 12px', fontSize: 12, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -1245,7 +1211,7 @@ function Products({ isMobile, domain, hideHeader }: { isMobile: boolean; domain:
                 return (
                   <div key={p.url + i} onClick={() => setSel((s) => ({ ...s, [p.url]: !s[p.url] }))} style={{ border: `1px solid ${on ? ORANGE : LINE}`, borderRadius: 14, background: '#fff', overflow: 'hidden', cursor: 'pointer', boxShadow: on ? `0 0 0 2px ${ORANGE}22` : 'none' }}>
                     <div className="sf-thumb" style={{ aspectRatio: '1', position: 'relative' }}>
-                      {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+                      {p.image /* eslint-disable-next-line @next/next/no-img-element */ && <img src={p.image} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
                       <span style={{ position: 'absolute', top: 8, right: 8, width: 20, height: 20, borderRadius: 6, border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? ORANGE : '#fff', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 900 }}>{on ? '✓' : ''}</span>
                     </div>
                     <div style={{ padding: '10px 12px' }}><div style={{ fontSize: 13, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>{p.price && <div style={{ fontSize: 12, color: SUB, marginTop: 2 }}>{p.price}</div>}</div>
@@ -1397,7 +1363,7 @@ function BrandKit({ isMobile, domain }: { isMobile: boolean; domain: string }) {
                   {(data.visualPages || []).map((u, i) => (
                     <div key={i} className="sf-thumb" style={{ aspectRatio: '4/3', overflow: 'hidden' }}>
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={shotUrl(u)} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img" style={{ objectPosition: 'top' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+                      <img src={shotUrl(u)} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" style={{ objectPosition: 'top' }} onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
                     </div>
                   ))}
                 </div>
