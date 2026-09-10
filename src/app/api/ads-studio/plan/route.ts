@@ -41,6 +41,7 @@ Return ONLY JSON:
 {
  "headlines": ["3 DISTINCT punchy on-image headline options (each <= 8 words), in ${language}, matching the format's vibe — vary the angle across them (e.g. benefit-led, curiosity/hook, offer/urgency) so the founder can pick the direction they like"],
  "angle": "one sentence of creative direction for the image — composition, mood, and the platform vibe (${format}); this steers the visual, not the copy",
+ "styleDirection": "the EXACT visual look/mood/lighting the founder explicitly asked for, in their intent — e.g. 'dark moody cinematic, single hard light, luxury fragrance-campaign' or 'flat-lay on a white studio background' or 'bright playful pop-art'. EMPTY STRING \"\" if they did not specify a look (do NOT invent one).",
  "caption": "a short social caption to post with the ad, in ${language}",
  "productIndex": <the 0-based index of the product to feature, or -1 if none applies>
 }`
@@ -54,6 +55,7 @@ Return ONLY JSON:
       headline: headlines[0] || String(j?.headline || '').slice(0, 120),
       headlines,
       angle: `${String(j?.angle || '').slice(0, 240)} Style: ${vibe}`,
+      styleDirection: String(j?.styleDirection || '').slice(0, 240),
       caption: String(j?.caption || '').slice(0, 400),
       productIndex: idx >= 0 && idx < productTitles.length ? idx : -1,
       aspect: FORMAT_VIBE[format].aspect,

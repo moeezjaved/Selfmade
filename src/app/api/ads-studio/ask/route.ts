@@ -84,7 +84,7 @@ ${convo || '(none yet)'}
 FOUNDER'S LATEST MESSAGE: "${message}"
 
 Return ONLY JSON (no markdown, no code fence):
-{"answer": "<your reply in ${language}>", "build": {"headline": "<on-image headline>", "angle": "<one-line creative direction>"} | null}
+{"answer": "<your reply in ${language}>", "build": {"headline": "<on-image headline>", "angle": "<one-line creative direction — and if the founder asked for a specific VISUAL style/mood/lighting (e.g. dark cinematic, flat-lay, studio white), state it explicitly here so it drives the image>"} | null}
 Set "build" to an object ONLY when there is a concrete, ready-to-generate ad concept the founder would want made now; otherwise set "build" to null. If you set build, end your answer with a short line offering to make it.`
 
   try {

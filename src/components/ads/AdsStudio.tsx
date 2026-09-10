@@ -138,7 +138,7 @@ const ASPECTS = ['Auto', '1:1', '4:5', '9:16', '16:9']
 const LANGS = ['English', 'Urdu', 'Hindi', 'Bengali', 'Arabic', 'Spanish', 'French', 'German', 'Portuguese', 'Indonesian']
 const CHANNELS: AdFormat[] = ['Banner Ad', 'WhatsApp', 'Instagram', 'Facebook', 'LinkedIn']
 type AdFormat = 'Banner Ad' | 'WhatsApp' | 'Instagram' | 'Facebook' | 'LinkedIn'
-type PlanPick = { angle: string; caption: string; aspect: string; productImages: string[]; useCompose: boolean; refTags: string[]; baseProduct: string[]; colors: string[]; fonts?: { heading?: string | null; body?: string | null } }
+type PlanPick = { angle: string; caption: string; aspect: string; productImages: string[]; useCompose: boolean; refTags: string[]; baseProduct: string[]; colors: string[]; fonts?: { heading?: string | null; body?: string | null }; artDirection?: string }
 type ChatMsg = { role: 'user' | 'assistant'; text?: string; image?: string | null; caption?: string; error?: string; loading?: boolean; format?: AdFormat; headlines?: string[]; pick?: PlanPick; build?: { headline: string; angle: string } }
 type HomeTag = StudioTag
 type BrandKitLite = { siteName?: string; logo?: string | null; colors?: { hex: string }[]; fonts?: string[]; facts?: string[]; voice?: any }
@@ -333,7 +333,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       const aspectRatio = aspect !== 'Auto' ? aspect : plan.aspect
       // Element tagged (a person) → /compose path (preserves identity + product). Else the studio engine.
       const useCompose = refTags.length > 0
-      const pick: PlanPick = { angle: plan.angle, caption: plan.caption, aspect: aspectRatio, productImages, useCompose, refTags, baseProduct, colors, fonts }
+      const pick: PlanPick = { angle: plan.angle, caption: plan.caption, aspect: aspectRatio, productImages, useCompose, refTags, baseProduct, colors, fonts, artDirection: typeof plan.styleDirection === 'string' ? plan.styleDirection : undefined }
       const headlines: string[] = Array.isArray(plan.headlines) && plan.headlines.length ? plan.headlines : (plan.headline ? [plan.headline] : [])
       // Higgsfield-style: offer the improved headline DIRECTIONS to pick from before spending a
       // generation. Multiple options → show the chooser; one (or none) → just generate.
@@ -356,7 +356,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     const endpoint = pick.useCompose ? '/api/ads-studio/compose' : '/api/discovery/generate-ad'
     const reqBody = pick.useCompose
       ? JSON.stringify({ personImages: pick.refTags, productImages: pick.baseProduct, headline, angle: pick.angle, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, brandName: kit?.siteName })
-      : JSON.stringify({ productImages: pick.productImages, newHeadline: headline, angle: pick.angle, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, imageSize: '2K' })
+      : JSON.stringify({ productImages: pick.productImages, newHeadline: headline, angle: pick.angle, artDirection: pick.artDirection, aspectRatio: pick.aspect, colors: pick.colors, fonts: pick.fonts, logo: kit?.logo || undefined, imageSize: '2K' })
     let res: Response, d: any
     for (let attempt = 0; ; attempt++) {
       res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody })
