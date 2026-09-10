@@ -178,6 +178,20 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   // pakistani" or "bigger logo" EDITS this ad rather than re-planning a brand-new one.
   const lastBuildRef = useRef<{ headline: string; pick: PlanPick; fmt: AdFormat } | null>(null)
 
+  // When a formula is tapped on a MULTI-product store, ask which product to feature before building
+  // (otherwise the planner just guesses). Single-product stores skip this and build immediately.
+  const [pickProduct, setPickProduct] = useState<{ prompt: string; title: string } | null>(null)
+  const startFormula = (prompt: string, title: string) => {
+    if (products.length > 1) setPickProduct({ prompt, title })
+    else send(prompt)
+  }
+  const buildFormulaWith = (p: { title: string; image: string | null }) => {
+    setPickProduct(null)
+    if (p.image) setTags((x) => [...x, { label: p.title.slice(0, 24), image: p.image!, kind: 'product' }])
+    const chosen = pickProduct?.prompt || ''
+    send(`${chosen}\n\nUse this exact product: "${p.title}".`)
+  }
+
   const send = async (text?: string, forceBuild?: boolean, directHeadline?: string) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
@@ -598,12 +612,35 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         </div>
       )}
 
-      {!started && <AdFormulasRow isMobile={isMobile} onUse={(f) => send(f.prompt)} />}
+      {!started && <AdFormulasRow isMobile={isMobile} onUse={(f) => startFormula(f.prompt, f.title)} />}
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
       {!started && <HomeDiscoverRow domain={domain} onTag={primeFromReference} />}
       {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
       {!started && <HomeCompetitorsRow domain={domain} onTag={primeFromReference} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={primeFromElement} />}
+
+      {/* Multi-product store → ask which product to feature before building a tapped formula. */}
+      {pickProduct && (
+        <div onClick={() => setPickProduct(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, maxWidth: 560, width: '100%', maxHeight: '80vh', overflow: 'auto', padding: 22, fontFamily: SANS, boxShadow: '0 30px 80px rgba(0,0,0,.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, marginBottom: 4 }}>
+              <div style={{ fontSize: 19, fontWeight: 800, color: INK }}>Which product for this ad?</div>
+              <button onClick={() => setPickProduct(null)} style={{ border: 'none', background: 'none', fontSize: 22, lineHeight: 1, color: SUB, cursor: 'pointer', padding: 0 }}>×</button>
+            </div>
+            <div style={{ fontSize: 13.5, color: SUB, marginBottom: 16 }}>“{pickProduct.title}” — pick the product Mello should feature.</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+              {products.map((p, i) => (
+                <button key={i} onClick={() => buildFormulaWith(p)} style={{ textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 13, background: '#fff', overflow: 'hidden', cursor: 'pointer', fontFamily: SANS, padding: 0 }}>
+                  <div className="sf-thumb" style={{ aspectRatio: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', background: CREAM }}>
+                    {p.image /* eslint-disable-next-line @next/next/no-img-element */ ? <img src={p.image} alt="" loading="lazy" referrerPolicy="no-referrer" className="sf-thumb-img contain" /> : <span style={{ fontSize: 22, color: '#cbc3b6' }}>▢</span>}
+                  </div>
+                  <div style={{ padding: '9px 11px', fontSize: 12.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{p.title}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
