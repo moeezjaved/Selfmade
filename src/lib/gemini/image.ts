@@ -361,6 +361,9 @@ export function buildClonePrompt(opts: {
 // outputs before the user sees them and the route regenerates. New failure mode → new CHECK here,
 // never a new paragraph in buildClonePrompt.
 const MODEL_VERIFY = process.env.GEMINI_VERIFY_MODEL || 'gemini-2.5-flash'
+// The product-fidelity check uses a STRONGER judge than the flash default: flash false-passed drifted
+// products, so ~20% of fresh gens shipped with a wrong product because the checker said "matches".
+const MODEL_VERIFY_STRONG = process.env.GEMINI_VERIFY_MODEL_STRONG || 'gemini-2.5-pro'
 
 export type CloneVerdict = {
   pass: boolean
@@ -369,6 +372,7 @@ export type CloneVerdict = {
   textClean: boolean            // no misspelled/duplicated/gibberish text
   productProportional: boolean  // product is a NATURAL real-world size for the scene (not giant/dominating)
   fix?: string                  // ONE short corrective sentence for the retry prompt
+  errored?: boolean             // true = the check could NOT actually run (failed OPEN) — for logging only
 }
 
 /**
@@ -376,7 +380,8 @@ export type CloneVerdict = {
  * Fails OPEN (pass:true) on any API error — QA must never block a paying user's result.
  */
 export async function verifyClonedAd(generated: ImageInput, product: ImageInput, brandName?: string): Promise<CloneVerdict> {
-  const OPEN: CloneVerdict = { pass: true, productMatches: true, brandingClean: true, textClean: true, productProportional: true }
+  // errored:true marks this as a FAIL-OPEN (the check couldn't run) so callers can log it apart from a real pass.
+  const OPEN: CloneVerdict = { pass: true, productMatches: true, brandingClean: true, textClean: true, productProportional: true, errored: true }
   if (!KEY) return OPEN
   const prompt = [
     `Image 1 is an AI-generated ad. Image 2 is the real product it must feature${brandName ? ` (brand "${brandName}")` : ''}. Inspect image 1 strictly and answer with ONLY this JSON:`,
@@ -386,33 +391,49 @@ export async function verifyClonedAd(generated: ImageInput, product: ImageInput,
     ` "productProportional":bool, // the product is rendered at a NATURAL, believable real-world size for the scene — NOT unnaturally huge, not larger-than-life, not dominating the frame. If a hand holds it, it must look right in the hand (a small handheld device stays small). false if it's blown up too big.`,
     ` "fix":string}           // if anything is false: ONE short imperative sentence telling an image model what to correct; else ""`,
   ].join('\n')
-  try {
-    const r = await fetch(`${BASE}/${MODEL_VERIFY}:generateContent?key=${KEY}`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{ parts: [
-          { text: prompt },
-          { inline_data: { mime_type: geminiImageMime(generated.mimeType) || 'image/png', data: generated.dataB64 } },
-          { inline_data: { mime_type: geminiImageMime(product.mimeType) || 'image/jpeg', data: product.dataB64 } },
-        ] }],
-        generationConfig: { temperature: 0, responseMimeType: 'application/json' },
-      }),
-    })
-    if (!r.ok) return OPEN
-    const j = await r.json()
-    const raw = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
-    const v = JSON.parse(raw.replace(/^```(?:json)?/m, '').replace(/```\s*$/m, '').trim())
-    const productMatches = v.productMatches !== false
-    const brandingClean = v.brandingClean !== false
-    const textClean = v.textClean !== false
-    const productProportional = v.productProportional !== false
-    return {
-      pass: productMatches && brandingClean && textClean && productProportional,
-      productMatches, brandingClean, textClean, productProportional,
-      fix: typeof v.fix === 'string' && v.fix.trim() ? v.fix.trim().slice(0, 200) : undefined,
+  const reqBody = JSON.stringify({
+    contents: [{ parts: [
+      { text: prompt },
+      { inline_data: { mime_type: geminiImageMime(generated.mimeType) || 'image/png', data: generated.dataB64 } },
+      { inline_data: { mime_type: geminiImageMime(product.mimeType) || 'image/jpeg', data: product.dataB64 } },
+    ] }],
+    generationConfig: { temperature: 0, responseMimeType: 'application/json' },
+  })
+  const RETRYABLE = new Set([429, 500, 502, 503, 504])
+  // Use a STRONGER judge than the flash default (flash false-passed drifted products), and retry the
+  // check ONCE on a transient error before failing open — a flaky verify call must not silently ship a
+  // bad render unchecked. Only a genuine parsed verdict carries errored:false.
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const r = await fetch(`${BASE}/${MODEL_VERIFY_STRONG}:generateContent?key=${KEY}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: reqBody,
+      })
+      if (!r.ok) {
+        if (RETRYABLE.has(r.status) && attempt === 0) { await new Promise((s) => setTimeout(s, 1500)); continue }
+        console.warn(`[verify] fail-open: HTTP ${r.status} (${MODEL_VERIFY_STRONG})`)
+        return OPEN
+      }
+      const j = await r.json()
+      const raw = (j?.candidates?.[0]?.content?.parts || []).map((p: any) => p.text || '').join('')
+      const v = JSON.parse(raw.replace(/^```(?:json)?/m, '').replace(/```\s*$/m, '').trim())
+      const productMatches = v.productMatches !== false
+      const brandingClean = v.brandingClean !== false
+      const textClean = v.textClean !== false
+      const productProportional = v.productProportional !== false
+      const pass = productMatches && brandingClean && textClean && productProportional
+      console.log(`[verify] ${MODEL_VERIFY_STRONG} pass=${pass} product=${productMatches} branding=${brandingClean} text=${textClean} prop=${productProportional}`)
+      return {
+        pass, productMatches, brandingClean, textClean, productProportional,
+        fix: typeof v.fix === 'string' && v.fix.trim() ? v.fix.trim().slice(0, 200) : undefined,
+        errored: false,
+      }
+    } catch (e: any) {
+      if (attempt === 0) { await new Promise((s) => setTimeout(s, 1500)); continue }
+      console.warn(`[verify] fail-open: ${String(e?.message || e).slice(0, 90)}`)
+      return OPEN
     }
-  } catch { return OPEN }
+  }
+  return OPEN
 }
 
 /**

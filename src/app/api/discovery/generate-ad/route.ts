@@ -171,7 +171,10 @@ async function handle(req: NextRequest) {
       best = { mimeType: gen.mimeType, dataB64: gen.dataB64, model: gen.model }
       if (isService || !products[0]) { verdictLog.push('service'); break }
       const v = await verifyClonedAd({ mimeType: best.mimeType, dataB64: best.dataB64 }, products[0], brandNm).catch(() => null)
-      if (!v || v.pass) { verdictLog.push(v ? 'pass' : 'verify-open'); break }
+      // errored = the verifier couldn't actually check (failed open). Don't loop pointlessly on an
+      // unchecked render — log it distinctly so we can see how often the safety net didn't run.
+      if (!v || v.errored) { verdictLog.push('verify-errored'); break }
+      if (v.pass) { verdictLog.push('pass'); break }
       const fix = v.fix || [
         !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
         !v.brandingClean && `Every logo and brand name shown must belong to ${brandNm ? `"${brandNm}"` : "the user's brand"} only.`,
@@ -192,6 +195,10 @@ async function handle(req: NextRequest) {
       }
       return NextResponse.json({ error: errRaw }, { status: 502 })
     }
+
+    // Measure the product-fidelity safety net: how many rounds ran and how each verdict landed
+    // (pass / a corrective fix / verify-errored). Grep Vercel logs for [gen-verify] to see the split.
+    console.log(`[gen-verify] inspired user=${user.id} brand=${effBrandId || 'none'} rounds=${verdictLog.length} outcome=[${verdictLog.map((s) => (s.length > 28 ? s.slice(0, 28) + '…' : s)).join(' | ')}]`)
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
