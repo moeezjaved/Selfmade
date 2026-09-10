@@ -43,7 +43,31 @@ const liveToCards = (live: LiveAd[]) => live.map((a) => ({
 // The competitor row shows IMAGE ads — float images to the front so they survive the display cap; videos tail.
 const imagesFirst = <T extends { format?: string | null }>(ads: T[]): T[] =>
   [...ads].sort((a, b) => (a.format === 'image' ? 0 : 1) - (b.format === 'image' ? 0 : 1))
-const AD_CARD_CAP = 24   // ads kept per competitor (was 8) — FÜM & friends have far more image ads to show
+// Signature of the ACTUAL image behind a thumb, so we dedup by creative — Meta serves the same image under
+// many ad IDs. For a proxied live thumb (/media?u=<fbcdn>) we key on the inner fbcdn image path; corpus
+// thumbs are stable R2 URLs. Falls back to the whole string. This is what removes visual duplicates.
+const imgSig = (thumb?: string | null): string => {
+  if (!thumb) return ''
+  try {
+    const m = thumb.match(/[?&]u=([^&]+)/)
+    const raw = m ? decodeURIComponent(m[1]) : thumb
+    const u = new URL(raw, 'https://x')
+    return (u.pathname.split('/').filter(Boolean).pop() || raw).toLowerCase()
+  } catch { return thumb }
+}
+// Dedup a competitor's ads by IMAGE (not ad id), images first. No arbitrary trim — show every unique creative
+// we have for them, bounded only by this generous safety cap.
+const uniqueByImage = (ads: any[]): any[] => {
+  const seen = new Set<string>()
+  const out: any[] = []
+  for (const a of imagesFirst(ads || [])) {
+    const s = imgSig(a?.thumb) || a?.id
+    if (!s || seen.has(s)) continue
+    seen.add(s); out.push(a)
+  }
+  return out.slice(0, AD_CARD_CAP)
+}
+const AD_CARD_CAP = 60   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -89,7 +113,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
     // a store sees only one competitor with ads. Pull its live ads now so MORE rivals surface WITH real
     // image creatives (this runs in the background/cached path, so the extra Ad Library calls are fine).
     if (!dna && !liveAds.length && c.pageId) {
-      liveAds = liveToCards(await fetchLiveAdsByPage(String(c.pageId), 40).catch(() => []))
+      liveAds = liveToCards(await fetchLiveAdsByPage(String(c.pageId), 60).catch(() => []))
     }
     const ads = imagesFirst(dna?.ads ?? liveAds)
     return {
@@ -180,7 +204,7 @@ export async function GET(req: NextRequest) {
           // top up LIVE from Meta right now so the row is rich; the 6h re-crawl backfills index + ad-DNA after.
           const corpusImages = cardAds.filter((a: any) => a.format === 'image').length
           if (corpusImages < 8) {
-            const live = await fetchLiveAdsByPage(pageId, 40).catch(() => [])
+            const live = await fetchLiveAdsByPage(pageId, 60).catch(() => [])
             const liveCards = liveToCards(live)
             if (liveCards.length) {
               const seen = new Set(cardAds.map((a: any) => a.id))
@@ -221,9 +245,9 @@ export async function GET(req: NextRequest) {
       if (!cur.domain && c.domain) cur.domain = c.domain
     }
     const merged = Array.from(byBrand.values())
-    // Images to the front (the row shows images), then cap each card. Done once here so single-card brands
-    // (no merge) are capped too.
-    for (const c of merged) c.ads = imagesFirst(c.ads || []).slice(0, AD_CARD_CAP)
+    // Dedup each card by the actual IMAGE (not ad id) so no repeats, images first. Done once here so
+    // single-card brands (no merge) are deduped too.
+    for (const c of merged) c.ads = uniqueByImage(c.ads || [])
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
