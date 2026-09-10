@@ -675,19 +675,23 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   )
 }
 
-type ElementItem = { id: string; label: string; url: string }
+type ElementItem = { id: string; label: string; url: string; global?: boolean }
 function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: string; onUse: (e: ElementItem) => void }) {
   const [els, setEls] = useState<ElementItem[] | null>(null)
   const [busy, setBusy] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const scopeRef = useRef<'brand' | 'global'>('brand')   // which button opened the picker
   useEffect(() => {
     if (!domain) return
     let on = true
-    fetch(`/api/ads-studio/elements?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => on && setEls(Array.isArray(d.elements) ? d.elements : [])).catch(() => on && setEls([]))
+    fetch(`/api/ads-studio/elements?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).then((d) => { if (!on) return; setEls(Array.isArray(d.elements) ? d.elements : []); setIsAdmin(!!d.isAdmin) }).catch(() => on && setEls([]))
     return () => { on = false }
   }, [domain])
+  const pick = (scope: 'brand' | 'global') => { scopeRef.current = scope; fileRef.current?.click() }
   const add = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []); if (!files.length) return
+    const scope = scopeRef.current
     setBusy(true)
     ;(async () => {
       try {
@@ -695,7 +699,7 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
         for (const f of files) {
           const dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) }).catch(() => '')
           if (!dataUrl) continue
-          const d = await fetch('/api/ads-studio/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, label: f.name.replace(/\.[^.]+$/, '').slice(0, 30), dataUrl }) }).then((r) => r.json()).catch(() => null)
+          const d = await fetch('/api/ads-studio/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, label: f.name.replace(/\.[^.]+$/, '').slice(0, 30), dataUrl, scope }) }).then((r) => r.json()).catch(() => null)
           if (d && Array.isArray(d.elements)) setEls(d.elements)
           else if (d?.error) { alert(d.error); break }
         }
@@ -708,16 +712,24 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
     <div style={{ marginTop: 40 }}>
       <input ref={fileRef} type="file" accept="image/*" multiple onChange={add} style={{ display: 'none' }} />
       <HScroll gap={12} titleSize={isMobile ? 22 : 26} title="Elements" sub="People & props to drop into your creative. Add a face or scene, then tag it in the chat.">
-        <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+        <button onClick={() => pick('brand')} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
           {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
           <span style={{ fontSize: 11.5, fontWeight: 700 }}>{busy ? 'Adding…' : 'Add element'}</span>
         </button>
+        {/* Admins can add SHARED people that appear in every brand's library. */}
+        {isAdmin && (
+          <button onClick={() => pick('global')} disabled={busy} title="Add a shared model everyone can use" style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${ORANGE}`, borderRadius: 12, background: '#fff8f5', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: ORANGE, fontFamily: SANS }}>
+            <span style={{ fontSize: 22 }}>🌐</span>
+            <span style={{ fontSize: 11.5, fontWeight: 700, textAlign: 'center', lineHeight: 1.2 }}>Add for everyone</span>
+          </button>
+        )}
         {els.map((e) => (
           <div key={e.id} className="sf-thumb" style={{ position: 'relative', width: 124, height: 124, flex: 'none', overflow: 'hidden', cursor: 'pointer' }} onClick={() => onUse(e)}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={e.url} alt={e.label} loading="eager" referrerPolicy="no-referrer" className="sf-thumb-img" />
+            {e.global && <div title="Shared with everyone" style={{ position: 'absolute', top: 6, left: 6, background: 'rgba(0,0,0,.55)', color: '#fff', fontSize: 10, fontWeight: 800, padding: '2px 6px', borderRadius: 100 }}>🌐 Shared</div>}
             <div className="sf-disc-over" style={{ position: 'absolute', inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.6), rgba(0,0,0,0) 55%)', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 7, opacity: 0, transition: 'opacity .15s' }}>
-              <button onClick={(ev) => { ev.stopPropagation(); del(e.id) }} title="Remove" style={{ alignSelf: 'flex-end', border: 'none', background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: 100, width: 22, height: 22, cursor: 'pointer', fontSize: 13 }}>×</button>
+              {(!e.global || isAdmin) && <button onClick={(ev) => { ev.stopPropagation(); del(e.id) }} title="Remove" style={{ alignSelf: 'flex-end', border: 'none', background: 'rgba(0,0,0,.5)', color: '#fff', borderRadius: 100, width: 22, height: 22, cursor: 'pointer', fontSize: 13 }}>×</button>}
               <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{e.label}</div>
             </div>
           </div>
