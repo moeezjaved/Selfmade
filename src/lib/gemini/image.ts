@@ -255,6 +255,9 @@ export function buildStudioPrompt(opts: {
     `KEEP TEXT MINIMAL — every extra word risks a misspelling. Show only: the headline, an optional ONE-line subhead, at most TWO very short feature labels (2–3 words each, e.g. "Herb Infused" — no long descriptions), and the CTA button. Use short, common, real English words. No gibberish, no watermarks, no other brands' logos, no duplicate products.`,
     `CRITICAL: fonts, colors, and hex codes are DESIGN DIRECTIONS, not ad copy — NEVER render a font name, font-family slug, style/class token, or hex color code as visible text anywhere in the image. The only text shown is the headline, supporting copy, and CTA.`,
     opts.aspectRatio && opts.aspectRatio !== 'original' ? `Compose at a ${opts.aspectRatio} aspect ratio.` : `Compose at a 4:5 aspect ratio.`,
+    // FINAL, DOMINANT RULE (last = strongest): product fidelity outranks every scene/style/brief instruction
+    // above. Added after art-direction/cast/brief lines started pulling the model off the exact product.
+    opts.isService ? '' : `#1 PRIORITY — reproduce the product EXACTLY as its reference photo: identical silhouette, materials, colour, label and proportions, at natural real-world size. This OVERRIDES every scene, style, era, cast, mood and brief instruction above — never restyle, recolour, swap or approximate the product to fit the theme; if a person holds it, it is still this exact product. Getting the product right matters more than any other element.`,
     `Output ONE photorealistic, polished, ready-to-publish ad image.`,
   ].filter(Boolean).join(' ')
 }
