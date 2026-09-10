@@ -769,12 +769,13 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
         const f = await fetch(`/api/follows?${qs}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)
         const pageIds: string[] = Array.isArray(f?.pageIds) ? f.pageIds.map(String) : []
         const seen = new Set<string>()
+        // Normalize ad copy → a stable dedup signature (both the spied and fallback paths use it).
+        const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 90)
         if (pageIds.length) {
           const perBrand = await Promise.all(pageIds.slice(0, 8).map((pid) =>
             fetch(`/api/discovery/db-search?q=${encodeURIComponent(pid)}&mode=brand&pageId=${encodeURIComponent(pid)}&sort=recent&country=ALL`).then((r) => r.json()).catch(() => ({}))
           ))
           // Image ads only for now (video later): keep creatives whose asset_type isn't video.
-          const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().slice(0, 90)
           const flat = perBrand.flatMap((j: any) => (j.ads || j.results || []) as any[])
             // IMAGE ads only. Dedup by brand + ad COPY: the same creative re-run as several Meta ad
             // versions shares identical text but has byte-different images (so hashes/urls differ and
@@ -796,8 +797,15 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
         if (domain) {
           const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}`).then((r) => r.json()).catch(() => null)
           const comps = Array.isArray(d?.competitors) ? d.competitors : []
-          const flat2 = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : []).map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
-            .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
+          // Same rules as the spied path: IMAGE ads only (drop video), dedup by brand + ad COPY so the
+          // same creative re-run as several versions collapses to one. (This is the path that actually
+          // serves the row now that the bulk corpus is off Supabase — db-search returns nothing.)
+          const flat2 = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : []).map((a: any) => {
+            const isVideo = a.format === 'video' || /video/i.test(a.format || '')
+            const sig = norm(a.copy || a.body || a.title || '')
+            return { thumb: (!isVideo ? a.thumb : '') as string, brand: cc.name as string, key: `${cc.name || ''}|${sig || a.id || a.thumb}` }
+          }))
+            .filter((x: any) => x.thumb && !seen.has(x.key) && seen.add(x.key))
             .slice(0, 24)
           if (on) setAds(flat2)
           return
