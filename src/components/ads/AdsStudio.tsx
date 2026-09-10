@@ -541,7 +541,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       )}
 
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
-      {!started && <HomeDiscoverRow onTag={primeFromReference} />}
+      {!started && <HomeDiscoverRow domain={domain} onTag={primeFromReference} />}
       {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
       {!started && <HomeCompetitorsRow domain={domain} onTag={primeFromReference} />}
       {!started && <ElementsRow isMobile={isMobile} domain={domain} onUse={primeFromElement} />}
@@ -768,10 +768,10 @@ function HomeCarousel({ title, sub, children }: { title: string; sub: string; ch
 
 const overlayBtn = { position: 'absolute' as const, inset: 0, background: 'linear-gradient(0deg, rgba(0,0,0,.55), rgba(0,0,0,0) 45%)', display: 'flex', flexDirection: 'column' as const, justifyContent: 'flex-end', padding: 9, opacity: 0, transition: 'opacity .15s' }
 
-function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
+function HomeDiscoverRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<DiscoverAd[] | null>(null)
   // Image ads only for now (video comes later) — drop any video-format creatives.
-  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=100').then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
+  useEffect(() => { let on = true; const dq = domain ? `&domain=${encodeURIComponent(domain)}` : ''; fetch(`/api/ads-studio/discover?limit=100${dq}`).then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
   if (ads && ads.length === 0) return null
   return (
     <HomeCarousel title="Discover" sub="Your competitors' ads and trending creative — tap Create Similar and Mello builds your version.">
@@ -814,13 +814,13 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
 function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<{ thumb: string; brand: string }[] | null>(null)
   useEffect(() => {
-    let on = true
-    ;(async () => {
+    let on = true, polls = 0
+    // ONE rich source: /api/ads-studio/competitors merges spied brands (deep live pull, cached) + web-
+    // discovered rivals, images-only, deduped BY IMAGE server-side. The deep pull fills in the background,
+    // so poll a few times while `refreshing`/`discovering` so the full set appears without a reload.
+    const load = async () => {
       try {
         if (!domain) { if (on) setAds([]); return }
-        // ONE rich source: /api/ads-studio/competitors already merges the brands you're spying (deep live
-        // pull) + web-discovered rivals, images-only, deduped BY IMAGE server-side. (The old db-search
-        // path is dead — its corpus is off Supabase — and it was short-circuiting on ~4 stale rows.)
         const c = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
         const qs = new URLSearchParams({ domain }); if (c) qs.set('brand', decodeURIComponent(c))
         const d = await fetch(`/api/ads-studio/competitors?${qs}`).then((r) => r.json()).catch(() => null)
@@ -831,9 +831,11 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
           .map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
           .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
           .slice(0, 100)
-        if (on) setAds(flat)
+        if (on && (flat.length || polls === 0)) setAds(flat)
+        if (on && (d?.refreshing || d?.discovering) && polls < 5) { polls++; setTimeout(load, 25000) }
       } catch { if (on) setAds([]) }
-    })()
+    }
+    load()
     return () => { on = false }
   }, [])
   if (ads !== null && ads.length === 0) return null

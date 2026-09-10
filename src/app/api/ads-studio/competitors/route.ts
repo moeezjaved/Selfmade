@@ -69,6 +69,8 @@ const uniqueByImage = (ads: any[]): any[] => {
 }
 const AD_CARD_CAP = 100   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
 const DISCOVERY_COOLDOWN_MS = 30 * 60 * 1000   // don't re-run open-web discovery more than every 30 min per brand
+const SPIED_TTL_MS = 30 * 60 * 1000            // re-pull a spied brand's live ads at most every 30 min (deep scrape is slow)
+const SPIED_REFRESH_MAX = 4                    // deep-pull at most this many spied brands per background run (droplet budget)
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -151,23 +153,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ debug: res?.debug || null, competitorsFound: (res?.competitors || []).length, error: res?.error || null })
     }
 
+    // The brand's warm ads-studio cache — reused by both the discovered pass (section 1) and the spied
+    // ad-pull cache (section 2), so neither blocks the workspace load on a slow droplet scrape.
+    const studioCache = brandId ? await readAdsStudio(admin, brandId) : {}
+
     // ── 1. DISCOVERED rivals (the expensive open-web pass) — cached per brand/domain so the workspace is
-    // instant after the first build. Only the discovered part is cached; spied brands stay live below. ──
+    // instant after the first build. ──
     let discovered: any[] = []
     let seed: any = null
     let configured = true
     let discoveryDone = false
     let discovering = false
     if (brandId && domain && !force) {
-      const ads = await readAdsStudio(admin, brandId)
-      const cached = readSection<{ discovered: any[]; seed: any; configured: boolean; ranAt?: number }>(ads, 'competitors', domain)
+      const cached = readSection<{ discovered: any[]; seed: any; configured: boolean; ranAt?: number }>(studioCache, 'competitors', domain)
       // Serve a cache that FOUND rivals, OR one that RAN RECENTLY even if it found none. The old code
       // treated every empty result as a miss and re-ran discovery on EVERY load — which hammered the one
       // shared droplet so no background run ever finished (permanent "discovering"). A recent run (within
       // the cooldown) is respected so the droplet can actually complete a scan; after that it retries.
       const recent = cached?.ranAt && (Date.now() - cached.ranAt < DISCOVERY_COOLDOWN_MS)
       if (cached && ((cached.discovered || []).length || recent)) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
-      else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true; discovering = true }   // a background run is in-flight → serve spied-only, client polls
+      else if (isBuilding(studioCache, 'competitors', domain)) { discoveryDone = true; discovering = true }   // a background run is in-flight → serve spied-only, client polls
     }
     if (!discoveryDone && domain && domain.includes('.') && !isAppDomain(domain)) {
       if (brandId) {
@@ -194,50 +199,67 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // ── 2. Merge in the logged-in user's manually-spied brands (always live — user can spy/unspy) ──
+    // ── 2. The user's manually-spied brands. The BRAND LIST is live (spy/unspy is instant); their AD-PULL
+    // is CACHED. A deep Meta scrape now walks the FULL library (~20-30s/brand), so it must NOT run inline
+    // on every workspace load. Serve the last cached deep pull instantly; refresh it in the background when
+    // stale. First-ever load falls back to whatever's in our corpus while the background pull fills in. ──
     let spied: any[] = []
+    let spiedBuilding = false
     if (user) {
       let q = admin.from('followed_brands').select('page_id, brand_name, brand_id').eq('user_id', user.id).eq('spied', true)
-      // STRICT per-brand (matches the brand-spy GET route): a specific active brand shows ONLY the
-      // competitors linked to it. Old global spies (brand_id null) surface under "All brands" only — not
-      // under every brand — else unrelated brands (e.g. gummy brands under a portable-wudu store) leak in. QA.
-      if (brandId) q = q.eq('brand_id', brandId)
+      if (brandId) q = q.eq('brand_id', brandId)   // STRICT per active brand (else unrelated spies leak in)
       const { data: follows } = await q.limit(30)
-      const pageIds: string[] = Array.from(new Set((follows || []).map((f: any) => String(f.page_id)).filter(Boolean)))
+      const pageIds: string[] = Array.from(new Set<string>((follows || []).map((f: any) => String(f.page_id)).filter(Boolean))).slice(0, 12)
       if (pageIds.length) {
         const nameMap = await resolveBrandNames(admin, pageIds).catch(() => new Map<string, string>())
-        spied = await Promise.all(pageIds.slice(0, 12).map(async (pageId) => {
-          const [{ data: ads }, { count }] = await Promise.all([
-            admin.from('discovery_ads_index').select(AD_COLS).eq('page_id', pageId).eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(AD_CARD_CAP),
-            admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pageId),
+        const nameFor = (pid: string) => nameMap.get(pid) || (follows || []).find((f: any) => String(f.page_id) === pid)?.brand_name || 'Competitor'
+        const corpusFor = async (pid: string) => {
+          const [{ data: cAds }, { count }] = await Promise.all([
+            admin.from('discovery_ads_index').select(AD_COLS).eq('page_id', pid).eq('has_creative', true).order('performance_score', { ascending: false, nullsFirst: false }).limit(AD_CARD_CAP),
+            admin.from('discovery_ads_index').select('ad_id', { count: 'exact', head: true }).eq('page_id', pid),
           ])
-          const list = ads || []
-          let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
-          let adCount = count ?? list.length
-          let adsSource: 'corpus' | 'live' = 'corpus'
-          // The row shows IMAGE ads. If our crawl index is THIN on this brand's images (a fresh spy not yet
-          // indexed, or a brand — like FÜM — whose Ad Library holds far more image ads than we've crawled),
-          // top up LIVE from Meta right now so the row is rich; the 6h re-crawl backfills index + ad-DNA after.
-          const corpusImages = cardAds.filter((a: any) => a.format === 'image').length
-          if (corpusImages < 8) {
-            const live = await fetchLiveAdsByPage(pageId, 100).catch(() => [])
-            const liveCards = liveToCards(live)
-            if (liveCards.length) {
-              const seen = new Set(cardAds.map((a: any) => a.id))
-              for (const a of liveCards) if (a.id && !seen.has(a.id)) { cardAds.push(a); seen.add(a.id) }
-              if (!list.length) adsSource = 'live'
-              adCount = Math.max(adCount, cardAds.length)
-            }
+          return { list: cAds || [], count: count ?? (cAds?.length || 0) }
+        }
+        // Long maxAge on the read so we always show the LAST cached deep pull; `ranAt` inside decides refresh.
+        const cachedSpied = brandId ? readSection<{ byPage: Record<string, any>; ranAt: number }>(studioCache, 'spiedAds', domain || 'spied', 1000 * 60 * 60 * 24 * 14) : null
+        const byPage = cachedSpied?.byPage || {}
+        spied = await Promise.all(pageIds.map(async (pageId) => {
+          const cc = byPage[pageId]
+          if (cc && Array.isArray(cc.ads) && cc.ads.length) {   // cached deep pull → instant, full
+            return { source: 'spied', pageId, domain: null, name: nameFor(pageId), reason: 'You are spying this brand', hasAdDna: cc.hasAdDna ?? false, adsSource: cc.adsSource || 'live', spyable: false, adCount: cc.adCount ?? cc.ads.length, ads: cc.ads, dna: cc.dna || { hooks: [], angles: [], personas: [] } }
           }
-          cardAds = imagesFirst(cardAds)
-          return {
-            source: 'spied', pageId, domain: null,
-            name: nameMap.get(pageId) || (follows || []).find((f: any) => String(f.page_id) === pageId)?.brand_name || 'Competitor',
-            reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource, spyable: false,
-            adCount, ads: cardAds,
-            dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) },
-          }
+          const { list, count } = await corpusFor(pageId)   // never-pulled brand → corpus placeholder
+          const cardAds = imagesFirst(list.map(cleanAd).filter((a: any) => a.thumb))
+          return { source: 'spied', pageId, domain: null, name: nameFor(pageId), reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource: 'corpus' as const, spyable: false, adCount: count, ads: cardAds, dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) } }
         }))
+        // Refresh in the BACKGROUND when the cache is stale/missing or any spied brand hasn't been pulled yet.
+        const stale = !cachedSpied || (Date.now() - (cachedSpied.ranAt || 0) > SPIED_TTL_MS) || pageIds.some((p) => !byPage[p]?.ads?.length)
+        if (brandId && stale && !isBuilding(studioCache, 'spiedAds', domain || 'spied')) {
+          spiedBuilding = true
+          await mergeAdsStudio(admin, brandId, { spiedAdsBuilding: buildingPayload(domain || 'spied') }).catch(() => {})
+          waitUntil((async () => {
+            const next: Record<string, any> = { ...byPage }   // keep other brands' cached pulls
+            // Prioritise brands we have NOTHING cached for, then the rest, capped for the droplet budget.
+            const order = [...pageIds.filter((p) => !byPage[p]?.ads?.length), ...pageIds.filter((p) => byPage[p]?.ads?.length)].slice(0, SPIED_REFRESH_MAX)
+            await Promise.all(order.map(async (pid) => {
+              try {
+                const { list, count } = await corpusFor(pid)
+                let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
+                let adCount = count
+                let adsSource: 'corpus' | 'live' = 'corpus'
+                const live = liveToCards(await fetchLiveAdsByPage(pid, 150).catch(() => []))   // deep pull
+                if (live.length) {
+                  const seen = new Set(cardAds.map((a: any) => a.id))
+                  for (const a of live) if (a.id && !seen.has(a.id)) { cardAds.push(a); seen.add(a.id) }
+                  if (!list.length) adsSource = 'live'
+                  adCount = Math.max(adCount, cardAds.length)
+                }
+                next[pid] = { name: nameFor(pid), ads: uniqueByImage(cardAds), adCount, adsSource, hasAdDna: list.length > 0, dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) } }
+              } catch { /* skip this brand this round */ }
+            }))
+            await mergeAdsStudio(admin, brandId, { spiedAds: sectionPayload(domain || 'spied', { byPage: next, ranAt: Date.now() }), spiedAdsBuilding: null }).catch(() => {})
+          })())
+        }
       }
     }
 
@@ -267,7 +289,7 @@ export async function GET(req: NextRequest) {
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
-    return NextResponse.json({ seed, configured, competitors: merged, discovering })
+    return NextResponse.json({ seed, configured, competitors: merged, discovering, refreshing: spiedBuilding })
   } catch (e: any) {
     return NextResponse.json({ competitors: [], error: String(e?.message || e).slice(0, 160) })
   }
