@@ -68,6 +68,7 @@ const uniqueByImage = (ads: any[]): any[] => {
   return out.slice(0, AD_CARD_CAP)
 }
 const AD_CARD_CAP = 100   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
+const DISCOVERY_COOLDOWN_MS = 30 * 60 * 1000   // don't re-run open-web discovery more than every 30 min per brand
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -105,7 +106,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
-const MAX_LIVE_TOPUPS = 6   // bound the background job: at most this many rivals get an on-the-fly live pull
+const MAX_LIVE_TOPUPS = 3   // bound the background job: at most this many rivals get an on-the-fly live pull
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
   const base = await Promise.all(res.competitors.map(async (c) => {
@@ -118,7 +119,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // an unbounded pull here was risking a timeout that left discovery spinning.
   const targets = base.filter((b) => b.needsTopup).slice(0, MAX_LIVE_TOPUPS)
   await Promise.all(targets.map(async (b) => {
-    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 60).catch(() => []))
+    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 40).catch(() => []))
   }))
   return base.map(({ c, dna, liveAds }) => {
     const ads = imagesFirst(dna?.ads ?? liveAds)
@@ -159,11 +160,13 @@ export async function GET(req: NextRequest) {
     let discovering = false
     if (brandId && domain && !force) {
       const ads = await readAdsStudio(admin, brandId)
-      const cached = readSection<{ discovered: any[]; seed: any; configured: boolean }>(ads, 'competitors', domain)
-      // Serve the cache ONLY if it actually found rivals. An EMPTY cached result (a transient/early failed
-      // run — e.g. the Ad Library blipped) was being served forever, hiding real rivals; treat it as a miss
-      // so discovery re-runs and self-heals. `force` still forces a fresh run.
-      if (cached && (cached.discovered || []).length) { discovered = cached.discovered; seed = cached.seed; configured = cached.configured; discoveryDone = true }
+      const cached = readSection<{ discovered: any[]; seed: any; configured: boolean; ranAt?: number }>(ads, 'competitors', domain)
+      // Serve a cache that FOUND rivals, OR one that RAN RECENTLY even if it found none. The old code
+      // treated every empty result as a miss and re-ran discovery on EVERY load — which hammered the one
+      // shared droplet so no background run ever finished (permanent "discovering"). A recent run (within
+      // the cooldown) is respected so the droplet can actually complete a scan; after that it retries.
+      const recent = cached?.ranAt && (Date.now() - cached.ranAt < DISCOVERY_COOLDOWN_MS)
+      if (cached && ((cached.discovered || []).length || recent)) { discovered = cached.discovered || []; seed = cached.seed; configured = cached.configured; discoveryDone = true }
       else if (isBuilding(ads, 'competitors', domain)) { discoveryDone = true; discovering = true }   // a background run is in-flight → serve spied-only, client polls
     }
     if (!discoveryDone && domain && domain.includes('.') && !isAppDomain(domain)) {
@@ -175,15 +178,14 @@ export async function GET(req: NextRequest) {
         discovering = true
         await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
         waitUntil((async () => {
+          // ALWAYS write a cache with a `ranAt` timestamp — even when discovery finds nothing or errors —
+          // so the cooldown above stops the every-load re-run spin and the droplet gets room to finish.
+          let payload: { discovered: any[]; seed: any; configured: boolean; ranAt: number } = { discovered: [], seed: null, configured: true, ranAt: Date.now() }
           try {
             const res = await discoverCompetitors(domain).catch(() => null)
-            if (res) {
-              const d2 = await enrichDiscovered(admin, res)
-              await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, { discovered: d2, seed: res.seed, configured: res.configured }), competitorsBuilding: null })
-            } else {
-              await mergeAdsStudio(admin, brandId, { competitorsBuilding: null })
-            }
-          } catch { await mergeAdsStudio(admin, brandId, { competitorsBuilding: null }).catch(() => {}) }
+            if (res) payload = { discovered: await enrichDiscovered(admin, res), seed: res.seed, configured: res.configured, ranAt: Date.now() }
+          } catch { /* keep the empty-but-timestamped payload */ }
+          await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, payload), competitorsBuilding: null }).catch(() => {})
         })())
       } else {
         // No brand to cache against (anon) → run inline so they still get a result this request.

@@ -161,14 +161,19 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
   // back down to true niche rivals, so casting wider only helps.
   const countries = Array.from(new Set([marketCountry, 'ALL']))
   // Keywords cover the product lines AND the buyer-language rivals use in ad copy (from seedQueries).
-  // Cap the total Ad Library searches (keywords × countries) so the background job stays inside budget.
-  const maxKw = countries.length > 1 ? 4 : 6
+  // HARD-CAP the total Ad Library searches (keywords × countries) — these are Playwright calls on ONE
+  // shared droplet, so too many pile up and the background job never finishes. Keep it to ~4 total.
+  const maxSearches = 4
+  const maxKw = Math.max(2, Math.floor(maxSearches / countries.length))
   const adQueries = (adKeywords.length ? adKeywords : [category, ...productForms]).filter(Boolean).slice(0, maxKw)
   if (dbg) dbg.adSearch = { countries, adQueries }
   const advByPage = new Map<string, Advertiser>()
   try {
+    // Time-bound each droplet search so one slow call can't stall the whole background job past its budget.
+    const withTimeout = (p: Promise<Advertiser[]>): Promise<Advertiser[]> =>
+      Promise.race([p.catch(() => [] as Advertiser[]), new Promise<Advertiser[]>((r) => setTimeout(() => r([]), 35_000))])
     const searches: Promise<Advertiser[]>[] = []
-    for (const q of adQueries) for (const cc of countries) searches.push(searchAdLibrary(q, cc).catch(() => [] as Advertiser[]))
+    for (const q of adQueries) for (const cc of countries) searches.push(withTimeout(searchAdLibrary(q, cc)))
     const found = (await Promise.all(searches)).flat()
     for (const a of found) {
       if (!a.pageId || !a.ads.length) continue
