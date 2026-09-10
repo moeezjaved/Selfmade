@@ -568,6 +568,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         </div>
       )}
 
+      {!started && <AdFormulasRow isMobile={isMobile} onUse={(f) => send(f.prompt)} />}
       {!started && <PersonalizedTemplates isMobile={isMobile} domain={domain} kit={kit} products={products} onUse={(t) => { setTags((x) => [...x, { label: t.title.slice(0, 24), image: t.image, kind: 'template' }]); send(`Make a ${t.title} for my brand`) }} />}
       {!started && <HomeDiscoverRow domain={domain} onTag={primeFromReference} />}
       {!started && <HomeProductsRow products={products} onTag={primeFromProduct} />}
@@ -605,6 +606,52 @@ function GeneratingCard({ format }: { format: string }) {
           ))}
         </div>
       </div>
+    </div>
+  )
+}
+
+/* ── Proven ad formulas ─────────────────────────────────────────────────────
+   Six viral creative structures (from the best-performing DTC ads) baked into
+   pre-written recipe prompts. Tapping one sends its prompt through the normal
+   plan → generate flow, which fuses the formula with THIS brand's real product
+   + facts from the Brand Kit and writes brand-specific copy. The founder never
+   writes the formula — they just pick the angle and Mello builds it for them. */
+type AdFormula = { key: string; emoji: string; title: string; example: string; tint: string; prompt: string }
+const AD_FORMULAS: AdFormula[] = [
+  { key: 'outcome', emoji: '✨', title: 'Sell the outcome', example: '“Olive oil that makes dinner taste like Italy.”', tint: '#eef6ec',
+    prompt: 'Make an ad that sells the OUTCOME, not the product. Give it one big headline that names the felt result my customer actually wants — the feeling, the transformation, the payoff my product delivers (in the spirit of "olive oil that makes dinner taste like Italy"). Ground that promise in what my product genuinely does. Warm, aspirational, editorial styling; the product supports the promise rather than being the headline.' },
+  { key: 'scene', emoji: '🌊', title: 'Product is the scene', example: 'Make the product massive — the whole world.', tint: '#eef1fb',
+    prompt: 'Make an ad where my PRODUCT is the entire scene — render it large and hero, and build the whole visual world around the feeling it creates (in the spirit of a giant can pouring out into a dreamy world people relax in). Bold, surreal, product-forward, with one short evocative line of copy about the feeling.' },
+  { key: 'usecase', emoji: '🎯', title: 'Show the use case', example: '“Cracked one before my long run — didn’t cramp once.”', tint: '#fdf3e8',
+    prompt: 'Make an ad showing a specific USE CASE — a real moment with a testimonial-style line about exactly when and why someone reaches for my product (in the spirit of "cracked one before my long run, didn\'t even cramp once"). Authentic UGC feel with a handwritten highlight; make the when and the why instantly obvious.' },
+  { key: 'replace', emoji: '🚫', title: 'Replace the bad habit', example: '“Your desk drawer is not a meal plan.”', tint: '#fbeef0',
+    prompt: 'Make an ad that calls out the bad habit my product replaces — name the old behaviour bluntly (in the spirit of "your desk drawer is not a meal plan") — then present my product as the obvious better solution. Punchy, contrarian, big confident type.' },
+  { key: 'problem', emoji: '😣', title: 'Lead with the problem', example: '“Still bloated. Still backed up.”', tint: '#f0f6ec',
+    prompt: 'Make an ad that leads with the uncomfortable, specific problem my customer has — say it plainly (in the spirit of "still bloated, still backed up") so they instantly know the ad is for them — then make my product the relief. Big blunt headline, product clearly shown, a touch of playful visual.' },
+  { key: 'metaphor', emoji: '🐆', title: 'Turn it into a metaphor', example: 'One striking image for the benefit.', tint: '#fdf6e3',
+    prompt: 'Make an ad that turns my product\'s #1 benefit into ONE striking visual metaphor the eye understands in a second (in the spirit of a cheetah for speed, or clear water for hydration). Make the metaphor the hero of the image, product featured or held, one bold benefit headline.' },
+]
+function AdFormulasRow({ isMobile, onUse }: { isMobile: boolean; onUse: (f: AdFormula) => void }) {
+  return (
+    <div style={{ marginTop: 48 }}>
+      <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Proven ad formulas" sub="Six viral creative structures — written for your product. Tap one and Mello builds it in the chat.">
+        {AD_FORMULAS.map((f, i) => (
+          <button key={f.key} onClick={() => onUse(f)} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: 'pointer', fontFamily: SANS, padding: 0, display: 'flex', flexDirection: 'column' }}>
+            <div style={{ background: f.tint, padding: '16px 16px 14px', display: 'flex', flexDirection: 'column', gap: 10, minHeight: 150 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                <span style={{ fontSize: 22, lineHeight: 1 }}>{f.emoji}</span>
+                <span style={{ fontSize: 12, fontWeight: 800, color: SUB, letterSpacing: '.06em' }}>{String(i + 1).padStart(2, '0')}</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: INK, lineHeight: 1.15 }}>{f.title}</div>
+              <div style={{ fontSize: 13, color: '#5a564e', lineHeight: 1.4, fontStyle: 'italic' }}>{f.example}</div>
+            </div>
+            <div style={{ padding: '11px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderTop: `1px solid ${LINE}` }}>
+              <span style={{ fontSize: 12.5, fontWeight: 700, color: SUB }}>For your product</span>
+              <span style={{ fontSize: 13, fontWeight: 800, color: ORANGE }}>Build →</span>
+            </div>
+          </button>
+        ))}
+      </HScroll>
     </div>
   )
 }
