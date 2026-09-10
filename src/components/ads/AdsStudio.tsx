@@ -795,7 +795,7 @@ function HomeDiscoverRow({ domain, onTag }: { domain: string; onTag: (t: StudioT
         <div key={a.id} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -20px rgba(0,0,0,.2)' }}>
           <div style={{ padding: '13px 16px 9px', fontFamily: SERIF, fontSize: 30, fontWeight: 600, color: INK, letterSpacing: '-.01em', lineHeight: 1 }}>{String(i + 1).padStart(2, '0')}</div>
           <div className="sf-thumb" style={{ position: 'relative', margin: '0 12px 12px', borderRadius: 12, overflow: 'hidden', aspectRatio: '4 / 5' }}>
-            {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
+            {a.thumb /* eslint-disable-next-line @next/next/no-img-element */ && <img src={a.thumb} alt="" loading={i < 8 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />}
             <div className="sf-disc-over" style={overlayBtn}>
               <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
               <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
@@ -859,7 +859,7 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
         <div key={i} className="sf-thumb" style={{ position: 'relative', width: 212, flex: 'none', overflow: 'hidden', minHeight: 140 }}>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={a.thumb} alt="" loading="eager" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
+          <img src={a.thumb} alt="" loading={i < 8 ? 'eager' : 'lazy'} decoding="async" referrerPolicy="no-referrer" className="sf-thumb-nat" onError={(e) => { (e.currentTarget as HTMLImageElement).style.opacity = '0' }} />
           <div className="sf-disc-over" style={overlayBtn}>
             <div style={{ color: '#fff', fontSize: 11.5, fontWeight: 700, marginBottom: 7, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.brand}</div>
             <button onClick={() => onTag({ label: `Like ${a.brand}`.slice(0, 24), image: a.thumb, kind: 'discover' })} style={{ ...primaryBtn, padding: '6px 10px', fontSize: 11.5, borderRadius: 8, width: '100%' }}>✦ Create Similar</button>
