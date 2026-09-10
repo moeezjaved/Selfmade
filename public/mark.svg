@@ -1,4 +1,20 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 700" role="img" aria-label="Selfmade">
-  <rect width="700" height="700" rx="182" fill="#ef4a1e"/>
-  <text x="350" y="360" text-anchor="middle" dominant-baseline="central" font-family="'Instrument Serif','Iowan Old Style',Georgia,'Times New Roman',serif" font-weight="700" font-size="440" fill="#ffffff">S</text>
+  <defs>
+    <filter id="sfgoo" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="13" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 24 -12"/>
+    </filter>
+  </defs>
+  <g filter="url(#sfgoo)" fill="#ef4a1e">
+    <line x1="291" y1="541" x2="409" y2="541" stroke="#ef4a1e" stroke-width="130" stroke-linecap="round"/>
+    <circle cx="291" cy="541" r="105"/><circle cx="409" cy="541" r="105"/>
+  </g>
+  <g filter="url(#sfgoo)" fill="#ef4a1e">
+    <line x1="155" y1="305" x2="214" y2="204" stroke="#ef4a1e" stroke-width="130" stroke-linecap="round"/>
+    <circle cx="155" cy="305" r="105"/><circle cx="214" cy="204" r="105"/>
+  </g>
+  <g filter="url(#sfgoo)" fill="#ef4a1e">
+    <line x1="486" y1="204" x2="545" y2="305" stroke="#ef4a1e" stroke-width="130" stroke-linecap="round"/>
+    <circle cx="486" cy="204" r="105"/><circle cx="545" cy="305" r="105"/>
+  </g>
 </svg>
