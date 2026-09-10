@@ -729,7 +729,7 @@ function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=40').then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
   if (ads && ads.length === 0) return null
   return (
-    <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
+    <HomeCarousel title="Discover" sub="Your competitors' ads and trending creative — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
         // Lapis-style card: big serif index on top, image below in a clean white card.
         <div key={a.id} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -20px rgba(0,0,0,.2)' }}>

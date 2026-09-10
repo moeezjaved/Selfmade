@@ -142,6 +142,14 @@ export async function GET(req: NextRequest) {
     const { data: { user } } = await supa.auth.getUser()
     const brandId = user ? await resolveActiveBrandId(admin, user.id, req.nextUrl.searchParams.get('brand') || undefined).catch(() => null) : null
 
+    // DIAGNOSTIC: ?debug=1 runs discovery INLINE and returns a per-stage breakdown (crawl → seed queries →
+    // SERP candidates → LLM rank → Ad Library → final) so we can see exactly where a brand drops to zero
+    // rivals. Logged-in only; no caching, no side effects.
+    if (req.nextUrl.searchParams.get('debug') === '1' && user && domain) {
+      const res: any = await discoverCompetitors(domain, { debug: true }).catch((e: any) => ({ error: String(e?.message || e).slice(0, 200) }))
+      return NextResponse.json({ debug: res?.debug || null, competitorsFound: (res?.competitors || []).length, error: res?.error || null })
+    }
+
     // ── 1. DISCOVERED rivals (the expensive open-web pass) — cached per brand/domain so the workspace is
     // instant after the first build. Only the discovered part is cached; spied brands stay live below. ──
     let discovered: any[] = []

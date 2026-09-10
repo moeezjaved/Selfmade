@@ -21,6 +21,7 @@ export type DiscoveryResult = {
   seed: { name: string; category: string; market: string; productForms?: string[]; queries: string[] }
   competitors: DiscoveredCompetitor[]
   configured: boolean
+  debug?: Record<string, any>   // populated only when discoverCompetitors is called with { debug: true }
 }
 
 /** Market name → Meta Ad Library ISO-2 country (for local advertiser search). ALL = global fallback. */
@@ -105,17 +106,21 @@ Return ONLY JSON: {"competitors":[{"domain":"exact domain from the list","name":
   } catch { return [] }
 }
 
-export async function discoverCompetitors(domain: string): Promise<DiscoveryResult> {
+export async function discoverCompetitors(domain: string, opts?: { debug?: boolean }): Promise<DiscoveryResult> {
+  const dbg: Record<string, any> | null = opts?.debug ? {} : null
   const configured = dfsConfigured()
+  if (dbg) dbg.serpConfigured = configured
   // Crawl the store AND build its Brand Kit in parallel — the Brand-Kit facts sharpen discovery to the
   // exact product niche (Lapis-level accuracy), instead of a loose category guess off the thin crawl.
   const [ctx, kit] = await Promise.all([crawlStore(domain), buildBrandKit(domain).catch(() => null)])
   const facts = kit?.facts ?? []
+  if (dbg) dbg.ctx = { siteName: ctx.siteName, domain: ctx.domain, products: ctx.products.length, descLen: (ctx.description || '').length, signals: ctx.signals, facts: facts.length }
   const { category, market, productForms, queries, adKeywords } = await seedQueries(ctx, facts)
+  if (dbg) dbg.seed = { category, market, productForms, queries, adKeywords }
   // Only give up entirely when we have NOTHING to search with. The Meta Ad Library step below runs on the
   // droplet independently of DataForSEO, so an unconfigured/empty SERP must NOT short-circuit it — that was
   // silently returning zero rivals for brands whose competitors live in the Ad Library, not Google.
-  if (!queries.length && !adKeywords.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured }
+  if (!queries.length && !adKeywords.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured, debug: dbg ? { ...dbg, stop: 'no queries or adKeywords' } : undefined }
 
   const loc = MARKET_LOCATION[market.trim().toLowerCase()] ?? 2840
   const self = domainRoot(domain)
@@ -136,8 +141,10 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
   const candidates = Array.from(pool.values())
     .sort((a, b) => (b.hits - a.hits) || (a.positions / a.hits - b.positions / b.hits))
     .slice(0, 22)
+  if (dbg) dbg.serp = { queriesRun: configured ? Math.min(queries.length, 8) : 0, serpRows: serps.reduce((n, r) => n + r.length, 0), pool: pool.size, candidates: candidates.map((c) => c.domain) }
 
   const ranked = await rankCompetitors(ctx, category, facts, candidates)
+  if (dbg) dbg.ranked = ranked.map((r) => r.domain)
   const competitors: DiscoveredCompetitor[] = ranked.map((r) => {
     const c = pool.get(r.domain)
     return { domain: r.domain, name: r.name || r.domain, reason: r.reason, foundVia: category || 'category search', positions: c ? Math.round(c.positions / c.hits) : 0, pageId: null, liveAds: [] }
@@ -162,6 +169,7 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
     }
   } catch { /* ad library best-effort */ }
   const advertisers = Array.from(advByPage.values())
+  if (dbg) dbg.adLibrary = { country, adQueries, advertisers: advertisers.map((a) => ({ name: a.pageName, domain: a.domain, ads: a.ads.length })) }
 
   // Attach live ads to the Google-ranked rivals (match by destination domain, else advertiser name).
   const usedPages = new Set<string>()
@@ -192,9 +200,11 @@ export async function discoverCompetitors(domain: string): Promise<DiscoveryResu
       }))
   }
 
+  if (dbg) { dbg.extra = extra.map((e) => e.name); dbg.competitorsFinal = [...competitors, ...extra].map((c) => c.name) }
   return {
     seed: { name: ctx.siteName, category, market, productForms, queries },
     competitors: [...competitors, ...extra],
     configured,
+    debug: dbg || undefined,
   }
 }
