@@ -8,7 +8,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime } from '@/lib/gemini/image'
+import { generateImage, buildStudioPrompt, geminiEnabled, geminiImageMime, verifyClonedAd } from '@/lib/gemini/image'
 import { saveGeneration } from '@/lib/creatives'
 import { resolveBrandNiche, getNicheInsights } from '@/lib/studio/insights'
 import { pickInspirations } from '@/lib/studio/inspiration'
@@ -147,28 +147,56 @@ async function handle(req: NextRequest) {
 
     // Order: [inspirations..., products..., logo?] — the prompt references indexes accordingly.
     const genImages = [...inspImgs, ...products, ...(logoImg ? [logoImg] : [])]
-    const gen = await generateImage(prompt, genImages, 'pro', { aspectRatio: resolvedAspect, imageSize })
-    if (!gen.ok) {
+    // Generate → vision-verify → retry — the same product-fidelity QA ladder the clone path runs, now
+    // on fresh ads too. After each render we check the PRODUCT actually matches its photo (plus branding/
+    // text/scale); if not, we regenerate with a correction. Physical products only (service ads have no
+    // product to verify). Up to 3 rounds, deadline-guarded so a busy Gemini can't blow maxDuration; the
+    // verifier fails OPEN (accepts) on its own API errors so QA never blocks a good render.
+    const genStart = Date.now()
+    const outOfTime = () => Date.now() - genStart > 255_000
+    const MAX_GENS = 3
+    let gen: Awaited<ReturnType<typeof generateImage>> | null = null
+    let best: { mimeType: string; dataB64: string; model: string } | null = null
+    const verdictLog: string[] = []
+    for (let i = 0; i < MAX_GENS; i++) {
+      if (i > 0 && outOfTime()) { verdictLog.push('deadline'); break }
+      const attemptPrompt = i === 0 ? prompt : `${prompt} IMPORTANT CORRECTION: ${verdictLog[verdictLog.length - 1]}`
+      gen = await generateImage(attemptPrompt, genImages, 'pro', { aspectRatio: resolvedAspect, imageSize })
+      if (!gen.ok) break
+      best = { mimeType: gen.mimeType, dataB64: gen.dataB64, model: gen.model }
+      if (isService || !products[0]) { verdictLog.push('service'); break }
+      const v = await verifyClonedAd({ mimeType: best.mimeType, dataB64: best.dataB64 }, products[0], brandNm).catch(() => null)
+      if (!v || v.pass) { verdictLog.push(v ? 'pass' : 'verify-open'); break }
+      const fix = v.fix || [
+        !v.productMatches && 'Render the product exactly as shown in its photo — same shape, container type, label and colors.',
+        !v.brandingClean && `Every logo and brand name shown must belong to ${brandNm ? `"${brandNm}"` : "the user's brand"} only.`,
+        !v.textClean && 'Fix all text: correct spelling, no repeated words or duplicated text blocks.',
+        !v.productProportional && 'Size the product at a natural, believable real-world scale — it must not dominate the frame, and must look right if held in a hand.',
+      ].filter(Boolean).join(' ')
+      verdictLog.push(fix)
+    }
+    if (!best) {
       await refund()
+      const errRaw = (gen && !gen.ok && gen.error) || 'generation failed'
       // pro_model_busy is transient Gemini-Pro congestion — the client already retries and the user is
       // refunded, so don't founder-alert on it (it was spamming 1 email per retry). Alert only on real
       // failures; busy episodes stay visible via /api/admin/gen-health.
-      if (gen.error !== 'pro_model_busy') {
+      if (errRaw !== 'pro_model_busy') {
         const { sendAdminAlert } = await import('@/lib/email')
-        await sendAdminAlert(`⚠️ studio ad generation failed`, `<p>User <b>${user.id}</b>'s fresh-ad generation failed and was refunded.</p><p><b>Error:</b> ${String(gen.error).slice(0, 300)}</p>`)
+        await sendAdminAlert(`⚠️ studio ad generation failed`, `<p>User <b>${user.id}</b>'s fresh-ad generation failed and was refunded.</p><p><b>Error:</b> ${String(errRaw).slice(0, 300)}</p><p><b>QA log:</b> ${verdictLog.join(' → ').slice(0, 300)}</p>`)
       }
-      return NextResponse.json({ error: gen.error }, { status: 502 })
+      return NextResponse.json({ error: errRaw }, { status: 502 })
     }
 
     if (txId) await admin.rpc('commit_credits', { p_tx: txId }).then(() => {}, () => {})
 
     const saved = await saveGeneration({
-      userId: user.id, dataB64: gen.dataB64, mimeType: gen.mimeType, type: 'inspired', tier: 'pro', model: gen.model,
+      userId: user.id, dataB64: best.dataB64, mimeType: best.mimeType, type: 'inspired', tier: 'pro', model: best.model,
       brandId: brandId || null, prompt: newHeadline || null,
     })
 
     return NextResponse.json({
-      image: `data:${gen.mimeType};base64,${gen.dataB64}`, url: saved?.url || null, generationId: saved?.id || null,
+      image: `data:${best.mimeType};base64,${best.dataB64}`, url: saved?.url || null, generationId: saved?.id || null,
       niche, inspirations: inspImgs.length, insightsUsed: { hooks: insights.topHooks, angles: insights.topAngles },
       // Which references were used + why (for the transparency panel).
       references: usedRefs.map((r) => ({
