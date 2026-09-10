@@ -736,6 +736,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   const [tpls, setTpls] = useState<Template[] | null>(null)
   const [canGen, setCanGen] = useState(false)
   const started = useRef(false)
+  const FREE_TEMPLATES = 5   // first 5 auto-generate free; the rest are locked → cost credits (free plan → upgrade)
 
   useEffect(() => {
     if (!domain) return
@@ -770,11 +771,18 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
       try {
         const d = await fetch('/api/ads-studio/templates', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(genBody(i, force)) }).then((r) => r.json())
         if (d.image) { setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, image: d.image, generating: false, failed: false } : x)); return }
+        if (d.error === 'insufficient_credits') {   // paid user out of credits → top up, don't mark failed
+          setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: false } : x))
+          openCredits('buy', 'Your first 5 templates are free — this one needs credits. Top up to generate more.')
+          return
+        }
       } catch { /* retry */ }
       if (attempt < 2) await new Promise((r) => setTimeout(r, 4000))   // busy → wait, then retry
     }
     setTpls((prev) => prev && prev.map((x, j) => j === i ? { ...x, generating: false, failed: true } : x))
   }
+  // A locked template (beyond the free 5) → free plan hits the upgrade wall; paid plans spend credits.
+  const genLocked = async (i: number) => { if (await requireUpgrade()) return; genOne(i) }
 
   // Progressively generate the missing template images — FREE (wow factor), 2 at a time.
   // We generate WITHOUT requiring a product hero image: many templates are graphic/brand-led, and
@@ -782,7 +790,7 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   // scraped product images stuck on blank cards forever.
   useEffect(() => {
     if (started.current || !tpls || !canGen || !kit) return
-    const todo = tpls.map((t, i) => ({ t, i })).filter(({ t }) => !t.image)
+    const todo = tpls.map((t, i) => ({ t, i })).filter(({ t, i }) => i < FREE_TEMPLATES && !t.image)   // only the free 5 auto-generate
     if (!todo.length) return
     started.current = true
     let cursor = 0
@@ -793,9 +801,9 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
   if (tpls !== null && tpls.length === 0) return null
   return (
     <div style={{ marginTop: 48 }}>
-      <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Personalized templates" sub="Ad concepts generated from your Brand Kit — free. Tap one and Mello builds it in the chat.">
+      <HScroll gap={16} titleSize={isMobile ? 24 : 30} title="Personalized templates" sub="Ad concepts from your Brand Kit — the first 5 are free. Tap one to build it in the chat; generate the rest with credits.">
         {(tpls || Array.from({ length: 6 }, () => null)).map((t, i) => (
-          <div key={i} onClick={() => t && !t.generating && !t.failed && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t && !t.generating && !t.failed ? 'pointer' : 'default', fontFamily: SANS }}>
+          <div key={i} onClick={() => t?.image && !t.generating && onUse({ title: t.title, image: t.image })} style={{ position: 'relative', width: 250, flex: 'none', textAlign: 'left', border: `1px solid ${LINE}`, borderRadius: 16, background: '#fff', overflow: 'hidden', cursor: t?.image && !t.generating ? 'pointer' : 'default', fontFamily: SANS }}>
             {/* Title on top, like the reference — no description below. */}
             <div style={{ padding: '11px 14px 9px', fontSize: 14, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{t?.title || '…'}</div>
             <div className="sf-thumb" style={{ aspectRatio: '4/5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', gap: 10, position: 'relative' }}>
@@ -812,6 +820,13 @@ function PersonalizedTemplates({ isMobile, domain, kit, products, onUse }: { isM
                   <span style={{ width: 30, height: 30, borderRadius: '50%', background: '#fdeee9', color: ORANGE, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>↻</span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: INK }}>Tap to retry</span>
                   <span style={{ fontSize: 11, color: SUB }}>Image engine was busy</span>
+                </button>
+              ) : (t && i >= FREE_TEMPLATES) ? (
+                // Locked (beyond the free 5) — tap to generate with credits (free plan → upgrade wall)
+                <button onClick={(e) => { e.stopPropagation(); genLocked(i) }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', fontFamily: SANS, padding: 16 }}>
+                  <span style={{ width: 34, height: 34, borderRadius: '50%', background: '#f3efe7', color: INK, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🔒</span>
+                  <span style={{ fontSize: 13, fontWeight: 800, color: INK }}>Generate</span>
+                  <span style={{ fontSize: 11, color: SUB }}>Uses credits</span>
                 </button>
               ) : null}
               {t?.image && !t.generating && (
