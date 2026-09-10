@@ -177,6 +177,51 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
   const send = async (text?: string, forceBuild?: boolean, directHeadline?: string) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
+
+    // SELECTION — the user is picking a numbered option the assistant just offered ("5", "yes 5 is good",
+    // "the 3rd one", "go with 2"), NOT starting a new ad. Resolve it against the most recent assistant
+    // message that offered options — the plan-flow chooser (structured) or a numbered headline list from
+    // the strategist — and BUILD that exact headline, instead of re-planning it into fresh directions.
+    if (!forceBuild && !directHeadline && tags.length === 0) {
+      const ord: Record<string, number> = { first: 1, second: 2, third: 3, fourth: 4, fifth: 5, sixth: 6, seventh: 7, eighth: 8, ninth: 9, tenth: 10 }
+      const numMatch = message.match(/(?:^|\b)(?:option|number|no\.?|#|headline)?\s*#?(\d{1,2})\b/i)
+      const ordWord = Object.keys(ord).find((w) => new RegExp(`\\b${w}\\b`, 'i').test(message))
+      const n = numMatch ? parseInt(numMatch[1], 10) : ordWord ? ord[ordWord] : 0
+      const isSelection = n > 0 && n <= 10 && (
+        /^\s*#?\d{1,2}\s*$/.test(message) ||
+        (message.trim().length <= 30 && /\b(good|yes|yeah|yep|ok|okay|sure|go|use|pick|choose|select|like|love|great|perfect|that|this|option|number|headline|one)\b/i.test(message))
+      )
+      if (isSelection) {
+        const parseOpts = (t: string): string[] => {
+          const out: string[] = []
+          for (const line of t.split('\n')) {
+            const mm = line.match(/^\s*(\d{1,2})[.)]\s*["“]?(.+?)["”]?\s*$/)
+            if (mm) out[parseInt(mm[1], 10) - 1] = mm[2].trim()
+          }
+          return out.filter(Boolean)
+        }
+        let handled = false
+        for (let i = msgs.length - 1; i >= 0; i--) {
+          const mm = msgs[i]
+          if (mm.role !== 'assistant') continue
+          if (Array.isArray(mm.headlines) && mm.headlines.length) {   // the structured 3-direction chooser
+            if (n <= mm.headlines.length && mm.pick) {
+              setInput('')
+              setMsgs((m) => [...m, { role: 'user', text: message, format }, { role: 'assistant', loading: true, format }])
+              await chooseHeadline(mm.headlines[n - 1], mm.pick, format)
+              handled = true
+            }
+            break
+          }
+          const opts = mm.text ? parseOpts(mm.text) : []
+          if (opts.length) {   // a numbered headline list the strategist wrote as text
+            if (n <= opts.length) { setInput(''); await send(`Make a ${format} ad — headline: "${opts[n - 1]}"`, true, opts[n - 1]); handled = true }
+            break
+          }
+        }
+        if (handled) return   // built the chosen headline — don't also treat it as a new brief
+      }
+    }
     // A QUESTION / strategy ask (persona, angle, "is this right?", "suggest ideas") — with no reference
     // or product attached — goes to the STRATEGIST brain: a real, brand-grounded, conversational answer
     // (with memory of the thread), which can also propose an ad to build. `forceBuild` (the "Build this
