@@ -174,9 +174,39 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     reader.readAsDataURL(f); setOpen('')
   }
 
+  // The last successfully built ad (headline + full pick + format). A follow-up like "make the person
+  // pakistani" or "bigger logo" EDITS this ad rather than re-planning a brand-new one.
+  const lastBuildRef = useRef<{ headline: string; pick: PlanPick; fmt: AdFormat } | null>(null)
+
   const send = async (text?: string, forceBuild?: boolean, directHeadline?: string) => {
     const message = (text ?? input).trim()
     if (!message || busy) return
+
+    // EDIT AN EXISTING AD — after an ad is built, the composer invites "changes or a new ad". A short
+    // follow-up describing a tweak (change the person, swap the background, bigger logo, make it Pakistani)
+    // re-renders the SAME ad — same headline, product, composition — with the change folded into its art
+    // direction, instead of re-planning fresh headlines. Only when no new reference/product is attached.
+    if (!forceBuild && !directHeadline && tags.length === 0 && lastBuildRef.current) {
+      const t = message.toLowerCase()
+      const wantsNew = /\b(new ad|another ad|other ad|different ad|start over|fresh ad|make an ad|create an ad|generate an ad|make a [\w\s]*\b(ad|banner|post|campaign)|create a [\w\s]*\b(ad|banner|post|campaign))\b/.test(t)
+      const isEdit = !wantsNew && message.length <= 200 && /\b(change|change the|make (it|the|this|him|her|them|his|hair)|turn (it|the)|swap|replace|instead|without|remove|delete|drop|hide|add|more|less|bigger|smaller|larger|brighter|darker|lighter|different|adjust|tweak|fix|move|keep|use |but|person|people|man|woman|women|guy|girl|model|face|background|scene|colou?r|headline|title|text|caption|logo|font|smile|hand|holding|pakistani|indian|south[- ]asian|asian|african|arab|middle[- ]eastern|white|black|older|younger|male|female)\b/.test(t)
+      if (isEdit) {
+        const prev = lastBuildRef.current
+        const add = message.trim()
+        const nextPick: PlanPick = {
+          ...prev.pick,
+          artDirection: `${prev.pick.artDirection || ''} ${add}`.trim().slice(0, 400),
+          angle: `${prev.pick.angle || ''} ${add}`.trim().slice(0, 400),
+        }
+        setInput('')
+        setMsgs((m) => [...m, { role: 'user', text: message, format }, { role: 'assistant', loading: true, format: prev.fmt }])
+        setBusy(true)
+        try { await runGeneration(prev.headline, nextPick, prev.fmt) }
+        catch { setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'Couldn’t apply that change — try again.', format: prev.fmt })) }
+        finally { setBusy(false) }
+        return
+      }
+    }
 
     // SELECTION — the user is picking a numbered option the assistant just offered ("5", "yes 5 is good",
     // "the 3rd one", "go with 2"), NOT starting a new ad. Resolve it against the most recent assistant
@@ -385,7 +415,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       // it still shows up in My Creatives. RECOVER that saved ad instead of regenerating (regenerating would
       // double-charge). Poll My Creatives for a generation made in this window.
       const recovered = await recoverGeneration(startedAt)
-      if (recovered) { setMsgs((m) => replaceLast(m, { role: 'assistant', image: recovered, caption: pick.caption, format: fmt })); celebrate(adReady()); return }
+      if (recovered) { lastBuildRef.current = { headline, pick, fmt }; setMsgs((m) => replaceLast(m, { role: 'assistant', image: recovered, caption: pick.caption, format: fmt })); celebrate(adReady()); return }
       setMsgs((m) => replaceLast(m, { role: 'assistant', error: 'That render is taking a little long — it should appear in My Creatives shortly. Check there before regenerating (you won’t be charged twice).', format: fmt }))
       return
     }
@@ -398,7 +428,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
       // instead of silently shipping a possibly-wrong product — this is common in busy multi-person scenes.
       const warn = d.productVerified === false ? '⚠️ The product may not match your exact device — regenerate if so (re-tries are free). ' : ''
       setMsgs((m) => replaceLast(m, { role: 'assistant', image: d.url || d.image || null, caption: warn + (pick.caption || ''), format: fmt }))
-      if (d.url || d.image) celebrate(adReady())
+      if (d.url || d.image) { lastBuildRef.current = { headline, pick, fmt }; celebrate(adReady()) }
     }
   }
 
