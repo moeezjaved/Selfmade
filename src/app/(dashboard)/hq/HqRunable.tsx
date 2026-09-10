@@ -68,6 +68,11 @@ const GROW_CATS: Cat[] = [
   ] },
 ]
 const BUILD_CATS: Cat[] = [
+  { name: 'Website', tiles: [
+    { label: 'Landing Page', sub: 'A page that converts', href: '/builder', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M3 8h18M7 6h.01" /></Ic> },
+    { label: 'Product Page', sub: 'High-converting PDP', href: '/builder', icon: pages },
+    { label: 'Advertorial', sub: 'Story-style sales page', href: '/builder', icon: lines },
+  ] },
   { name: 'Ads', tiles: [
     { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', seed: 'Make a scroll-stopping image ad for my bestseller', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
     { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
@@ -83,7 +88,6 @@ const BUILD_CATS: Cat[] = [
 export default function HqRunable() {
   const [convId, setConvId] = useState<string | null>(null)
   const [input, setInput] = useState('')
-  const [mode, setMode] = useState<'grow' | 'build'>('grow')
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   const [journey, setJourney] = useState<any>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -128,7 +132,6 @@ export default function HqRunable() {
   const connect = (journey?.stages || []).find((s: any) => s.key === 'connect')?.tasks || []
   const shopifyOn = !!journey?.store   // brand-scoped: connected only if THIS brand has a store (not any store on the account)
   const metaOn = !!connect.find((t: any) => t.key === 'meta')?.done
-  const cats = mode === 'grow' ? GROW_CATS : BUILD_CATS
 
   // ── task setup popup (Runable-style) ──────────────────────────────────────
   const router = useRouter()
@@ -227,11 +230,6 @@ export default function HqRunable() {
         {/* top bar */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 26px', borderBottom: `1px solid ${LINE2}` }}>
           <div style={{ fontSize: 13, color: SUB, fontWeight: 500 }}>Hire the team · run it from here</div>
-          <div style={{ display: 'flex', background: INSET, border: `1px solid ${LINE}`, borderRadius: 999, padding: 5, gap: 4 }}>
-            {(['grow', 'build'] as const).map((m) => (
-              <button key={m} onClick={() => setMode(m)} style={{ border: 0, background: mode === m ? '#fff' : 'transparent', color: mode === m ? INK : SUB, fontWeight: mode === m ? 700 : 600, fontSize: 15, padding: '9px 30px', borderRadius: 999, cursor: 'pointer', boxShadow: mode === m ? `0 1px 3px rgba(20,18,15,.16), 0 0 0 1px ${LINE}` : 'none', textTransform: 'capitalize' }}>{m}</button>
-            ))}
-          </div>
           {/* Wait for the real plan before deciding — else it flashes ⚡ Upgrade for paid users on load. */}
           {credits.loading
             ? <span style={{ width: 96, height: 30, borderRadius: 999, background: INSET }} />
@@ -244,19 +242,25 @@ export default function HqRunable() {
           {!started ? (
             <div style={{ maxWidth: 720, margin: '0 auto', padding: '52px 24px 40px' }}>
               <h1 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 'clamp(31px,3.6vw,43px)', textAlign: 'center', letterSpacing: '-.015em', margin: 0 }}>
-                {mode === 'grow' ? <>Let&rsquo;s grow <span style={{ color: SUB }}>your store.</span></> : <>What needs <span style={{ color: SUB }}>building?</span></>}
+                What needs <span style={{ color: SUB }}>doing?</span>
               </h1>
               {/* composer */}
               <div style={{ margin: '24px auto 0', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, boxShadow: `0 1px 2px rgba(20,18,15,.05),0 14px 40px -26px rgba(20,18,15,.4)`, padding: '16px 16px 12px' }}>
-                <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }} placeholder={mode === 'grow' ? 'Increase my customer reach…' : 'Describe what you want the team to build…'} rows={2} style={{ width: '100%', border: 0, outline: 0, resize: 'none', background: 'transparent', fontSize: 16, color: INK, fontFamily: 'inherit', lineHeight: 1.5 }} />
+                <textarea value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(input) } }} placeholder="Ask Mello, or describe what you want to build or grow…" rows={2} style={{ width: '100%', border: 0, outline: 0, resize: 'none', background: 'transparent', fontSize: 16, color: INK, fontFamily: 'inherit', lineHeight: 1.5 }} />
                 <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 10 }}>
                   <span style={{ fontSize: 12.5, color: FAINT }}>Ask Mello, or start a task below</span>
                   <button onClick={() => submit(input)} disabled={streaming || !input.trim()} aria-label="Send" style={{ width: 36, height: 36, borderRadius: 10, border: 0, background: ORANGE, color: '#fff', cursor: input.trim() ? 'pointer' : 'default', opacity: input.trim() ? 1 : .5, fontSize: 17, display: 'grid', placeItems: 'center' }}>→</button>
                 </div>
               </div>
-              {/* task launcher — categorised, collapsible (Runable-style) */}
-              <div style={{ marginTop: 20 }}>
-                {cats.map((cat) => {
+              {/* task launcher — Build first, then Grow, both on one page (Runable-style) */}
+              <div style={{ marginTop: 22 }}>
+                {([['Build', 'Make things — website, ads, content', BUILD_CATS], ['Grow', 'Get customers — ads, social, SEO, storefront', GROW_CATS]] as const).map(([section, sectionSub, sectionCats]) => (
+                  <div key={section} style={{ marginTop: 30 }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, paddingBottom: 10, marginBottom: 4, borderBottom: `1px solid ${LINE}` }}>
+                      <span style={{ fontFamily: SERIF, fontWeight: 500, fontSize: 22, color: INK, letterSpacing: '-.01em' }}>{section}</span>
+                      <span style={{ fontSize: 12.5, color: FAINT }}>{sectionSub}</span>
+                    </div>
+                    {sectionCats.map((cat) => {
                   const off = !!collapsed[cat.name]
                   return (
                     <div key={cat.name} style={{ marginTop: 20 }}>
@@ -278,6 +282,8 @@ export default function HqRunable() {
                     </div>
                   )
                 })}
+                  </div>
+                ))}
               </div>
             </div>
           ) : (
