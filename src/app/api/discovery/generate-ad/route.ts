@@ -200,6 +200,28 @@ async function handle(req: NextRequest) {
       return NextResponse.json({ error: errRaw }, { status: 502 })
     }
 
+    // PRODUCT COMPOSITE PASS — the QA still can't confirm the product (common when a scene has people
+    // holding small devices). Run ONE reference-anchored EDIT: feed the finished ad + the user's REAL
+    // product photo(s) back into the pro model and swap ONLY the product(s) to the exact reference, keeping
+    // everyone/background/text/logo/layout identical. Generic — works for ANY product(s), and for several
+    // different products in one scene. Only fires on a confirmed mismatch, so the clean 80% pay nothing.
+    if (best && !isService && products.length && productMatch === false && !outOfTime()) {
+      const refinePrompt = [
+        `Image 1 is a FINISHED advertisement. Image${products.length > 1 ? `s 2-${products.length + 1} are` : ` 2 is`} the EXACT real product(s) it must feature.`,
+        `Edit image 1 so EVERY product a person is holding, using or displaying becomes the EXACT product from the reference photo(s): identical silhouette, materials, colour, label/branding and proportions. Match the existing hand grip, angle, size and lighting so it looks natural.${products.length > 1 ? ' If several different products are shown, match each to the reference it most resembles.' : ''}`,
+        `Change NOTHING ELSE — keep the people, faces, poses, clothing, background, headline and all text, logo, colours, CTA and layout PIXEL-IDENTICAL. Only the product changes. Output the same ad with only the product(s) corrected.`,
+      ].join(' ')
+      const refined = await generateImage(refinePrompt, [{ mimeType: best.mimeType, dataB64: best.dataB64 }, ...products], 'pro', { aspectRatio: resolvedAspect, imageSize }).catch(() => null)
+      if (refined?.ok) {
+        const rv = await verifyClonedAd({ mimeType: refined.mimeType, dataB64: refined.dataB64 }, products[0], brandNm).catch(() => null)
+        if (rv && !rv.errored && (rv.productMatches || rv.pass)) {
+          best = { mimeType: refined.mimeType, dataB64: refined.dataB64, model: refined.model }
+          productMatch = rv.productMatches !== false
+          verdictLog.push('composite-fixed')
+        } else verdictLog.push('composite-nofix')
+      }
+    }
+
     // Measure the product-fidelity safety net: how many rounds ran and how each verdict landed
     // (pass / a corrective fix / verify-errored). Grep Vercel logs for [gen-verify] to see the split.
     console.log(`[gen-verify] inspired user=${user.id} brand=${effBrandId || 'none'} rounds=${verdictLog.length} outcome=[${verdictLog.map((s) => (s.length > 28 ? s.slice(0, 28) + '…' : s)).join(' | ')}]`)
