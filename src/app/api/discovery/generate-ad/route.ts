@@ -47,7 +47,7 @@ async function handle(req: NextRequest) {
   if (!geminiEnabled) return NextResponse.json({ error: 'Image generation not configured (GEMINI_API_KEY)' }, { status: 503 })
 
   const body = await req.json().catch(() => ({}))
-  const { productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, angle, artDirection } = body || {}
+  const { productImageB64, productImages, productMimeType, newHeadline, brandName, colors, brandId, aspectRatio, angle, artDirection, brief } = body || {}
   const nicheOverride = typeof body.niche === 'string' && body.niche.trim() ? body.niche.trim() : null
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
@@ -147,6 +147,7 @@ async function handle(req: NextRequest) {
       palette: kitPalette, colors: kitColors, fonts: kitFonts, styleTags, insights, productDesc,
       angle: typeof angle === 'string' && angle.trim() ? angle.trim() : undefined,
       artDirection: typeof artDirection === 'string' && artDirection.trim() ? artDirection.trim().slice(0, 240) : undefined,
+      brief: typeof brief === 'string' && brief.trim() ? brief.trim().slice(0, 500) : undefined,
       isService,
     })
     console.log(`generate-ad [niche:${niche || 'none'} refs:${inspImgs.length} sample:${insights.sampleSize}] prompt:`, prompt)

@@ -185,6 +185,7 @@ export function buildStudioPrompt(opts: {
   productDesc?: string
   angle?: string          // user-supplied concept/positioning ("quit nicotine naturally — 92% success")
   artDirection?: string   // the user's EXPLICIT visual style/mood ("dark cinematic, hard light") — drives the look
+  brief?: string          // the founder's RAW request, verbatim — so specifics (cast, setting, era) aren't lost in planning
   isService?: boolean     // service/app/website brand → no physical product to render as hero
 }): string {
   const n = opts.numInspirations
@@ -236,6 +237,9 @@ export function buildStudioPrompt(opts: {
     opts.isService ? '' : `Render the product 1:1 from the photo(s): match its EXACT silhouette, proportions, materials, textures, and on-label branding/text. Do NOT reshape, restyle, or invent a different product.`,
     opts.isService ? '' : `SIZE THE PRODUCT REALISTICALLY — this is critical. Render it at its true real-world size RELATIVE TO the scene: a small handheld device must look small in a hand, in correct proportion to fingers, faces, furniture, and surroundings. Keep it to roughly a QUARTER of the frame; never enlarge it, never make it larger-than-life, never let it dominate the composition. If a person holds it, it must look natural in their grip, not oversized. Leave clear negative space around it. It is the only product shown.`,
     opts.productDesc ? `The ${opts.isService ? 'brand/service' : 'product'} is: ${opts.productDesc}.` : '',
+    // The founder's OWN words — the source of truth for specifics the planner may have compressed away
+    // (who's in the scene + their ethnicity, the setting, the era, the vibe). Honour these exactly.
+    opts.brief ? `FOUNDER'S EXACT REQUEST — honour every specific detail they named (the people/cast and their ethnicity/look, the setting, era, mood and props): "${opts.brief}". These specifics are REQUIRED — do not generalise them away.` : '',
     // The user's explicit look wins over the default warm-lifestyle aesthetic — commit to it fully.
     opts.artDirection ? `ART DIRECTION — commit fully to this look: ${opts.artDirection}. Apply it to the background, lighting, colour grade, wardrobe, props, overall mood AND the PEOPLE/cast. Render any people EXACTLY as described — if a nationality/ethnicity is named (e.g. Pakistani / South-Asian), the people MUST clearly and authentically look that way (skin tone, features, hair), not generic or Western; if an era is named (e.g. 80s), make it unmistakably that era (period wardrobe, hair, set, film grain — not modern). CRITICAL EXCEPTION: this styling must NOT touch the PRODUCT or the LOGO/brand name — keep the product EXACTLY as its photo (never restyle, retro-fy, recolour or redraw it) and keep the brand name clean and correct. Theme everything EXCEPT the product and branding.` : '',
     opts.angle ? `The ad's core message/angle is: ${opts.angle}. Build the concept, headline, and supporting copy around THIS.` : '',
