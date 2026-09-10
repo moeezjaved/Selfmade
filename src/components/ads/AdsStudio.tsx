@@ -726,10 +726,10 @@ const overlayBtn = { position: 'absolute' as const, inset: 0, background: 'linea
 function HomeDiscoverRow({ onTag }: { onTag: (t: StudioTag) => void }) {
   const [ads, setAds] = useState<DiscoverAd[] | null>(null)
   // Image ads only for now (video comes later) — drop any video-format creatives.
-  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=40').then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
+  useEffect(() => { let on = true; fetch('/api/ads-studio/discover?limit=100').then((r) => r.json()).then((d) => on && setAds((Array.isArray(d.ads) ? d.ads : []).filter((a: DiscoverAd) => !/video/i.test(a.format || '')))).catch(() => on && setAds([])); return () => { on = false } }, [])
   if (ads && ads.length === 0) return null
   return (
-    <HomeCarousel title="Discover" sub="Trending creative from the community — tap Create Similar and Mello builds your version.">
+    <HomeCarousel title="Discover" sub="Your competitors' ads and trending creative — tap Create Similar and Mello builds your version.">
       {(ads || Array.from({ length: 6 }, () => null)).map((a, i) => a ? (
         // Lapis-style card: big serif index on top, image below in a clean white card.
         <div key={a.id} style={{ width: 232, flex: 'none', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 16, overflow: 'hidden', boxShadow: '0 10px 30px -20px rgba(0,0,0,.2)' }}>
@@ -785,7 +785,7 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
           .filter((a: any) => a.thumb && a.format !== 'video' && !/video/i.test(a.format || ''))
           .map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
           .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
-          .slice(0, 60)
+          .slice(0, 100)
         if (on) setAds(flat)
       } catch { if (on) setAds([]) }
     })()

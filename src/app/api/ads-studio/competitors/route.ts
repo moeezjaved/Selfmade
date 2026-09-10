@@ -67,7 +67,7 @@ const uniqueByImage = (ads: any[]): any[] => {
   }
   return out.slice(0, AD_CARD_CAP)
 }
-const AD_CARD_CAP = 60   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
+const AD_CARD_CAP = 100   // safety cap on unique creatives shown per competitor (dedup handles the repeats)
 
 /** Look up a discovered rival in our ad-DNA corpus. Matches by the rival's own DOMAIN (precise — the ad's
  * destination URL) first, so "Flair" (flavored air) never collides with "Flair Espresso" (coffee); falls back
@@ -118,7 +118,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // an unbounded pull here was risking a timeout that left discovery spinning.
   const targets = base.filter((b) => b.needsTopup).slice(0, MAX_LIVE_TOPUPS)
   await Promise.all(targets.map(async (b) => {
-    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 30).catch(() => []))
+    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 60).catch(() => []))
   }))
   return base.map(({ c, dna, liveAds }) => {
     const ads = imagesFirst(dna?.ads ?? liveAds)
@@ -218,7 +218,7 @@ export async function GET(req: NextRequest) {
           // top up LIVE from Meta right now so the row is rich; the 6h re-crawl backfills index + ad-DNA after.
           const corpusImages = cardAds.filter((a: any) => a.format === 'image').length
           if (corpusImages < 8) {
-            const live = await fetchLiveAdsByPage(pageId, 60).catch(() => [])
+            const live = await fetchLiveAdsByPage(pageId, 100).catch(() => [])
             const liveCards = liveToCards(live)
             if (liveCards.length) {
               const seen = new Set(cardAds.map((a: any) => a.id))
