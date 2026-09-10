@@ -220,8 +220,9 @@ export function buildStudioPrompt(opts: {
   const styleLine = opts.styleTags?.length ? `Aesthetic direction: ${opts.styleTags.slice(0, 5).join(', ')}.` : ''
   const cta = ins.topCtas?.[0]
   const logoLine = opts.hasLogo
-    ? `The FINAL attached image is the brand logo — place it small and tasteful in a corner. If it isn't a clean logo, ignore it (never add a person/scene from it).`
-    : ''
+    ? `The FINAL attached image is the brand logo — place it small and tasteful in a corner and reproduce it EXACTLY (same letterforms, shapes and colours). Do NOT redraw, restyle, embellish, or add any extra icon/emblem/symbol to it. If it isn't a clean logo, ignore it (never add a person/scene from it).`
+    // No logo image → the model must NOT invent one. Wordmark-only, no made-up icon/emblem (the "AURA + leaf" bug).
+    : `Do NOT invent a logo, emblem, icon, symbol, badge or monogram (no leaf, lotus, circle, drop, swirl, etc.). If the brand appears at all, show ONLY the brand name${opts.brandName ? ` "${opts.brandName}"` : ''} as clean plain text — nothing else next to it.`
   return [
     `TASK: Design ONE brand-new, breathtaking, scroll-stopping advertisement for the user's product${opts.brandName ? ` (brand "${opts.brandName}")` : ''}.`,
     n > 0
