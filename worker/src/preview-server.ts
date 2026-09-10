@@ -364,13 +364,18 @@ async function fetchPreview(pageId: string, limit: number) {
       locale: 'en-US',
     })
 
-    // Targeted blocking — kill bandwidth hogs but allow Meta's React to
-    // render properly. Preview doesn't need pagination so blocking images
-    // is safer here than in the indexer, but we still allow them just in
-    // case future preview improvements need to scroll.
+    // Blocking mirrors the INDEXER (which paginates to hundreds of ads): drop heavy media by resourceType
+    // and the video/scontent CDNs (ad bytes come from GraphQL JSON, not these), but NEVER block
+    // `static.xx.fbcdn.net` (Meta's PAGINATION JS) or `www.facebook.com` (the GraphQL endpoint) — the old
+    // rule aborted static.xx.fbcdn.net, which killed scroll pagination and capped every page at ~30 ads.
     await context.route('**/*', (route) => {
-      const url = route.request().url()
-      if (url.includes('static.xx.fbcdn.net')) return route.abort()
+      const req = route.request()
+      const t = req.resourceType()
+      if (t === 'media' || t === 'image' || t === 'font') return route.abort()
+      const url = req.url()
+      let host = ''
+      try { host = new URL(url).hostname } catch { /* ignore */ }
+      if (host.startsWith('video-') || host.startsWith('video.') || host.startsWith('scontent-') || host.startsWith('scontent.')) return route.abort()
       if (url.includes('/ajax/bz?') || url.includes('/log_clientside_error')) return route.abort()
       if (url.includes('/groups/') || url.includes('/messenger/') || url.includes('/marketplace/')) return route.abort()
       return route.continue()
@@ -403,12 +408,17 @@ async function fetchPreview(pageId: string, limit: number) {
     // Meta lazy-loads more ad batches only as you scroll. Without this we saw just the first ~30 ads per
     // page (a brand like FÜM runs far more). Scroll to the bottom repeatedly until we have `limit` ads or
     // growth stalls, time-boxed so a big advertiser can't run the scrape past the caller's timeout.
-    const scrollDeadline = Date.now() + 55_000
+    const scrollDeadline = Date.now() + 65_000
     let stale = 0
-    while (adObjects.length < limit && Date.now() < scrollDeadline && stale < 3) {
+    while (adObjects.length < limit && Date.now() < scrollDeadline && stale < 4) {
       const before = adObjects.length
+      // Real wheel events + a window scroll — Meta's IntersectionObserver (in new-headless) fires the next
+      // GraphQL page off these. Two nudges per round because the loader sometimes needs a second trigger.
+      await page.mouse.wheel(0, 5000).catch(() => {})
       await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
-      await new Promise(r => setTimeout(r, 1_800))   // let the next GraphQL page fire + parse
+      await new Promise(r => setTimeout(r, 1_200))
+      await page.mouse.wheel(0, 5000).catch(() => {})
+      await new Promise(r => setTimeout(r, 1_600))   // let the next GraphQL page fire + parse
       stale = adObjects.length > before ? 0 : stale + 1
     }
 
