@@ -687,23 +687,26 @@ function ElementsRow({ isMobile, domain, onUse }: { isMobile: boolean; domain: s
     return () => { on = false }
   }, [domain])
   const add = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0]; if (!f) return
-    const reader = new FileReader()
-    reader.onload = async () => {
-      setBusy(true)
+    const files = Array.from(e.target.files || []); if (!files.length) return
+    setBusy(true)
+    ;(async () => {
       try {
-        const d = await fetch('/api/ads-studio/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, label: f.name.replace(/\.[^.]+$/, '').slice(0, 30), dataUrl: String(reader.result) }) }).then((r) => r.json())
-        if (Array.isArray(d.elements)) setEls(d.elements)
-        else if (d.error) alert(d.error)
-      } finally { setBusy(false) }
-    }
-    reader.readAsDataURL(f)
+        // Add every selected photo (multi-select) — upload one at a time so each person appears as it lands.
+        for (const f of files) {
+          const dataUrl = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result)); r.onerror = rej; r.readAsDataURL(f) }).catch(() => '')
+          if (!dataUrl) continue
+          const d = await fetch('/api/ads-studio/elements', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, label: f.name.replace(/\.[^.]+$/, '').slice(0, 30), dataUrl }) }).then((r) => r.json()).catch(() => null)
+          if (d && Array.isArray(d.elements)) setEls(d.elements)
+          else if (d?.error) { alert(d.error); break }
+        }
+      } finally { setBusy(false); if (fileRef.current) fileRef.current.value = '' }
+    })()
   }
   const del = async (id: string) => { const d = await fetch('/api/ads-studio/elements', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ domain, id }) }).then((r) => r.json()).catch(() => null); if (d && Array.isArray(d.elements)) setEls(d.elements) }
   if (els === null) return null
   return (
     <div style={{ marginTop: 40 }}>
-      <input ref={fileRef} type="file" accept="image/*" onChange={add} style={{ display: 'none' }} />
+      <input ref={fileRef} type="file" accept="image/*" multiple onChange={add} style={{ display: 'none' }} />
       <HScroll gap={12} titleSize={isMobile ? 22 : 26} title="Elements" sub="People & props to drop into your creative. Add a face or scene, then tag it in the chat.">
         <button onClick={() => fileRef.current?.click()} disabled={busy} style={{ width: 124, height: 124, flex: 'none', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: '#fff', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
           {busy ? <span style={{ width: 18, height: 18, border: `2px solid ${LINE}`, borderTopColor: ORANGE, borderRadius: '50%', animation: 'sfspin .7s linear infinite' }} /> : <span style={{ fontSize: 22 }}>＋</span>}
