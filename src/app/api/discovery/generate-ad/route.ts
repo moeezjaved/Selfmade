@@ -52,7 +52,9 @@ async function handle(req: NextRequest) {
   const rawProducts: string[] = Array.isArray(productImages) && productImages.length
     ? productImages.filter((s: any) => typeof s === 'string' && s.trim())
     : (productImageB64 ? [String(productImageB64)] : [])
-  if (rawProducts.length === 0) return NextResponse.json({ error: 'at least one product image required' }, { status: 400 })
+  // SERVICE / SaaS brands have no product to render — allow an empty product set for them (design-only ad).
+  const bodyIsService = body?.productType === 'service' || body?.productType === 'app'
+  if (rawProducts.length === 0 && !bodyIsService) return NextResponse.json({ error: 'at least one product image required' }, { status: 400 })
 
   const imageSize = body.imageSize === '4K' ? '4K' : '2K'
   const action = imageSize === '4K' ? 'image_studio_4k' : 'image_studio_pro'
