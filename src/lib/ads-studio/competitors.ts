@@ -36,6 +36,11 @@ const nameMatch = (a: string, b: string) => { const x = norm(a), y = norm(b); re
 // Sites that are never a DTC brand competitor — marketplaces, platforms, social, publishers, tools.
 const NON_BRAND = /(amazon|ebay|walmart|etsy|aliexpress|alibaba|daraz|flipkart|noon|jumia|temu|shein)\.|(kickstarter|indiegogo|gofundme)\.|(shopify|myshopify|wix|squarespace|bigcommerce|godaddy|wordpress|webflow)\.|(facebook|instagram|tiktok|youtube|twitter|x\.com|pinterest|reddit|linkedin|quora|medium|tumblr)\.|(wikipedia|google|bing|yahoo|yelp|trustpilot|glassdoor|indeed|crunchbase)\.|(nytimes|forbes|businessinsider|techcrunch|theguardian|bbc|cnn|healthline|webmd|verywell)\.|\.gov|\.edu|(gumtree|olx|craigslist)\./i
 
+// A same-NAME different-INDUSTRY page (e.g. "Medora Hotels & Resorts" matching cosmetics brand "Medora").
+// The LLM only names in-category rivals, so a resolved Ad Library page whose NAME shouts a different service
+// industry is a name collision, not the rival — reject it.
+export const WRONG_INDUSTRY = /\b(hotels?|resorts?|restaurants?|cafe|café|catering|realty|real estate|properties|property|builders?|constructions?|developers?|travels?|tours?|tourism|airlines?|airways|hospitals?|clinics?|pharma|university|college|school|academy|institute|bank|financ(e|ial)|insurance|law\s?firm|attorneys?|lawyers?|logistics|freight|foundation|charity|ngo|church|mosque|temple|motors?|automobiles?|autos?)\b/i
+
 function domainRoot(d: string) { return d.replace(/^www\./, '').toLowerCase() }
 
 /** Step 2 — LLM turns the store context + Brand-Kit knowledge into the PRECISE product niche, its market,
@@ -202,7 +207,8 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
       // STRICT: only accept an advertiser whose PAGE NAME actually matches the queried brand — otherwise a
       // brand-name search returns resellers / unrelated pages that merely mention the brand in ad copy.
       const best = ads
-        .filter((a) => a.pageId && a.ads.length && nameMatch(a.pageName || '', nm) && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)))
+        .filter((a) => a.pageId && a.ads.length && nameMatch(a.pageName || '', nm) && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self))
+          && !(WRONG_INDUSTRY.test(a.pageName || '') && !WRONG_INDUSTRY.test(nm)))   // reject same-name wrong-industry pages
         .sort((a, b) => b.ads.length - a.ads.length)[0]
       if (best && !namedCompetitors.some((c) => c.pageId === best.pageId)) {
         namedCompetitors.push({ domain: best.domain || '', name: best.pageName || nm, reason: `A direct competitor of ${ctx.siteName}.`, foundVia: 'Known rival', positions: 0, pageId: best.pageId, liveAds: best.ads.slice(0, 300) })

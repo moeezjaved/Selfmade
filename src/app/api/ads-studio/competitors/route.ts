@@ -9,7 +9,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveActiveBrandId } from '@/lib/brand/active'
 import { resolveBrandNames } from '@/lib/discovery/brandNames'
-import { discoverCompetitors, type DiscoveryResult } from '@/lib/ads-studio/competitors'
+import { discoverCompetitors, WRONG_INDUSTRY, type DiscoveryResult } from '@/lib/ads-studio/competitors'
 import { fetchLiveAdsByPage, type LiveAd } from '@/lib/ads-studio/adlibrary'
 import { isAppDomain } from '@/lib/domain-guard'
 import { readAdsStudio, mergeAdsStudio, readSection, sectionPayload, isBuilding, buildingPayload } from '@/lib/ads-studio/cache'
@@ -323,7 +323,10 @@ export async function GET(req: NextRequest) {
       if (!cur.pageId && c.pageId) cur.pageId = c.pageId
       if (!cur.domain && c.domain) cur.domain = c.domain
     }
-    const merged = Array.from(byBrand.values())
+    let merged = Array.from(byBrand.values())
+    // Drop same-name wrong-industry collisions (e.g. "Medora Hotels & Resorts" for cosmetics brand "Medora")
+    // at serve-time too, so an already-cached bad match clears without waiting for a re-scan.
+    merged = merged.filter((c: any) => !(WRONG_INDUSTRY.test(c?.name || '') && c?.source !== 'spied'))
     // Dedup each card by the actual IMAGE (not ad id) so no repeats, images first, AND drop any catalog/DPA
     // product ads (serve-time filter, so already-cached results are cleaned without waiting for a re-scan).
     for (const c of merged) c.ads = uniqueByImage((c.ads || []).filter((a: any) => !isCatalogAd(a?.copy)))
