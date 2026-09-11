@@ -116,7 +116,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
 const MAX_DEEP_PULLS = 6        // rivals deep-pulled per background run (bounded for the shared droplet; union accumulates the rest across runs)
-const DEEP_PULL_LIMIT = 300     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
+const DEEP_PULL_LIMIT = 500     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
   const base = await Promise.all(res.competitors.map(async (c) => {
@@ -132,7 +132,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   await Promise.all(targets.map(async (b) => {
     const deep: any[] = await Promise.race([
       fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).then(liveToCards).catch(() => []),
-      new Promise<any[]>((r) => setTimeout(() => r([]), 70_000)),
+      new Promise<any[]>((r) => setTimeout(() => r([]), 100_000)),
     ])
     if (deep.length >= b.liveAds.length) b.liveAds = deep   // the full page pull replaces the shallow search result
   }))

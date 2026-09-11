@@ -257,7 +257,7 @@ const server = createServer(async (req, res) => {
         return
       }
       const country = (url.searchParams.get('country') || 'ALL').toUpperCase().replace(/[^A-Z]/g, '') || 'ALL'
-      const cap = Math.min(parseInt(url.searchParams.get('limit') || '60', 10), 120)
+      const cap = Math.min(parseInt(url.searchParams.get('limit') || '60', 10), 250)
       console.log(`[search] "${q}" country=${country} cap=${cap}`)
       const data = await fetchSearch(q, country, cap)
       res.statusCode = 200
@@ -311,7 +311,7 @@ const server = createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'page_id required (numeric)' }))
       return
     }
-    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 300)
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '10', 10), 1000)
 
     console.log(`[preview] ${pageId} (limit=${limit})`)
     const data = await fetchPreview(pageId, limit)
@@ -334,6 +334,9 @@ server.listen(PORT, () => {
 // ───────────────────────────────────────────
 
 async function fetchPreview(pageId: string, limit: number) {
+  // Retry the whole scrape once on a throttled/empty result (fresh proxy + browser) — the shared droplet's
+  // single biggest flakiness source is Meta throttling one proxy, which returned 0 ads for a real advertiser.
+  for (let attempt = 0; attempt < 2; attempt++) {
   const sessionId = randomBytes(4).toString('hex').slice(0, 8)
   let proxy: { url: string; close: () => Promise<void> } | null = null
   let browser: Browser | null = null
@@ -408,9 +411,9 @@ async function fetchPreview(pageId: string, limit: number) {
     // Meta lazy-loads more ad batches only as you scroll. Without this we saw just the first ~30 ads per
     // page (a brand like FÜM runs far more). Scroll to the bottom repeatedly until we have `limit` ads or
     // growth stalls, time-boxed so a big advertiser can't run the scrape past the caller's timeout.
-    const scrollDeadline = Date.now() + 65_000
+    const scrollDeadline = Date.now() + 100_000
     let stale = 0
-    while (adObjects.length < limit && Date.now() < scrollDeadline && stale < 4) {
+    while (adObjects.length < limit && Date.now() < scrollDeadline && stale < 6) {
       const before = adObjects.length
       // Real wheel events + a window scroll — Meta's IntersectionObserver (in new-headless) fires the next
       // GraphQL page off these. Two nudges per round because the loader sometimes needs a second trigger.
@@ -425,6 +428,7 @@ async function fetchPreview(pageId: string, limit: number) {
     await context.close()
 
     if (adObjects.length === 0) {
+      if (attempt === 0) continue   // likely a throttled proxy → retry once with a fresh proxy+browser
       return {
         page: null,
         ads: [],
@@ -474,6 +478,8 @@ async function fetchPreview(pageId: string, limit: number) {
     await browser?.close().catch(() => {})
     if (proxy) await proxy.close().catch(() => {})
   }
+  }
+  return { page: null, ads: [], total_returned: 0, warning: 'No ads found after retries (Meta throttling this lookup).' }
 }
 
 /**
@@ -495,7 +501,10 @@ async function fetchSearch(query: string, country: string, cap: number) {
     const context = await browser.newContext({ userAgent: UA, viewport: { width: 1440, height: 900 }, locale: 'en-US' })
     await context.route('**/*', (route) => {
       const u = route.request().url()
-      if (u.includes('static.xx.fbcdn.net')) return route.abort()
+      // NEVER block static.xx.fbcdn.net — that's Meta's pagination JS; blocking it capped search at the
+      // first ~30 results (same bug we fixed in fetchPreview). Only drop heavy media + noise.
+      const t = route.request().resourceType()
+      if (t === 'media' || t === 'image' || t === 'font') return route.abort()
       if (u.includes('/ajax/bz?') || u.includes('/log_clientside_error')) return route.abort()
       if (u.includes('/groups/') || u.includes('/messenger/') || u.includes('/marketplace/')) return route.abort()
       return route.continue()
@@ -518,8 +527,9 @@ async function fetchSearch(query: string, country: string, cap: number) {
     await new Promise(r => setTimeout(r, 6_000))
     // Scroll to trigger more result batches until we hit the cap or stop growing.
     let last = 0, stable = 0
-    for (let i = 0; i < 12 && adObjects.length < cap && stable < 3; i++) {
-      await page.mouse.wheel(0, 4000).catch(() => {})
+    for (let i = 0; i < 24 && adObjects.length < cap && stable < 4; i++) {
+      await page.mouse.wheel(0, 5000).catch(() => {})
+      await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight)).catch(() => {})
       await new Promise(r => setTimeout(r, 2_500))
       if (adObjects.length === last) stable++; else { stable = 0; last = adObjects.length }
     }
