@@ -129,13 +129,17 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // time-boxed so the shared droplet finishes inside the 180s budget; the sticky-union cache accumulates
   // the rest across runs, so over a few refreshes we hold every rival's whole set of live creatives.
   const targets = base.filter((b) => b.c.pageId).slice(0, MAX_DEEP_PULLS)
-  await Promise.all(targets.map(async (b) => {
+  // Each rival updates its own liveAds as its deep pull resolves. We race the WHOLE batch against one
+  // overall deadline so the run ALWAYS returns in time to write the cache — rivals whose pull finished get
+  // their full set; the rest keep their shallow ads and deepen on a later run (durable union accumulates).
+  const deepPulls = Promise.all(targets.map(async (b) => {
     const deep: any[] = await Promise.race([
       fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).then(liveToCards).catch(() => []),
-      new Promise<any[]>((r) => setTimeout(() => r([]), 75_000)),
+      new Promise<any[]>((r) => setTimeout(() => r([]), 50_000)),   // per-rival cap
     ])
-    if (deep.length >= b.liveAds.length) b.liveAds = deep   // the full page pull replaces the shallow search result
+    if (deep.length >= b.liveAds.length) b.liveAds = deep
   }))
+  await Promise.race([deepPulls, new Promise<void>((r) => setTimeout(r, 60_000))])   // OVERALL cap → always leaves budget to write
   return base.map(({ c, dna, liveAds }) => {
     // Prefer the deep LIVE pull (the rival's actual current ads, ALL of them); fall back to our corpus DNA.
     const ads = imagesFirst(liveAds.length ? liveAds : (dna?.ads ?? []))
