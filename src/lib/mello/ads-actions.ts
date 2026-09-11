@@ -377,6 +377,70 @@ export async function manageViaMello(userId: string, request: string, confirm: b
   return done.ok ? { done: true, note: done.message } : { done: false, note: done.error }
 }
 
+/**
+ * Mello chat REFRESH — swap a new creative into a LIVE ad (or add a carousel card). Resolves the creative and
+ * the target running ad, then reuses planAttach → executeAction. Two-step: confirm=false previews (no writes);
+ * confirm=true creates the new ad PAUSED in the same campaign (inheriting its budget + audience) and pauses the
+ * old one. When the target ad is ambiguous it returns the candidate ads so Mello can ask which one.
+ */
+export async function refreshViaMello(
+  userId: string,
+  spec: { creativeId?: string; creativeUrl?: string; targetAd?: string; variant?: 'refresh' | 'carousel' },
+  confirm: boolean,
+): Promise<any> {
+  const mc = await createMetaClientForUser(userId).catch(() => null)
+  if (!mc) return { done: false, note: 'Meta isn’t connected — tell the user to reconnect Meta from Settings.' }
+  const { pageId } = await accountCtx(userId)
+  if (!pageId) return { done: false, note: 'No Facebook Page linked to this ad account — tell the user to reconnect Meta with a Page.' }
+
+  // Resolve the NEW creative image: explicit url > explicit id > most-recent generated image.
+  const admin = createAdminClient() as any
+  let creativeUrl = (spec.creativeUrl || '').trim()
+  let brandName = ''; let website = ''; let brandId: string | null = null
+  if (!creativeUrl) {
+    let row: any = null
+    if (spec.creativeId) { const { data } = await admin.from('creative_generations').select('id, brand_id, image_url').eq('user_id', userId).eq('id', spec.creativeId).maybeSingle(); row = data }
+    if (!row) { const { data } = await admin.from('creative_generations').select('id, brand_id, image_url').eq('user_id', userId).eq('media_type', 'image').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle(); row = data }
+    if (!row?.image_url) return { done: false, note: 'The user has no image creative to swap in — tell them to make one first (Ad Studio / create_ad).' }
+    creativeUrl = String(row.image_url); brandId = row.brand_id || null
+  }
+  try {
+    const bq = brandId
+      ? admin.from('brands').select('name, website').eq('id', brandId).maybeSingle()
+      : admin.from('brands').select('name, website').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    const { data: b } = await bq; brandName = (b as any)?.name || ''; website = (b as any)?.website || ''
+  } catch { /* best-effort */ }
+
+  // Resolve the LIVE ad to refresh (match on ad or campaign name; ask when 0-or-many match).
+  const ads = await mc.listAdsForPicker().catch(() => [] as Awaited<ReturnType<typeof mc.listAdsForPicker>>)
+  if (!ads.length) return { done: false, note: 'The user has no live ads to refresh — nothing is running on the account. Suggest launch_ad to put a NEW ad live instead.' }
+  const q = (spec.targetAd || '').trim().toLowerCase()
+  let matches = q ? ads.filter((a) => (a.name || '').toLowerCase().includes(q) || (a.campaignName || '').toLowerCase().includes(q)) : ads
+  if (q && matches.length === 0) matches = ads
+  if (matches.length !== 1) {
+    return {
+      done: false, needs_input: 'which_ad',
+      ads: matches.slice(0, 12).map((a) => ({ id: a.adId, name: a.name, campaign: a.campaignName })),
+      note: `${q && matches.length ? 'That matched more than one ad' : 'I need to know which live ad gets the new creative'}. Show the user these live ads and ask which one, then call refresh_ad again with target_ad set to that ad's exact name.`,
+    }
+  }
+  const target = matches[0]
+
+  const plan = await planAttach(userId, { creativeUrl, brandName, website, variant: spec.variant === 'carousel' ? 'carousel' : 'refresh', targetAdId: target.adId })
+  if ('error' in plan) return { done: false, note: plan.error }
+  if ('clarify' in plan) return { done: false, needs_input: plan.clarify, note: `Ask the user: ${plan.clarify}` }
+  const card = plan.card
+  if (!confirm) {
+    return {
+      done: false, preview: true,
+      plan: { title: card.title, summary: card.summary, lines: card.lines || [] },
+      note: `Show the user this plan and ask them to confirm: "${card.title}" — ${card.summary}. It creates the new ad PAUSED in the same campaign (keeping its budget + audience) and pauses the old ad. ONLY when they say yes, call refresh_ad again with the SAME creative and target_ad plus confirm=true.`,
+    }
+  }
+  const done = await executeAction(userId, card.action)
+  return done.ok ? { done: true, note: done.message } : { done: false, note: done.error }
+}
+
 /** The founder approved the card → perform the write. Returns a human result + logs a Win. */
 export async function executeAction(userId: string, action: AdAction): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const mc = await createMetaClientForUser(userId).catch(() => null)

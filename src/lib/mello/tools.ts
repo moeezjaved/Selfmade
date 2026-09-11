@@ -260,6 +260,23 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'refresh_ad',
+      description: "Swap a NEW creative into one of the user's LIVE ads (Refresh), or add a carousel card to it. Use when the user says 'swap this creative into my running ad', 'refresh my <X> ad with this new image', 'put this creative on my live ad', 'add this as a carousel card'. Meta can't change a live ad's image in place, so this creates a fresh ad with the new creative in the SAME campaign (inheriting its budget + audience) PAUSED, and pauses the old ad — the correct, safe equivalent. APPROVE-GATED, two-step: confirm=false resolves the creative + the target ad and previews (NO writes); after the user approves, confirm=true applies it. If the target ad is unclear it returns the live ads to pick from — show them and ask which. For putting a BRAND-NEW ad live (not swapping into a running one) use launch_ad instead.",
+      parameters: {
+        type: 'object',
+        properties: {
+          creative_id: { type: 'string', description: "The NEW creative to swap in (a creative_generations id from create_ad / My Creatives). Omit to use the user's most recent generated image." },
+          creative_url: { type: 'string', description: 'A direct image URL to swap in instead of a saved creative (rarely needed — prefer creative_id).' },
+          target_ad: { type: 'string', description: "Which LIVE ad to refresh — the ad's name or its campaign name, in the user's words. If omitted or ambiguous the tool returns the live ads so you can ask which one." },
+          variant: { type: 'string', enum: ['refresh', 'carousel'], description: "refresh = replace the creative (default); carousel = add the new image as an extra carousel card alongside the existing one." },
+          confirm: { type: 'boolean', description: 'false = resolve & preview, NO writes (default); true = apply it (new ad PAUSED, old ad paused), only after the user approved the previewed plan.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'manage_ad',
       description: "CHANGE the user's LIVE Meta ads — scale/increase/lower a budget, pause, resume/turn on, change an ad's headline/body/CTA, or duplicate a campaign to a new audience. Use when the user says things like 'increase ROY 1 to $80/day', 'pause the retargeting campaign', 'turn my ads back on', 'change the headline on X to …', 'clone my winner to a new audience'. This is for EXISTING ads — to put a NEW ad live use launch_ad instead. APPROVE-GATED, two-step: call with confirm=false FIRST to resolve the exact campaign/ad against their live account and return the plan (NO writes); present it and ask them to approve; ONLY after they say yes, call again with the SAME request and confirm=true to make the change. Anything that creates an ad (copy change / duplicate) lands PAUSED. Requires a connected Meta account.",
       parameters: {
@@ -420,6 +437,7 @@ export const TOOL_LABELS: Record<string, string> = {
   create_ad: 'Creating on the canvas…',
   author_competitor_report: 'Writing the intelligence report…',
   manage_ad: 'Working on your live ads…',
+  refresh_ad: 'Swapping the creative on your live ad…',
   launch_ad: 'Setting up your ad launch…',
   run_seo_audit: 'Crawling your site for SEO…',
   fix_seo: 'Preparing SEO fixes…',
@@ -665,6 +683,13 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
     case 'manage_ad': {
       const { manageViaMello } = await import('./ads-actions')
       return await manageViaMello(ctx.userId, String(args.request || ''), args.confirm === true)
+    }
+    case 'refresh_ad': {
+      const { refreshViaMello } = await import('./ads-actions')
+      return await refreshViaMello(ctx.userId, {
+        creativeId: args.creative_id, creativeUrl: args.creative_url,
+        targetAd: args.target_ad, variant: args.variant === 'carousel' ? 'carousel' : 'refresh',
+      }, args.confirm === true)
     }
     case 'launch_ad': {
       const { launchViaMello } = await import('./ads-actions')
