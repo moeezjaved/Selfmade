@@ -11,7 +11,7 @@ import { planEntitlements, firstPlanWith, PLANS, type PlanEntitlements, type Pla
 const DARK = '#14281a', LIME = '#ff5a2c', ACCENT = '#3a7000'
 
 // One-plan model: every gated feature unlocks on Creator ($49). Perks describe what Creator turns on.
-const CREATOR_PERKS = ['The full Meta cockpit — Launch, Campaigns, Scale & Insights', 'Winning-ad Patterns & AI Insights + Ask Mello', '10 video ads/mo + free unlimited image ads', 'Deep reports, exports & API access']
+const CREATOR_PERKS = ['The full Meta cockpit — Launch, Campaigns, Scale & Insights', 'Winning-ad Patterns & AI Insights + Ask Mello', '10 video ads/mo + 6,000 credits/mo for image ads', 'Deep reports, exports & API access']
 const PERKS: Record<string, string[]> = {
   aiInsights: CREATOR_PERKS,
   launch: CREATOR_PERKS,

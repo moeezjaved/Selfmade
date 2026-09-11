@@ -661,7 +661,7 @@ export default function HomeLanding() {
         {[['Where do the ads come from?', 'We index millions of real, running ads from the Meta Ad Library — so you’re learning from ads with actual spend behind them, not mockups.'],
           ['Do I need design skills?', 'No. Remake a proven ad onto your product with one click, or describe what you want and the AI Ad Studio generates it in your brand — no editor required.'],
           ['Will the ads match my brand?', 'Yes. Set a Brand Kit (colors, fonts, logo, products) once — or let Selfmade auto-detect it from your site — and every generation stays on-brand.'],
-          ['How does pricing work?', 'No credits, no math — you pay for what you make. An image ad is $0.15 and a video ad is $6. Start free with 5 image ads (no card), buy as you go, or subscribe for unlimited images plus a monthly batch of videos. See the pricing section above.'],
+          ['How does pricing work?', 'You pay for what you make — an image ad is $0.50 and a video ad is $6. Start free with 5 image ads (no card), buy as you go, or subscribe for a monthly pool of credits to spend on images and videos. See the pricing section above.'],
           ['Can I launch ads from Selfmade?', 'Yes — connect Meta and push creatives straight to your ad account, then track performance in Campaigns & Reports.'],
           ['Is my data private?', 'Your brands, products, and creatives are yours alone and never shared.']].map(([q, a]) => <FAQItem key={q} q={q} a={a} />)}
       </section>

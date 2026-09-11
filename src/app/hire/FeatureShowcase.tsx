@@ -92,7 +92,7 @@ export default function FeatureShowcase() {
         eyebrow="Creative"
         title="It finds what works — then makes it yours."
         desc="It finds winning ads, understands why they work, then creates new images and videos for your brand — in minutes. No designer, no filming."
-        bullets={['Image ads · $0.15', 'UGC-style video · $6', 'Their proven angle, your product']}
+        bullets={['Image ads · $0.50', 'UGC-style video · $6', 'Their proven angle, your product']}
         grad="radial-gradient(120% 120% at 85% 0%, #ffe1ef, #efe4ff 52%, #e1ecff)"
       >
         <div className="rm">

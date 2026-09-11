@@ -1131,7 +1131,7 @@ function ImageEditor({ value, onChange }: { value?: string; onChange: (url: stri
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
             <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe an image to generate…" onKeyDown={(e) => { if (e.key === 'Enter') generate() }} style={{ ...editInput, flex: 1 }} />
-            <button onClick={generate} disabled={!!busy} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{busy === 'gen' ? 'Generating…' : '✨ AI · 15 cr'}</button>
+            <button onClick={generate} disabled={!!busy} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, whiteSpace: 'nowrap' }}>{busy === 'gen' ? 'Generating…' : '✨ AI · 50 cr'}</button>
           </div>
           {err && <div style={{ fontSize: 12, color: '#9a2b2b', marginTop: 6 }}>{err}</div>}
         </div>

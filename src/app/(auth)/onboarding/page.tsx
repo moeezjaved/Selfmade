@@ -870,7 +870,7 @@ function InterviewPage() {
                   <div style={{ ...planBadge }}>FULL-TIME</div>
                   <div style={planName}>Mello, full-time</div>
                   <div style={planPrice}>$49<span style={planPer}>/mo</span></div>
-                  <div style={planFeat}>Video ads<br />Unlimited image ads<br />Every competitor watched<br />Fresh creatives every morning</div>
+                  <div style={planFeat}>Video ads<br />Image ads from your credits<br />Every competitor watched<br />Fresh creatives every morning</div>
                   <button style={{ ...btnMain, width: '100%', marginTop: 14, opacity: planBusy ? 0.6 : 1 }} disabled={!!planBusy} onClick={() => choosePlan('starter')}>{planBusy === 'starter' ? 'Opening…' : 'Go full-time · $49/mo'}</button>
                 </div>
               </div>

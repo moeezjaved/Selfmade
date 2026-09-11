@@ -36,12 +36,12 @@ export interface PlanEntitlements {
 
 // ── Pricing model v2 (2026-07-17, LOCKED) ── The customer sees VIDEOS & IMAGES, not credits.
 // Internal ids are KEPT to avoid a data migration: `starter` IS "Creator", `business` IS "Agency",
-// `pro` is hidden (legacy). Subscribers get FREE unlimited image ads; their credit pool = video budget
-// (1 video = 600 cr). Free = a taste of images; Pay-as-you-go (the $9 launch top-up) needs no plan.
+// `pro` is hidden (legacy). Subscribers get a monthly CREDIT POOL spent on image AND video ads — NO free
+// images on any plan (mig 104); an image ad = 50 cr, a video = 600 cr. PAYG top-ups need no plan.
 export const PLANS: Record<PlanId, PlanEntitlements> = {
   free: {
     label: 'Free', priceMonthly: 0, priceAnnualMonthly: 0,
-    // Free = a ONE-TIME 75-credit trial (5 image ads @ 15 cr each). No monthly refill, and free users
+    // Free = the audit's 5 free image ads + a ONE-TIME 75-credit trial for anything else. No monthly refill, and free users
     // CANNOT buy credits — when the 75 run out, generating media prompts an upgrade to a paid plan.
     monthlyCredits: 0, welcomeCredits: 75, seats: 1, brandSpy: 1, expressPulls: 3, discoveryPages: 3,
     aiInsights: false, launch: false, campaigns: false, api: false, exports: false, canBuyCredits: false,
@@ -126,11 +126,11 @@ export const ACTION_COSTS: Record<string, number> = {
   brand_analysis: 20,
   review_mining: 20,
   ask_mello: 10,
-  image_clone_pro: 15,      // 2K Nano Banana Pro — DEFAULT ad clone ($0.15, matches CloneModal)
-  image_clone_4k: 25,       // 4K / HD download ($0.25)
-  image_studio_pro: 15,     // 2K AI Ad Studio — original ad ($0.15). Flat "image ad = 15 cr" (mig 168), same as a clone.
-  image_studio_4k: 25,      // 4K / HD Studio ad ($0.25) — same as a 4K clone (mig 168)
-  image_edit_pro: 15,       // iterative edit — one 2K Pro image, same cost as a fresh clone ($0.15). Free for subscribers.
+  image_clone_pro: 50,      // 2K Nano Banana Pro — DEFAULT ad clone ($0.50). Cost to us ~$0.13-0.27/ad.
+  image_clone_4k: 80,       // 4K / HD download ($0.80) — ~2x the cost of 2K
+  image_studio_pro: 50,     // 2K AI Ad Studio — original ad ($0.50). Flat "image ad = 50 cr", same as a clone.
+  image_studio_4k: 80,      // 4K / HD Studio ad ($0.80) — same as a 4K clone
+  image_edit_pro: 50,       // iterative edit — one 2K Pro image, same cost as a fresh clone ($0.50). Charged on every plan.
   video_clone: 600,         // UGC 15s ($6.00 @ 1cr=1¢) — the "video ad = $6" anchor (v2 pricing)
   video_captions: 100,      // TikTok-style burned captions — high-margin add-on
   asset_ai_tag: 10,         // AI tagging of an uploaded asset (caption/embed + video clip analysis)
@@ -139,7 +139,7 @@ export const ACTION_COSTS: Record<string, number> = {
 }
 
 // Retired 2026-07-29: no free images on any plan — every image ad is charged its credit_pricing price
-// ($0.15). (The DB stopped free-images in migration 104; this app-layer set is now empty to match.)
+// ($0.50). (The DB stopped free-images in migration 104; this app-layer set is now empty to match.)
 export const FREE_FOR_SUBSCRIBERS = new Set<string>()
 
 // ── Top-up packs — pricing spec §3.1 ──

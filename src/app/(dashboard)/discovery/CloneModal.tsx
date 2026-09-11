@@ -64,7 +64,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
   const [imageSize, setImageSize] = useState<'2K' | '4K'>('2K')
   const tier: 'pro' = 'pro'   // Pro (Nano Banana Pro) always — best product fidelity + text
   const [emailDaily, setEmailDaily] = useState(true)
-  const [autopilot, setAutopilot] = useState(false)   // Daily Ad Autopilot — a fresh ad for this brand every day ($0.15/day)
+  const [autopilot, setAutopilot] = useState(false)   // Daily Ad Autopilot — a fresh ad for this brand every day ($0.50/day)
 
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
@@ -419,7 +419,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
   const cost = imageSize === '4K' ? 25 : 15   // 2K → image_clone_pro (15) · 4K → image_clone_4k (25)
   const totalCost = cost * count
   const editCost = pricing?.image_edit_pro?.credits ?? 15   // live DB price (image_edit_pro) so the shown cost always == what's charged
-  // Images are priced in dollars for the user (1 credit = 1¢) — $0.15 for 2K, $0.25 for 4K.
+  // Images are priced in dollars for the user (1 credit = 1¢) — $0.50 for 2K, $0.80 for 4K.
   const cr = (n: number) => `$${(n / 100).toFixed(2)}`   // label helper
   const hasResults = results.length > 0
 
@@ -736,7 +736,7 @@ export default function CloneModal({ ad, onClose, onGenerated }: { ad: { id: str
                     {!ad.assetImageUrl && (
                       <label style={{ display: 'flex', alignItems: 'flex-start', gap: 9, fontSize: 12.5, color: L_INK, cursor: 'pointer', background: '#fff', border: `1.5px solid ${autopilot ? SEL_BORDER : L_LINE}`, borderRadius: 12, padding: '11px 13px', marginTop: 10 }}>
                         <input type="checkbox" checked={autopilot} onChange={(e) => setAutopilot(e.target.checked)} style={{ marginTop: 2, accentColor: GREEN }} />
-                        <span>🚀 <b>Put this ad on autopilot</b><br /><span style={{ color: L_MUTED, fontSize: 11.5 }}>Get a brand-new ad for <b>{bName.trim() || 'this brand'}</b> emailed every day — we alternate a fresh take on this ad with a new competitor winner. <b>$0.15/day</b>, skipped when you’re out of credits, cancel anytime in Settings.{!isService && !brandId && !saveAsBrand ? ' Turn on “Save as a brand” so we can reuse your product.' : ''}</span></span>
+                        <span>🚀 <b>Put this ad on autopilot</b><br /><span style={{ color: L_MUTED, fontSize: 11.5 }}>Get a brand-new ad for <b>{bName.trim() || 'this brand'}</b> emailed every day — we alternate a fresh take on this ad with a new competitor winner. <b>$0.50/day</b>, skipped when you’re out of credits, cancel anytime in Settings.{!isService && !brandId && !saveAsBrand ? ' Turn on “Save as a brand” so we can reuse your product.' : ''}</span></span>
                       </label>
                     )}
                   </section>

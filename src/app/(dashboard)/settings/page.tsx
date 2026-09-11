@@ -371,11 +371,11 @@ export default function SettingsPage() {
       </>)}
 
       {tab==='autopilot' && (
-      /* Daily Ad Autopilot — one fresh ad per enrolled brand, emailed daily ($0.15/ad) */
+      /* Daily Ad Autopilot — one fresh ad per enrolled brand, emailed daily ($0.50/ad) */
       <div style={{background:'#ffffff',border:'1px solid rgba(0,0,0,0.07)',borderRadius:18,overflow:'hidden'}}>
         <div style={{padding:'18px 22px',borderBottom:'1px solid rgba(255,90,44,0.08)'}}>
           <div style={{fontSize:15,fontWeight:700,color:'#141d15'}}>🚀 Daily Ad Autopilot</div>
-          <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A fresh ad for each brand below, generated and emailed every day at $0.15/ad. We skip days you’re out of credits. Runs until you turn it off.</div>
+          <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>A fresh ad for each brand below, generated and emailed every day at $0.50/ad. We skip days you’re out of credits. Runs until you turn it off.</div>
         </div>
         <div style={{padding:12}}>
           {/* Turn it on RIGHT HERE — pick a brand + format. (Previously this pointed to a 'Remake screen'
@@ -403,7 +403,7 @@ export default function SettingsPage() {
             <div key={a.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,padding:'10px 10px',borderRadius:12,background:'#f9f5ec',marginBottom:8}}>
               <div>
                 <div style={{fontSize:14,fontWeight:600,color:'#141d15'}}>{a.brand_name || 'Your brand'} <span style={{fontSize:11,fontWeight:600,color:'#3b6d11',background:'#eaf3de',borderRadius:20,padding:'2px 8px',marginLeft:4}}>{a.media_type === 'video' ? 'Video' : 'Image'}</span></div>
-                <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>{a.runs} ad{a.runs === 1 ? '' : 's'} sent so far · $0.15/day</div>
+                <div style={{fontSize:12,color:'#7a9a7a',marginTop:2}}>{a.runs} ad{a.runs === 1 ? '' : 's'} sent so far · $0.50/day</div>
               </div>
               <button onClick={() => stopAutopilot(a.id)} style={{padding:'7px 14px',borderRadius:8,border:'1.5px solid #e2e8f0',background:'#fff',color:'#b91c1c',fontSize:13,fontWeight:600,cursor:'pointer',fontFamily:'inherit'}}>Turn off</button>
             </div>

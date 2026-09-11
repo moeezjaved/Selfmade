@@ -49,12 +49,12 @@ export async function POST(req: NextRequest) {
     const referenceUrl = String(b?.referenceUrl || '').trim()
     const aspect = String(b?.aspectRatio || '1:1')
     const admin = createAdminClient()
-    // AI image generation is metered like every other image render (15 credits — the image_edit rate).
+    // AI image generation is metered like every other image render (50 credits — the image_edit rate).
     // Reserve up front; refund if the model fails to produce/host an image so a miss never charges.
     let txId: string
     try { txId = (await reserveCredits(admin as any, user.id, 'image_edit')).id }
     catch (e) {
-      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating an image costs 15 credits — top up or upgrade.' }, { status: 402 })
+      if (e instanceof InsufficientCreditsError) return NextResponse.json({ error: 'insufficient_credits', need: e.need, have: e.have, reason: 'Generating an image costs 50 credits — top up or upgrade.' }, { status: 402 })
       return NextResponse.json({ error: 'reserve_failed' }, { status: 500 })
     }
     try {

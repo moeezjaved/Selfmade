@@ -243,7 +243,7 @@ export default function StudioModal({ onClose }: { onClose: () => void }) {
               <div>
                 <div style={{ fontSize: 11.5, color: '#6f6d5a', marginBottom: 5 }}>Resolution</div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button onClick={() => setImageSize('2K')} style={tierBtn(imageSize === '2K')}>2K · 15 cr</button>
+                  <button onClick={() => setImageSize('2K')} style={tierBtn(imageSize === '2K')}>2K · 50 cr</button>
                   <button onClick={() => setImageSize('4K')} style={tierBtn(imageSize === '4K')}>4K HD · 25 cr</button>
                 </div>
               </div>

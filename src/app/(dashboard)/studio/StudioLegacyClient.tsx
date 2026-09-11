@@ -548,7 +548,7 @@ function StudioInner() {
                       <button key={q} onClick={() => setImgQuality(q)} style={{ border: 'none', borderRadius: 100, padding: '7px 15px', fontSize: 12, fontWeight: 800, cursor: 'pointer', background: imgQuality === q ? '#fff' : 'transparent', color: imgQuality === q ? INK : MUTED }}>{q}</button>
                     ))}
                   </div>
-                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 5 }}>{imgQuality === '4K' ? 'Sharper — 25 credits each' : 'Standard — 15 credits each'}</div>
+                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 5 }}>{imgQuality === '4K' ? 'Sharper — 80 credits each' : 'Standard — 50 credits each'}</div>
                 </div>
 
                 <div>
