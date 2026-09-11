@@ -353,6 +353,30 @@ export async function launchViaMello(
   }
 }
 
+/**
+ * Mello chat CHANGE — scale / pause / resume / edit-copy / duplicate an existing campaign or ad by typing.
+ * Stateless + two-step like launch: `confirm=false` parses the request against the LIVE account and returns
+ * the plan WITHOUT writing; `confirm=true` re-parses the SAME request and executes the resolved write. Reuses
+ * the exact planAction/executeAction engine the Creative-Studio command box uses, so behavior is identical.
+ */
+export async function manageViaMello(userId: string, request: string, confirm: boolean): Promise<any> {
+  const req = (request || '').trim()
+  if (!req) return { done: false, note: 'Tell me what to change — e.g. "scale ROY 1 to $80/day", "pause the retargeting campaign", or "change the headline on X".' }
+  const res = await planAction(userId, { message: req })
+  if ('error' in res) return { done: false, note: res.error }
+  if ('clarify' in res) return { done: false, needs_input: res.clarify, note: `Ask the user this before doing anything: ${res.clarify}` }
+  const card = res.card
+  if (!confirm) {
+    return {
+      done: false, preview: true,
+      plan: { title: card.title, summary: card.summary, lines: card.lines || [] },
+      note: `Show the user this plan and ask them to confirm: "${card.title}" — ${card.summary}${card.lines?.length ? ` (${card.lines.join('; ')})` : ''}. It writes to their LIVE Meta account; anything that creates an ad lands PAUSED. ONLY when they say yes, call manage_ad again with the SAME request and confirm=true.`,
+    }
+  }
+  const done = await executeAction(userId, card.action)
+  return done.ok ? { done: true, note: done.message } : { done: false, note: done.error }
+}
+
 /** The founder approved the card → perform the write. Returns a human result + logs a Win. */
 export async function executeAction(userId: string, action: AdAction): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const mc = await createMetaClientForUser(userId).catch(() => null)

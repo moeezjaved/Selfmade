@@ -260,6 +260,21 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'manage_ad',
+      description: "CHANGE the user's LIVE Meta ads — scale/increase/lower a budget, pause, resume/turn on, change an ad's headline/body/CTA, or duplicate a campaign to a new audience. Use when the user says things like 'increase ROY 1 to $80/day', 'pause the retargeting campaign', 'turn my ads back on', 'change the headline on X to …', 'clone my winner to a new audience'. This is for EXISTING ads — to put a NEW ad live use launch_ad instead. APPROVE-GATED, two-step: call with confirm=false FIRST to resolve the exact campaign/ad against their live account and return the plan (NO writes); present it and ask them to approve; ONLY after they say yes, call again with the SAME request and confirm=true to make the change. Anything that creates an ad (copy change / duplicate) lands PAUSED. Requires a connected Meta account.",
+      parameters: {
+        type: 'object',
+        required: ['request'],
+        properties: {
+          request: { type: 'string', description: "The user's change in their own words, kept verbatim — e.g. \"scale ROY 1 to $80/day\", \"pause the retargeting campaign\", \"change the headline on the founder ad to 'Sleep better tonight'\". Pass the same string on the confirm=true call." },
+          confirm: { type: 'boolean', description: 'false = resolve & preview the change, NO writes (default); true = apply it, only after the user approved the previewed plan.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'launch_ad',
       description: "Put one of the user's ads LIVE on Meta (Facebook/Instagram) — actually creates the campaign. Use when the user says 'launch this', 'run this ad', 'put it live', 'launch my best ad at $20/day', etc. APPROVE-GATED, two-step: call with confirm=false FIRST to build the launch plan (it resolves the creative, writes the ad copy, picks the audience, and shows the budget) WITHOUT writing anything; present that plan and note it launches PAUSED for their review; ONLY after the user explicitly approves, call again with the SAME details and confirm=true to actually create it. Every launch lands PAUSED — the user turns it on in Meta. Needs a connected Meta account with a Facebook Page and at least one image creative (from Ad Studio / create_ad). If the user hasn't given a daily budget, ask for it before confirming.",
       parameters: {
@@ -404,6 +419,7 @@ export const TOOL_LABELS: Record<string, string> = {
   request_clarification: 'Asking for clarification…',
   create_ad: 'Creating on the canvas…',
   author_competitor_report: 'Writing the intelligence report…',
+  manage_ad: 'Working on your live ads…',
   launch_ad: 'Setting up your ad launch…',
   run_seo_audit: 'Crawling your site for SEO…',
   fix_seo: 'Preparing SEO fixes…',
@@ -646,6 +662,10 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return { remembered: String(args.content || '').slice(0, 400) }
     case 'author_competitor_report':
       return await authorCompetitorReport(ctx.userId, String(args.competitor || '').trim(), args.brand_name)
+    case 'manage_ad': {
+      const { manageViaMello } = await import('./ads-actions')
+      return await manageViaMello(ctx.userId, String(args.request || ''), args.confirm === true)
+    }
     case 'launch_ad': {
       const { launchViaMello } = await import('./ads-actions')
       return await launchViaMello(ctx.userId, {
