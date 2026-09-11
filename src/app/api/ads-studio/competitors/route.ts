@@ -115,7 +115,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
-const MAX_DEEP_PULLS = 6        // rivals deep-pulled per background run (bounded for the shared droplet; union accumulates the rest across runs)
+const MAX_DEEP_PULLS = 4        // rivals deep-pulled per background run (bounded for the shared droplet; union accumulates the rest across runs)
 const DEEP_PULL_LIMIT = 500     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
@@ -132,7 +132,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   await Promise.all(targets.map(async (b) => {
     const deep: any[] = await Promise.race([
       fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).then(liveToCards).catch(() => []),
-      new Promise<any[]>((r) => setTimeout(() => r([]), 100_000)),
+      new Promise<any[]>((r) => setTimeout(() => r([]), 75_000)),
     ])
     if (deep.length >= b.liveAds.length) b.liveAds = deep   // the full page pull replaces the shallow search result
   }))
@@ -222,7 +222,11 @@ export async function GET(req: NextRequest) {
             byKey.set(k, { ...cur, ...c, ads: mergedAds, adCount: mergedAds.length, spyable: mergedAds.length === 0 })
           }
           const chosen = Array.from(byKey.values()).sort((a, b) => (b?.ads?.length || 0) - (a?.ads?.length || 0)).slice(0, 40)
-          const payload = { discovered: chosen, seed: seedOut || prev?.seed || null, configured: configuredOut, ranAt: Date.now() }
+          // Only stamp `ranAt` (which arms the 30-min cooldown) when we ACTUALLY have rivals. An empty result
+          // gets ranAt:0 so the cooldown never locks a blank cache — the next load retries until a run lands
+          // rivals. Prevents the "stuck at 0 for 30 min" trap from one flaky run.
+          const ranAt = chosen.length ? Date.now() : 0
+          const payload = { discovered: chosen, seed: seedOut || prev?.seed || null, configured: configuredOut, ranAt }
           await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, payload), competitorsBuilding: null }).catch(() => {})
         })())
       } else {
