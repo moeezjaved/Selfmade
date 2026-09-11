@@ -1027,8 +1027,11 @@ function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: Stud
           .map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
           .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
           .slice(0, 100)
-        if (on && (flat.length || polls === 0)) setAds(flat)
-        if (on && (d?.refreshing || d?.discovering) && polls < 5) { polls++; setTimeout(load, 25000) }
+        // Don't lock the empty state on a transient 0 (the server can momentarily return no ads mid-refresh):
+        // only commit an empty result after a few retries; commit a non-empty result immediately.
+        if (on && (flat.length || polls >= 3)) setAds(flat)
+        const keepPolling = d?.refreshing || d?.discovering || (flat.length === 0 && polls < 3)
+        if (on && keepPolling && polls < 6) { polls++; setTimeout(load, flat.length ? 25000 : 6000) }
       } catch { if (on) setAds([]) }
     }
     load()
