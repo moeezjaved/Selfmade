@@ -48,9 +48,20 @@ export default function QuickLaunch() {
 
   // Load creatives, the connected Page(s), and auto-detect the brand → pre-fill URL/country, then generate copy.
   useEffect(() => {
+    // A specific creative can arrive via ?img=<url> (e.g. "Run on Facebook" from a single ad) — pre-select it,
+    // injecting a synthetic entry when it isn't in the recent list so that exact ad is what gets launched.
+    let wantImg = ''
+    try { wantImg = new URLSearchParams(window.location.search).get('img') || '' } catch { /* SSR-safe */ }
+
     fetch('/api/creatives?limit=60').then((r) => r.json()).then((d) => {
-      setCreatives((Array.isArray(d.creatives) ? d.creatives : []).filter((c: Creative) => c.image_url && c.media_type !== 'video'))
-    }).catch(() => setCreatives([]))
+      let list: Creative[] = (Array.isArray(d.creatives) ? d.creatives : []).filter((c: Creative) => c.image_url && c.media_type !== 'video')
+      if (wantImg) {
+        const hit = list.find((c) => c.image_url === wantImg)
+        if (hit) { setPicked(hit.id) }
+        else { const synth: Creative = { id: '_img', image_url: wantImg, media_type: 'image' }; list = [synth, ...list]; setPicked('_img') }
+      }
+      setCreatives(list)
+    }).catch(() => { if (wantImg) { setCreatives([{ id: '_img', image_url: wantImg, media_type: 'image' }]); setPicked('_img') } else setCreatives([]) })
 
     fetch('/api/m4/pages').then((r) => r.json()).then((d) => {
       const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
@@ -128,7 +139,6 @@ export default function QuickLaunch() {
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Launch an ad</h1>
           <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</p>
         </div>
-        <Link href="/m4" style={{ fontSize: 13, fontWeight: 700, color: SUB, textDecoration: 'none', border: `1px solid ${LINE}`, borderRadius: 999, padding: '8px 14px' }}>Advanced setup →</Link>
       </div>
 
       {heading('1', 'Pick your ad')}
