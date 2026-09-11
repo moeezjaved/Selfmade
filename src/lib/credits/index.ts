@@ -10,10 +10,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { resolveBillingOwner } from '@/lib/org'
 import { normalizePlan, PLAN_ORDER } from '@/lib/plans'
-// NOTE: "free unlimited images for subscribers" (pricing v2) lives in the DB reserve_credits function
-// (migration 102), NOT here — because some routes call the RPC directly and would bypass an app-layer
-// check. reserve_credits returns a real 0-credit committed tx for subscriber image actions, so commit/
-// refund below work unchanged.
+// NOTE: image actions are charged their normal credit cost on EVERY plan, subscribers included — the old
+// pricing-v2 "free unlimited images for subscribers" block (migration 102) was removed in migration 104
+// (2026-07-18). All credit costs live in the DB credit_pricing table read by reserve_credits (image
+// actions = 50 credits / 2K, 80 / 4K), so changing prices needs no deploy.
 
 export class InsufficientCreditsError extends Error {
   constructor(public need: number, public have: number) {
