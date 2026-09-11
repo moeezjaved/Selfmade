@@ -260,6 +260,28 @@ export const TOOLS = [
   {
     type: 'function' as const,
     function: {
+      name: 'launch_ad',
+      description: "Put one of the user's ads LIVE on Meta (Facebook/Instagram) — actually creates the campaign. Use when the user says 'launch this', 'run this ad', 'put it live', 'launch my best ad at $20/day', etc. APPROVE-GATED, two-step: call with confirm=false FIRST to build the launch plan (it resolves the creative, writes the ad copy, picks the audience, and shows the budget) WITHOUT writing anything; present that plan and note it launches PAUSED for their review; ONLY after the user explicitly approves, call again with the SAME details and confirm=true to actually create it. Every launch lands PAUSED — the user turns it on in Meta. Needs a connected Meta account with a Facebook Page and at least one image creative (from Ad Studio / create_ad). If the user hasn't given a daily budget, ask for it before confirming.",
+      parameters: {
+        type: 'object',
+        properties: {
+          creative_id: { type: 'string', description: "The creative to launch (a creative_generations id from a create_ad result or My Creatives). Omit to use the user's most recent generated image." },
+          creative_url: { type: 'string', description: 'A direct image URL to launch instead of a saved creative (rarely needed — prefer creative_id).' },
+          daily_budget: { type: 'number', description: 'Daily budget in the account currency (e.g. 20 for $20/day). Required to actually launch — ask the user if unknown.' },
+          campaign_name: { type: 'string', description: 'Optional short campaign name; a sensible one is generated if omitted.' },
+          audience: { type: 'string', description: 'Who to target, in the user\'s words (e.g. "women 30+ into clean skincare"). Omit for a broad Advantage+ audience.' },
+          headline: { type: 'string', description: 'Ad headline (≤40 chars). Omit to auto-write it.' },
+          primary_text: { type: 'string', description: 'Ad primary/body text. Omit to auto-write it.' },
+          cta: { type: 'string', enum: ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'GET_OFFER'], description: 'Button. Default SHOP_NOW.' },
+          country: { type: 'string', description: 'Two-letter country code to target (e.g. US, GB, PK). Default US.' },
+          confirm: { type: 'boolean', description: 'false = build & preview the plan, NO writes (default); true = actually launch it PAUSED, only after the user approved the previewed plan.' },
+        },
+      },
+    },
+  },
+  {
+    type: 'function' as const,
+    function: {
       name: 'author_competitor_report',
       description: "Write the flagship strategy report — a McKinsey/Sequoia-grade written analysis grounded in real crawled ads, ending every section with a concrete move. Works for a RIVAL brand OR the user's OWN brand. This is the ONLY way to produce the beautiful, saved report doc — ALWAYS use it whenever the user wants a report or written analysis: 'analyze <brand>', 'deep-dive / teardown / full report on <brand>', 'create/make me a report', 'report on what's working for <my brand/Aura>', 'strategy doc on X'. Do NOT answer a report request with a plain chat summary from search_ad_library or analyze_niche_patterns — call this instead. Takes ~1-2 minutes; it saves a document the user can reopen and returns a link — after it finishes, give a 2-3 sentence highlight then link them to the full document. Tell the user you're writing it before you call this.",
       parameters: {
@@ -382,6 +404,7 @@ export const TOOL_LABELS: Record<string, string> = {
   request_clarification: 'Asking for clarification…',
   create_ad: 'Creating on the canvas…',
   author_competitor_report: 'Writing the intelligence report…',
+  launch_ad: 'Setting up your ad launch…',
   run_seo_audit: 'Crawling your site for SEO…',
   fix_seo: 'Preparing SEO fixes…',
   run_cro_audit: 'Auditing your store for conversion…',
@@ -623,6 +646,15 @@ export async function executeTool(name: string, args: any, ctx: ToolCtx): Promis
       return { remembered: String(args.content || '').slice(0, 400) }
     case 'author_competitor_report':
       return await authorCompetitorReport(ctx.userId, String(args.competitor || '').trim(), args.brand_name)
+    case 'launch_ad': {
+      const { launchViaMello } = await import('./ads-actions')
+      return await launchViaMello(ctx.userId, {
+        creativeId: args.creative_id, creativeUrl: args.creative_url,
+        dailyBudget: typeof args.daily_budget === 'number' ? args.daily_budget : (args.daily_budget ? Number(args.daily_budget) : undefined),
+        campaignName: args.campaign_name, audience: args.audience,
+        headline: args.headline, primaryText: args.primary_text, cta: args.cta, country: args.country,
+      }, args.confirm === true)
+    }
     default:
       throw new Error(`Unknown tool: ${name}`)
   }

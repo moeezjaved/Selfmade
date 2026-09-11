@@ -253,6 +253,106 @@ export async function planAttach(
   } }
 }
 
+/**
+ * Mello chat launch — the conversational way to put an ad live. Stateless + two-step so it fits the tool
+ * loop (like fix_seo/fix_cro): `confirm=false` resolves everything (creative, copy, audience, budget) and
+ * returns a PREVIEW without writing; `confirm=true` re-resolves and actually launches ONE Advantage+/interest
+ * campaign, PAUSED, via the same launchFullCampaign engine the confirm-card flow uses. Never writes on preview.
+ */
+export async function launchViaMello(
+  userId: string,
+  spec: {
+    creativeId?: string; creativeUrl?: string
+    dailyBudget?: number; campaignName?: string; audience?: string
+    headline?: string; primaryText?: string; cta?: string; country?: string
+  },
+  confirm: boolean,
+): Promise<any> {
+  const mc = await createMetaClientForUser(userId).catch(() => null)
+  if (!mc) return { launched: false, note: 'Meta isn’t connected (or access expired). Tell the user to reconnect Meta from Settings before you can launch ads.' }
+  const { currency, pageId } = await accountCtx(userId)
+  if (!pageId) return { launched: false, note: 'No Facebook Page is linked to this ad account. Tell the user to reconnect Meta WITH a Page — a launch needs one.' }
+
+  // ── Resolve the creative to launch: explicit url > explicit id > most-recent generated image. ──
+  const admin = createAdminClient() as any
+  let creativeUrl = (spec.creativeUrl || '').trim()
+  let brandName = ''
+  let website = ''
+  let brandId: string | null = null
+  if (!creativeUrl) {
+    let row: any = null
+    if (spec.creativeId) {
+      const { data } = await admin.from('creative_generations').select('id, brand_id, image_url, media_type').eq('user_id', userId).eq('id', spec.creativeId).maybeSingle()
+      row = data
+    }
+    if (!row) {
+      const { data } = await admin.from('creative_generations').select('id, brand_id, image_url, media_type').eq('user_id', userId).eq('media_type', 'image').not('image_url', 'is', null).order('created_at', { ascending: false }).limit(1).maybeSingle()
+      row = data
+    }
+    if (!row?.image_url) return { launched: false, note: 'The user has no image creative to launch yet. Tell them to make an ad first (Ad Studio / create_ad), then launch it.' }
+    creativeUrl = String(row.image_url)
+    brandId = row.brand_id || null
+  }
+  // Brand name + website for the copy + the click destination.
+  try {
+    const bq = brandId
+      ? admin.from('brands').select('name, website').eq('id', brandId).maybeSingle()
+      : admin.from('brands').select('name, website').eq('user_id', userId).order('created_at', { ascending: true }).limit(1).maybeSingle()
+    const { data: b } = await bq
+    brandName = (b as any)?.name || ''
+    website = (b as any)?.website || ''
+  } catch { /* best-effort */ }
+
+  const budget = Number(spec.dailyBudget)
+  if (!budget || budget <= 0) return { launched: false, needs_input: 'budget', note: 'Ask the user what DAILY budget this ad should run at (e.g. $20/day), then call launch_ad again with that budget.' }
+
+  const description = (spec.audience || '').trim() || (brandName ? `${brandName} customers` : 'a relevant audience')
+  const copy = (spec.headline && spec.primaryText)
+    ? { headline: String(spec.headline).slice(0, 40), primaryText: String(spec.primaryText).slice(0, 125), cta: /^(SHOP_NOW|LEARN_MORE|SIGN_UP|GET_OFFER)$/.test(String(spec.cta)) ? String(spec.cta) : CTA_DEFAULT }
+    : await launchCopy(description, brandName)
+  const linkUrl = website ? (website.startsWith('http') ? website : `https://${website}`) : 'https://'
+  const countryCode = (spec.country && /^[A-Za-z]{2}$/.test(spec.country.trim())) ? spec.country.trim().toUpperCase() : 'US'
+  const campaignName = String(spec.campaignName || copy.headline || 'New campaign').slice(0, 60)
+
+  // Interests from the audience description (best-effort; empty → broad Advantage+).
+  let interests: { id: string; name: string }[] = []
+  if (spec.audience) {
+    try {
+      const kw = await interestKeywords(description, brandName)
+      const found = (await Promise.all(kw.slice(0, 4).map((q) => mc.searchInterests(q)))).flat()
+      const seen = new Set<string>(); interests = found.filter((i: any) => !seen.has(i.id) && seen.add(i.id)).slice(0, 6)
+    } catch { /* broad */ }
+  }
+  const audienceLine = interests.length ? `Interests: ${interests.map((i) => i.name).join(', ')}` : 'Broad (Advantage+) audience'
+
+  if (!confirm) {
+    return {
+      launched: false, preview: true,
+      plan: { campaign: campaignName, budget: `${money(budget, currency)}/day`, audience: audienceLine, country: countryCode, headline: copy.headline, primary_text: copy.primaryText, cta: copy.cta, creative_url: creativeUrl },
+      note: `Show the user this exact plan (creative image, campaign name, ${money(budget, currency)}/day, ${audienceLine}, headline "${copy.headline}"). Tell them it will be created PAUSED for their review. Ask them to confirm. ONLY when they say yes, call launch_ad again with the SAME creative, budget, audience and copy plus confirm=true.`,
+    }
+  }
+
+  // ── confirm=true → actually launch, PAUSED. ──
+  try {
+    const img = await mc.uploadAdImage(creativeUrl)
+    const imageHash = img?.images?.[Object.keys(img.images || {})[0]]?.hash || img?.hash
+    if (!imageHash) return { launched: false, note: 'Couldn’t upload that creative to Meta — tell the user to try another ad.' }
+    const targeting: Record<string, unknown> = interests.length
+      ? { geo_locations: { countries: [countryCode] }, flexible_spec: [{ interests: interests.map((i) => ({ id: i.id, name: i.name })) }] }
+      : { geo_locations: { countries: [countryCode] } }
+    const launched = await mc.launchFullCampaign({
+      campaignName, objective: 'OUTCOME_SALES', targeting, dailyBudget: budget,
+      startTime: new Date(Date.now() + 60_000).toISOString(), pageId,
+      creative: { imageHash, headline: copy.headline, primaryText: copy.primaryText, cta: copy.cta, linkUrl },
+    })
+    try { const { recordWin } = await import('@/lib/mello/wins'); await recordWin(admin, { userId, brandId, category: 'ads', title: `Launched “${campaignName}”`, detail: `${money(budget, currency)}/day · PAUSED for review`, meta: { campaignId: launched?.campaign_id, via: 'mello' } }) } catch { /* optional */ }
+    return { launched: true, campaign: campaignName, budget: `${money(budget, currency)}/day`, note: `“${campaignName}” is created and PAUSED on ${'Meta'} — tell the user it’s ready, they just review it in Meta (or /reports) and switch it on. Give them the link: /reports.` }
+  } catch (e: any) {
+    return { launched: false, note: `Meta rejected the launch: ${String(e?.response?.data?.error?.message || e?.message || e).slice(0, 180)}. Tell the user plainly.` }
+  }
+}
+
 /** The founder approved the card → perform the write. Returns a human result + logs a Win. */
 export async function executeAction(userId: string, action: AdAction): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
   const mc = await createMetaClientForUser(userId).catch(() => null)
