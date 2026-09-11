@@ -183,13 +183,23 @@ export async function GET(req: NextRequest) {
         discovering = true
         await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
         waitUntil((async () => {
-          // ALWAYS write a cache with a `ranAt` timestamp — even when discovery finds nothing or errors —
-          // so the cooldown above stops the every-load re-run spin and the droplet gets room to finish.
-          let payload: { discovered: any[]; seed: any; configured: boolean; ranAt: number } = { discovered: [], seed: null, configured: true, ranAt: Date.now() }
+          // The Meta Ad Library scrape runs on ONE shared droplet and is FLAKY — the same brand can return
+          // 15 rivals on one run and 0 on the next. So NEVER let an empty/worse scrape wipe a good cached
+          // result: read the latest cache and keep whichever set has MORE competitors WITH live ads. We
+          // still stamp `ranAt` every time so the cooldown stops the every-load re-run spin.
+          const latest = brandId ? await readAdsStudio(admin, brandId).catch(() => ({})) : {}
+          const prev = readSection<{ discovered: any[]; seed: any; configured: boolean }>(latest, 'competitors', domain, 1000 * 60 * 60 * 24 * 30)
+          const prevDisc: any[] = Array.isArray(prev?.discovered) ? prev!.discovered : []
+          const adsN = (arr: any[]) => arr.filter((c) => Array.isArray(c?.ads) && c.ads.length).length
+          let payload: { discovered: any[]; seed: any; configured: boolean; ranAt: number } = { discovered: prevDisc, seed: prev?.seed ?? null, configured: prev?.configured ?? true, ranAt: Date.now() }
           try {
             const res = await discoverCompetitors(domain).catch(() => null)
-            if (res) payload = { discovered: await enrichDiscovered(admin, res), seed: res.seed, configured: res.configured, ranAt: Date.now() }
-          } catch { /* keep the empty-but-timestamped payload */ }
+            if (res) {
+              const fresh = await enrichDiscovered(admin, res)
+              const chosen = adsN(fresh) >= adsN(prevDisc) ? fresh : prevDisc   // sticky-best: keep the richer set
+              payload = { discovered: chosen, seed: res.seed || prev?.seed || null, configured: res.configured, ranAt: Date.now() }
+            }
+          } catch { /* keep the prev-or-empty timestamped payload */ }
           await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, payload), competitorsBuilding: null }).catch(() => {})
         })())
       } else {
