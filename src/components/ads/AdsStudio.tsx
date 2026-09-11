@@ -305,7 +305,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
     if (willRemake) {
       try {
         const b = await fetch('/api/credits/balance', { cache: 'no-store' }).then((r) => r.json())
-        if (typeof b?.balance === 'number' && b.balance < 15) { if (!(await requireUpgrade())) openCredits('buy', `Making an ad needs 15 credits — you have ${b.balance}. Top up to continue.`); return }
+        if (typeof b?.balance === 'number' && b.balance < 50) { if (!(await requireUpgrade())) openCredits('buy', `Making an ad needs 50 credits — you have ${b.balance}. Top up to continue.`); return }
       } catch { /* balance check failed — the server still gates before rendering */ }
     }
     setBusy(true); setInput('')

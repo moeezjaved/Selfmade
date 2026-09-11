@@ -87,7 +87,7 @@ export function confirmCredits(action: string, credits: number, balance: number)
 
 export function CreditCounter({ compact = false }: { compact?: boolean }) {
   const { balance, loading, plan, trialing } = useCredits()
-  const low = balance < 15  // below the priciest action (image_clone)
+  const low = balance < 50  // below one image generation (image_studio_pro / image_clone_pro = 50)
   const title = trialing
     ? `Trial · ${balance} credits — your full plan credits unlock when the trial ends, or click to pay now & unlock`
     : `Plan: ${plan} · ${balance} credits`
