@@ -42,7 +42,7 @@ function domainRoot(d: string) { return d.replace(/^www\./, '').toLowerCase() }
  * and the exact brand-discovery queries a shopper types to find true alternatives. Grounding in the Brand-Kit
  * facts is what makes discovery accurate: it pins the specific product FORM (e.g. "non-electronic flavored-air
  * aromatherapy device"), not a loose category ("nicotine-free vape"). */
-async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; productForms: string[]; queries: string[]; adKeywords: string[] }> {
+async function seedQueries(ctx: StoreContext, facts: string[]): Promise<{ category: string; market: string; productForms: string[]; queries: string[]; adKeywords: string[]; names: string[] }> {
   const products = ctx.products.slice(0, 12).map((p) => p.title).join(' | ') || ctx.description
   const knowledge = facts.length ? facts.slice(0, 18).map((f) => `- ${f}`).join('\n') : '(none)'
   const prompt = `You are a DTC market analyst finding a store's TRUE competitors. A brand often sells SEVERAL distinct product lines (e.g. testosterone GUMMIES and testosterone TABLETS, or a supplement brand with 10 products) — you must cover EVERY line, not just the one that appears most. Accuracy depends on pinning each PRECISE product form, not one loose category.
@@ -64,7 +64,8 @@ Return ONLY JSON:
  "market":"the primary country the store sells to. ONLY name a country when the signals give an EXPLICIT, unambiguous cue (currency symbol/code, a shipping-country statement, or a physical address). A single weak hint (one price, a stray mention) is NOT enough — when in doubt return 'global'. Never guess a country from the language alone.",
  "productForms":["each distinct product line/form from Step 1 — 1-5 short phrases"],
  "queries":["8 Google queries that surface COMPETING BRANDS. COVER EVERY product line above — include at least one exact-form query per line ('<line> brands', 'buy <line>') plus a couple brand-level 'alternatives to <brand/category>' queries. Do NOT over-index on a single line."],
- "adKeywords":["6-8 SHORT keyword phrases (1-3 words each) to find COMPETING ADVERTISERS in the Meta Ad Library. Include BOTH: (a) the core product noun per line (e.g. 'testosterone gummies'), AND (b) how rivals describe this product in their OWN ADS — the buyer-outcome / category language a competitor uses as a hook, NOT the literal device name (e.g. for a nicotine-free flavored-air device: 'quit smoking','nicotine free','smoking alternative','vape alternative','stop smoking'; for testosterone gummies: 'testosterone booster','low testosterone'). Short and broad — NOT 'brands'/'buy'/'best'. Max 8."]
+ "adKeywords":["6-8 SHORT keyword phrases (1-3 words each) to find COMPETING ADVERTISERS in the Meta Ad Library. Include BOTH: (a) the core product noun per line (e.g. 'testosterone gummies'), AND (b) how rivals describe this product in their OWN ADS — the buyer-outcome / category language a competitor uses as a hook, NOT the literal device name (e.g. for a nicotine-free flavored-air device: 'quit smoking','nicotine free','smoking alternative','vape alternative','stop smoking'; for testosterone gummies: 'testosterone booster','low testosterone'). Short and broad — NOT 'brands'/'buy'/'best'. Max 8."],
+ "competitors":["6-10 REAL, well-known direct competitor BRAND NAMES you are genuinely confident about for THIS brand, in its category and market — the actual rival brands a shopper compares it to. Use real names you know (e.g. for a Pakistani cosmetics brand: 'Rivaj','Medora','Masarrat Misbah Makeup','WB by Hemani','Saeed Ghani','J.'; for a US greens brand: 'AG1','Bloom','Supergreen Tonik'). Only names you are CONFIDENT are real brands — if unsure, return fewer or []. Do NOT invent names."]
 }`
   try {
     const res: any = await llm.messages.create({ model: 'gpt-4o', max_tokens: 900, temperature: 0.4, messages: [{ role: 'user', content: prompt }] })
@@ -76,8 +77,9 @@ Return ONLY JSON:
       productForms: (Array.isArray(j?.productForms) ? j.productForms : []).map((q: any) => String(q).slice(0, 50)).filter(Boolean).slice(0, 5),
       queries: (Array.isArray(j?.queries) ? j.queries : []).map((q: any) => String(q).slice(0, 90)).filter(Boolean).slice(0, 10),
       adKeywords: (Array.isArray(j?.adKeywords) ? j.adKeywords : []).map((q: any) => String(q).slice(0, 40)).filter(Boolean).slice(0, 8),
+      names: (Array.isArray(j?.competitors) ? j.competitors : []).map((q: any) => String(q).slice(0, 60)).filter(Boolean).slice(0, 10),
     }
-  } catch { return { category: '', market: '', productForms: [], queries: [], adKeywords: [] } }
+  } catch { return { category: '', market: '', productForms: [], queries: [], adKeywords: [], names: [] } }
 }
 
 /** Step 5 — LLM keeps only the real product competitors (same product FORM) and says why each competes. */
@@ -115,12 +117,12 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
   const [ctx, kit] = await Promise.all([crawlStore(domain), buildBrandKit(domain).catch(() => null)])
   const facts = kit?.facts ?? []
   if (dbg) dbg.ctx = { siteName: ctx.siteName, domain: ctx.domain, products: ctx.products.length, descLen: (ctx.description || '').length, signals: ctx.signals, facts: facts.length }
-  const { category, market, productForms, queries, adKeywords } = await seedQueries(ctx, facts)
-  if (dbg) dbg.seed = { category, market, productForms, queries, adKeywords }
+  const { category, market, productForms, queries, adKeywords, names } = await seedQueries(ctx, facts)
+  if (dbg) dbg.seed = { category, market, productForms, queries, adKeywords, names }
   // Only give up entirely when we have NOTHING to search with. The Meta Ad Library step below runs on the
   // droplet independently of DataForSEO, so an unconfigured/empty SERP must NOT short-circuit it — that was
   // silently returning zero rivals for brands whose competitors live in the Ad Library, not Google.
-  if (!queries.length && !adKeywords.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured, debug: dbg ? { ...dbg, stop: 'no queries or adKeywords' } : undefined }
+  if (!queries.length && !adKeywords.length && !names.length) return { seed: { name: ctx.siteName, category, market, productForms, queries }, competitors: [], configured, debug: dbg ? { ...dbg, stop: 'no queries, adKeywords or names' } : undefined }
 
   const loc = MARKET_LOCATION[market.trim().toLowerCase()] ?? 2840
   const self = domainRoot(domain)
@@ -186,6 +188,27 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
   const advertisers = Array.from(advByPage.values())
   if (dbg) dbg.adLibrary = { countries, adQueries, advertisers: advertisers.map((a) => ({ name: a.pageName, domain: a.domain, ads: a.ads.length })) }
 
+  // NAMED rivals — the LLM's known competitors, resolved DIRECTLY to their Meta page + live ads by
+  // brand-name search. This is what a human does by hand, and it works even when Google/SERP returned
+  // nothing. A name match is high-confidence, so these skip the relevance re-filter. Bounded droplet calls.
+  const namedCompetitors: DiscoveredCompetitor[] = []
+  if (names.length) {
+    const nameCountry = marketCountry !== 'ALL' ? marketCountry : 'ALL'
+    const nameTimeout = (p: Promise<Advertiser[]>): Promise<Advertiser[]> =>
+      Promise.race([p.catch(() => [] as Advertiser[]), new Promise<Advertiser[]>((r) => setTimeout(() => r([]), 35_000))])
+    const nameTargets = names.slice(0, 4)
+    const nameResults = await Promise.all(nameTargets.map(async (nm) => ({ nm, ads: await nameTimeout(searchAdLibrary(nm, nameCountry)) })))
+    for (const { nm, ads } of nameResults) {
+      const best = ads
+        .filter((a) => a.pageId && a.ads.length && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)))
+        .sort((a, b) => ((nameMatch(b.pageName || '', nm) ? 1 : 0) - (nameMatch(a.pageName || '', nm) ? 1 : 0)) || (b.ads.length - a.ads.length))[0]
+      if (best && !namedCompetitors.some((c) => c.pageId === best.pageId)) {
+        namedCompetitors.push({ domain: best.domain || '', name: best.pageName || nm, reason: `A direct competitor of ${ctx.siteName}.`, foundVia: 'Known rival', positions: 0, pageId: best.pageId, liveAds: best.ads.slice(0, 24) })
+      }
+    }
+    if (dbg) (dbg as any).named = { targets: nameTargets, resolved: namedCompetitors.map((c) => c.name) }
+  }
+
   // Attach live ads to the Google-ranked rivals (match by destination domain, else advertiser name).
   const usedPages = new Set<string>()
   for (const c of competitors) {
@@ -215,10 +238,16 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
       }))
   }
 
-  if (dbg) { dbg.extra = extra.map((e) => e.name); dbg.competitorsFinal = [...competitors, ...extra].map((c) => c.name) }
+  // Named rivals FIRST (highest confidence), then Google-ranked, then breadth — deduped by page/name/domain.
+  const merged: DiscoveredCompetitor[] = [...namedCompetitors]
+  for (const c of [...competitors, ...extra]) {
+    const dup = merged.some((m) => (m.pageId && c.pageId && m.pageId === c.pageId) || (m.domain && c.domain && domainRoot(m.domain) === domainRoot(c.domain)) || nameMatch(m.name, c.name))
+    if (!dup) merged.push(c)
+  }
+  if (dbg) { dbg.extra = extra.map((e) => e.name); dbg.competitorsFinal = merged.map((c) => c.name) }
   return {
     seed: { name: ctx.siteName, category, market, productForms, queries },
-    competitors: [...competitors, ...extra],
+    competitors: merged,
     configured,
     debug: dbg || undefined,
   }
