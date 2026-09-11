@@ -190,13 +190,21 @@ export async function GET(req: NextRequest) {
           const latest = brandId ? await readAdsStudio(admin, brandId).catch(() => ({})) : {}
           const prev = readSection<{ discovered: any[]; seed: any; configured: boolean }>(latest, 'competitors', domain, 1000 * 60 * 60 * 24 * 30)
           const prevDisc: any[] = Array.isArray(prev?.discovered) ? prev!.discovered : []
-          const adsN = (arr: any[]) => arr.filter((c) => Array.isArray(c?.ads) && c.ads.length).length
           let payload: { discovered: any[]; seed: any; configured: boolean; ranAt: number } = { discovered: prevDisc, seed: prev?.seed ?? null, configured: prev?.configured ?? true, ranAt: Date.now() }
           try {
             const res = await discoverCompetitors(domain).catch(() => null)
             if (res) {
               const fresh = await enrichDiscovered(admin, res)
-              const chosen = adsN(fresh) >= adsN(prevDisc) ? fresh : prevDisc   // sticky-best: keep the richer set
+              // sticky-UNION: merge this (flaky) run's rivals with the cached ones, deduped by page/domain/
+              // name, keeping the richer entry (more live ads) — so each run ADDS what it found instead of
+              // replacing, converging on the full set across runs. Rivals with ads lead; cap at 24.
+              const byKey = new Map<string, any>()
+              for (const c of [...fresh, ...prevDisc]) {
+                const key = String(c?.pageId || c?.domain || c?.name || '').toLowerCase(); if (!key) continue
+                const cur = byKey.get(key)
+                if (!cur || (c?.ads?.length || 0) > (cur?.ads?.length || 0)) byKey.set(key, c)
+              }
+              const chosen = Array.from(byKey.values()).sort((a, b) => (b?.ads?.length || 0) - (a?.ads?.length || 0)).slice(0, 24)
               payload = { discovered: chosen, seed: res.seed || prev?.seed || null, configured: res.configured, ranAt: Date.now() }
             }
           } catch { /* keep the prev-or-empty timestamped payload */ }
