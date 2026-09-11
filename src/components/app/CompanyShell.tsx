@@ -46,7 +46,7 @@ const NAV: Group[] = [
     { href: '/discovery/saved', label: 'Boards', icon: Bookmark },
     { href: '/ads-workspace/brand', label: 'Brand Hub', icon: Wand2 },
     { href: '/reports', label: 'Reports', icon: BarChart2 },
-    { href: '/m4', label: 'Launch Ads', icon: Rocket },
+    { href: '/m4/quick', label: 'Launch Ads', icon: Rocket },
   ] },
   { label: 'Website', items: [
     { href: '/builder', label: 'Page Builder', icon: LayoutTemplate },
