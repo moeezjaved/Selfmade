@@ -322,7 +322,9 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         // The uploaded image is the REFERENCE here (not the product), so the product must be a real
         // synced product — never the upload we're remaking.
         const productImg = productOverride?.image || tags.find((t) => t.kind === 'product')?.image || (refAdRaw !== uploadImg ? uploadImg : undefined) || products.find((p) => p.image)?.image
-        if (!productImg) throw new Error('no-product')
+        // SERVICE / SaaS brand (no products) → remake the reference's layout WITHOUT a product (design-only).
+        const isService = products.length === 0
+        if (!productImg && !isService) throw new Error('no-product')
         const refAd = refAdRaw.startsWith('/') ? window.location.origin + refAdRaw : refAdRaw   // server fetch needs absolute
         const brandId = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
         const colors = (kit?.colors || []).map((c) => c.hex).slice(0, 4)
@@ -338,7 +340,7 @@ function Home({ isMobile, domain, tags, setTags }: { isMobile: boolean; domain: 
         }
         const enq = await fetch('/api/discovery/clone-image', {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ refImageUrl: refAd, productImages: [productImg], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K', look: recastLook, newHeadline }),
+          body: JSON.stringify({ refImageUrl: refAd, productImages: productImg ? [productImg] : [], productType: isService ? 'service' : undefined, productDesc: (kit?.facts || [])[0], brandId: brandId ? decodeURIComponent(brandId) : undefined, brandName: kit?.siteName, colors, logo: kit?.logo || undefined, aspectRatio: aspect !== 'Auto' ? aspect : undefined, imageSize: '2K', look: recastLook, newHeadline }),
         }).then((r) => r.json())
         if (!enq?.jobId) throw new Error(enq?.error === 'insufficient_credits' ? 'credits' : 'no-job')
         const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
