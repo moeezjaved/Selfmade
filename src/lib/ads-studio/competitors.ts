@@ -196,12 +196,14 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
     const nameCountry = marketCountry !== 'ALL' ? marketCountry : 'ALL'
     const nameTimeout = (p: Promise<Advertiser[]>): Promise<Advertiser[]> =>
       Promise.race([p.catch(() => [] as Advertiser[]), new Promise<Advertiser[]>((r) => setTimeout(() => r([]), 35_000))])
-    const nameTargets = names.slice(0, 4)
+    const nameTargets = names.slice(0, 6)
     const nameResults = await Promise.all(nameTargets.map(async (nm) => ({ nm, ads: await nameTimeout(searchAdLibrary(nm, nameCountry)) })))
     for (const { nm, ads } of nameResults) {
+      // STRICT: only accept an advertiser whose PAGE NAME actually matches the queried brand — otherwise a
+      // brand-name search returns resellers / unrelated pages that merely mention the brand in ad copy.
       const best = ads
-        .filter((a) => a.pageId && a.ads.length && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)))
-        .sort((a, b) => ((nameMatch(b.pageName || '', nm) ? 1 : 0) - (nameMatch(a.pageName || '', nm) ? 1 : 0)) || (b.ads.length - a.ads.length))[0]
+        .filter((a) => a.pageId && a.ads.length && nameMatch(a.pageName || '', nm) && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)))
+        .sort((a, b) => b.ads.length - a.ads.length)[0]
       if (best && !namedCompetitors.some((c) => c.pageId === best.pageId)) {
         namedCompetitors.push({ domain: best.domain || '', name: best.pageName || nm, reason: `A direct competitor of ${ctx.siteName}.`, foundVia: 'Known rival', positions: 0, pageId: best.pageId, liveAds: best.ads.slice(0, 24) })
       }
