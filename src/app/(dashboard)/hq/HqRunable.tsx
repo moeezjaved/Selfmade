@@ -31,7 +31,7 @@ const LinkedIn = () => <svg width="16" height="16" viewBox="0 0 24 24" style={{ 
 // monoline icon wrapper (black stroke, matches Runable's non-brand icons)
 const Ic = ({ children }: { children: React.ReactNode }) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ display: 'block' }}>{children}</svg>
 
-type Tile = { label: string; sub: string; href: string; icon: React.ReactNode; seed?: string }
+type Tile = { label: string; sub: string; href: string; icon: React.ReactNode; seed?: string; soon?: boolean }
 type Cat = { name: string; tiles: Tile[] }
 const spark = <Ic><path d="M12 3l1.8 4.7L18.5 9l-4.7 1.8L12 15.5l-1.8-4.7L5.5 9l4.7-1.3z" /><path d="M18 15l.7 1.8L20.5 17.5l-1.8.7L18 20l-.7-1.8L15.5 17.5l1.8-.7z" /></Ic>
 const lines = <Ic><path d="M4 6h16M4 12h10M4 18h7" /></Ic>
@@ -41,14 +41,14 @@ const magnifier = <Ic><circle cx="11" cy="11" r="7" /><path d="M20 20l-3-3" /></
 const GROW_CATS: Cat[] = [
   { name: 'Running Ads', tiles: [
     { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
-    { label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
-    { label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
+    { soon: true, label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
+    { soon: true, label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
   ] },
   { name: 'Social Media', tiles: [
-    { label: 'Instagram', sub: 'Create a post', href: '/ads-workspace', seed: 'Make an Instagram post for my product', icon: <Insta /> },
-    { label: 'TikTok', sub: 'Create a post', href: '/ads-workspace', seed: 'Make a TikTok post for my product', icon: <TikTok /> },
-    { label: 'X / Twitter', sub: 'Write a post', href: '/ads-workspace', seed: 'Write an X post for my product', icon: <XLogo /> },
-    { label: 'LinkedIn', sub: 'Write a post', href: '/ads-workspace', seed: 'Write a LinkedIn post for my brand', icon: <LinkedIn /> },
+    { soon: true, label: 'Instagram', sub: 'Create a post', href: '/ads-workspace', seed: 'Make an Instagram post for my product', icon: <Insta /> },
+    { soon: true, label: 'TikTok', sub: 'Create a post', href: '/ads-workspace', seed: 'Make a TikTok post for my product', icon: <TikTok /> },
+    { soon: true, label: 'X / Twitter', sub: 'Write a post', href: '/ads-workspace', seed: 'Write an X post for my product', icon: <XLogo /> },
+    { soon: true, label: 'LinkedIn', sub: 'Write a post', href: '/ads-workspace', seed: 'Write a LinkedIn post for my brand', icon: <LinkedIn /> },
   ] },
   { name: 'Intel & Listening', tiles: [
     { label: 'Spy a Competitor', sub: 'Track their live ads', href: '/ads-workspace/competitors', icon: <Ic><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z" /><circle cx="12" cy="12" r="3" /></Ic> },
@@ -75,9 +75,9 @@ const BUILD_CATS: Cat[] = [
   ] },
   { name: 'Ads', tiles: [
     { label: 'Ad Image', sub: 'Static from your winning DNA', href: '/ads-workspace', seed: 'Make a scroll-stopping image ad for my bestseller', icon: <Ic><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M4 17l5-5 4 4 3-3 4 4" /></Ic> },
-    { label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
-    { label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', seed: 'Make a UGC testimonial-style ad for my product', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
-    { label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
+    { soon: true, label: 'Ad Video', sub: 'Short-form, native audio', href: '/ads-workspace', seed: 'Make a short-form video ad for my bestseller', icon: <Ic><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M10 9l5 3-5 3z" /></Ic> },
+    { soon: true, label: 'UGC Ad', sub: '"Real person" testimonial', href: '/ads-workspace', seed: 'Make a UGC testimonial-style ad for my product', icon: <Ic><rect x="6" y="3" width="12" height="18" rx="2" /><path d="M10 18h4" /></Ic> },
+    { soon: true, label: 'Carousel', sub: 'Multi-frame for social', href: '/ads-workspace', seed: 'Make a multi-frame carousel ad for my product', icon: <Ic><rect x="4" y="5" width="7" height="14" rx="2" /><rect x="13" y="5" width="7" height="14" rx="2" /></Ic> },
   ] },
   { name: 'Content', tiles: [
     { label: 'Blog Post', sub: 'Ranks + one-click publish', href: '/mission/blog', seed: 'Write a buyer-intent blog post for my store, then bring it to me to approve before publishing. Do not analyse competitors — just write the article.', icon: lines },
@@ -271,10 +271,11 @@ export default function HqRunable() {
                       {!off && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                           {cat.tiles.map((t) => (
-                            <button key={t.label} type="button" onClick={() => openTask(t)} style={{ background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textAlign: 'left', width: '100%', cursor: 'pointer', font: 'inherit', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                            <button key={t.label} type="button" disabled={t.soon} onClick={() => { if (!t.soon) openTask(t) }} title={t.soon ? 'Coming soon' : undefined} style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textAlign: 'left', width: '100%', cursor: t.soon ? 'default' : 'pointer', opacity: t.soon ? 0.65 : 1, font: 'inherit', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                              {t.soon && <span style={{ position: 'absolute', top: 9, right: 9, fontSize: 9.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: SUB, background: INSET, border: `1px solid ${LINE}`, borderRadius: 999, padding: '3px 7px' }}>Soon</span>}
                               <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
                               <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
-                              <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.sub}</span>
+                              <span style={{ display: 'block', fontSize: 11.5, color: FAINT, marginTop: 2 }}>{t.soon ? 'Coming soon' : t.sub}</span>
                             </button>
                           ))}
                         </div>
