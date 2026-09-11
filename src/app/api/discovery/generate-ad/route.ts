@@ -96,6 +96,7 @@ async function handle(req: NextRequest) {
     if (!kitPalette && body.palette && typeof body.palette === 'object') kitPalette = body.palette
     if (!kitFonts && body.fonts && typeof body.fonts === 'object') kitFonts = body.fonts
     if (!logoUrl && typeof body.logo === 'string' && body.logo.trim()) logoUrl = body.logo.trim()
+    if (!productDesc && typeof body.productDesc === 'string' && body.productDesc.trim()) productDesc = body.productDesc.trim()   // service brand: describe what it does (from the Brand Kit)
 
     // Product photos → base64 (cap 3 to leave room for up to 4 inspirations + logo). Done first so
     // we can auto-detect the niche from the product when the brand has no industry set.
