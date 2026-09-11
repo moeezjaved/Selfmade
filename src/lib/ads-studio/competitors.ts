@@ -205,7 +205,7 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
         .filter((a) => a.pageId && a.ads.length && nameMatch(a.pageName || '', nm) && !(a.domain && (NON_BRAND.test(a.domain) || domainRoot(a.domain) === self)))
         .sort((a, b) => b.ads.length - a.ads.length)[0]
       if (best && !namedCompetitors.some((c) => c.pageId === best.pageId)) {
-        namedCompetitors.push({ domain: best.domain || '', name: best.pageName || nm, reason: `A direct competitor of ${ctx.siteName}.`, foundVia: 'Known rival', positions: 0, pageId: best.pageId, liveAds: best.ads.slice(0, 24) })
+        namedCompetitors.push({ domain: best.domain || '', name: best.pageName || nm, reason: `A direct competitor of ${ctx.siteName}.`, foundVia: 'Known rival', positions: 0, pageId: best.pageId, liveAds: best.ads.slice(0, 300) })
       }
     }
     if (dbg) (dbg as any).named = { targets: nameTargets, resolved: namedCompetitors.map((c) => c.name) }
@@ -215,7 +215,7 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
   const usedPages = new Set<string>()
   for (const c of competitors) {
     const match = advertisers.find((a) => (a.domain && domainRoot(a.domain) === c.domain) || nameMatch(a.pageName || '', c.name))
-    if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 24); usedPages.add(match.pageId) }
+    if (match) { c.pageId = match.pageId; c.liveAds = match.ads.slice(0, 300); usedPages.add(match.pageId) }
   }
 
   // BREADTH: advertisers we didn't already surface via Google. The keyword search is broad, so it also
@@ -236,7 +236,7 @@ export async function discoverCompetitors(domain: string, opts?: { debug?: boole
       .slice(0, Math.max(0, 12 - competitors.length))
       .map(({ a, r }): DiscoveredCompetitor => ({
         domain: a.domain || '', name: r.name || a.pageName, reason: r.reason || 'Active advertiser in your niche — found in the Meta Ad Library.',
-        foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 24),
+        foundVia: 'Meta Ad Library', positions: 0, pageId: a.pageId, liveAds: a.ads.slice(0, 300),
       }))
   }
 

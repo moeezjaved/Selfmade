@@ -67,7 +67,7 @@ const uniqueByImage = (ads: any[]): any[] => {
   }
   return out.slice(0, AD_CARD_CAP)
 }
-const AD_CARD_CAP = 200   // safety cap on unique creatives kept per competitor (dedup handles the repeats)
+const AD_CARD_CAP = 1000   // keep essentially ALL of a competitor's unique creatives (dedup handles repeats)
 const DISCOVERY_COOLDOWN_MS = 30 * 60 * 1000   // don't re-run open-web discovery more than every 30 min per brand
 const SPIED_TTL_MS = 30 * 60 * 1000            // re-pull a spied brand's live ads at most every 30 min (deep scrape is slow)
 const SPIED_REFRESH_MAX = 4                    // deep-pull at most this many spied brands per background run (droplet budget)
@@ -108,28 +108,35 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
-const MAX_LIVE_TOPUPS = 3   // bound the background job: at most this many rivals get an on-the-fly live pull
+const MAX_DEEP_PULLS = 6        // rivals deep-pulled per background run (bounded for the shared droplet; union accumulates the rest across runs)
+const DEEP_PULL_LIMIT = 300     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
   const base = await Promise.all(res.competitors.map(async (c) => {
     const dna = await adDnaFor(admin, c.name, c.domain)
-    const liveAds = (!dna && c.liveAds?.length) ? liveToCards(c.liveAds) : []
-    return { c, dna, liveAds, needsTopup: !dna && !liveAds.length && !!c.pageId }
+    const liveAds: any[] = c.liveAds?.length ? liveToCards(c.liveAds) : []
+    return { c, dna, liveAds }
   }))
-  // Pass 2: live top-up ONLY for the first few empty rivals (a matched Meta page with no ads = a dead
-  // "spyable" shell). Bounded in count + depth so the 180s background job always finishes and caches —
-  // an unbounded pull here was risking a timeout that left discovery spinning.
-  const targets = base.filter((b) => b.needsTopup).slice(0, MAX_LIVE_TOPUPS)
+  // Pass 2: DEEP-PULL each rival that has a Meta page — scroll their FULL live Ad Library page (up to
+  // DEEP_PULL_LIMIT), NOT the 4 the name/keyword search returned. Bounded per run (MAX_DEEP_PULLS) and
+  // time-boxed so the shared droplet finishes inside the 180s budget; the sticky-union cache accumulates
+  // the rest across runs, so over a few refreshes we hold every rival's whole set of live creatives.
+  const targets = base.filter((b) => b.c.pageId).slice(0, MAX_DEEP_PULLS)
   await Promise.all(targets.map(async (b) => {
-    b.liveAds = liveToCards(await fetchLiveAdsByPage(String(b.c.pageId), 40).catch(() => []))
+    const deep: any[] = await Promise.race([
+      fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).then(liveToCards).catch(() => []),
+      new Promise<any[]>((r) => setTimeout(() => r([]), 70_000)),
+    ])
+    if (deep.length >= b.liveAds.length) b.liveAds = deep   // the full page pull replaces the shallow search result
   }))
   return base.map(({ c, dna, liveAds }) => {
-    const ads = imagesFirst(dna?.ads ?? liveAds)
+    // Prefer the deep LIVE pull (the rival's actual current ads, ALL of them); fall back to our corpus DNA.
+    const ads = imagesFirst(liveAds.length ? liveAds : (dna?.ads ?? []))
     return {
       source: 'discovered', domain: c.domain, name: c.name, reason: c.reason,
-      hasAdDna: !!dna, adsSource: dna ? 'corpus' : (liveAds.length ? 'live' : null),
+      hasAdDna: !!dna, adsSource: liveAds.length ? 'live' : (dna ? 'corpus' : null),
       spyable: ads.length === 0,
-      adCount: dna?.adCount ?? liveAds.length ?? 0, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
+      adCount: ads.length, ads, dna: dna?.dna ?? null, pageId: dna?.pageId ?? c.pageId ?? null,
     }
   })
 }
