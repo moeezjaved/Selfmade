@@ -26,6 +26,11 @@ const topOf = (vals: (string | null | undefined)[], n = 3): string[] => {
   for (const v of vals) { const s = (v || '').trim(); if (s) c.set(s, (c.get(s) || 0) + 1) }
   return Array.from(c.entries()).sort((a, b) => b[1] - a[1]).slice(0, n).map(([k]) => k)
 }
+// A Dynamic Product Ad (catalog feed) — Meta auto-generates it from the store's product catalog, so the
+// "creative" is just a plain product photo and the copy is an unfilled template token like {{product.brand}}
+// or {{product.name}}. These are NOT real creative ads (they're the competitor's CATALOG products), so we
+// drop them from the inspiration row — the founder wants designed ads to remake, not product shots.
+const isCatalogAd = (...text: (string | null | undefined)[]) => text.some((t) => /\{\{\s*[\w.]+\s*\}\}/.test(t || ''))
 const cleanAd = (a: any) => ({
   id: a.ad_id,
   thumb: a.thumbnail_url || (Array.isArray(a.raw_image_urls) ? a.raw_image_urls[0] : null) || null,
@@ -35,11 +40,13 @@ const cleanAd = (a: any) => ({
 })
 // Live fbcdn media → permanent R2 cache (never hotlink fbcdn); corpus thumbs are already R2, left as-is.
 const mediaUrl = (u?: string | null) => (u ? `/api/ads-studio/media?u=${encodeURIComponent(u)}` : null)
-// A live Ad Library ad → a competitor card ad (one thumb per ad).
-const liveToCards = (live: LiveAd[]) => live.map((a) => ({
-  id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]),
-  copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive,
-})).filter((a) => a.thumb)
+// A live Ad Library ad → a competitor card ad (one thumb per ad). Catalog/DPA ads are filtered out.
+const liveToCards = (live: LiveAd[]) => live
+  .filter((a) => !isCatalogAd(a.body, a.title))
+  .map((a) => ({
+    id: a.adId, thumb: mediaUrl(a.images[0] || a.videoPreviews[0]),
+    copy: (a.body || a.title || '').slice(0, 220), format: a.videos.length ? 'video' : 'image', active: a.isActive,
+  })).filter((a) => a.thumb)
 // The competitor row shows IMAGE ads — float images to the front so they survive the display cap; videos tail.
 const imagesFirst = <T extends { format?: string | null }>(ads: T[]): T[] =>
   [...ads].sort((a, b) => (a.format === 'image' ? 0 : 1) - (b.format === 'image' ? 0 : 1))
@@ -100,7 +107,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
     return {
       pageId,
       adCount: count ?? ads.length,
-      ads: ads.map(cleanAd).filter((a: any) => a.thumb),
+      ads: ads.map(cleanAd).filter((a: any) => a.thumb && !isCatalogAd(a.copy)),
       dna: { hooks: topOf(ads.map((a: any) => a.hook_type)), angles: topOf(ads.map((a: any) => a.angle)), personas: topOf(ads.map((a: any) => a.persona)) },
     }
   } catch { return null }
@@ -254,7 +261,7 @@ export async function GET(req: NextRequest) {
             return { source: 'spied', pageId, domain: null, name: nameFor(pageId), reason: 'You are spying this brand', hasAdDna: cc.hasAdDna ?? false, adsSource: cc.adsSource || 'live', spyable: false, adCount: cc.adCount ?? cc.ads.length, ads: cc.ads, dna: cc.dna || { hooks: [], angles: [], personas: [] } }
           }
           const { list, count } = await corpusFor(pageId)   // never-pulled brand → corpus placeholder
-          const cardAds = imagesFirst(list.map(cleanAd).filter((a: any) => a.thumb))
+          const cardAds = imagesFirst(list.map(cleanAd).filter((a: any) => a.thumb && !isCatalogAd(a.copy)))
           return { source: 'spied', pageId, domain: null, name: nameFor(pageId), reason: 'You are spying this brand', hasAdDna: list.length > 0, adsSource: 'corpus' as const, spyable: false, adCount: count, ads: cardAds, dna: { hooks: topOf(list.map((a: any) => a.hook_type)), angles: topOf(list.map((a: any) => a.angle)), personas: topOf(list.map((a: any) => a.persona)) } }
         }))
         // Refresh in the BACKGROUND when the cache is stale/missing or any spied brand hasn't been pulled yet.
@@ -269,7 +276,7 @@ export async function GET(req: NextRequest) {
             await Promise.all(order.map(async (pid) => {
               try {
                 const { list, count } = await corpusFor(pid)
-                let cardAds = list.map(cleanAd).filter((a: any) => a.thumb)
+                let cardAds = list.map(cleanAd).filter((a: any) => a.thumb && !isCatalogAd(a.copy))
                 let adCount = count
                 let adsSource: 'corpus' | 'live' = 'corpus'
                 const live = liveToCards(await fetchLiveAdsByPage(pid, 250).catch(() => []))   // deep pull
@@ -308,9 +315,10 @@ export async function GET(req: NextRequest) {
       if (!cur.domain && c.domain) cur.domain = c.domain
     }
     const merged = Array.from(byBrand.values())
-    // Dedup each card by the actual IMAGE (not ad id) so no repeats, images first. Done once here so
-    // single-card brands (no merge) are deduped too.
-    for (const c of merged) c.ads = uniqueByImage(c.ads || [])
+    // Dedup each card by the actual IMAGE (not ad id) so no repeats, images first, AND drop any catalog/DPA
+    // product ads (serve-time filter, so already-cached results are cleaned without waiting for a re-scan).
+    for (const c of merged) c.ads = uniqueByImage((c.ads || []).filter((a: any) => !isCatalogAd(a?.copy)))
+    merged.forEach((c: any) => { c.adCount = c.ads.length })
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
 
