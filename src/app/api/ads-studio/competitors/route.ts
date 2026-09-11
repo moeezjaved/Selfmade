@@ -197,31 +197,32 @@ export async function GET(req: NextRequest) {
         discovering = true
         await mergeAdsStudio(admin, brandId, { competitorsBuilding: buildingPayload(domain) }).catch(() => {})
         waitUntil((async () => {
-          // The Meta Ad Library scrape runs on ONE shared droplet and is FLAKY — the same brand can return
-          // 15 rivals on one run and 0 on the next. So NEVER let an empty/worse scrape wipe a good cached
-          // result: read the latest cache and keep whichever set has MORE competitors WITH live ads. We
-          // still stamp `ranAt` every time so the cooldown stops the every-load re-run spin.
+          // The Meta Ad Library scrape runs on ONE shared droplet and is FLAKY — the same brand returns a
+          // different handful of rivals each run. DURABLE ACCUMULATION: a rival, once found with ads, is NEVER
+          // dropped because a later run missed it; each run only ADDS new rivals and UNIONs more ads onto the
+          // ones we already have. The list only ever grows toward the complete set.
+          let fresh: any[] = []; let seedOut: any = null; let configuredOut = true
+          try {
+            const res = await discoverCompetitors(domain).catch(() => null)
+            if (res) { fresh = await enrichDiscovered(admin, res); seedOut = res.seed; configuredOut = res.configured }
+          } catch { /* scrape failed → we still keep everything we had (below) */ }
+          // Re-read the cache AFTER the long scrape (not a stale pre-scrape snapshot) so a slow run merges
+          // against the freshest state instead of clobbering a run that finished while this one was scraping.
           const latest = brandId ? await readAdsStudio(admin, brandId).catch(() => ({})) : {}
           const prev = readSection<{ discovered: any[]; seed: any; configured: boolean }>(latest, 'competitors', domain, 1000 * 60 * 60 * 24 * 30)
           const prevDisc: any[] = Array.isArray(prev?.discovered) ? prev!.discovered : []
-          let payload: { discovered: any[]; seed: any; configured: boolean; ranAt: number } = { discovered: prevDisc, seed: prev?.seed ?? null, configured: prev?.configured ?? true, ranAt: Date.now() }
-          try {
-            const res = await discoverCompetitors(domain).catch(() => null)
-            if (res) {
-              const fresh = await enrichDiscovered(admin, res)
-              // sticky-UNION: merge this (flaky) run's rivals with the cached ones, deduped by page/domain/
-              // name, keeping the richer entry (more live ads) — so each run ADDS what it found instead of
-              // replacing, converging on the full set across runs. Rivals with ads lead; cap at 24.
-              const byKey = new Map<string, any>()
-              for (const c of [...fresh, ...prevDisc]) {
-                const key = String(c?.pageId || c?.domain || c?.name || '').toLowerCase(); if (!key) continue
-                const cur = byKey.get(key)
-                if (!cur || (c?.ads?.length || 0) > (cur?.ads?.length || 0)) byKey.set(key, c)
-              }
-              const chosen = Array.from(byKey.values()).sort((a, b) => (b?.ads?.length || 0) - (a?.ads?.length || 0)).slice(0, 24)
-              payload = { discovered: chosen, seed: res.seed || prev?.seed || null, configured: res.configured, ranAt: Date.now() }
-            }
-          } catch { /* keep the prev-or-empty timestamped payload */ }
+          const keyOf = (c: any) => String(c?.pageId || c?.domain || c?.name || '').toLowerCase()
+          const byKey = new Map<string, any>()
+          for (const c of prevDisc) { const k = keyOf(c); if (k) byKey.set(k, c) }   // start from EVERYTHING we already had
+          for (const c of fresh) {
+            const k = keyOf(c); if (!k) continue
+            const cur = byKey.get(k)
+            if (!cur) { byKey.set(k, c); continue }                                    // a newly-found rival → add
+            const mergedAds = uniqueByImage([...(c?.ads || []), ...(cur?.ads || [])])  // known rival → union its ads
+            byKey.set(k, { ...cur, ...c, ads: mergedAds, adCount: mergedAds.length, spyable: mergedAds.length === 0 })
+          }
+          const chosen = Array.from(byKey.values()).sort((a, b) => (b?.ads?.length || 0) - (a?.ads?.length || 0)).slice(0, 40)
+          const payload = { discovered: chosen, seed: seedOut || prev?.seed || null, configured: configuredOut, ranAt: Date.now() }
           await mergeAdsStudio(admin, brandId, { competitors: sectionPayload(domain, payload), competitorsBuilding: null }).catch(() => {})
         })())
       } else {
