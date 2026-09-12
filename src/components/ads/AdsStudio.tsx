@@ -1013,35 +1013,44 @@ function HomeProductsRow({ products, onTag }: { products: { title: string; image
 }
 
 function HomeCompetitorsRow({ domain, onTag }: { domain: string; onTag: (t: StudioTag) => void }) {
+  const CAP = 100
   const [ads, setAds] = useState<{ thumb: string; brand: string }[] | null>(null)
+  // Signature by the ACTUAL image (fbcdn path inside the /media proxy) so the same creative served under
+  // different CDN URLs across polls doesn't duplicate — matches the server's dedup key.
+  const sigOf = (t: string): string => { try { const m = t.match(/[?&]u=([^&]+)/); const raw = m ? decodeURIComponent(m[1]) : t; return (new URL(raw, 'https://x').pathname.split('/').filter(Boolean).pop() || raw).toLowerCase() } catch { return t } }
   useEffect(() => {
     let on = true, polls = 0
-    // ONE rich source: /api/ads-studio/competitors merges spied brands (deep live pull, cached) + web-
-    // discovered rivals, images-only, deduped BY IMAGE server-side. The deep pull fills in the background,
-    // so poll a few times while `refreshing`/`discovering` so the full set appears without a reload.
+    const KEY = `sf_comprow_${domain || 'x'}`
+    // Show the last-known full set INSTANTLY (survives hard refresh), then refresh + UNION in the background.
+    // The competitors API returns a partial set while a discovery is refreshing; unioning (never replacing)
+    // means the row only ever GROWS toward the full 100 — a refresh can never shrink it.
+    try { const s = localStorage.getItem(KEY); if (s) { const j = JSON.parse(s); if (Array.isArray(j)) setAds(j) } } catch { /* ignore */ }
     const load = async () => {
       try {
-        if (!domain) { if (on) setAds([]); return }
+        if (!domain) { setAds((p) => p || []); return }
         const c = (document.cookie.match(/(?:^|; )sf_brand=([^;]+)/) || [])[1]
         const qs = new URLSearchParams({ domain }); if (c) qs.set('brand', decodeURIComponent(c))
         const d = await fetch(`/api/ads-studio/competitors?${qs}`).then((r) => r.json()).catch(() => null)
         const comps = Array.isArray(d?.competitors) ? d.competitors : []
-        const seen = new Set<string>()
-        const flat = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : [])
+        const fresh: { thumb: string; brand: string }[] = comps.flatMap((cc: any) => (Array.isArray(cc.ads) ? cc.ads : [])
           .filter((a: any) => a.thumb && a.format !== 'video' && !/video/i.test(a.format || ''))
           .map((a: any) => ({ thumb: a.thumb as string, brand: cc.name as string })))
-          .filter((x: any) => x.thumb && !seen.has(x.thumb) && seen.add(x.thumb))
-          .slice(0, 100)
-        // Don't lock the empty state on a transient 0 (the server can momentarily return no ads mid-refresh):
-        // only commit an empty result after a few retries; commit a non-empty result immediately.
-        if (on && (flat.length || polls >= 3)) setAds(flat)
-        const keepPolling = d?.refreshing || d?.discovering || (flat.length === 0 && polls < 3)
-        if (on && keepPolling && polls < 6) { polls++; setTimeout(load, flat.length ? 25000 : 6000) }
-      } catch { if (on) setAds([]) }
+        if (on) setAds((prev) => {
+          const seen = new Set<string>(); const merged: { thumb: string; brand: string }[] = []
+          for (const a of [...(prev || []), ...fresh]) { const s = sigOf(a.thumb); if (!s || seen.has(s)) continue; seen.add(s); merged.push(a) }
+          const next = merged.slice(0, CAP)
+          try { localStorage.setItem(KEY, JSON.stringify(next)) } catch { /* quota */ }
+          return next
+        })
+        // Keep polling while the server is still filling (discovering/refreshing) OR until we've asked a few
+        // times — each poll unions more of the deep pull as it lands, growing toward the full set.
+        const keepPolling = d?.refreshing || d?.discovering || polls < 4
+        if (on && keepPolling && polls < 10) { polls++; setTimeout(load, 7000) }
+      } catch { setAds((p) => p || []) }
     }
     load()
     return () => { on = false }
-  }, [])
+  }, [domain])
   if (ads !== null && ads.length === 0) return (
     <HomeCarousel title="Competitor ads" sub="The newest ads from the competitors you're spying — tap Create Similar to make your own.">
       <RowEmpty icon="🕵️" title="No competitor ads yet" body="Spy a competitor and their newest live ads land here — ready to remake into your own." cta="Spy a competitor" href="/ads-workspace/competitors" />
