@@ -40,7 +40,7 @@ const magnifier = <Ic><circle cx="11" cy="11" r="7" /><path d="M20 20l-3-3" /></
 
 const GROW_CATS: Cat[] = [
   { name: 'Running Ads', tiles: [
-    { label: 'Meta Ads', sub: 'Spy, clone & launch', href: '/ads-workspace', icon: <Meta /> },
+    { label: 'Meta Ads', sub: 'Put an ad live on Meta', href: '/m4/quick', icon: <Meta /> },
     { soon: true, label: 'Google Ads', sub: 'Search & Shopping', href: '/m4', icon: <Google /> },
     { soon: true, label: 'TikTok Ads', sub: 'Short-form that converts', href: '/ads-workspace', icon: <TikTok /> },
   ] },
@@ -271,7 +271,7 @@ export default function HqRunable() {
                       {!off && (
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: 10 }}>
                           {cat.tiles.map((t) => (
-                            <button key={t.label} type="button" disabled={t.soon} onClick={() => { if (!t.soon) openTask(t) }} title={t.soon ? 'Coming soon' : undefined} style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textAlign: 'left', width: '100%', cursor: t.soon ? 'default' : 'pointer', opacity: t.soon ? 0.65 : 1, font: 'inherit', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+                            <button key={t.label} type="button" disabled={t.soon} onClick={() => { if (t.soon) return; if (t.href === '/m4/quick') router.push(t.href); else openTask(t) }} title={t.soon ? 'Coming soon' : undefined} style={{ position: 'relative', background: '#fff', border: `1px solid ${LINE}`, borderRadius: 13, padding: 14, textAlign: 'left', width: '100%', cursor: t.soon ? 'default' : 'pointer', opacity: t.soon ? 0.65 : 1, font: 'inherit', color: INK, boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
                               {t.soon && <span style={{ position: 'absolute', top: 9, right: 9, fontSize: 9.5, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: SUB, background: INSET, border: `1px solid ${LINE}`, borderRadius: 999, padding: '3px 7px' }}>Soon</span>}
                               <span style={{ width: 30, height: 30, borderRadius: 8, background: INSET, display: 'grid', placeItems: 'center', marginBottom: 10, color: '#111' }}>{t.icon}</span>
                               <span style={{ display: 'block', fontSize: 13.5, fontWeight: 600 }}>{t.label}</span>
