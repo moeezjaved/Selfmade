@@ -91,17 +91,16 @@ export default function BuilderPage() {
   // The click-anywhere visual editor is now the DEFAULT way to edit a page. `?editor=form` opts back to
   // the classic copy form (kept as a rollback while the team pressure-tests the visual editor).
   const editorV2 = search?.get('editor') !== 'form'
-  // Advanced PagePilot-style 3-pane editor — opt-in via ?adv=1 (kept until it reaches parity). Sticky:
-  // once enabled it persists in localStorage so the ⚡ Advanced button survives in-app navigation that
-  // drops the query string; ?adv=0 turns it back off.
-  const [advEditor, setAdvEditor] = useState(false)
+  // Advanced PagePilot-style 3-pane editor is now the DEFAULT — editing any page opens it. `?adv=0` is the
+  // escape hatch back to the classic editor (persisted); `?adv=1` re-enables the new one.
+  const [advEditor, setAdvEditor] = useState(true)
   useEffect(() => {
     const q = search?.get('adv')
     try {
-      if (q === '1') { localStorage.setItem('sf_adv_editor', '1'); setAdvEditor(true) }
-      else if (q === '0') { localStorage.removeItem('sf_adv_editor'); setAdvEditor(false) }
-      else setAdvEditor(localStorage.getItem('sf_adv_editor') === '1')
-    } catch { setAdvEditor(q === '1') }
+      if (q === '0') { localStorage.setItem('sf_adv_editor', '0'); setAdvEditor(false) }
+      else if (q === '1') { localStorage.removeItem('sf_adv_editor'); setAdvEditor(true) }
+      else setAdvEditor(localStorage.getItem('sf_adv_editor') !== '0')   // default ON unless explicitly disabled
+    } catch { setAdvEditor(true) }
   }, [search])
   const [step, setStep] = useState<Step>('list')
 
