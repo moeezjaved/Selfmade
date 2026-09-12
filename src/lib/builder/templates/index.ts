@@ -7,8 +7,9 @@ import { advertorialV1 } from './advertorial'
 import { listicleV1 } from './listicle'
 import { productV1 } from './product'
 import { homeV1 } from './home'
+import { wellnessV1 } from './wellness'
 
-export const TEMPLATES: PageTemplate[] = [advertorialV1, listicleV1, productV1, homeV1]
+export const TEMPLATES: PageTemplate[] = [advertorialV1, listicleV1, productV1, homeV1, wellnessV1]
 
 export function getTemplate(id: string): PageTemplate | undefined {
   return TEMPLATES.find((t) => t.id === id)
