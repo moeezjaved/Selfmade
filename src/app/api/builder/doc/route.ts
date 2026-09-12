@@ -7,6 +7,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { starterProductDoc } from '@/lib/builder/seed'
+import { pageDocFromContent } from '@/lib/builder/docFromContent'
+import { getTemplate } from '@/lib/builder/templates'
 import type { PageDoc } from '@/lib/builder/schema'
 
 export const dynamic = 'force-dynamic'
@@ -21,12 +23,23 @@ export async function GET(req: NextRequest) {
 
   const admin = createAdminClient() as any
   const { data: row } = await admin.from('builder_pages')
-    .select('id, user_id, product_id, doc, doc_version').eq('id', pageId).maybeSingle()
+    .select('id, user_id, template_id, type, product_id, product_name, content, render_opts, doc, doc_version').eq('id', pageId).maybeSingle()
   if (!row || row.user_id !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   if (row.doc) return NextResponse.json({ doc: row.doc, version: row.doc_version || 0, seeded: false })
-  // No structured doc yet — seed a starter from the page's product so the advanced editor can open it.
-  const doc = starterProductDoc({ productId: row.product_id || undefined })
+
+  // No structured doc yet — build one from THIS page's template + filled content (generic across every
+  // template, current and future). Falls back to a product starter only when there's nothing to convert.
+  let doc: PageDoc
+  try {
+    if (row.content && Object.keys(row.content).length) {
+      doc = pageDocFromContent(getTemplate(row.template_id), row.content, row.render_opts || undefined, { productId: row.product_id || undefined })
+    } else {
+      doc = starterProductDoc({ productId: row.product_id || undefined })
+    }
+  } catch {
+    doc = starterProductDoc({ productId: row.product_id || undefined })
+  }
   return NextResponse.json({ doc, version: 0, seeded: true })
 }
 
