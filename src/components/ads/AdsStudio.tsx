@@ -1257,6 +1257,11 @@ function SpiedBrands() {
   )
 }
 
+// Drop catalog/DPA placeholder ads (copy is a template token like {{product.brand}}) and any card with no
+// image — so a stale session cache or a corpus fallback never renders the blank "{{product.brand}}" cards.
+const isCatalogCopy = (t?: string | null) => /\{\{\s*[\w.]+\s*\}\}/.test(t || '')
+const cleanComp = (list: Comp[]): Comp[] => (list || []).map((c) => ({ ...c, ads: (c.ads || []).filter((a) => a?.thumb && !isCatalogCopy(a?.copy)) }))
+
 function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }) {
   const { addToChat } = useContext(StudioCtx)
   // Tap a competitor ad → drop it into Mello chat as the remake reference (same as Discover Create Similar).
@@ -1272,13 +1277,18 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
   const cacheKey = domain ? `sf_comps_v1_${domain}` : ''
   useEffect(() => {
     let on = true; let pollT: ReturnType<typeof setTimeout> | undefined
+    // Show the cached rivals INSTANTLY (no blank flash), but ALWAYS refetch fresh below — the old code
+    // returned here, so a session cache built before the catalog filter kept showing "{{product.brand}}"
+    // placeholder ads forever. cleanComp strips any catalog/DPA + imageless ads from whatever we render.
+    let hadCache = false
     if (cacheKey) {
       try {
         const raw = sessionStorage.getItem(cacheKey)
-        if (raw) { const c = JSON.parse(raw); setComps(Array.isArray(c.competitors) ? c.competitors : []); setSeed(c.seed || null); setDiscovering(false); return () => { on = false } }
+        if (raw) { const c = JSON.parse(raw); setComps(cleanComp(Array.isArray(c.competitors) ? c.competitors : [])); setSeed(c.seed || null); setDiscovering(false); hadCache = true }
       } catch { /* storage blocked → fall through to fetch */ }
     }
-    setComps(null); setStep(0)
+    if (!hadCache) setComps(null)
+    setStep(0)
     const tick = setInterval(() => on && setStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1)), 11000)
     // The server runs discovery in the BACKGROUND and replies discovering:true with the spied brands right
     // away; we poll until the full result is cached, then remember it. So the slow scan happens at most ONCE
@@ -1290,11 +1300,11 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
         const found = Array.isArray(d.competitors) ? d.competitors : []
         setSeed(d.seed || null)
         if (d.discovering) {
-          setComps(found)                 // show spied brands now; keep the "finding more" state
+          setComps(cleanComp(found))  // show spied brands now; keep the "finding more" state
           setDiscovering(true)
           pollT = setTimeout(load, 5000)  // poll for the background result
         } else {
-          setComps(found); setDiscovering(false); clearInterval(tick)
+          setComps(cleanComp(found)); setDiscovering(false); clearInterval(tick)
           if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
         }
       } catch { if (on) { setComps((c) => c ?? []) } }
@@ -1311,7 +1321,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
     try {
       const d = await fetch(`/api/ads-studio/competitors?domain=${encodeURIComponent(domain)}&force=1`).then((r) => r.json())
       const found = Array.isArray(d.competitors) ? d.competitors : []
-      setComps(found); setSeed(d.seed || null)
+      setComps(cleanComp(found)); setSeed(d.seed || null)
       if (cacheKey) { try { sessionStorage.setItem(cacheKey, JSON.stringify({ competitors: found, seed: d.seed || null })) } catch { /* ignore */ } }
       if (found.length) celebrate(competitorsFound(found.length))
     } catch { setComps([]) }
@@ -1323,7 +1333,7 @@ function Competitors({ isMobile, domain }: { isMobile: boolean; domain: string }
     if (c.name) p.set('name', c.name)
     if (c.domain) p.set('domain', c.domain)
     const d = await fetch(`/api/ads-studio/competitor-ads?${p.toString()}`).then((r) => r.json()).catch(() => null)
-    const ads: CompAd[] = Array.isArray(d?.ads) ? d.ads : []
+    const ads: CompAd[] = (Array.isArray(d?.ads) ? d.ads : []).filter((a: any) => a?.thumb && !isCatalogCopy(a?.copy))
     const key = (x: Comp) => x.pageId || x.domain || x.name
     setComps((prev) => (prev || []).map((x) => key(x) === key(c) ? { ...x, ads, adsSource: ads.length ? 'live' : x.adsSource, adCount: ads.length || x.adCount, spyable: ads.length ? false : x.spyable, checked: true, pageId: d?.pageId || x.pageId } : x))
   }
