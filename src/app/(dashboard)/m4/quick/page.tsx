@@ -90,6 +90,9 @@ export default function QuickLaunch() {
   const [locQuery, setLocQuery] = useState('')
   const [locResults, setLocResults] = useState<any[]>([])
   const [locSearching, setLocSearching] = useState(false)
+  // Ad account this ad runs in — scoped to the active brand (same as Reports). Page/pixel/URL follow it.
+  const [accounts, setAccounts] = useState<{ account_id: string; account_name: string; currency: string }[]>([])
+  const [accountId, setAccountId] = useState('')
   // Conversion pixel(s) from the connected account.
   const [pixels, setPixels] = useState<{ id: string; name: string; active: boolean }[]>([])
   const [pixelId, setPixelId] = useState('')
@@ -136,20 +139,17 @@ export default function QuickLaunch() {
       setCreatives(list)
     }).catch(() => setCreatives([]))
 
-    fetch('/api/m4/pages').then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) })).then(({ ok, d }) => {
-      setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
-      const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
-      setPages(ps)
-      if (ps[0]) { setPageId(ps[0].id); if (ps[0].website && !url) setUrl(ps[0].website) }
-    }).catch(() => setMetaConnected(true))
-
-    // Conversion pixel(s) — real, from the connected account. Auto-select the active one.
-    fetch('/api/m4/pixels').then((r) => r.json()).then((d) => {
-      const px = Array.isArray(d.pixels) ? d.pixels : []
-      setPixels(px)
-      const pick = px.find((p: any) => p.active) || px[0]
-      if (pick) setPixelId(pick.id)
-    }).catch(() => {})
+    // Ad accounts for the ACTIVE brand (strict, same as Reports) → the account picker. Fall back to the
+    // whole workspace so a brand with nothing linked can still choose one. Selecting drives pages/pixel below.
+    fetch('/api/meta/accounts').then((r) => r.json()).then((d) => {
+      const brandAccts = Array.isArray(d.accounts) ? d.accounts : []
+      const list = brandAccts.length ? brandAccts : (Array.isArray(d.workspaceAccounts) ? d.workspaceAccounts : [])
+      const norm = list.map((a: any) => ({ account_id: String(a.account_id), account_name: a.account_name || a.account_id, currency: a.currency || 'USD' }))
+      setAccounts(norm)
+      if (!norm.length) { setMetaConnected(false); return }
+      const primary = brandAccts.find((a: any) => a.is_primary) || list[0]
+      setAccountId(String(primary.account_id))
+    }).catch(() => setMetaConnected(false))
 
     ;(async () => {
       try {
@@ -164,6 +164,25 @@ export default function QuickLaunch() {
       setPrefilling(false)
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Pages + pixel follow the SELECTED ad account (so they match where the ad runs — not a fallback account).
+  useEffect(() => {
+    if (!accountId) return
+    const q = `?account_id=${encodeURIComponent(accountId)}`
+    fetch(`/api/m4/pages${q}`).then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) })).then(({ ok, d }) => {
+      setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
+      const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
+      setPages(ps)
+      setPageId((cur) => cur && ps.some((p) => p.id === cur) ? cur : (ps[0]?.id || ''))
+      if (ps[0]?.website) setUrl((u) => u || ps[0].website || '')
+    }).catch(() => setMetaConnected(true))
+
+    fetch(`/api/m4/pixels${q}`).then((r) => r.json()).then((d) => {
+      const px = Array.isArray(d.pixels) ? d.pixels : []
+      setPixels(px)
+      setPixelId((cur) => cur && px.some((p: any) => p.id === cur) ? cur : ((px.find((p: any) => p.active) || px[0])?.id || ''))
+    }).catch(() => setPixels([]))
+  }, [accountId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // AI copy — always produce something. Uses detected product/desc, falling back to the brand name or the
   // site domain so the fields never sit empty. `force` rewrites even if the user has edited.
@@ -271,6 +290,7 @@ export default function QuickLaunch() {
         budget: String(parseFloat(budget) || 20),
         ageMin, ageMax, gender,
         objective,
+        accountId,
         pixelId,
         pageId,
         instagramActorId: page?.instagram?.id || '',
@@ -324,7 +344,7 @@ export default function QuickLaunch() {
       )}
 
       {/* file input for uploads */}
-      <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
+      <input ref={fileRef} type="file" accept="image/*,video/*" multiple hidden onChange={(e) => { const fs = Array.from(e.target.files || []); e.target.value = ''; fs.forEach((f) => onUpload(f)) }} />
 
       {metaConnected !== true ? (
         metaConnected === false ? (
@@ -341,6 +361,24 @@ export default function QuickLaunch() {
         </div>
       ) : (
         <div style={{ marginTop: 22, display: 'grid', gap: 14 }}>
+          {/* AD ACCOUNT — where this ad runs (scoped to the brand, like Reports). Everything below follows it. */}
+          {accounts.length > 0 && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: INSET, border: `1px solid ${LINE2}`, borderRadius: 14, padding: '12px 15px', flexWrap: 'wrap' }}>
+              <span style={{ width: 30, height: 30, borderRadius: 8, background: '#1877F2', color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 900, fontSize: 15, flex: 'none' }}>f</span>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.05em', textTransform: 'uppercase', color: SUB }}>Ad account</div>
+                <div style={{ fontSize: 12.5, color: FAINT }}>Where this ad runs</div>
+              </div>
+              {accounts.length === 1 ? (
+                <div style={{ marginLeft: 'auto', fontSize: 14, fontWeight: 700, color: INK }}>{accounts[0].account_name} <span style={{ color: FAINT, fontWeight: 500 }}>· {accounts[0].currency}</span></div>
+              ) : (
+                <select value={accountId} onChange={(e) => setAccountId(e.target.value)} style={{ marginLeft: 'auto', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, fontWeight: 600, fontFamily: SANS, color: INK, background: '#fff', cursor: 'pointer', maxWidth: '100%' }}>
+                  {accounts.map((a) => <option key={a.account_id} value={a.account_id}>{a.account_name} · {a.currency}</option>)}
+                </select>
+              )}
+            </div>
+          )}
+
           {/* 1 · YOUR AD */}
           <Section icon={ICONS.ad} n={1} title="Your ad">
             {chosen.length === 0 ? (

@@ -1,5 +1,5 @@
-import { NextResponse } from 'next/server'
-import { resolveBrandScopedAccount } from '@/lib/meta/scope'
+import { NextRequest, NextResponse } from 'next/server'
+import { resolveBrandScopedAccount, resolveScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
@@ -7,13 +7,16 @@ const V = process.env.META_API_VERSION || 'v20.0'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 30
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const admin = createAdminClient()
-  const metaAccount = await resolveBrandScopedAccount(admin, user.id)
+  // When the launcher passes an explicit account_id (the account picker), scope to THAT account so pages
+  // match where the ad will run — not the brand-fallback primary (which showed another account's pages).
+  const acctId = request.nextUrl.searchParams.get('account_id') || ''
+  const metaAccount = acctId ? await resolveScopedAccount(admin, user.id, acctId) : await resolveBrandScopedAccount(admin, user.id)
 
   if (!metaAccount) return NextResponse.json({ error: 'No Meta account' }, { status: 400 })
 
