@@ -23,7 +23,7 @@ const TEMPLATES: { emoji: string; title: string; desc: string; audience?: string
 
 const BUDGETS = [20, 50, 100, 200]
 
-export default function MelloAdsChat({ website, brandName }: { website?: string; brandName?: string }) {
+export default function MelloAdsChat({ website, brandName, seed }: { website?: string; brandName?: string; seed?: { text: string; n: number } }) {
   const [msgs, setMsgs] = useState<Msg[]>([])
   const [input, setInput] = useState('')
   const [busy, setBusy] = useState(false)
@@ -114,9 +114,10 @@ export default function MelloAdsChat({ website, brandName }: { website?: string;
   }
 
   // ── free-text (scale/pause/resume/edit/duplicate) ──
-  const send = async () => {
-    if (!input.trim() || busy) return
-    const message = input.trim(); setInput(''); you(message); setStarted(true); setBusy(true)
+  const submit = async (raw: string) => {
+    const message = (raw || '').trim()
+    if (!message || busy) return
+    you(message); setStarted(true); setBusy(true)
     // Mid-launch, waiting for a targeted audience. If they ASKED (a question) rather than described one,
     // recommend audiences from their store instead of silently treating the question as the audience.
     if (draft.current.audienceLabel === 'targeted' && draft.current.creativeUrl && !draft.current.budget && !draft.current.audience) {
@@ -131,6 +132,13 @@ export default function MelloAdsChat({ website, brandName }: { website?: string;
       else mello(res.error || 'Tell me what to do — e.g. “scale ROY 1 to €80/day” or pick a template above.')
     } catch { mello('Something went wrong — try again.') } finally { setBusy(false) }
   }
+  const send = () => { if (!input.trim() || busy) return; const m = input.trim(); setInput(''); submit(m) }
+
+  // A parent surface (e.g. the live-ads list) can seed an action — clicking an ad sends "pause X" here.
+  const seedN = useRef(0)
+  useEffect(() => {
+    if (seed?.n && seed.n !== seedN.current && seed.text) { seedN.current = seed.n; submit(seed.text) }
+  }, [seed?.n]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const approve = async (card: any, idx: number) => {
     setBusy(true)
