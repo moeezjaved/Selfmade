@@ -8,7 +8,6 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
-import MelloAdsChat from '@/components/ads/MelloAdsChat'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.12)', INSET = '#f7f6f4', ORANGE = '#e02f06', GOOD = '#12a150'
@@ -32,49 +31,6 @@ const toCode = (c?: string): string => {
 }
 const CTAS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'GET_OFFER', 'BOOK_TRAVEL', 'SUBSCRIBE', 'CONTACT_US']
 
-type OwnAd = { adId: string; title: string; body: string; isActive: boolean; image: string | null; link: string }
-
-// The full list of every ad on the connected account (active + paused), straight from Meta. Each ad's
-// quick actions seed the Mello chat above (onAct) — click "Pause", Mello resolves it and shows a confirm.
-function LiveAdsList({ onAct }: { onAct: (text: string) => void }) {
-  const [ads, setAds] = useState<OwnAd[] | null>(null)
-  useEffect(() => { fetch('/api/ads-studio/your-ads').then((r) => r.json()).then((d) => setAds(Array.isArray(d.ads) ? d.ads : [])).catch(() => setAds([])) }, [])
-  if (ads === null) return <div style={{ color: FAINT, fontSize: 14, padding: '16px 0' }}>Loading every ad on your account…</div>
-  if (!ads.length) return <div style={{ color: FAINT, fontSize: 14, padding: '8px 0' }}>No ads on your account yet — launch one from the <b style={{ color: INK }}>Launch a new ad</b> tab.</div>
-  const active = ads.filter((a) => a.isActive).length
-  const actBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '5px 11px', fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS, whiteSpace: 'nowrap' }
-  return (
-    <div style={{ marginTop: 26 }}>
-      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 4 }}>All your ads · {ads.length} <span style={{ color: FAINT, fontWeight: 600 }}>({active} active)</span></div>
-      <div style={{ fontSize: 12.5, color: FAINT, marginBottom: 12 }}>Tap an action on any ad and Mello handles it above — you approve before anything changes.</div>
-      <div style={{ display: 'grid', gap: 10 }}>
-        {ads.map((a) => {
-          const name = (a.title || 'this ad').slice(0, 40)
-          return (
-          <div key={a.adId} style={{ display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 12, padding: 10, background: '#fff', flexWrap: 'wrap' }}>
-            <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: INSET, flex: 'none' }}>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {a.image ? <img src={a.image} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : null}
-            </div>
-            <div style={{ flex: 1, minWidth: 140 }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || 'Untitled ad'}</div>
-              {a.body ? <div style={{ fontSize: 12, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.body}</div> : null}
-            </div>
-            <span style={{ flex: 'none', fontSize: 11, fontWeight: 800, borderRadius: 999, padding: '4px 11px', background: a.isActive ? '#eef8f0' : INSET, color: a.isActive ? GOOD : SUB }}>{a.isActive ? '● Active' : 'Paused'}</span>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', flex: 'none' }}>
-              {a.isActive
-                ? <button style={actBtn} onClick={() => onAct(`Pause the ad "${name}"`)}>Pause</button>
-                : <button style={actBtn} onClick={() => onAct(`Resume the ad "${name}"`)}>Resume</button>}
-              <button style={actBtn} onClick={() => onAct(`Scale the ad "${name}"`)}>Scale</button>
-              <button style={actBtn} onClick={() => onAct(`Change the copy on the ad "${name}"`)}>Edit copy</button>
-            </div>
-          </div>
-        )})}
-      </div>
-    </div>
-  )
-}
-
 export default function QuickLaunch() {
   const [creatives, setCreatives] = useState<Creative[] | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
@@ -88,7 +44,6 @@ export default function QuickLaunch() {
   const [budget, setBudget] = useState('10')
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
   const [tab, setTab] = useState<'launch' | 'manage'>('launch')   // one page: launch a NEW ad, or manage LIVE ads
-  const [melloSeed, setMelloSeed] = useState<{ text: string; n: number } | null>(null)   // ad-list click → seed the Mello chat
   const [prefilling, setPrefilling] = useState(true)
   const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
   const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
@@ -227,7 +182,7 @@ export default function QuickLaunch() {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Your ads</h1>
-          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : tab === 'manage' ? 'See what’s live and tell Mello what to do — scale, pause, or launch, just by typing.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
+          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : tab === 'manage' ? 'Everything that’s live. Hit Manage on any ad to scale, pause, duplicate or edit it — Mello does it, you approve.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
         </div>
       </div>
 
@@ -255,11 +210,9 @@ export default function QuickLaunch() {
         )
       ) : tab === 'manage' ? (
         <div style={{ marginTop: 22 }}>
-          <MelloAdsChat website={url || undefined} seed={melloSeed || undefined} />
-          <div style={{ marginTop: 20 }}>
-            <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
-          </div>
-          <LiveAdsList onAct={(text) => { setMelloSeed({ text, n: Date.now() }); window.scrollTo({ top: 0, behavior: 'smooth' }) }} />
+          {/* One clean surface: your live ads (this brand's account). Each ad's "Manage" opens an inline
+              Mello panel — Scale, Pause, Duplicate, Edit copy — with approve-before-it-happens. */}
+          <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
         </div>
       ) : (<>
 
