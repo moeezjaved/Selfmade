@@ -405,7 +405,7 @@ export default function QuickLaunch() {
   const pill = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? '#fff5f2' : '#fff', color: on ? ORANGE : INK, borderRadius: 999, padding: '8px 15px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS })
 
   return (
-    <div style={{ maxWidth: 720, margin: '0 auto', padding: '30px 22px 90px', fontFamily: SANS, color: INK }}>
+    <div style={{ maxWidth: 1180, margin: '0 auto', padding: '30px 30px 90px', fontFamily: SANS, color: INK }}>
       {/* header + tabs */}
       <h1 style={{ margin: 0, fontSize: 32, fontWeight: 820, letterSpacing: '-.025em' }}>Your ads</h1>
       <p style={{ margin: '7px 0 0', color: SUB, fontSize: 14.5, lineHeight: 1.5 }}>

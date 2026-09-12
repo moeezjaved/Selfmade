@@ -5,7 +5,7 @@
  * account switcher, so the founder can flip between their connected accounts (ROY 1, ROY 4, …) right
  * on the brief and see each one's spend-today, 14-day ROAS, and who to scale/pause — without leaving.
  */
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import toast from 'react-hot-toast'
 import { confirmAction } from '@/components/ConfirmDialog'
@@ -25,22 +25,23 @@ type Summary = {
 
 const RANGE_LABEL: Record<string, string> = { last_3d: '3d', last_7d: '7d', last_14d: '14d', last_30d: '30d' }
 
-// Per-row quick actions on the Top-ads table — change ONE campaign in one tap, no typing. Each chip
-// compiles a plain-English instruction pre-targeting THIS campaign, runs it through the same
-// plan → confirm card → execute spine as the "run ads by typing" bar. Nothing writes without Approve.
+// Per-row Mello manager — the chat-style way to change ONE campaign. Suggested one-tap tasks PLUS a
+// free-text box ("tell Mello what to do") PLUS upload a new creative to swap in. Everything runs through
+// the same plan → confirm card → execute spine as the "run ads by typing" bar. Nothing writes without Approve.
 function RowManage({ campaignName }: { campaignName: string }) {
   const [busy, setBusy] = useState(false)
+  const [uploading, setUploading] = useState(false)
   const [card, setCard] = useState<{ title: string; summary: string; lines?: string[]; confirmLabel: string; action: any } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [done, setDone] = useState<string | null>(null)
-  const [editing, setEditing] = useState(false)
-  const [copyText, setCopyText] = useState('')
+  const [instruction, setInstruction] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
-  const plan = async (message: string) => {
+  const plan = async (message: string, attach?: { creativeUrl: string }) => {
     if (busy) return
     setBusy(true); setError(null); setDone(null); setCard(null)
     try {
-      const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'plan', message }) })
+      const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'plan', message, attach }) })
       const d = await r.json()
       if (d.card) setCard(d.card); else setError(d.clarify || d.error || 'Couldn’t plan that — open Campaigns.')
     } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
@@ -54,33 +55,46 @@ function RowManage({ campaignName }: { campaignName: string }) {
       if (d.ok) { setDone(d.message || 'Done.'); setCard(null) } else setError(d.error || 'Meta rejected that.')
     } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
   }
+  const send = () => { const t = instruction.trim(); if (t) { plan(`For the live campaign "${campaignName}": ${t}`); setInstruction('') } }
+  const onCreative = async (f: File | null) => {
+    if (!f) return
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { setError('Use a JPEG, PNG, WebP or GIF.'); return }
+    if (f.size > 8 * 1024 * 1024) { setError('Image must be under 8MB.'); return }
+    setUploading(true); setError(null); setDone(null)
+    try {
+      const dataB64 = await new Promise<string>((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(',')[1] || ''); rd.onerror = () => rej(new Error('read')); rd.readAsDataURL(f) })
+      const up = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'upload', dataB64, mimeType: f.type }) }).then((r) => r.json())
+      if (!up?.url) throw new Error(up?.error || 'Upload failed')
+      await plan(`Swap the creative of the live campaign "${campaignName}" to this newly uploaded image.`, { creativeUrl: up.url })
+    } catch (e) { setError((e as Error)?.message || 'Upload failed') }
+    finally { setUploading(false); if (fileRef.current) fileRef.current.value = '' }
+  }
 
   const Chip = ({ label, onClick }: { label: string; onClick: () => void }) => (
-    <button onClick={onClick} disabled={busy}
-      style={{ border: `1px solid ${ORANGE}33`, background: '#fff', color: ORANGE, borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>{label}</button>
+    <button onClick={onClick} disabled={busy || uploading}
+      style={{ border: `1px solid ${ORANGE}33`, background: '#fff', color: ORANGE, borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: (busy || uploading) ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>{label}</button>
   )
 
   return (
     <div style={{ padding: '10px 0 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
-      {!editing ? (
-        <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap' }}>
-          <Chip label="Scale +20%" onClick={() => plan(`Scale the campaign "${campaignName}" by +20% per day.`)} />
-          <Chip label="Scale +50%" onClick={() => plan(`Scale the campaign "${campaignName}" by +50% per day.`)} />
-          <Chip label="Pause" onClick={() => plan(`Pause the campaign "${campaignName}".`)} />
-          <Chip label="Duplicate" onClick={() => plan(`Duplicate the campaign "${campaignName}" as a fresh copy.`)} />
-          <Chip label="Edit copy" onClick={() => { setEditing(true); setCard(null); setError(null); setDone(null) }} />
-        </div>
-      ) : (
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <input value={copyText} autoFocus onChange={(e) => setCopyText(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && copyText.trim() && plan(`Edit the copy of the campaign "${campaignName}" — set the primary text to: ${copyText.trim()}`)}
-            placeholder="New primary text for this campaign…"
-            style={{ flex: 1, minWidth: 220, padding: '9px 13px', fontSize: 13, borderRadius: 100, border: '1px solid #e3ded2', background: '#fff', color: '#1a1410', outline: 'none' }} />
-          <button onClick={() => copyText.trim() && plan(`Edit the copy of the campaign "${campaignName}" — set the primary text to: ${copyText.trim()}`)} disabled={busy || !copyText.trim()}
-            style={{ background: copyText.trim() ? ORANGE : '#e3ded2', color: '#fff', border: 'none', borderRadius: 100, padding: '9px 16px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: copyText.trim() ? 'pointer' : 'default' }}>{busy ? 'Thinking…' : 'Preview'}</button>
-          <button onClick={() => { setEditing(false); setCopyText('') }} disabled={busy}
-            style={{ background: 'none', border: '1px solid #e3ded2', borderRadius: 100, padding: '9px 14px', fontSize: 13, fontWeight: 600, color: '#555', fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
-        </div>
-      )}
+      <input ref={fileRef} type="file" accept="image/*" onChange={(e) => onCreative(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+      {/* Suggested tasks (one tap) */}
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 11.5, fontWeight: 800, color: '#8a8578', textTransform: 'uppercase', letterSpacing: '.05em' }}>Suggested</span>
+        <Chip label="Scale +20%" onClick={() => plan(`Scale the campaign "${campaignName}" by +20% per day.`)} />
+        <Chip label="Scale +50%" onClick={() => plan(`Scale the campaign "${campaignName}" by +50% per day.`)} />
+        <Chip label="Pause" onClick={() => plan(`Pause the campaign "${campaignName}".`)} />
+        <Chip label="Duplicate" onClick={() => plan(`Duplicate the campaign "${campaignName}" as a fresh copy.`)} />
+        <Chip label={uploading ? 'Uploading…' : '⬆ New creative'} onClick={() => fileRef.current?.click()} />
+      </div>
+      {/* Free-text instruction — write anything, Mello plans it */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input value={instruction} onChange={(e) => setInstruction(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
+          placeholder={`Tell Mello what to do with this campaign — e.g. “raise budget to $30/day”, “change the copy to…”, “target women 25–40”`}
+          style={{ flex: 1, minWidth: 240, padding: '10px 14px', fontSize: 13, borderRadius: 100, border: '1px solid #e3ded2', background: '#fff', color: '#1a1410', outline: 'none' }} />
+        <button onClick={send} disabled={busy || uploading || !instruction.trim()}
+          style={{ background: instruction.trim() ? ORANGE : '#e3ded2', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: instruction.trim() ? 'pointer' : 'default' }}>{busy ? 'Thinking…' : 'Ask Mello'}</button>
+      </div>
 
       {error && <div style={{ fontSize: 12.5, color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{error}</div>}
       {done && <div style={{ fontSize: 12.5, color: '#15803d', background: '#f0f9f2', border: '1px solid #bbe6c6', borderRadius: 10, padding: '9px 12px' }}>✅ {done}</div>}
