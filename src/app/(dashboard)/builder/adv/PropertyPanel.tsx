@@ -8,10 +8,12 @@
  * Controls are gated by node kind (typography only for text-bearing elements; container layout only for
  * blocks/sections) so the panel shows what's relevant to the selection.
  */
-import { useState } from 'react'
-import type { PageDoc, Section, Block, Element, Device, StyleProps, DesignTokens } from '@/lib/builder/schema'
+import { useRef, useState } from 'react'
+import type { PageDoc, Section, Block, Element, Device, StyleProps, DesignTokens, ImportedProductRef } from '@/lib/builder/schema'
 import { type NodeRef, levelOf, findNode } from '@/lib/builder/docOps'
 import { readField, hasOverride, type StyleKey } from '@/lib/builder/styleField'
+import { useCredits } from '@/components/credits/CreditCounter'
+import { openCredits } from '@/components/credits/CreditModal'
 
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
 const LINE = 'rgba(20,18,15,.10)', ORANGE = '#e02f06', WASH = '#fdeee9', INSET = '#f7f6f4'
@@ -41,7 +43,6 @@ export default function PropertyPanel({ doc, sel, device, onStyle, onHidden, onC
 
   const showTypography = !!el && TEXTY.has(el.type)
   const showText = !!el && !el.content.bind && 'text' in el.content
-  const showImage = !!el && (el.type === 'image' || el.type === 'video')
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -68,19 +69,22 @@ export default function PropertyPanel({ doc, sel, device, onStyle, onHidden, onC
           )}
         </Group>
       )}
-      {showImage && (
-        <Group title={el!.type === 'video' ? 'Video' : 'Image'}>
+      {el?.type === 'image' && (
+        <Group title="Image">
+          <ImageControl el={el} product={doc.productRef?.importedProduct || undefined} onContent={onContent} />
+          <label style={{ display: 'block', marginTop: 10 }}>
+            <span style={rowLabel}>Alt text</span>
+            <input defaultValue={el.content.alt || ''} key={el.id + 'alt'} onBlur={(e) => onContent({ alt: e.target.value })} style={input} />
+          </label>
+        </Group>
+      )}
+      {el?.type === 'video' && (
+        <Group title="Video">
           <label style={{ display: 'block' }}>
             <span style={rowLabel}>Source URL</span>
-            <input defaultValue={el!.content.src || ''} key={el!.id + 'src'} onBlur={(e) => onContent({ src: e.target.value })} placeholder="https://…" style={input} />
+            <input defaultValue={el.content.src || ''} key={el.id + 'src'} onBlur={(e) => onContent({ src: e.target.value })} placeholder="https://…" style={input} />
           </label>
-          {el!.type === 'image' && (
-            <label style={{ display: 'block', marginTop: 8 }}>
-              <span style={rowLabel}>Alt text</span>
-              <input defaultValue={el!.content.alt || ''} key={el!.id + 'alt'} onBlur={(e) => onContent({ alt: e.target.value })} style={input} />
-            </label>
-          )}
-          <div style={hintNote}>Upload / AI-generate / pick a product photo land in a later phase — paste a URL for now.</div>
+          <div style={hintNote}>Paste a hosted video URL (mp4). Upload lands in a later pass.</div>
         </Group>
       )}
       {el?.content.bind && <div style={{ ...hintNote, marginTop: 8 }}>Bound to <b>{el.content.bind.replace('product.', '')}</b> — value comes from the product.</div>}
@@ -130,6 +134,85 @@ export default function PropertyPanel({ doc, sel, device, onStyle, onHidden, onC
           Hidden on the page
         </label>
       </Group>
+    </div>
+  )
+}
+
+/* ── image control: upload · pick from product · AI generate (Creator-plan, credits, manual click) ── */
+function ImageControl({ el, product, onContent }: { el: Element; product?: ImportedProductRef; onContent: (patch: Partial<Element['content']>) => void }) {
+  const { plan, refetch } = useCredits()
+  const isPaid = plan !== 'free' && plan !== 'trial'                 // Creator plan or higher
+  const [busy, setBusy] = useState<'upload' | 'gen' | null>(null)
+  const [prompt, setPrompt] = useState('')
+  const [err, setErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const src = el.content.src || ''
+  const productImgs = (product?.images && product.images.length ? product.images : (product?.image ? [product.image] : [])).filter(Boolean) as string[]
+
+  const upload = async (f: File | null) => {
+    if (!f) return
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { setErr('Use a JPEG, PNG, WebP or GIF.'); return }
+    if (f.size > 8 * 1024 * 1024) { setErr('Image must be under 8MB.'); return }
+    setBusy('upload'); setErr('')
+    try {
+      const dataB64 = await new Promise<string>((res, rej) => { const r = new FileReader(); r.onload = () => res(String(r.result).split(',')[1] || ''); r.onerror = () => rej(new Error('read')); r.readAsDataURL(f) })
+      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'upload', dataB64, mimeType: f.type }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Upload failed')
+      onContent({ src: j.url })
+    } catch (e) { setErr((e as Error)?.message || 'Upload failed') }
+    finally { setBusy(null); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  const generate = async () => {
+    if (!isPaid) { openCredits('plan', 'AI image generation is a Creator-plan feature'); return }
+    if (!prompt.trim()) { setErr('Describe the image you want first.'); return }
+    setBusy('gen'); setErr('')
+    try {
+      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'generate', prompt: prompt.trim(), referenceUrl: src || productImgs[0] || '' }) })
+      const j = await r.json()
+      if (r.status === 402 && j?.feature === 'ai_images') { openCredits('plan', 'AI image generation is a Creator-plan feature'); return }
+      if (r.status === 402) { openCredits('buy', 'Generating an image costs 50 credits'); return }
+      if (!r.ok) throw new Error(j?.reason || j?.error || 'Could not generate')
+      onContent({ src: j.url }); setPrompt(''); refetch()
+    } catch (e) { setErr((e as Error)?.message || 'Could not generate') }
+    finally { setBusy(null) }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input ref={fileRef} type="file" accept="image/*" onChange={(e) => upload(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flex: 'none', background: INSET, border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center' }}>
+          {src ? <img src={src} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: FAINT }}>No image</span>}
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <button onClick={() => fileRef.current?.click()} disabled={!!busy} style={miniAction}>{busy === 'upload' ? 'Uploading…' : '⬆ Upload'}</button>
+          {src && <button onClick={() => onContent({ src: '' })} disabled={!!busy} style={miniAction}>Remove</button>}
+        </div>
+      </div>
+
+      {productImgs.length > 0 && (
+        <div>
+          <span style={rowLabel}>From product</span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
+            {productImgs.slice(0, 8).map((u, i) => (
+              <button key={i} onClick={() => onContent({ src: u })} title="Use this photo" style={{ width: 42, height: 42, borderRadius: 8, overflow: 'hidden', border: `1px solid ${src === u ? ORANGE : LINE}`, padding: 0, cursor: 'pointer', background: '#fff' }}>
+                <img src={u} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <span style={rowLabel}>Generate with AI {isPaid ? <span style={{ color: FAINT, fontWeight: 500 }}>· 50 credits</span> : <span style={{ color: ORANGE, fontWeight: 700 }}>· Creator plan</span>}</span>
+        <div style={{ display: 'flex', gap: 6, marginTop: 6 }}>
+          <input value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe the image…" onKeyDown={(e) => { if (e.key === 'Enter') generate() }} style={{ ...input, flex: 1 }} disabled={busy === 'gen'} />
+          <button onClick={generate} disabled={busy === 'gen'} title={isPaid ? 'Generate (50 credits)' : 'Creator plan required'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 9, padding: '8px 14px', fontWeight: 700, fontSize: 13, cursor: busy === 'gen' ? 'default' : 'pointer', opacity: busy === 'gen' ? 0.6 : 1, whiteSpace: 'nowrap' }}>{busy === 'gen' ? '…' : isPaid ? '✨ Make' : '✨ Upgrade'}</button>
+        </div>
+        {!isPaid && <div style={{ ...hintNote, marginTop: 6 }}>Generating product images is a Creator-plan feature and uses credits. Upgrade to turn it on.</div>}
+      </div>
+      {err && <div style={{ fontSize: 12, color: ORANGE }}>{err}</div>}
     </div>
   )
 }
@@ -241,6 +324,7 @@ function ColorRow({ label, val, over, onReset, tokens, onChange, allowNone }: Ro
 const rowLabel: React.CSSProperties = { fontSize: 12, color: SUB, fontWeight: 600 }
 const input: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', fontSize: 13, color: INK, fontFamily: 'inherit', outline: 'none', background: '#fff', boxSizing: 'border-box' }
 const hintNote: React.CSSProperties = { fontSize: 11.5, color: SUB, background: INSET, borderRadius: 9, padding: '8px 10px', lineHeight: 1.5 }
+const miniAction: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer', height: 'fit-content' }
 const resetBtn: React.CSSProperties = { border: 0, background: 'transparent', color: ORANGE, fontSize: 11, fontWeight: 700, cursor: 'pointer', padding: 0 }
 const miniBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 8, padding: '6px 8px', fontSize: 11, fontWeight: 700, cursor: 'pointer' }
 

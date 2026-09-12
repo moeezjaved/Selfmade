@@ -37,6 +37,8 @@ export function pageDocFromContent(
   const schema = template?.schema || inferSchema(content)
   const c = content || {}
   const used = new Set<string>()
+  const productImages: string[] = []                       // every image URL on the page → the "From product" picker
+  const addImg = (u?: string) => { const s = (u || '').trim(); if (s && !productImages.includes(s)) productImages.push(s) }
   const val = (k: string) => { used.add(k); return c[k] }
   const firstKey = (pred: (s: SlotDef) => boolean) => schema.find(pred)?.key
 
@@ -50,6 +52,7 @@ export function pageDocFromContent(
 
   const headline = headKey ? plain(val(headKey)) : (renderOpts?.productName || '')
   const heroImg = imgKey ? str(val(imgKey)) : ''
+  addImg(heroImg); addImg(renderOpts?.productImage)
   const price = renderOpts?.priceLabel || ''
   const detailEls: Element[] = []
   if (renderOpts?.rating?.stars) detailEls.push(el('stars', { stars: renderOpts.rating.stars }))
@@ -83,12 +86,12 @@ export function pageDocFromContent(
     switch (slot.type) {
       case 'reasons': {
         flushText()
-        const blocks = arr(v).map((it, i) => block('benefitList', [
+        const blocks = arr(v).map((it, i) => { addImg(it.image); return block('benefitList', [
           el('badge', { text: it.label || `#${i + 1}` }, { background: 'Primary', color: '#fff', paddingX: '10px', paddingY: '4px', radius: '999px', fontSize: '12px', fontWeight: 800 }),
           heading(plain(it.title) || `Reason ${i + 1}`, { fontSize: '18px' }),
           ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
           ...(it.image ? [el('image', { src: it.image, alt: '' }, { radius: '12px', width: '100%' })] : []),
-        ], { direction: 'column', gap: '8px', width: '46%' }))
+        ], { direction: 'column', gap: '8px', width: '46%' }) })
         doc.sections.push(withHead(slot, section('imageBenefits', blocks, { paddingY: '40px' })))
         break
       }
@@ -133,7 +136,7 @@ export function pageDocFromContent(
         doc.sections.push(withHead(slot, section('imageText', blocks, { paddingY: '32px', direction: 'column', gap: '14px' })))
         break
       }
-      case 'image': galleryImgs.push(el('image', { src: str(v), alt: slot.label || '' }, { radius: '12px', width: '31%' })); break
+      case 'image': addImg(str(v)); galleryImgs.push(el('image', { src: str(v), alt: slot.label || '' }, { radius: '12px', width: '31%' })); break
       case 'video': videos.push(el('video', { src: str(v) }, { radius: '12px', width: '31%' })); break
       case 'number': break // skip bare numbers (countdown handled elsewhere)
       case 'text': case 'richtext': default: {
@@ -146,6 +149,18 @@ export function pageDocFromContent(
   flushText()
   if (galleryImgs.length) doc.sections.push(section('recommendedProducts', [block('media', galleryImgs, { direction: 'row', gap: '14px', width: '100%' })], { paddingY: '32px' }))
   if (videos.length) doc.sections.push(section('reviewsCarousel', [block('media', videos, { direction: 'row', gap: '14px', width: '100%' })], { paddingY: '32px' }))
+
+  // Expose the page's images (+ known product fields) so the editor's image control can "pick from product".
+  doc.productRef = {
+    ...doc.productRef,
+    importedProduct: {
+      ...(doc.productRef.importedProduct || {}),
+      image: heroImg || renderOpts?.productImage || doc.productRef.importedProduct?.image || null,
+      images: productImages,
+      ...(renderOpts?.productName ? { title: renderOpts.productName } : {}),
+      ...(renderOpts?.priceLabel ? { price: renderOpts.priceLabel } : {}),
+    },
+  }
 
   return doc
 }

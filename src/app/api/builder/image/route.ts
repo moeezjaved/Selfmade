@@ -49,6 +49,12 @@ export async function POST(req: NextRequest) {
     const referenceUrl = String(b?.referenceUrl || '').trim()
     const aspect = String(b?.aspectRatio || '1:1')
     const admin = createAdminClient()
+    // Creator-plan gate: AI image generation is a paid-plan feature (it spends credits/real money). Free
+    // users get an upgrade prompt; paid plans continue to the credit reserve below.
+    const { getBalance } = await import('@/lib/credits')
+    const bal = await getBalance(admin as any, user.id).catch(() => null as any)
+    const plan = (bal?.plan as string) || 'free'
+    if (plan === 'free') return NextResponse.json({ error: 'upgrade_required', feature: 'ai_images', reason: 'AI image generation is a Creator-plan feature — upgrade to use it.' }, { status: 402 })
     // AI image generation is metered like every other image render (50 credits — the image_edit rate).
     // Reserve up front; refund if the model fails to produce/host an image so a miss never charges.
     let txId: string
