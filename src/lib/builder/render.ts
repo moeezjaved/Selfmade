@@ -94,13 +94,23 @@ function renderBlock(b: Block, tokens: DesignTokens, o: Required<Pick<RenderOpts
   return `<div class="sf-block sf-block-${attr(b.type)}"${styleAttr}${idAttr}>${inner}</div>`
 }
 
+// Background/full-bleed props live on the outer <section>; layout props (flex direction, gap, align,
+// padding) live on .sf-section-inner — the element that actually contains the blocks — so the section's
+// layout reaches its blocks instead of stopping at the inner wrapper.
+const OUTER_STYLE_KEYS = new Set(['background', 'backgroundImage', 'shadow'])
 function renderSection(s: Section, tokens: DesignTokens, o: Required<Pick<RenderOpts, 'device' | 'mode'>> & { product?: RenderProduct }): string {
   if (s.hidden) return ''
-  const css = compileStyle(s.style, tokens, o.device)
-  const styleAttr = css ? ` style="${attr(css)}"` : ''
+  const style = s.style || {}
+  const outerStyle: typeof style = {}
+  const innerStyle: typeof style = {}
+  for (const [k, v] of Object.entries(style)) (OUTER_STYLE_KEYS.has(k) ? outerStyle : innerStyle)[k as keyof typeof style] = v as never
+  const outerCss = compileStyle(outerStyle, tokens, o.device)
+  const innerCss = compileStyle(innerStyle, tokens, o.device)
+  const outerAttr = outerCss ? ` style="${attr(outerCss)}"` : ''
+  const innerAttr = innerCss ? ` style="${attr(innerCss)}"` : ''
   const idAttr = o.mode === 'edit' ? ` data-node-id="${attr(s.id)}" data-node-type="section:${attr(s.type)}"` : ''
   const inner = s.blocks.map((b) => renderBlock(b, tokens, o)).join('')
-  return `<section class="sf-section sf-section-${attr(s.type)}"${styleAttr}${idAttr}><div class="sf-section-inner">${inner}</div></section>`
+  return `<section class="sf-section sf-section-${attr(s.type)}"${outerAttr}${idAttr}><div class="sf-section-inner"${innerAttr}>${inner}</div></section>`
 }
 
 /** Base CSS shared by every rendered page (the design-token vars come from the theme). */
