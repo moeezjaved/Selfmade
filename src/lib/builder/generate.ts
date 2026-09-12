@@ -32,7 +32,7 @@ const SOFT_AI_ROLES = new Set(['editorial', 'lifestyle'])
 
 export async function generatePage(
   userId: string,
-  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string; paletteId?: string; importedProduct?: ImportedProduct | null; skipAiImages?: boolean },
+  args: { templateId: string; productId: string; persona: any; angle: any; brandId?: string | null; research?: string; language?: string; paletteId?: string; importedProduct?: ImportedProduct | null; skipAiImages?: boolean; aiImageCount?: number },
 ): Promise<GenerateResult> {
   const template = getTemplate(args.templateId)
   if (!template) throw new Error(`Unknown template: ${args.templateId}`)
@@ -93,6 +93,7 @@ export async function generatePage(
     category: vision ? '' : (voice.category || voice.industry || ''),
     keyPrefix: `${slugify(voice.name || productName, 'store')}/${args.templateId}`,
     skipAiImages: !!args.skipAiImages,
+    aiImageCap: args.aiImageCount,
   })
 
   // timeline thumbnails all use the main product image; listicle reason items cycle the product photos
@@ -289,10 +290,14 @@ async function resolveImages(
   ctx: {
     productImages: string[]; productImage: string | null; productName: string
     productDesc: string; category: string; keyPrefix: string; skipAiImages?: boolean
+    aiImageCap?: number   // max AI images to generate with the page (from the plan-gated selector); rest use product photos
   },
 ): Promise<void> {
   const imageSlots = schema.filter((s) => s.type === 'image')
   if (!imageSlots.length) return
+  // How many AI images we've generated so far — once we hit aiImageCap we fall back to real product photos.
+  let aiUsed = 0
+  const canGenAi = () => !ctx.skipAiImages && (ctx.aiImageCap === undefined || aiUsed < ctx.aiImageCap)
 
   // A single product reference (base64) is fetched once and reused by every AI generation.
   let reference: ImageInput | null | undefined
@@ -310,16 +315,19 @@ async function resolveImages(
     let url: string | null = null
 
     if (HARD_AI_ROLES.has(role)) {
-      // Free/audit mode: never call the paid AI image engine — use a real product photo (the visitor
-      // upgrades to AI-generated shots with credits once they join). Else generate as normal.
-      url = ctx.skipAiImages
-        ? (nextPhoto() || ctx.productImage)
-        : await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: role === 'before_after' ? '16:9' : '1:1' })
+      // Free/audit mode OR past the AI-image cap: use a real product photo (the user upgrades to more
+      // AI-generated shots with credits). Else generate as normal, counting against the cap.
+      if (canGenAi()) {
+        url = await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: role === 'before_after' ? '16:9' : '1:1' })
+        if (url) aiUsed++
+      } else {
+        url = nextPhoto() || ctx.productImage
+      }
       if (!url) url = ctx.productImage   // AI gen failed / free mode with no photo → use the product photo
     } else if (SOFT_AI_ROLES.has(role)) {
-      // Prefer an as-yet-unused real product photo; only generate when the store has none to spare.
+      // Prefer an as-yet-unused real product photo; only generate when the store has none to spare AND we're under the cap.
       url = nextPhoto()
-      if (!url && !ctx.skipAiImages) url = await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: '1:1' })
+      if (!url && canGenAi()) { url = await generateAndHost(imagePrompt(role, ctx), await getRef(), `${ctx.keyPrefix}-${slot.key}`, { aspectRatio: '1:1' }); if (url) aiUsed++ }
       if (!url) url = ctx.productImage   // fall back to the product photo rather than a blank block
     } else {
       // 'product' / default → a real product photo.

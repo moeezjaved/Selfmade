@@ -34,6 +34,10 @@ export async function POST(req: NextRequest) {
   // upgrades to AI-generated imagery with their credits after they join. No AI images ⇒ nothing costly is
   // generated ⇒ we skip the credit charge entirely (not an abuse hole: the charge is for the AI images).
   const noAiImages = b?.noAiImages === true
+  // Plan-gated "AI product images with the page" selector (None / 1–6). >0 requires a paid (Creator) plan
+  // AND spends credits per image (billed inside the pipeline). Legacy callers (no imageCount) keep old behavior.
+  const hasImageCount = b?.imageCount !== undefined
+  const imageCount = Math.max(0, Math.min(6, parseInt(String(b?.imageCount)) || 0))
   // An externally-imported product (pasted URL) can stand in for a Shopify productId.
   const ip = b?.importedProduct && typeof b.importedProduct === 'object' ? b.importedProduct : null
   const importedProduct = ip?.title ? {
@@ -60,8 +64,23 @@ export async function POST(req: NextRequest) {
   const admin = createAdminClient()
   const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
 
+  // Resolve the AI-image plan gate + cap.
+  let aiImageCount: number | undefined = undefined
+  let skipAi = noAiImages
+  if (hasImageCount) {
+    if (imageCount === 0) {
+      skipAi = true                                   // "None" → page with real product photos, no paid AI images
+    } else {
+      const { getBalance } = await import('@/lib/credits')
+      const bal = await getBalance(admin, user.id).catch(() => null as any)
+      const plan = (bal?.plan as string) || 'free'
+      if (plan === 'free') return NextResponse.json({ error: 'upgrade_required', feature: 'ai_images', note: 'Generating AI images with your page is a Creator-plan feature — upgrade to add them.' }, { status: 402 })
+      aiImageCount = imageCount; skipAi = false
+    }
+  }
+
   let txId: string | null = null
-  if (!noAiImages) {
+  if (!skipAi) {
     try {
       txId = (await reserveCredits(admin, user.id, ACTION)).id
     } catch (e: any) {
@@ -73,7 +92,7 @@ export async function POST(req: NextRequest) {
 
   let gen
   try {
-    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId, importedProduct, skipAiImages: noAiImages })
+    gen = await generatePage(user.id, { templateId, productId, persona, angle, brandId, research, language, paletteId, importedProduct, skipAiImages: skipAi, aiImageCount })
   } catch (e: any) {
     await refund()
     return NextResponse.json({ error: e?.message || 'Generation failed' }, { status: 502 })

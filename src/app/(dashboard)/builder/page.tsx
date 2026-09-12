@@ -11,6 +11,8 @@ import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { PALETTES, DEFAULT_PALETTE_ID } from '@/lib/builder/palettes'
+import { useCredits } from '@/components/credits/CreditCounter'
+import { normalizePlan } from '@/lib/plans'
 import BuilderEditor from './BuilderEditor'
 
 /* ── theme tokens (shared with HqRunable / Reports) ── */
@@ -106,12 +108,16 @@ export default function BuilderPage() {
     document.head.appendChild(l)
   }, [])
 
+  const credits = useCredits()
+  const isPaid = normalizePlan(credits.plan) !== 'free'   // AI-images-with-page is a Creator-plan feature
+
   /* ── step 1: templates ── */
   const [templates, setTemplates] = useState<Template[] | null>(null)
   const [tplErr, setTplErr] = useState('')
   const [tplId, setTplId] = useState<string | null>(null)
   const [language, setLanguage] = useState('English')
   const [paletteId, setPaletteId] = useState(DEFAULT_PALETTE_ID)
+  const [imageCount, setImageCount] = useState(0)   // AI product images to generate with the page (0 = none)
   const loadTemplates = useCallback(async () => {
     setTplErr(''); setTemplates(null)
     try {
@@ -262,6 +268,7 @@ export default function BuilderPage() {
           research: researchPayload(),
           language,
           paletteId,
+          imageCount: isPaid ? imageCount : 0,
         }),
       })
       const j = await r.json()
@@ -580,6 +587,29 @@ export default function BuilderPage() {
                 <select value={language} onChange={(e) => setLanguage(e.target.value)} style={{ border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, background: '#fff', outline: 'none', fontFamily: 'inherit', minWidth: 180 }}>
                   {LANGUAGES.map((l) => <option key={l} value={l}>{l}</option>)}
                 </select>
+              </div>}
+
+              {/* AI product images WITH the page — plan-gated (Creator). None uses your real product photos;
+                  1–6 generates on-brand AI shots (each spends credits, like image generation elsewhere). */}
+              {tplId && <div style={{ ...CARD, marginTop: 12, padding: '14px 16px' }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+                  <div style={{ fontSize: 14, fontWeight: 700 }}>Create AI product images with the page</div>
+                  {!isPaid && <span style={{ fontSize: 11, fontWeight: 800, color: ORANGE, background: '#fff5f2', border: `1px solid ${ORANGE}44`, borderRadius: 999, padding: '2px 9px' }}>Creator</span>}
+                </div>
+                <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>How many AI images to generate? <b style={{ color: INK }}>None</b> uses your real product photos. {isPaid ? 'Each image spends credits.' : ''}</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
+                  {[0, 1, 2, 3, 4, 5, 6].map((n) => {
+                    const on = imageCount === n
+                    const locked = !isPaid && n > 0
+                    return (
+                      <button key={n} onClick={() => { if (locked) return; setImageCount(n) }} disabled={locked} title={locked ? 'Upgrade to Creator to generate AI images with the page' : undefined}
+                        style={{ minWidth: 46, border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? '#fff5f2' : '#fff', color: locked ? '#c7c2b9' : (on ? ORANGE : INK), borderRadius: 10, padding: '9px 12px', fontSize: 14, fontWeight: 700, cursor: locked ? 'default' : 'pointer', fontFamily: 'inherit' }}>
+                        {n === 0 ? 'None' : n}
+                      </button>
+                    )
+                  })}
+                </div>
+                {!isPaid && <div style={{ fontSize: 12.5, color: SUB, marginTop: 10 }}>Available on the <b>Creator</b> plan. <Link href="/upgrade" style={{ color: ORANGE, fontWeight: 700 }}>Upgrade now →</Link></div>}
               </div>}
 
               {/* colour palette — re-skins the whole generated page; shown once a template is chosen */}
