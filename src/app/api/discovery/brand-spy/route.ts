@@ -263,9 +263,23 @@ export async function POST(req: NextRequest) {
   // plan-limit / upgrade message.
   try {
     const body = await req.json().catch(() => ({}))
-    const pageId = extractPageId(body.url || body.pageId || '')
-    if (!pageId) return NextResponse.json({ error: 'Paste a Meta Ad Library page URL (…view_all_page_id=123…) or a numeric page ID — not a keyword search.' }, { status: 400 })
-    let name = (body.name || '').trim().toLowerCase() || pageId
+    let pageId = extractPageId(body.url || body.pageId || '')
+    let resolvedName = ''
+    // No page id in the input → treat it as a brand keyword and find the brand's page via the Ad Library
+    // search (the droplet), so "pull pravana" works without pasting a Meta Ad Library URL.
+    if (!pageId) {
+      const kw = String(body.url || body.name || '').trim()
+      if (kw && !/^https?:\/\//i.test(kw)) {
+        try {
+          const advertisers = await searchAdLibrary(kw)
+          const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
+          const hit = advertisers.find((a) => norm(a.pageName) === norm(kw)) || advertisers.find((a) => norm(a.pageName).includes(norm(kw))) || advertisers[0]
+          if (hit?.pageId) { pageId = String(hit.pageId); resolvedName = hit.pageName || '' }
+        } catch { /* fall through to the error below */ }
+      }
+    }
+    if (!pageId) return NextResponse.json({ error: `Couldn’t find “${String(body.url || body.name || '').trim()}” in the Meta Ad Library. Try the exact brand name, or paste their Ad Library page link.` }, { status: 404 })
+    let name = (body.name || '').trim().toLowerCase() || resolvedName.toLowerCase() || pageId
     // Spying by page id with no name → the activity log/brief would show a raw number. Resolve the real
     // brand name (crawl_state → directory → first ad) so it reads "Started spying Nike".
     if (name === pageId || /^\d+$/.test(name)) {

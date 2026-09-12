@@ -75,11 +75,11 @@ const ICONS = {
 // Defined at MODULE scope (not inside the component) — a component defined inside render is a NEW type
 // every keystroke, so React remounts the whole subtree, which resets scroll + steals focus. This was the
 // "fill budget → jumps up to creatives" bug.
-function Section({ icon, n, title, children }: { icon: string; n: number; title: string; children: React.ReactNode }) {
+function Section({ icon, glyph, n, title, children }: { icon?: string; glyph?: string; n: number; title: string; children: React.ReactNode }) {
   return (
     <section style={{ background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 16, padding: '18px 18px 20px', boxShadow: '0 1px 2px rgba(20,18,15,.04)' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <span style={{ width: 30, height: 30, borderRadius: 9, background: INSET, color: INK, display: 'grid', placeItems: 'center' }}><Ic d={icon} /></span>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: INSET, color: INK, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800 }}>{glyph ? glyph : <Ic d={icon || ''} />}</span>
         <span style={{ fontSize: 15, fontWeight: 750, color: INK }}>{title}</span>
         <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: FAINT }}>{n}</span>
       </div>
@@ -170,13 +170,14 @@ export default function QuickLaunch() {
 
     // Ad accounts for the ACTIVE brand (strict, same as Reports) → the account picker. Fall back to the
     // whole workspace so a brand with nothing linked can still choose one. Selecting drives pages/pixel below.
+    // ONLY the active brand's own ad accounts (brand isolation). If the brand has none linked, prompt to
+    // connect — never silently borrow another brand's / the workspace's account.
     fetch('/api/meta/accounts').then((r) => r.json()).then((d) => {
       const brandAccts = Array.isArray(d.accounts) ? d.accounts : []
-      const list = brandAccts.length ? brandAccts : (Array.isArray(d.workspaceAccounts) ? d.workspaceAccounts : [])
-      const norm = list.map((a: any) => ({ account_id: String(a.account_id), account_name: a.account_name || a.account_id, currency: a.currency || 'USD' }))
+      const norm = brandAccts.map((a: any) => ({ account_id: String(a.account_id), account_name: a.account_name || a.account_id, currency: a.currency || 'USD' }))
       setAccounts(norm)
       if (!norm.length) { setMetaConnected(false); return }
-      const primary = brandAccts.find((a: any) => a.is_primary) || list[0]
+      const primary = brandAccts.find((a: any) => a.is_primary) || brandAccts[0]
       setAccountId(String(primary.account_id))
     }).catch(() => setMetaConnected(false))
 
@@ -272,7 +273,8 @@ export default function QuickLaunch() {
       setISearching(true)
       try {
         const d = await fetch(`/api/m4/search-interests?q=${encodeURIComponent(iQuery.trim())}`).then((r) => r.json())
-        const res: Interest[] = (Array.isArray(d.results) ? d.results : []).map((x: any) => ({ id: String(x.id), name: String(x.name) })).filter((x: Interest) => !interests.some((i) => i.id === x.id))
+        const raw = Array.isArray(d.interests) ? d.interests : (Array.isArray(d.results) ? d.results : [])
+        const res: Interest[] = raw.map((x: any) => ({ id: String(x.id), name: String(x.name) })).filter((x: Interest) => !interests.some((i) => i.id === x.id))
         setIResults(res.slice(0, 8))
       } catch { setIResults([]) } finally { setISearching(false) }
     }, 280)
@@ -661,7 +663,7 @@ export default function QuickLaunch() {
           </Section>
 
           {/* 6 · BUDGET */}
-          <Section icon={ICONS.money} n={7} title="Daily budget">
+          <Section glyph={cur.sym} n={7} title="Daily budget">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 11, padding: '0 12px', background: '#fff' }}>
                 <span style={{ color: SUB, fontSize: 15 }}>{cur.sym}</span>

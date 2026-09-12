@@ -121,7 +121,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
-const MAX_DEEP_PULLS = 8        // rivals deep-pulled per background run — pull more competitors' full sets each run (union accumulates the rest)
+const MAX_DEEP_PULLS = 14       // rivals deep-pulled per background run — cover a typical competitor list in ONE refresh (union accumulates the rest). Slow pulls just return shallow within the overall race, so a higher count only ADDS depth.
 const DEEP_PULL_LIMIT = 500     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).
@@ -134,7 +134,9 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // DEEP_PULL_LIMIT), NOT the 4 the name/keyword search returned. Bounded per run (MAX_DEEP_PULLS) and
   // time-boxed so the shared droplet finishes inside the 180s budget; the sticky-union cache accumulates
   // the rest across runs, so over a few refreshes we hold every rival's whole set of live creatives.
-  const targets = base.filter((b) => b.c.pageId).slice(0, MAX_DEEP_PULLS)
+  // Deepen the SHALLOWEST rivals first (fewest ads so far) so the competitors showing only 1–2 ads get
+  // their full set before ones that already have plenty — then bound to the per-run budget.
+  const targets = base.filter((b) => b.c.pageId).sort((a, b) => a.liveAds.length - b.liveAds.length).slice(0, MAX_DEEP_PULLS)
   // Each rival updates its own liveAds as its deep pull resolves. We race the WHOLE batch against one
   // overall deadline so the run ALWAYS returns in time to write the cache — rivals whose pull finished get
   // their full set; the rest keep their shallow ads and deepen on a later run (durable union accumulates).
