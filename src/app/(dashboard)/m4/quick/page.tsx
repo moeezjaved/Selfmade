@@ -86,7 +86,12 @@ export default function QuickLaunch() {
   const [ageMin, setAgeMin] = useState('18')
   const [ageMax, setAgeMax] = useState('65')
   const [gender, setGender] = useState<'ALL' | 'MEN' | 'WOMEN'>('ALL')
+  // Campaign types (M4 parity): new customers is always on; retargeting = warm visitors; retention = past
+  // buyers. Each can carry its own message; the budget is split across whichever are on (60% new / 40% warm).
   const [retarget, setRetarget] = useState(false)
+  const [retention, setRetention] = useState(false)
+  const [retargetMsg, setRetargetMsg] = useState('')
+  const [retainMsg, setRetainMsg] = useState('')
 
   // upload
   const [uploaded, setUploaded] = useState<Creative[]>([])         // uploaded-from-computer creatives (carry Meta hash)
@@ -243,7 +248,13 @@ export default function QuickLaunch() {
         pixelId,
         pageId,
         instagramActorId: page?.instagram?.id || '',
+        // Retargeting (warm visitors) + Retention (past buyers) campaigns — reuse the chosen creatives, with
+        // their own message (falls back to the main copy). includeRetainer flips the retention campaign on.
         retargetingCreatives: retarget ? creativesBody : [],
+        retainerCreatives: retention ? creativesBody : [],
+        includeRetainer: retention,
+        retargetingCopy: retarget ? { primaryText: (retargetMsg || primaryText).trim().slice(0, 300), headline: headline.trim().slice(0, 40), cta, destinationUrl: url.trim() } : {},
+        retainerCopy: retention ? { primaryText: (retainMsg || primaryText).trim().slice(0, 300), headline: headline.trim().slice(0, 40), cta, destinationUrl: url.trim() } : {},
         websiteUrl: url.trim(),
         headline: headline.trim().slice(0, 40),
         primaryText: primaryText.trim().slice(0, 300),
@@ -254,8 +265,12 @@ export default function QuickLaunch() {
       const r = await fetch('/api/m4/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
       setBusy('')
+      // Meta needs the account to accept Custom Audiences ToS before retargeting/retention can run.
+      if (d.needsCustomAudienceTos && d.tosUrl) { setResult({ ok: !!d.success, msg: d.note || 'Accept Meta’s Custom Audiences Terms, then relaunch so retargeting/retention go out too.', href: d.tosUrl, hrefLabel: 'Open Meta’s accept page →' }); return }
       if (!r.ok || d.error) { setResult({ ok: false, msg: d.error || 'Launch failed — try again.', href: d.needsReconnect ? '/settings' : (r.status === 402 ? '/upgrade' : d.tosUrl || undefined), hrefLabel: 'Fix it →' }); return }
-      setResult({ ok: true, msg: (d.broad_adsets || d.adsets || 1) ? `Your ad is set up on ${d.account || 'Meta'} — paused for your review.` : 'Campaign created — check your Meta account is ready to run ads.', note: d.note, href: '/reports', hrefLabel: 'Review & turn it on →' })
+      const total = (d.broad_adsets || 0) + (d.interest_adsets || 0) + (d.retargeting_adsets || 0) + (d.retainer_adsets || 0)
+      const kinds = [d.broad_adsets && 'new customers', d.interest_adsets && 'interest audiences', d.retargeting_adsets && 'retargeting', d.retainer_adsets && 'retention'].filter(Boolean).join(', ')
+      setResult({ ok: true, msg: `Your ad is set up on ${d.account || 'Meta'}${kinds ? ` — ${kinds}` : ''} — paused for your review.`, note: total ? `${total} ad set${total === 1 ? '' : 's'} created.` : d.note, href: '/reports', hrefLabel: 'Review & turn it on →' })
     } catch { setBusy(''); setResult({ ok: false, msg: 'Something went wrong — try again.' }) }
   }
 
@@ -395,14 +410,39 @@ export default function QuickLaunch() {
                 </div>
               </div>
             </div>
-            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, cursor: 'pointer' }}>
-              <input type="checkbox" checked={retarget} onChange={(e) => setRetarget(e.target.checked)} style={{ width: 16, height: 16, accentColor: ORANGE }} />
-              <span style={{ fontSize: 13.5, color: INK }}>Also retarget people who already engaged <span style={{ color: FAINT }}>(recommended)</span></span>
-            </label>
+          </Section>
+
+          {/* 4 · CAMPAIGNS — who to reach (M4 parity: new customers always; + retargeting + retention) */}
+          <Section icon={ICONS.people} n={4} title="Who to reach">
+            <div style={{ display: 'grid', gap: 10 }}>
+              <div style={{ border: `1.5px solid ${GOOD}55`, background: '#f1faf3', borderRadius: 13, padding: '13px 15px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                  <span style={{ color: GOOD }}>✓</span>
+                  <span style={{ fontSize: 14, fontWeight: 750 }}>New customers</span>
+                  <span style={{ marginLeft: 'auto', fontSize: 11.5, fontWeight: 700, color: GOOD }}>Always on</span>
+                </div>
+                <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, paddingLeft: 26 }}>Prospecting — reach people who’ve never heard of you ({broad ? 'broad Advantage+' : 'by interest'}).</div>
+              </div>
+
+              {([
+                { on: retarget, set: setRetarget, msg: retargetMsg, setMsg: setRetargetMsg, title: 'Retargeting', sub: 'People who visited or engaged but didn’t buy — the warmest audience.', ph: 'Message for returning visitors — e.g. “Still thinking it over? Here’s 10% off.”' },
+                { on: retention, set: setRetention, msg: retainMsg, setMsg: setRetainMsg, title: 'Retention', sub: 'Past buyers — bring them back for another order.', ph: 'Message for past buyers — e.g. “Time to restock? Members save today.”' },
+              ] as const).map((c) => (
+                <div key={c.title} style={{ border: `1.5px solid ${c.on ? ORANGE : LINE}`, background: c.on ? '#fff5f2' : '#fff', borderRadius: 13, padding: '13px 15px' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
+                    <input type="checkbox" checked={c.on} onChange={(e) => c.set(e.target.checked)} style={{ width: 16, height: 16, accentColor: ORANGE }} />
+                    <span style={{ fontSize: 14, fontWeight: 750, color: c.on ? ORANGE : INK }}>{c.title}</span>
+                  </label>
+                  <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, paddingLeft: 26 }}>{c.sub}</div>
+                  {c.on && <textarea value={c.msg} onChange={(e) => c.setMsg(e.target.value)} rows={2} placeholder={c.ph} style={{ ...input, marginTop: 10, resize: 'vertical', lineHeight: 1.45, fontSize: 13.5 }} />}
+                </div>
+              ))}
+              {(retarget || retention) && <div style={{ fontSize: 12, color: FAINT }}>Budget is split automatically — ~60% to new customers, ~40% to warm audiences. Reuses your chosen creative unless you write a different message above.</div>}
+            </div>
           </Section>
 
           {/* 4 · COPY */}
-          <Section icon={ICONS.copy} n={4} title="Ad copy">
+          <Section icon={ICONS.copy} n={5} title="Ad copy">
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -40, marginBottom: 12 }}>
               <button onClick={() => genCopy(true)} disabled={copyBusy} style={{ border: `1px solid ${LINE}`, background: '#fff', color: ORANGE, borderRadius: 999, padding: '6px 13px', fontSize: 12.5, fontWeight: 750, cursor: copyBusy ? 'default' : 'pointer', fontFamily: SANS }}>{copyBusy ? 'Writing…' : '✨ Rewrite with AI'}</button>
             </div>
@@ -416,7 +456,7 @@ export default function QuickLaunch() {
           </Section>
 
           {/* 5 · DESTINATION */}
-          <Section icon={ICONS.pin} n={5} title="Where it goes">
+          <Section icon={ICONS.pin} n={6} title="Where it goes">
             <div style={{ display: 'grid', gap: 14 }}>
               <div>{label('Facebook Page', 'the ad posts from here')}
                 {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page — <Link href="/connect-meta?next=/m4/quick" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
@@ -451,7 +491,7 @@ export default function QuickLaunch() {
           </Section>
 
           {/* 6 · BUDGET */}
-          <Section icon={ICONS.money} n={6} title="Daily budget">
+          <Section icon={ICONS.money} n={7} title="Daily budget">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 11, padding: '0 12px', background: '#fff' }}>
                 <span style={{ color: SUB, fontSize: 15 }}>$</span>
