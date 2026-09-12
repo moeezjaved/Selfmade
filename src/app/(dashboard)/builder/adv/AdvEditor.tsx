@@ -17,7 +17,7 @@ import {
   moveNode, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
 } from '@/lib/builder/docOps'
 import { writeField, type StyleKey } from '@/lib/builder/styleField'
-import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL } from '@/lib/builder/seed'
+import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
 import PropertyPanel from './PropertyPanel'
 
 /* theme tokens (shared with the builder / HqRunable) */
@@ -276,7 +276,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {addMenu && (
         <AddMenu
           title={addMenu.kind === 'section' ? 'Add a section' : 'Add a block'}
-          options={addMenu.kind === 'section' ? SECTION_TYPES.map((t) => ({ id: t, label: SECTION_LABEL(t) })) : BLOCK_TYPES.map((t) => ({ id: t, label: BLOCK_LABEL(t as Block['type']) }))}
+          options={addMenu.kind === 'section'
+            ? SECTION_TYPES.map((t) => ({ id: t, label: SECTION_LABEL(t) }))
+            : (SECTION_BLOCK_PALETTE[doc.sections.find((s) => s.id === addMenu.sectionId)?.type || 'productInfo'] || BLOCK_TYPES).map((t) => ({ id: t, label: BLOCK_LABEL(t as Block['type']) }))}
           onPick={(id) => {
             if (addMenu.kind === 'section') apply((d) => { const { doc: nd, newRef } = insertSection(d, newSection(id as Section['type'])); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd })
             else { const sid = addMenu.sectionId; apply((d) => { const { doc: nd, newRef } = insertBlock(d, sid, newBlock(id as Block['type'])); queueMicrotask(() => setSel(newRef)); return nd }) }

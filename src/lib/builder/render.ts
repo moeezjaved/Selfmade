@@ -109,7 +109,10 @@ function renderSection(s: Section, tokens: DesignTokens, o: Required<Pick<Render
   const outerAttr = outerCss ? ` style="${attr(outerCss)}"` : ''
   const innerAttr = innerCss ? ` style="${attr(innerCss)}"` : ''
   const idAttr = o.mode === 'edit' ? ` data-node-id="${attr(s.id)}" data-node-type="section:${attr(s.type)}"` : ''
-  const inner = s.blocks.map((b) => renderBlock(b, tokens, o)).join('')
+  // Shape divider is a decorative section — a full-width SVG wave (color = its background/Primary token).
+  const inner = s.type === 'shapeDivider'
+    ? `<svg class="sf-shape-divider" viewBox="0 0 1200 70" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,32 C240,88 480,0 720,24 C960,48 1080,16 1200,36 L1200,70 L0,70 Z"></path></svg>`
+    : s.blocks.map((b) => renderBlock(b, tokens, o)).join('')
   return `<section class="sf-section sf-section-${attr(s.type)}"${outerAttr}${idAttr}><div class="sf-section-inner"${innerAttr}>${inner}</div></section>`
 }
 
@@ -127,6 +130,35 @@ function baseCss(tokens: DesignTokens): string {
 .sf-stars{letter-spacing:2px;color:#f5a623}
 .sf-price-was{text-decoration:line-through;opacity:.55;margin-left:8px}
 .sf-price-save{margin-left:8px;font-weight:700}
+
+/* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
+/* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */
+.sf-section-imageBenefits .sf-section-inner,
+.sf-section-reviewsCarousel .sf-section-inner,
+.sf-section-imagePercentage .sf-section-inner,
+.sf-section-recommendedProducts .sf-section-inner,
+.sf-section-productDifferences .sf-section-inner,
+.sf-section-imageTimeline .sf-section-inner{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:22px}
+/* sticky add-to-cart bar */
+.sf-section-stickyAtc{position:sticky;bottom:0;z-index:5;border-top:1px solid var(--sf-line,#e7e3dd);box-shadow:0 -6px 20px -12px rgba(20,18,15,.3)}
+.sf-block-atc{display:flex;align-items:center;gap:14px;width:100%}
+.sf-block-atc .sf-heading{flex:1;margin:0}
+/* benefit cards */
+.sf-block-benefitList{text-align:center;align-items:center;padding:6px}
+/* review cards */
+.sf-block-reviewCard{box-shadow:0 1px 2px rgba(20,18,15,.06)}
+/* logo strip */
+.sf-block-logoStrip{flex-wrap:wrap;justify-content:center;opacity:.85}
+/* timeline steps: left accent + connector */
+.sf-block-timelineStep{width:100%;max-width:640px;border-left:2px solid var(--sf-line,#e7e3dd);padding-left:18px;position:relative}
+.sf-block-timelineStep .sf-badge{align-self:flex-start}
+/* comparison rows as a 3-column grid */
+.sf-block-diffTable{display:grid;grid-template-columns:1fr 90px 90px;align-items:center;gap:10px;max-width:640px;padding:12px 4px;border-bottom:1px solid var(--sf-line,#e7e3dd)}
+/* product cards */
+.sf-block-productCard{align-items:center;text-align:center}
+/* shape divider */
+.sf-shape-divider{display:block;width:100%;height:70px}
+.sf-shape-divider path{fill:var(--sf-primary,#e02f06)}
 `.trim()
 }
 
