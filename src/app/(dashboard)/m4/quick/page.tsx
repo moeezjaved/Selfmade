@@ -32,6 +32,38 @@ const toCode = (c?: string): string => {
 }
 const CTAS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'GET_OFFER', 'BOOK_TRAVEL', 'SUBSCRIBE', 'CONTACT_US']
 
+type OwnAd = { adId: string; title: string; body: string; isActive: boolean; image: string | null; link: string }
+
+// The full list of every ad on the connected account (active + paused), straight from Meta.
+function LiveAdsList() {
+  const [ads, setAds] = useState<OwnAd[] | null>(null)
+  useEffect(() => { fetch('/api/ads-studio/your-ads').then((r) => r.json()).then((d) => setAds(Array.isArray(d.ads) ? d.ads : [])).catch(() => setAds([])) }, [])
+  if (ads === null) return <div style={{ color: FAINT, fontSize: 14, padding: '16px 0' }}>Loading every ad on your account…</div>
+  if (!ads.length) return <div style={{ color: FAINT, fontSize: 14, padding: '8px 0' }}>No ads on your account yet — launch one from the <b style={{ color: INK }}>Launch a new ad</b> tab.</div>
+  const active = ads.filter((a) => a.isActive).length
+  return (
+    <div style={{ marginTop: 26 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, marginBottom: 12 }}>All your ads · {ads.length} <span style={{ color: FAINT, fontWeight: 600 }}>({active} active)</span></div>
+      <div style={{ display: 'grid', gap: 10 }}>
+        {ads.map((a) => (
+          <div key={a.adId} style={{ display: 'flex', gap: 12, alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 12, padding: 10, background: '#fff' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 8, overflow: 'hidden', background: INSET, flex: 'none' }}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {a.image ? <img src={a.image} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} /> : null}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 14, fontWeight: 600, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.title || 'Untitled ad'}</div>
+              {a.body ? <div style={{ fontSize: 12, color: SUB, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{a.body}</div> : null}
+            </div>
+            <span style={{ flex: 'none', fontSize: 11, fontWeight: 800, borderRadius: 999, padding: '4px 11px', background: a.isActive ? '#eef8f0' : INSET, color: a.isActive ? GOOD : SUB }}>{a.isActive ? '● Active' : 'Paused'}</span>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 12.5, color: FAINT, marginTop: 12 }}>To change any of these, just tell Mello above — e.g. “pause {ads[0]?.title?.slice(0, 24) || 'this ad'}” or “scale it to $50/day”.</div>
+    </div>
+  )
+}
+
 export default function QuickLaunch() {
   const [creatives, setCreatives] = useState<Creative[] | null>(null)
   const [picked, setPicked] = useState<string | null>(null)
@@ -215,6 +247,7 @@ export default function QuickLaunch() {
           <div style={{ marginTop: 20 }}>
             <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
           </div>
+          <LiveAdsList />
         </div>
       ) : (<>
 
