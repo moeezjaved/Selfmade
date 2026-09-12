@@ -13,10 +13,12 @@ import Link from 'next/link'
 import { renderDoc, type RenderProduct } from '@/lib/builder/render'
 import type { PageDoc, Section, Block, Element, Device } from '@/lib/builder/schema'
 import {
-  type NodeRef, levelOf, findNode, findElement, descendantCount,
-  moveNode, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent,
+  type NodeRef, findNode, findElement, descendantCount,
+  moveNode, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
 } from '@/lib/builder/docOps'
+import { writeField, type StyleKey } from '@/lib/builder/styleField'
 import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL } from '@/lib/builder/seed'
+import PropertyPanel from './PropertyPanel'
 
 /* theme tokens (shared with the builder / HqRunable) */
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
@@ -100,6 +102,14 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const undo = useCallback(() => {
     setDoc((cur) => { const prev = history.current.pop(); if (!prev || !cur) return cur; save(prev); return prev })
   }, [save])
+
+  /* ── property-panel writes (style is written for the device shown on the canvas) ── */
+  const onStyle = useCallback((key: StyleKey, value: unknown) => {
+    if (!sel) return
+    apply((d) => { const n = findNode(d, sel); if (!n) return d; return patchStyle(d, sel, writeField(n.style, key, device, value)) })
+  }, [sel, device, apply])
+  const onHidden = useCallback(() => { if (sel) apply((d) => setHidden(d, sel)) }, [sel, apply])
+  const onContent = useCallback((patch: Partial<Element['content']>) => { if (sel) apply((d) => patchElementContent(d, sel, patch)) }, [sel, apply])
 
   /* ── canvas render (edit mode) ── */
   const product = useMemo(() => (doc ? editorProduct(doc) : {}), [doc])
@@ -258,7 +268,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           {!sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
           ) : (
-            <PropertyPanel doc={doc} sel={sel} apply={apply} />
+            <PropertyPanel doc={doc} sel={sel} device={device} onStyle={onStyle} onHidden={onHidden} onContent={onContent} />
           )}
         </aside>
       </div>
@@ -275,37 +285,6 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           onClose={() => setAddMenu(null)}
         />
       )}
-    </div>
-  )
-}
-
-/* ── property panel (Phase 2 minimal: hidden toggle + inline text for free-text elements) ── */
-function PropertyPanel({ doc, sel, apply }: { doc: PageDoc; sel: NodeRef; apply: (m: (d: PageDoc) => PageDoc, s?: NodeRef | null) => void }) {
-  const node = findNode(doc, sel)
-  if (!node) return <div style={{ color: FAINT, fontSize: 13 }}>Selection no longer exists.</div>
-  const lvl = levelOf(sel)
-  const el = lvl === 'element' ? (node as Element) : null
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <div>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>{lvl}</div>
-        <div style={{ fontFamily: SERIF, fontSize: 20 }}>{el ? elLabel(el) : ('type' in node ? String((node as Section | Block).type) : '')}</div>
-      </div>
-      {el && !el.content.bind && 'text' in el.content && (
-        <label style={{ display: 'block' }}>
-          <span style={{ fontSize: 12, color: SUB, fontWeight: 600 }}>Text</span>
-          <textarea defaultValue={el.content.text || ''} onBlur={(e) => apply((d) => patchElementContent(d, sel, { text: e.target.value }))}
-            style={{ width: '100%', marginTop: 6, border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px', fontSize: 14, color: INK, fontFamily: 'inherit', resize: 'vertical', minHeight: 64 }} />
-        </label>
-      )}
-      {el?.content.bind && <div style={{ fontSize: 12, color: SUB, background: INSET, borderRadius: 10, padding: '10px 12px' }}>Bound to <b>{el.content.bind.replace('product.', '')}</b> — value comes from the product.</div>}
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: SUB }}>
-        <input type="checkbox" checked={!!(node as { hidden?: boolean }).hidden} onChange={() => apply((d) => setHidden(d, sel))} />
-        Hidden on the page
-      </label>
-      <div style={{ marginTop: 4, fontSize: 11.5, color: FAINT, lineHeight: 1.6, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-        Full styling controls — typography, spacing, color, background, border, layout, per-device — arrive in Phase 3.
-      </div>
     </div>
   )
 }
