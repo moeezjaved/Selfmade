@@ -31,8 +31,10 @@ export async function GET(_req: NextRequest) {
   const [store, meta, health, catalogApplied, blogPub, pseoPub, pseoDraft, geoAnswers, geoAudit, seoAudit, keywords] = await Promise.all([
     one(() => scope(admin.from('shopify_stores').select('shop_name, shop_domain').eq('user_id', uid).eq('status', 'active').limit(1)).maybeSingle()),
     // Meta must be scoped to the ACTIVE brand — else a new brand shows "connected" because the user
-    // linked Meta on a different brand (meta_accounts.brand_id, mig 142). Brand isolation.
-    count(() => scope(admin.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', uid))),
+    // linked Meta on a different brand (meta_accounts.brand_id, mig 142). Brand isolation. Must ALSO
+    // be status='active' — every real Meta path (scopedMetaAccounts, createMetaClientForUser, Launch)
+    // requires active, so an expired/inactive row must NOT read as "Connected" here (it can't launch).
+    count(() => scope(admin.from('meta_accounts').select('id', { count: 'exact', head: true }).eq('user_id', uid).eq('status', 'active'))),
     one(() => scope(admin.from('shopify_stores').select('id').eq('user_id', uid).limit(1)).maybeSingle()).then(async (s: any) => {
       if (!s?.id) return null
       const { data } = await admin.from('shopify_products').select('seo_title, images_missing_alt').eq('store_id', s.id).limit(5000)
