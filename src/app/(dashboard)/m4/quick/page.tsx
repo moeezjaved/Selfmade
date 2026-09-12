@@ -159,8 +159,25 @@ export default function QuickLaunch() {
         const cc = toCode(d?.country)
         if (cc) setLocations((l) => l.length ? l : [{ key: cc, name: COUNTRIES.find(([c]) => c === cc)?.[1] || cc, type: 'country' }])
         detected.current = { product: d?.product || '', description: d?.description || '', targetCustomer: d?.targetCustomer || '', brand: d?.brand || '' }
+        // Enrich from BRAND HUB (curated product facts + product names) so copy is about the real product,
+        // not a generic "our range of products". The Brand Hub is the source of truth we already have.
+        const dom = String(d?.website || url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+        if (dom) {
+          const [kit, prods] = await Promise.all([
+            fetch(`/api/ads-studio/brand-kit?domain=${encodeURIComponent(dom)}`).then((r) => r.json()).catch(() => null),
+            fetch(`/api/ads-studio/products?domain=${encodeURIComponent(dom)}`).then((r) => r.json()).catch(() => null),
+          ])
+          const pTitle = (Array.isArray(prods?.products) && prods.products[0]?.title) || ''
+          const facts = (Array.isArray(kit?.facts) ? kit.facts : []).slice(0, 5).join('. ')
+          detected.current = {
+            product: pTitle || detected.current.product || kit?.siteName || '',
+            description: facts || detected.current.description || '',
+            targetCustomer: detected.current.targetCustomer,
+            brand: kit?.siteName || detected.current.brand || '',
+          }
+        }
       } catch { /* best-effort */ }
-      await genCopy()   // ALWAYS write copy (falls back to brand/site when detect is thin)
+      await genCopy()   // ALWAYS write copy (now grounded in the real product from Brand Hub)
       setPrefilling(false)
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
@@ -197,6 +214,18 @@ export default function QuickLaunch() {
       const cp = await fetch('/api/m4/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product, description, targetCustomer: dc.targetCustomer || '', type: 'main', tone: 'benefit' }) }).then((r) => r.json())
       if (cp) { if (cp.primaryText) setPrimaryText(cp.primaryText); if (cp.headline) setHeadline(String(cp.headline).slice(0, 40)); if (force) copyEdited.current = false }
     } catch { /* keep whatever's there */ } finally { setCopyBusy(false) }
+  }
+
+  // Auto-write the message for a retargeting / retention campaign (grounded in the same product).
+  const genCampaignCopy = async (type: 'retargeting' | 'retainer', setMsg: (s: string) => void) => {
+    const dc = detected.current
+    const domain = (url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    const product = dc.product || dc.brand || domain || 'our product'
+    const description = dc.description || `Products from ${dc.brand || domain || 'our store'}`
+    try {
+      const cp = await fetch('/api/m4/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product, description, targetCustomer: dc.targetCustomer || '', type, tone: 'benefit' }) }).then((r) => r.json())
+      if (cp?.primaryText) setMsg(String(cp.primaryText))
+    } catch { /* leave empty — user can write it */ }
   }
 
   // ── interest search (debounced) ──
@@ -486,7 +515,7 @@ export default function QuickLaunch() {
                 return (
                 <div key={c.title} style={{ border: `1.5px solid ${c.on ? ORANGE : LINE}`, background: c.on ? '#fff5f2' : '#fff', borderRadius: 13, padding: '13px 15px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
-                    <input type="checkbox" checked={c.on} onChange={(e) => c.set(e.target.checked)} style={{ width: 16, height: 16, accentColor: ORANGE }} />
+                    <input type="checkbox" checked={c.on} onChange={(e) => { const on = e.target.checked; c.set(on); if (on && !c.msg.trim()) genCampaignCopy(c.kind === 'retarget' ? 'retargeting' : 'retainer', c.setMsg) }} style={{ width: 16, height: 16, accentColor: ORANGE }} />
                     <span style={{ fontSize: 14, fontWeight: 750, color: c.on ? ORANGE : INK }}>{c.title}</span>
                   </label>
                   <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, paddingLeft: 26 }}>{c.sub}</div>
