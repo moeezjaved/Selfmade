@@ -45,6 +45,12 @@ export default function QuickLaunch() {
   const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
   const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
   const copyEdited = useRef(false)
+  // A creative uploaded straight from the user's computer (image OR video). We hold Meta's hash so launch
+  // skips the re-upload, and a local preview URL so it shows in the grid.
+  const [uploaded, setUploaded] = useState<{ id: string; previewUrl: string; hash: string; isVideo: boolean; name: string } | null>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadErr, setUploadErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
 
   // Load creatives, the connected Page(s), and auto-detect the brand → pre-fill URL/country, then generate copy.
   useEffect(() => {
@@ -84,7 +90,31 @@ export default function QuickLaunch() {
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const chosen = creatives?.find((c) => c.id === picked) || null
+  // Upload a picture/video from the computer → Meta gives back a hash (image) or video id, which we reuse
+  // at launch. Video is fully supported by /api/m4/launch (it builds a video creative).
+  const onUpload = async (file: File) => {
+    setUploadErr('')
+    const isVideo = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v)$/i.test(file.name)
+    if (file.size > 200 * 1024 * 1024) { setUploadErr('That file is over 200MB — pick a smaller one.'); return }
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      fd.append('isVideo', isVideo ? 'true' : 'false')
+      const d = await fetch('/api/m4/upload-image', { method: 'POST', body: fd }).then((r) => r.json())
+      if (!d?.hash) { setUploadErr(d?.error || 'Couldn’t prepare that file for Meta — try another.'); setUploading(false); return }
+      const previewUrl = URL.createObjectURL(file)
+      const up = { id: '_upload', previewUrl, hash: String(d.hash), isVideo: !!d.isVideo || isVideo, name: file.name }
+      setUploaded(up); setPicked('_upload')
+    } catch { setUploadErr('Upload failed — try again.') }
+    finally { setUploading(false) }
+  }
+
+  // The full pickable list = the uploaded creative (if any) first, then generated ones.
+  const uploadedCreative: Creative | null = uploaded ? { id: '_upload', image_url: uploaded.previewUrl, media_type: uploaded.isVideo ? 'video' : 'image', brand_name: uploaded.name } : null
+  const allCreatives: Creative[] | null = creatives === null ? null : (uploadedCreative ? [uploadedCreative, ...creatives] : creatives)
+
+  const chosen = allCreatives?.find((c) => c.id === picked) || null
   const page = pages.find((p) => p.id === pageId) || null
   const missing: string[] = []
   if (!chosen) missing.push('an ad')
@@ -98,14 +128,20 @@ export default function QuickLaunch() {
     if (!chosen?.image_url || !ready) return
     setResult(null)
     try {
-      setBusy('uploading')
-      const up = await fetch('/api/m4/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: chosen.image_url }) }).then((r) => r.json())
-      if (!up?.hash) { setBusy(''); setResult({ ok: false, msg: up?.error || 'Couldn’t prepare that creative for Meta — try another.' }); return }
+      // Uploaded-from-computer creative already has its Meta hash (image or video) — no re-upload needed.
+      let hash = uploaded && chosen.id === '_upload' ? uploaded.hash : ''
+      let creativeType: 'image' | 'video' = uploaded && chosen.id === '_upload' && uploaded.isVideo ? 'video' : 'image'
+      if (!hash) {
+        setBusy('uploading')
+        const up = await fetch('/api/m4/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: chosen.image_url }) }).then((r) => r.json())
+        if (!up?.hash) { setBusy(''); setResult({ ok: false, msg: up?.error || 'Couldn’t prepare that creative for Meta — try another.' }); return }
+        hash = up.hash; creativeType = 'image'
+      }
 
       setBusy('launching')
       const body = {
         campaignName: `Quick Launch — ${chosen.brand_name || 'Ad'}`,
-        creatives: [{ id: chosen.id, name: chosen.brand_name || 'Your ad', pack: 1, type: 'image', hash: up.hash }],
+        creatives: [{ id: chosen.id, name: chosen.brand_name || 'Your ad', pack: 1, type: creativeType, hash }],
         interests: [],                       // Advantage+ auto-targeting — no manual interests
         budget: String(parseFloat(budget) || 10),
         objective: 'OUTCOME_SALES',          // engine auto-downgrades to Traffic if the account has no Pixel
@@ -142,18 +178,32 @@ export default function QuickLaunch() {
       </div>
 
       {heading('1', 'Pick your ad')}
+      <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
       {creatives === null ? <div style={{ color: FAINT, fontSize: 14 }}>Loading your creatives…</div>
-        : creatives.length === 0 ? <div style={{ border: `1.5px dashed ${LINE}`, borderRadius: 14, padding: 24, textAlign: 'center', color: SUB, fontSize: 14 }}>No creatives yet. <Link href="/ads-workspace" style={{ color: ORANGE, fontWeight: 700 }}>Make an ad first →</Link></div>
         : (
+          <>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
-            {creatives.map((c) => (
+            {/* Upload from computer — first cell */}
+            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ position: 'relative', padding: 0, border: `2px dashed ${LINE}`, borderRadius: 12, background: INSET, cursor: uploading ? 'default' : 'pointer', aspectRatio: '4/5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB }}>
+              <span style={{ fontSize: 24, lineHeight: 1 }}>{uploading ? '…' : '↑'}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, textAlign: 'center', padding: '0 8px' }}>{uploading ? 'Uploading…' : 'Upload photo or video'}</span>
+              <span style={{ fontSize: 10.5, color: FAINT }}>from your computer</span>
+            </button>
+            {(allCreatives || []).map((c) => (
               <button key={c.id} onClick={() => setPicked(c.id)} style={{ position: 'relative', padding: 0, border: `2px solid ${c.id === picked ? ORANGE : LINE}`, borderRadius: 12, overflow: 'hidden', background: INSET, cursor: 'pointer', aspectRatio: '4/5' }}>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={c.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                {c.media_type === 'video'
+                  ? <video src={c.image_url!} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  : <img src={c.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                {c.media_type === 'video' && <span style={{ position: 'absolute', bottom: 7, left: 7, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>▶ Video</span>}
+                {c.id === '_upload' && <span style={{ position: 'absolute', top: 7, left: 7, background: INK, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>Yours</span>}
                 {c.id === picked && <span style={{ position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800 }}>✓</span>}
               </button>
             ))}
           </div>
+          {uploadErr && <div style={{ marginTop: 8, fontSize: 12.5, color: ORANGE }}>{uploadErr}</div>}
+          {creatives.length === 0 && !uploaded && <div style={{ marginTop: 8, fontSize: 12.5, color: FAINT }}>No generated creatives yet — upload one above, or <Link href="/ads-workspace" style={{ color: ORANGE, fontWeight: 700 }}>make an ad →</Link></div>}
+          </>
         )}
 
       {heading('2', 'Your ad copy')}

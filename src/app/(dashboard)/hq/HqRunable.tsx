@@ -64,7 +64,6 @@ const GROW_CATS: Cat[] = [
   { name: 'Storefront', tiles: [
     { label: 'CRO Audit', sub: 'Fix conversion leaks', href: '/mission/cro', seed: 'Run a CRO audit of my store — score my conversion and list the biggest leaks with their fixes. Then offer to rewrite my product page.', icon: <Ic><path d="M12 3l8 4v5c0 5-3.5 8-8 9-4.5-1-8-4-8-9V7z" /><path d="M9 12l2 2 4-4" /></Ic> },
     { label: 'Fix Catalog', sub: 'Product SEO & schema', href: '/mission/catalog', seed: 'Fix my Shopify product catalog — draft better product descriptions, then bring them to me to approve before applying. Do not analyse competitors — use the fix_catalog tool.', icon: <Ic><path d="M4 7h16v13H4z" /><path d="M9 7V4h6v3" /></Ic> },
-    { label: 'Launch Ads', sub: 'Pick a creative, set budget, go', href: '/m4/quick', icon: <Ic><path d="M13 3c3 1 5 4 5 8l-3 3h-4L8 11c0-4 2-7 5-8z" /><path d="M9 18c-1 1-1 3-1 3s2 0 3-1" /><circle cx="13" cy="9" r="1.4" /></Ic> },
   ] },
 ]
 const BUILD_CATS: Cat[] = [
