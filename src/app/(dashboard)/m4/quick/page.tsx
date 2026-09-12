@@ -1,22 +1,22 @@
 'use client'
 /**
- * Quick Launch — the dead-simple way to put an ad live on Meta. We ask ONLY what's genuinely needed to run
- * ads, PRE-FILL everything we can (Facebook Page, destination URL, country) and GENERATE what we can
- * (the ad copy) so the founder mostly just confirms + sets a budget. Launches a single Advantage+
- * (auto-targeted) campaign via the SAME battle-tested /api/m4/launch engine — no interests to pick, no
- * pixel wrangling. The full 8-step wizard stays at /m4 as "Advanced".
+ * Your Ads — the most important page in the app. Two jobs on one screen:
+ *   · Launch a new ad  — pick creative(s) from a modal (or upload), everything else pre-filled/generated,
+ *     with the FULL targeting the old M4 wizard asked (goal, audience by interest, age/gender, location,
+ *     retargeting) but organised so it stays simple. Fires the same /api/m4/launch engine.
+ *   · Your live ads    — the live account with per-ad Manage (Scale/Pause/Duplicate/Edit via Mello).
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 
-const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.12)', INSET = '#f7f6f4', ORANGE = '#e02f06', GOOD = '#12a150'
+const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.12)', LINE2 = 'rgba(20,18,15,.07)', INSET = '#f7f6f4', ORANGE = '#e02f06', GOOD = '#12a150', PAPER = '#fbfaf8'
 const SANS = 'Inter, system-ui, sans-serif'
 
-type Creative = { id: string; image_url: string | null; media_type?: string | null; prompt?: string | null; brand_name?: string | null }
+type Creative = { id: string; image_url: string | null; media_type?: string | null; prompt?: string | null; brand_name?: string | null; hash?: string; local?: boolean }
 type Page = { id: string; name: string; website?: string; instagram?: { id: string } | null }
+type Interest = { id: string; name: string }
 
-// Country name → Meta geo ISO-2 (the launch engine sends these as geo_locations.countries).
 const COUNTRIES: [string, string][] = [
   ['US', 'United States'], ['GB', 'United Kingdom'], ['CA', 'Canada'], ['AU', 'Australia'], ['PK', 'Pakistan'],
   ['IN', 'India'], ['AE', 'UAE'], ['SA', 'Saudi Arabia'], ['DE', 'Germany'], ['FR', 'France'], ['NL', 'Netherlands'],
@@ -29,55 +29,82 @@ const toCode = (c?: string): string => {
   const hit = COUNTRIES.find(([, name]) => name.toLowerCase() === s.toLowerCase())
   return hit ? hit[0] : ''
 }
-const CTAS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'GET_OFFER', 'BOOK_TRAVEL', 'SUBSCRIBE', 'CONTACT_US']
+const CTAS = ['SHOP_NOW', 'LEARN_MORE', 'SIGN_UP', 'GET_OFFER', 'SUBSCRIBE', 'CONTACT_US', 'BOOK_TRAVEL']
+const OBJECTIVES: { key: string; label: string; sub: string }[] = [
+  { key: 'OUTCOME_SALES', label: 'Sales', sub: 'Buyers & conversions' },
+  { key: 'OUTCOME_TRAFFIC', label: 'Traffic', sub: 'Clicks to your site' },
+  { key: 'OUTCOME_LEADS', label: 'Leads', sub: 'Sign-ups & enquiries' },
+]
+
+// ── tiny line icons (single-colour, match the app) ──
+const Ic = ({ d, size = 18 }: { d: string; size?: number }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d.split('|').map((p, i) => <path key={i} d={p} />)}</svg>
+)
+const ICONS = {
+  ad: 'M3 5h18v14H3z|M3 15l5-5 4 4 3-3 6 6',
+  goal: 'M12 2v4|M12 18v4|M2 12h4|M18 12h4', // simplified target
+  people: 'M17 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2|M12 7a4 4 0 1 0 0 0.01|M22 21v-2a4 4 0 0 0-3-3.87',
+  copy: 'M4 7h16|M4 12h16|M4 17h10',
+  pin: 'M12 21s7-6.2 7-11a7 7 0 1 0-14 0c0 4.8 7 11 7 11z|M12 12a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5z',
+  money: 'M12 2v20|M17 6.5c0-2-2.2-3.5-5-3.5s-5 1.3-5 3.3S9 12 12 12s5 1 5 3.2-2.2 3.3-5 3.3-5-1.5-5-3.5',
+}
 
 export default function QuickLaunch() {
+  // data
   const [creatives, setCreatives] = useState<Creative[] | null>(null)
-  const [picked, setPicked] = useState<string | null>(null)
   const [pages, setPages] = useState<Page[]>([])
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
+  const [tab, setTab] = useState<'launch' | 'manage'>('launch')
+  const [prefilling, setPrefilling] = useState(true)
+
+  // launch selections
+  const [selected, setSelected] = useState<string[]>([])          // creative ids chosen (multi)
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [pageId, setPageId] = useState('')
+  const [objective, setObjective] = useState('OUTCOME_SALES')
   const [primaryText, setPrimaryText] = useState('')
   const [headline, setHeadline] = useState('')
   const [cta, setCta] = useState('SHOP_NOW')
   const [url, setUrl] = useState('')
   const [country, setCountry] = useState('')
-  const [budget, setBudget] = useState('10')
-  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
-  const [tab, setTab] = useState<'launch' | 'manage'>('launch')   // one page: launch a NEW ad, or manage LIVE ads
-  const [prefilling, setPrefilling] = useState(true)
-  const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
-  const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
-  const copyEdited = useRef(false)
-  // A creative uploaded straight from the user's computer (image OR video). We hold Meta's hash so launch
-  // skips the re-upload, and a local preview URL so it shows in the grid.
-  const [uploaded, setUploaded] = useState<{ id: string; previewUrl: string; hash: string; isVideo: boolean; name: string } | null>(null)
+  const [budget, setBudget] = useState('20')
+  // audience
+  const [broad, setBroad] = useState(true)                        // Advantage+ vs interest-targeted
+  const [interests, setInterests] = useState<Interest[]>([])
+  const [iQuery, setIQuery] = useState('')
+  const [iResults, setIResults] = useState<Interest[]>([])
+  const [iSearching, setISearching] = useState(false)
+  const [ageMin, setAgeMin] = useState('18')
+  const [ageMax, setAgeMax] = useState('65')
+  const [gender, setGender] = useState<'ALL' | 'MEN' | 'WOMEN'>('ALL')
+  const [retarget, setRetarget] = useState(false)
+
+  // upload
+  const [uploaded, setUploaded] = useState<Creative[]>([])         // uploaded-from-computer creatives (carry Meta hash)
   const [uploading, setUploading] = useState(false)
   const [uploadErr, setUploadErr] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  // Load creatives, the connected Page(s), and auto-detect the brand → pre-fill URL/country, then generate copy.
+  const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
+  const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
+  const copyEdited = useRef(false)
+
+  // ── load creatives + pages + detect brand → prefill url/country → generate copy ──
   useEffect(() => {
-    // A specific creative can arrive via ?img=<url> (e.g. "Run on Facebook" from a single ad) — pre-select it,
-    // injecting a synthetic entry when it isn't in the recent list so that exact ad is what gets launched.
     let wantImg = ''
-    try {
-      const sp = new URLSearchParams(window.location.search)
-      wantImg = sp.get('img') || ''
-      if (sp.get('tab') === 'manage') setTab('manage')   // deep-link straight to the live-ads view
-    } catch { /* SSR-safe */ }
+    try { const sp = new URLSearchParams(window.location.search); wantImg = sp.get('img') || ''; if (sp.get('tab') === 'manage') setTab('manage') } catch { /* SSR */ }
 
     fetch('/api/creatives?limit=60').then((r) => r.json()).then((d) => {
       let list: Creative[] = (Array.isArray(d.creatives) ? d.creatives : []).filter((c: Creative) => c.image_url && c.media_type !== 'video')
       if (wantImg) {
         const hit = list.find((c) => c.image_url === wantImg)
-        if (hit) { setPicked(hit.id) }
-        else { const synth: Creative = { id: '_img', image_url: wantImg, media_type: 'image' }; list = [synth, ...list]; setPicked('_img') }
+        if (hit) setSelected([hit.id])
+        else { list = [{ id: '_img', image_url: wantImg, media_type: 'image' }, ...list]; setSelected(['_img']) }
       }
       setCreatives(list)
-    }).catch(() => { if (wantImg) { setCreatives([{ id: '_img', image_url: wantImg, media_type: 'image' }]); setPicked('_img') } else setCreatives([]) })
+    }).catch(() => setCreatives([]))
 
     fetch('/api/m4/pages').then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) })).then(({ ok, d }) => {
-      // A "No Meta account" error (400) means Facebook isn't connected at all — gate the whole flow on it.
       setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
       const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
       setPages(ps)
@@ -89,73 +116,87 @@ export default function QuickLaunch() {
         const d = await fetch('/api/m4/detect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then((r) => r.json())
         if (d?.website && !url) setUrl(String(d.website))
         if (d?.country) setCountry(toCode(d.country) || '')
-        // Generate the ad copy from what we detected — the founder can edit it.
         if (d?.product || d?.description) {
           const cp = await fetch('/api/m4/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product: d.product || '', description: d.description || '', targetCustomer: d.targetCustomer || '', type: 'main', tone: 'benefit' }) }).then((r) => r.json()).catch(() => null)
           if (cp && !copyEdited.current) { if (cp.primaryText) setPrimaryText(cp.primaryText); if (cp.headline) setHeadline(cp.headline) }
         }
-      } catch { /* prefill is best-effort */ }
+      } catch { /* best-effort */ }
       finally { setPrefilling(false) }
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Upload a picture/video from the computer → Meta gives back a hash (image) or video id, which we reuse
-  // at launch. Video is fully supported by /api/m4/launch (it builds a video creative).
+  // ── interest search (debounced) ──
+  useEffect(() => {
+    if (broad || iQuery.trim().length < 2) { setIResults([]); return }
+    const t = setTimeout(async () => {
+      setISearching(true)
+      try {
+        const d = await fetch(`/api/m4/search-interests?q=${encodeURIComponent(iQuery.trim())}`).then((r) => r.json())
+        const res: Interest[] = (Array.isArray(d.results) ? d.results : []).map((x: any) => ({ id: String(x.id), name: String(x.name) })).filter((x: Interest) => !interests.some((i) => i.id === x.id))
+        setIResults(res.slice(0, 8))
+      } catch { setIResults([]) } finally { setISearching(false) }
+    }, 280)
+    return () => clearTimeout(t)
+  }, [iQuery, broad]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── upload from computer (image or video) ──
   const onUpload = async (file: File) => {
     setUploadErr('')
     const isVideo = /^video\//.test(file.type) || /\.(mp4|mov|webm|m4v)$/i.test(file.name)
     if (file.size > 200 * 1024 * 1024) { setUploadErr('That file is over 200MB — pick a smaller one.'); return }
     setUploading(true)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      fd.append('isVideo', isVideo ? 'true' : 'false')
+      const fd = new FormData(); fd.append('file', file); fd.append('isVideo', isVideo ? 'true' : 'false')
       const d = await fetch('/api/m4/upload-image', { method: 'POST', body: fd }).then((r) => r.json())
       if (!d?.hash) { setUploadErr(d?.error || 'Couldn’t prepare that file for Meta — try another.'); setUploading(false); return }
-      const previewUrl = URL.createObjectURL(file)
-      const up = { id: '_upload', previewUrl, hash: String(d.hash), isVideo: !!d.isVideo || isVideo, name: file.name }
-      setUploaded(up); setPicked('_upload')
-    } catch { setUploadErr('Upload failed — try again.') }
-    finally { setUploading(false) }
+      const id = `_up_${Date.now()}`
+      const c: Creative = { id, image_url: URL.createObjectURL(file), media_type: isVideo ? 'video' : 'image', brand_name: file.name, hash: String(d.hash), local: true }
+      setUploaded((u) => [c, ...u]); setSelected((s) => [id, ...s])
+    } catch { setUploadErr('Upload failed — try again.') } finally { setUploading(false) }
   }
 
-  // The full pickable list = the uploaded creative (if any) first, then generated ones.
-  const uploadedCreative: Creative | null = uploaded ? { id: '_upload', image_url: uploaded.previewUrl, media_type: uploaded.isVideo ? 'video' : 'image', brand_name: uploaded.name } : null
-  const allCreatives: Creative[] | null = creatives === null ? null : (uploadedCreative ? [uploadedCreative, ...creatives] : creatives)
-
-  const chosen = allCreatives?.find((c) => c.id === picked) || null
+  const allCreatives: Creative[] = [...uploaded, ...(creatives || [])]
+  const chosen = allCreatives.filter((c) => selected.includes(c.id))
   const page = pages.find((p) => p.id === pageId) || null
+  const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
+
   const missing: string[] = []
-  if (!chosen) missing.push('an ad')
+  if (!chosen.length) missing.push('an ad')
   if (!pageId) missing.push('a Facebook Page')
   if (!url.trim()) missing.push('a destination URL')
   if (!headline.trim() || !primaryText.trim()) missing.push('ad copy')
   if (!country) missing.push('a country')
+  if (!broad && interests.length === 0) missing.push('at least one interest (or switch to Advantage+)')
   const ready = missing.length === 0 && !busy
 
+  // resolve a creative's Meta hash: uploaded already have it; saved ones upload their image URL.
+  const hashFor = async (c: Creative): Promise<{ hash: string; type: 'image' | 'video' } | null> => {
+    if (c.hash) return { hash: c.hash, type: c.media_type === 'video' ? 'video' : 'image' }
+    if (!c.image_url) return null
+    const up = await fetch('/api/m4/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: c.image_url }) }).then((r) => r.json()).catch(() => null)
+    return up?.hash ? { hash: up.hash, type: 'image' } : null
+  }
+
   const launch = async () => {
-    if (!chosen?.image_url || !ready) return
+    if (!ready) return
     setResult(null)
     try {
-      // Uploaded-from-computer creative already has its Meta hash (image or video) — no re-upload needed.
-      let hash = uploaded && chosen.id === '_upload' ? uploaded.hash : ''
-      let creativeType: 'image' | 'video' = uploaded && chosen.id === '_upload' && uploaded.isVideo ? 'video' : 'image'
-      if (!hash) {
-        setBusy('uploading')
-        const up = await fetch('/api/m4/upload-image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ imageUrl: chosen.image_url }) }).then((r) => r.json())
-        if (!up?.hash) { setBusy(''); setResult({ ok: false, msg: up?.error || 'Couldn’t prepare that creative for Meta — try another.' }); return }
-        hash = up.hash; creativeType = 'image'
-      }
+      setBusy('uploading')
+      const resolved = await Promise.all(chosen.map(async (c) => { const h = await hashFor(c); return h ? { id: c.id, name: c.brand_name || 'Your ad', pack: 1, type: h.type, hash: h.hash } : null }))
+      const creativesBody = resolved.filter(Boolean) as any[]
+      if (!creativesBody.length) { setBusy(''); setResult({ ok: false, msg: 'Couldn’t prepare your creative(s) for Meta — try again or pick another.' }); return }
 
       setBusy('launching')
       const body = {
-        campaignName: `Quick Launch — ${chosen.brand_name || 'Ad'}`,
-        creatives: [{ id: chosen.id, name: chosen.brand_name || 'Your ad', pack: 1, type: creativeType, hash }],
-        interests: [],                       // Advantage+ auto-targeting — no manual interests
-        budget: String(parseFloat(budget) || 10),
-        objective: 'OUTCOME_SALES',          // engine auto-downgrades to Traffic if the account has no Pixel
+        campaignName: `${chosen[0]?.brand_name || 'New'} — ${OBJECTIVES.find((o) => o.key === objective)?.label || 'Ad'}`,
+        creatives: creativesBody,
+        interests: broad ? [] : interests.map((i) => ({ id: i.id, name: i.name })),
+        budget: String(parseFloat(budget) || 20),
+        ageMin, ageMax, gender,
+        objective,
         pageId,
         instagramActorId: page?.instagram?.id || '',
+        retargetingCreatives: retarget ? creativesBody : [],
         websiteUrl: url.trim(),
         headline: headline.trim().slice(0, 40),
         primaryText: primaryText.trim().slice(0, 300),
@@ -165,130 +206,246 @@ export default function QuickLaunch() {
       const r = await fetch('/api/m4/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
       setBusy('')
-      if (!r.ok || d.error) {
-        setResult({ ok: false, msg: d.error || 'Launch failed — try again.', href: d.needsReconnect ? '/settings' : (r.status === 402 ? '/upgrade' : d.tosUrl || undefined), hrefLabel: 'Fix it →' })
-        return
-      }
-      setResult({ ok: true, msg: (d.broad_adsets || 0) ? `Your ad is set up on ${d.account || 'Meta'} — paused for your review.` : 'Campaign created — check your Meta account is ready to run ads.', note: d.note, href: '/reports', hrefLabel: 'Review & turn it on →' })
+      if (!r.ok || d.error) { setResult({ ok: false, msg: d.error || 'Launch failed — try again.', href: d.needsReconnect ? '/settings' : (r.status === 402 ? '/upgrade' : d.tosUrl || undefined), hrefLabel: 'Fix it →' }); return }
+      setResult({ ok: true, msg: (d.broad_adsets || d.adsets || 1) ? `Your ad is set up on ${d.account || 'Meta'} — paused for your review.` : 'Campaign created — check your Meta account is ready to run ads.', note: d.note, href: '/reports', hrefLabel: 'Review & turn it on →' })
     } catch { setBusy(''); setResult({ ok: false, msg: 'Something went wrong — try again.' }) }
   }
 
-  const label = (t: string) => <span style={{ display: 'block', fontSize: 12.5, color: SUB, marginBottom: 6, fontWeight: 600 }}>{t}</span>
-  const input: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '11px 12px', fontSize: 15, fontFamily: SANS, color: INK, background: '#fff', boxSizing: 'border-box' }
-  const heading = (n: string, t: string) => <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: SUB, margin: '30px 0 12px' }}>{n} · {t}</div>
+  // ── shared bits ──
+  const input: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 11, padding: '12px 13px', fontSize: 15, fontFamily: SANS, color: INK, background: '#fff', boxSizing: 'border-box', outline: 'none' }
+  const label = (t: string, hint?: string) => <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}><span style={{ fontSize: 13, color: INK, fontWeight: 650 }}>{t}</span>{hint && <span style={{ fontSize: 12, color: FAINT }}>{hint}</span>}</div>
+  const Section = ({ icon, n, title, children }: { icon: string; n: number; title: string; children: React.ReactNode }) => (
+    <section style={{ background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 16, padding: '18px 18px 20px', boxShadow: '0 1px 2px rgba(20,18,15,.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: INSET, color: INK, display: 'grid', placeItems: 'center' }}><Ic d={icon} /></span>
+        <span style={{ fontSize: 15, fontWeight: 750, color: INK }}>{title}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: FAINT }}>{n}</span>
+      </div>
+      {children}
+    </section>
+  )
+  const pill = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? '#fff5f2' : '#fff', color: on ? ORANGE : INK, borderRadius: 999, padding: '8px 15px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS })
 
   return (
-    <div style={{ maxWidth: 880, margin: '0 auto', padding: '28px 22px 70px', fontFamily: SANS, color: INK }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Your ads</h1>
-          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : tab === 'manage' ? 'Everything that’s live. Hit Manage on any ad to scale, pause, duplicate or edit it — Mello does it, you approve.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
-        </div>
-      </div>
+    <div style={{ maxWidth: 720, margin: '0 auto', padding: '30px 22px 90px', fontFamily: SANS, color: INK }}>
+      {/* header + tabs */}
+      <h1 style={{ margin: 0, fontSize: 32, fontWeight: 820, letterSpacing: '-.025em' }}>Your ads</h1>
+      <p style={{ margin: '7px 0 0', color: SUB, fontSize: 14.5, lineHeight: 1.5 }}>
+        {metaConnected === false ? 'Connect your Facebook account to get started.'
+          : tab === 'manage' ? 'Everything that’s live. Hit Manage on any ad to scale, pause, duplicate or edit it — Mello does it, you approve.'
+          : <>Pick a creative, we pre-fill the rest. Launches paused for your review. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}
+      </p>
 
-      {/* One page, two jobs: launch a NEW ad, or manage the ads already LIVE. */}
       {metaConnected === true && (
-        <div style={{ display: 'flex', gap: 4, marginTop: 18, background: INSET, borderRadius: 999, padding: 4, width: 'fit-content' }}>
-          {([['launch', '🚀 Launch a new ad'], ['manage', '📊 Your live ads']] as const).map(([k, lbl]) => (
-            <button key={k} onClick={() => setTab(k)} style={{ border: 0, background: tab === k ? '#fff' : 'transparent', color: tab === k ? INK : SUB, boxShadow: tab === k ? '0 1px 2px rgba(20,18,15,.12)' : 'none', borderRadius: 999, padding: '8px 16px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS }}>{lbl}</button>
+        <div style={{ display: 'inline-flex', gap: 4, marginTop: 18, background: INSET, borderRadius: 999, padding: 4 }}>
+          {([['launch', 'Launch a new ad'], ['manage', 'Your live ads']] as const).map(([k, lbl]) => (
+            <button key={k} onClick={() => setTab(k)} style={{ border: 0, background: tab === k ? '#fff' : 'transparent', color: tab === k ? INK : SUB, boxShadow: tab === k ? '0 1px 3px rgba(20,18,15,.14)' : 'none', borderRadius: 999, padding: '8px 18px', fontSize: 13.5, fontWeight: 750, cursor: 'pointer', fontFamily: SANS }}>{lbl}</button>
           ))}
         </div>
       )}
 
+      {/* file input for uploads */}
+      <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
+
       {metaConnected !== true ? (
         metaConnected === false ? (
-          <div style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, padding: '28px 24px', background: INSET, textAlign: 'center' }}>
-            <div style={{ fontSize: 34, marginBottom: 10 }}>📘</div>
-            <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 6 }}>Connect Facebook to launch ads</div>
-            <div style={{ fontSize: 14, color: SUB, maxWidth: 440, margin: '0 auto 18px', lineHeight: 1.5 }}>
-              Ads run inside your own Meta ad account, so we need to connect Facebook first. It takes about a minute — then come back here and your ad is one click away.
-            </div>
-            <Link href="/connect-meta?next=/m4/quick" style={{ display: 'inline-block', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '12px 26px', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Connect Facebook →</Link>
+          <div style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 18, padding: '34px 24px', background: PAPER, textAlign: 'center' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: '#1877F2', display: 'grid', placeItems: 'center', margin: '0 auto 14px', color: '#fff', fontWeight: 900, fontSize: 24 }}>f</div>
+            <div style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Connect Facebook to run ads</div>
+            <div style={{ fontSize: 14, color: SUB, maxWidth: 400, margin: '0 auto 20px', lineHeight: 1.55 }}>Ads run inside your own Meta ad account — connect once (about a minute) and your ad is a few clicks away.</div>
+            <Link href="/connect-meta?next=/m4/quick" style={{ display: 'inline-block', background: ORANGE, color: '#fff', borderRadius: 999, padding: '13px 28px', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Connect Facebook →</Link>
           </div>
-        ) : (
-          <div style={{ marginTop: 40, textAlign: 'center', color: FAINT, fontSize: 14 }}>Checking your Facebook connection…</div>
-        )
+        ) : <div style={{ marginTop: 44, textAlign: 'center', color: FAINT, fontSize: 14 }}>Checking your Facebook connection…</div>
       ) : tab === 'manage' ? (
         <div style={{ marginTop: 22 }}>
-          {/* One clean surface: your live ads (this brand's account). Each ad's "Manage" opens an inline
-              Mello panel — Scale, Pause, Duplicate, Edit copy — with approve-before-it-happens. */}
           <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
         </div>
-      ) : (<>
-
-      {heading('1', 'Pick your ad')}
-      <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
-      {creatives === null ? <div style={{ color: FAINT, fontSize: 14 }}>Loading your creatives…</div>
-        : (
-          <>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: 12 }}>
-            {/* Upload from computer — first cell */}
-            <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ position: 'relative', padding: 0, border: `2px dashed ${LINE}`, borderRadius: 12, background: INSET, cursor: uploading ? 'default' : 'pointer', aspectRatio: '4/5', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB }}>
-              <span style={{ fontSize: 24, lineHeight: 1 }}>{uploading ? '…' : '↑'}</span>
-              <span style={{ fontSize: 12, fontWeight: 700, textAlign: 'center', padding: '0 8px' }}>{uploading ? 'Uploading…' : 'Upload photo or video'}</span>
-              <span style={{ fontSize: 10.5, color: FAINT }}>from your computer</span>
-            </button>
-            {(allCreatives || []).map((c) => (
-              <button key={c.id} onClick={() => setPicked(c.id)} style={{ position: 'relative', padding: 0, border: `2px solid ${c.id === picked ? ORANGE : LINE}`, borderRadius: 12, overflow: 'hidden', background: INSET, cursor: 'pointer', aspectRatio: '4/5' }}>
-                {c.media_type === 'video'
-                  ? <video src={c.image_url!} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                  /* eslint-disable-next-line @next/next/no-img-element */
-                  : <img src={c.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
-                {c.media_type === 'video' && <span style={{ position: 'absolute', bottom: 7, left: 7, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>▶ Video</span>}
-                {c.id === '_upload' && <span style={{ position: 'absolute', top: 7, left: 7, background: INK, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>Yours</span>}
-                {c.id === picked && <span style={{ position: 'absolute', top: 7, right: 7, width: 22, height: 22, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800 }}>✓</span>}
+      ) : (
+        <div style={{ marginTop: 22, display: 'grid', gap: 14 }}>
+          {/* 1 · YOUR AD */}
+          <Section icon={ICONS.ad} n={1} title="Your ad">
+            {chosen.length === 0 ? (
+              <button onClick={() => setPickerOpen(true)} style={{ width: '100%', border: `1.5px dashed ${LINE}`, borderRadius: 14, background: PAPER, padding: '26px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+                <span style={{ color: ORANGE }}><Ic d="M12 5v14|M5 12h14" size={22} /></span>
+                <span style={{ fontSize: 14.5, fontWeight: 750, color: INK }}>Select your ad{`(s)`}</span>
+                <span style={{ fontSize: 12.5, color: FAINT }}>Choose from your creatives, or upload from your computer</span>
               </button>
-            ))}
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  {chosen.map((c) => (
+                    <div key={c.id} style={{ position: 'relative', width: 80, height: 100, borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: INSET }}>
+                      {c.media_type === 'video'
+                        ? <video src={c.image_url!} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        : <img src={c.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                      <button onClick={() => toggle(c.id)} aria-label="Remove" style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                    </div>
+                  ))}
+                  <button onClick={() => setPickerOpen(true)} style={{ width: 80, height: 100, borderRadius: 10, border: `1.5px dashed ${LINE}`, background: '#fff', cursor: 'pointer', color: SUB, display: 'grid', placeItems: 'center' }}><Ic d="M12 5v14|M5 12h14" size={20} /></button>
+                </div>
+                <div style={{ fontSize: 12.5, color: FAINT, marginTop: 9 }}>{chosen.length} selected · they’ll run as separate ads in one campaign</div>
+              </div>
+            )}
+          </Section>
+
+          {/* 2 · GOAL */}
+          <Section icon={ICONS.goal} n={2} title="Goal">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10 }}>
+              {OBJECTIVES.map((o) => {
+                const on = objective === o.key
+                return (
+                  <button key={o.key} onClick={() => setObjective(o.key)} style={{ border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? '#fff5f2' : '#fff', borderRadius: 13, padding: '13px 12px', cursor: 'pointer', textAlign: 'left', fontFamily: SANS }}>
+                    <div style={{ fontSize: 14.5, fontWeight: 780, color: on ? ORANGE : INK }}>{o.label}</div>
+                    <div style={{ fontSize: 11.5, color: SUB, marginTop: 2 }}>{o.sub}</div>
+                  </button>
+                )
+              })}
+            </div>
+          </Section>
+
+          {/* 3 · AUDIENCE */}
+          <Section icon={ICONS.people} n={3} title="Audience">
+            <div style={{ display: 'flex', gap: 8, marginBottom: 14 }}>
+              <button onClick={() => setBroad(true)} style={pill(broad)}>✨ Let Meta find buyers</button>
+              <button onClick={() => setBroad(false)} style={pill(!broad)}>🎯 Target by interest</button>
+            </div>
+            {!broad && (
+              <div style={{ marginBottom: 14 }}>
+                {label('Interests', 'type to search, add a few')}
+                {interests.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {interests.map((i) => (
+                      <span key={i.id} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff5f2', border: `1px solid ${ORANGE}44`, color: ORANGE, borderRadius: 999, padding: '5px 11px', fontSize: 12.5, fontWeight: 700 }}>{i.name}<button onClick={() => setInterests((x) => x.filter((y) => y.id !== i.id))} style={{ border: 0, background: 'none', color: ORANGE, cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>×</button></span>
+                    ))}
+                  </div>
+                )}
+                <input value={iQuery} onChange={(e) => setIQuery(e.target.value)} placeholder="e.g. clean skincare, wellness, yoga…" style={input} />
+                {(iSearching || iResults.length > 0) && (
+                  <div style={{ marginTop: 6, border: `1px solid ${LINE}`, borderRadius: 11, overflow: 'hidden', background: '#fff' }}>
+                    {iSearching && <div style={{ padding: '10px 12px', fontSize: 13, color: FAINT }}>Searching…</div>}
+                    {iResults.map((r) => (
+                      <button key={r.id} onClick={() => { setInterests((x) => [...x, r]); setIQuery(''); setIResults([]) }} style={{ display: 'block', width: '100%', textAlign: 'left', border: 0, borderTop: `1px solid ${LINE2}`, background: '#fff', padding: '10px 12px', fontSize: 13.5, color: INK, cursor: 'pointer', fontFamily: SANS }}>{r.name}</button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                {label('Age')}
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <select value={ageMin} onChange={(e) => setAgeMin(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{Array.from({ length: 48 }, (_, i) => 18 + i).map((a) => <option key={a} value={a}>{a}</option>)}</select>
+                  <span style={{ color: FAINT }}>–</span>
+                  <select value={ageMax} onChange={(e) => setAgeMax(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{Array.from({ length: 48 }, (_, i) => 18 + i).map((a) => <option key={a} value={a}>{a}{a === 65 ? '+' : ''}</option>)}</select>
+                </div>
+              </div>
+              <div style={{ flex: 1, minWidth: 150 }}>
+                {label('Gender')}
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {(['ALL', 'WOMEN', 'MEN'] as const).map((g) => <button key={g} onClick={() => setGender(g)} style={{ ...pill(gender === g), flex: 1, textAlign: 'center', padding: '10px 6px' }}>{g === 'ALL' ? 'All' : g === 'WOMEN' ? 'Women' : 'Men'}</button>)}
+                </div>
+              </div>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 14, cursor: 'pointer' }}>
+              <input type="checkbox" checked={retarget} onChange={(e) => setRetarget(e.target.checked)} style={{ width: 16, height: 16, accentColor: ORANGE }} />
+              <span style={{ fontSize: 13.5, color: INK }}>Also retarget people who already engaged <span style={{ color: FAINT }}>(recommended)</span></span>
+            </label>
+          </Section>
+
+          {/* 4 · COPY */}
+          <Section icon={ICONS.copy} n={4} title="Ad copy">
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div>{label('Primary text', 'what people read')}<textarea value={primaryText} onChange={(e) => { copyEdited.current = true; setPrimaryText(e.target.value) }} rows={3} placeholder={prefilling ? 'Writing your copy…' : 'Say why they should care…'} style={{ ...input, resize: 'vertical', lineHeight: 1.45 }} /></div>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 2, minWidth: 220 }}>{label('Headline', '≤ 40 chars')}<input value={headline} onChange={(e) => { copyEdited.current = true; setHeadline(e.target.value.slice(0, 40)) }} placeholder="One hard-hitting benefit" style={input} /></div>
+                <div style={{ flex: 1, minWidth: 150 }}>{label('Button')}<select value={cta} onChange={(e) => setCta(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{CTAS.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}</option>)}</select></div>
+              </div>
+            </div>
+          </Section>
+
+          {/* 5 · DESTINATION */}
+          <Section icon={ICONS.pin} n={5} title="Where it goes">
+            <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <div style={{ flex: 2, minWidth: 220 }}>{label('Facebook Page', 'posts from here')}
+                  {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page — <Link href="/connect-meta?next=/m4/quick" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
+                    : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
+                </div>
+                <div style={{ flex: 1, minWidth: 150 }}>{label('Country')}<select value={country} onChange={(e) => setCountry(e.target.value)} style={{ ...input, cursor: 'pointer' }}><option value="">Select…</option>{COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></div>
+              </div>
+              <div>{label('Where clicks go')}<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://yourstore.com" style={input} /></div>
+            </div>
+          </Section>
+
+          {/* 6 · BUDGET */}
+          <Section icon={ICONS.money} n={6} title="Daily budget">
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 11, padding: '0 12px', background: '#fff' }}>
+                <span style={{ color: SUB, fontSize: 15 }}>$</span>
+                <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" style={{ border: 0, outline: 0, padding: '13px 6px', fontSize: 17, width: 80, fontFamily: SANS, color: INK, fontWeight: 700 }} />
+                <span style={{ color: FAINT, fontSize: 13 }}>/day</span>
+              </div>
+              <div style={{ display: 'flex', gap: 6 }}>{['10', '20', '50', '100'].map((b) => <button key={b} onClick={() => setBudget(b)} style={{ ...pill(budget === b), padding: '8px 13px' }}>${b}</button>)}</div>
+            </div>
+          </Section>
+
+          {/* LAUNCH */}
+          <div style={{ position: 'sticky', bottom: 0, background: 'linear-gradient(180deg,rgba(255,255,255,0),#fff 34%)', paddingTop: 18, marginTop: 2 }}>
+            <button onClick={launch} disabled={!ready} style={{ width: '100%', border: 0, background: ORANGE, color: '#fff', borderRadius: 14, padding: '15px 24px', fontWeight: 820, fontSize: 15.5, cursor: ready ? 'pointer' : 'default', opacity: ready ? 1 : 0.5, fontFamily: SANS }}>
+              {busy === 'uploading' ? 'Preparing…' : busy === 'launching' ? 'Launching…' : '🚀 Launch ad'}
+            </button>
+            <div style={{ textAlign: 'center', fontSize: 12.5, color: SUB, marginTop: 9 }}>{missing.length ? `Add ${missing.join(', ')}` : `$${parseFloat(budget) || 20}/day · ${broad ? 'Advantage+ audience' : `${interests.length} interest${interests.length === 1 ? '' : 's'}`} · created paused for your review`}</div>
           </div>
-          {uploadErr && <div style={{ marginTop: 8, fontSize: 12.5, color: ORANGE }}>{uploadErr}</div>}
-          {creatives.length === 0 && !uploaded && <div style={{ marginTop: 8, fontSize: 12.5, color: FAINT }}>No generated creatives yet — upload one above, or <Link href="/ads-workspace" style={{ color: ORANGE, fontWeight: 700 }}>make an ad →</Link></div>}
-          </>
-        )}
 
-      {heading('2', 'Your ad copy')}
-      <div style={{ display: 'grid', gap: 12 }}>
-        <label>{label('Primary text (what people read)')}<textarea value={primaryText} onChange={(e) => { copyEdited.current = true; setPrimaryText(e.target.value) }} rows={3} placeholder={prefilling ? 'Writing your copy…' : 'Say why they should care…'} style={{ ...input, resize: 'vertical', lineHeight: 1.45 }} /></label>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <label style={{ flex: 2, minWidth: 220 }}>{label('Headline (≤ 40 chars)')}<input value={headline} onChange={(e) => { copyEdited.current = true; setHeadline(e.target.value.slice(0, 40)) }} placeholder="One hard-hitting benefit" style={input} /></label>
-          <label style={{ flex: 1, minWidth: 150 }}>{label('Button')}<select value={cta} onChange={(e) => setCta(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{CTAS.map((c) => <option key={c} value={c}>{c.replace(/_/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase())}</option>)}</select></label>
-        </div>
-      </div>
-
-      {heading('3', 'Where & who')}
-      <div style={{ display: 'grid', gap: 12 }}>
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <label style={{ flex: 2, minWidth: 220 }}>{label('Facebook Page (ad posts from here)')}
-            {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page connected — <Link href="/connect/meta" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
-              : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
-          </label>
-          <label style={{ flex: 1, minWidth: 150 }}>{label('Country')}<select value={country} onChange={(e) => setCountry(e.target.value)} style={{ ...input, cursor: 'pointer' }}><option value="">Select…</option>{COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></label>
-        </div>
-        <label>{label('Where clicks go')}<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://yourstore.com" style={input} /></label>
-      </div>
-
-      {heading('4', 'Budget')}
-      <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 10, padding: '0 12px', background: '#fff', width: 'fit-content' }}>
-        <span style={{ color: SUB, fontSize: 15 }}>$</span>
-        <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" style={{ border: 0, outline: 0, padding: '12px 6px', fontSize: 16, width: 90, fontFamily: SANS, color: INK }} />
-        <span style={{ color: FAINT, fontSize: 13 }}>/day</span>
-      </div>
-
-      <div style={{ marginTop: 26, display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
-        <button onClick={launch} disabled={!ready} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '13px 24px', fontWeight: 800, fontSize: 15, cursor: ready ? 'pointer' : 'default', opacity: ready ? 1 : 0.5, fontFamily: SANS }}>
-          {busy === 'uploading' ? 'Preparing…' : busy === 'launching' ? 'Launching…' : '🚀 Launch ad'}
-        </button>
-        <span style={{ fontSize: 13, color: SUB }}>{missing.length ? `Add ${missing.join(', ')}` : `$${parseFloat(budget) || 10}/day · Advantage+ audience · created paused for your review`}</span>
-      </div>
-
-      {result && (
-        <div style={{ marginTop: 20, border: `1px solid ${result.ok ? 'rgba(18,161,80,.4)' : 'rgba(224,47,6,.35)'}`, background: result.ok ? '#f1faf3' : '#fff5f2', borderRadius: 14, padding: '14px 16px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>
-          <div style={{ fontWeight: 800, color: result.ok ? GOOD : ORANGE }}>{result.ok ? '✓ Ready to go live' : 'Couldn’t launch'}</div>
-          <div style={{ marginTop: 4 }}>{result.msg}</div>
-          {result.note && <div style={{ marginTop: 6, color: SUB, fontSize: 13 }}>{result.note}</div>}
-          {result.href && <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>}
+          {result && (
+            <div style={{ border: `1px solid ${result.ok ? 'rgba(18,161,80,.4)' : 'rgba(224,47,6,.35)'}`, background: result.ok ? '#f1faf3' : '#fff5f2', borderRadius: 14, padding: '15px 16px', fontSize: 14.5, color: INK, lineHeight: 1.5 }}>
+              <div style={{ fontWeight: 800, color: result.ok ? GOOD : ORANGE }}>{result.ok ? '✓ Ready to go live' : 'Couldn’t launch'}</div>
+              <div style={{ marginTop: 4 }}>{result.msg}</div>
+              {result.note && <div style={{ marginTop: 6, color: SUB, fontSize: 13 }}>{result.note}</div>}
+              {result.href && <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>}
+            </div>
+          )}
         </div>
       )}
-      </>)}
+
+      {/* CREATIVE PICKER MODAL */}
+      {pickerOpen && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setPickerOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(20,18,15,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
+          <div style={{ background: '#fff', width: '100%', maxWidth: 760, maxHeight: '88vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -20px 60px -30px rgba(0,0,0,.5)' }}>
+            <div style={{ padding: '16px 20px', borderBottom: `1px solid ${LINE2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>Choose your ad{`(s)`}</div>
+              <span style={{ fontSize: 13, color: FAINT }}>{selected.length} selected</span>
+              <button onClick={() => setPickerOpen(false)} style={{ marginLeft: 'auto', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: SANS }}>Done</button>
+            </div>
+            <div style={{ padding: 20, overflowY: 'auto' }}>
+              {uploadErr && <div style={{ marginBottom: 12, fontSize: 13, color: ORANGE }}>{uploadErr}</div>}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(120px, 1fr))', gap: 12 }}>
+                <button onClick={() => fileRef.current?.click()} disabled={uploading} style={{ aspectRatio: '4/5', border: `1.5px dashed ${LINE}`, borderRadius: 12, background: PAPER, cursor: uploading ? 'default' : 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+                  <span style={{ color: ORANGE }}><Ic d="M12 19V5|M5 12l7-7 7 7" size={22} /></span>
+                  <span style={{ fontSize: 12.5, fontWeight: 750, color: INK, textAlign: 'center', padding: '0 8px' }}>{uploading ? 'Uploading…' : 'Upload photo or video'}</span>
+                  <span style={{ fontSize: 10.5, color: FAINT }}>from your computer</span>
+                </button>
+                {creatives === null ? <div style={{ color: FAINT, fontSize: 13, alignSelf: 'center' }}>Loading…</div> : allCreatives.map((c) => {
+                  const on = selected.includes(c.id)
+                  return (
+                    <button key={c.id} onClick={() => toggle(c.id)} style={{ position: 'relative', padding: 0, border: `2.5px solid ${on ? ORANGE : LINE}`, borderRadius: 12, overflow: 'hidden', background: INSET, cursor: 'pointer', aspectRatio: '4/5' }}>
+                      {c.media_type === 'video'
+                        ? <video src={c.image_url!} muted playsInline preload="metadata" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        : <img src={c.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />}
+                      {c.media_type === 'video' && <span style={{ position: 'absolute', bottom: 6, left: 6, background: 'rgba(0,0,0,.6)', color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>▶ Video</span>}
+                      {c.local && <span style={{ position: 'absolute', top: 6, left: 6, background: INK, color: '#fff', fontSize: 10, fontWeight: 700, borderRadius: 6, padding: '2px 6px' }}>Yours</span>}
+                      {on && <span style={{ position: 'absolute', top: 6, right: 6, width: 22, height: 22, borderRadius: '50%', background: ORANGE, color: '#fff', display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800 }}>✓</span>}
+                    </button>
+                  )
+                })}
+                {creatives && allCreatives.length === 0 && <div style={{ color: FAINT, fontSize: 13, gridColumn: '1/-1' }}>No creatives yet — upload one, or <Link href="/ads-workspace" style={{ color: ORANGE, fontWeight: 700 }}>make an ad →</Link></div>}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
