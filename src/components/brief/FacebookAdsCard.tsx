@@ -25,95 +25,117 @@ type Summary = {
 
 const RANGE_LABEL: Record<string, string> = { last_3d: '3d', last_7d: '7d', last_14d: '14d', last_30d: '30d' }
 
-// Per-row Mello manager — the chat-style way to change ONE campaign. Suggested one-tap tasks PLUS a
-// free-text box ("tell Mello what to do") PLUS upload a new creative to swap in. Everything runs through
-// the same plan → confirm card → execute spine as the "run ads by typing" bar. Nothing writes without Approve.
+// Per-row Mello manager — a persistent CHAT THREAD for one campaign. Suggested one-tap tasks, a free-text
+// box ("tell Mello what to do"), and upload-a-new-creative all post into the same conversation. Every plan
+// comes back as a confirm card inside a Mello message; nothing writes until you Approve that card.
+type PlanCard = { title: string; summary: string; lines?: string[]; confirmLabel: string; action: any }
+type Msg = { id: string; role: 'user' | 'mello'; text?: string; card?: PlanCard; approved?: boolean }
+
 function RowManage({ campaignName }: { campaignName: string }) {
+  const [msgs, setMsgs] = useState<Msg[]>([{ id: 'greet', role: 'mello', text: `I can manage “${campaignName}” — scale, pause, change budget or audience, edit the copy, or swap the creative. What would you like to do?` }])
   const [busy, setBusy] = useState(false)
   const [uploading, setUploading] = useState(false)
-  const [card, setCard] = useState<{ title: string; summary: string; lines?: string[]; confirmLabel: string; action: any } | null>(null)
-  const [error, setError] = useState<string | null>(null)
-  const [done, setDone] = useState<string | null>(null)
   const [instruction, setInstruction] = useState('')
   const fileRef = useRef<HTMLInputElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const mid = () => `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`
+  const push = (m: Msg) => setMsgs((x) => [...x, m])
+  useEffect(() => { const el = scrollRef.current; if (el) el.scrollTop = el.scrollHeight }, [msgs, busy])
 
-  const plan = async (message: string, attach?: { creativeUrl: string }) => {
-    if (busy) return
-    setBusy(true); setError(null); setDone(null); setCard(null)
+  const run = async (userText: string, message: string, attach?: { creativeUrl: string }) => {
+    if (busy || uploading) return
+    push({ id: mid(), role: 'user', text: userText }); setBusy(true)
     try {
       const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'plan', message, attach }) })
       const d = await r.json()
-      if (d.card) setCard(d.card); else setError(d.clarify || d.error || 'Couldn’t plan that — open Campaigns.')
-    } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
+      if (d.card) push({ id: mid(), role: 'mello', card: d.card })
+      else push({ id: mid(), role: 'mello', text: d.clarify || d.error || 'I couldn’t plan that — try rephrasing, or open Campaigns.' })
+    } catch { push({ id: mid(), role: 'mello', text: 'Something went wrong — try again.' }) } finally { setBusy(false) }
   }
-  const approve = async () => {
-    if (!card || busy) return
-    setBusy(true); setError(null)
+  const approve = async (msgId: string, card: PlanCard) => {
+    if (busy) return
+    setBusy(true)
     try {
       const r = await fetch('/api/ads/action', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'execute', action: card.action }) })
       const d = await r.json()
-      if (d.ok) { setDone(d.message || 'Done.'); setCard(null) } else setError(d.error || 'Meta rejected that.')
-    } catch { setError('Something went wrong — try again.') } finally { setBusy(false) }
+      setMsgs((x) => x.map((m) => (m.id === msgId ? { ...m, approved: true } : m)))
+      push({ id: mid(), role: 'mello', text: d.ok ? `✅ ${d.message || 'Done — it’s live.'}` : `Meta rejected that: ${d.error || 'try again.'}` })
+    } catch { push({ id: mid(), role: 'mello', text: 'Something went wrong — try again.' }) } finally { setBusy(false) }
   }
-  const send = () => { const t = instruction.trim(); if (t) { plan(`For the live campaign "${campaignName}": ${t}`); setInstruction('') } }
+  const dismiss = (msgId: string) => setMsgs((x) => x.map((m) => (m.id === msgId ? { ...m, approved: true } : m)))
+  const send = () => { const t = instruction.trim(); if (t) { run(t, `For the live campaign "${campaignName}": ${t}`); setInstruction('') } }
   const onCreative = async (f: File | null) => {
     if (!f) return
-    if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { setError('Use a JPEG, PNG, WebP or GIF.'); return }
-    if (f.size > 8 * 1024 * 1024) { setError('Image must be under 8MB.'); return }
-    setUploading(true); setError(null); setDone(null)
+    if (!/^image\/(jpeg|png|webp|gif)$/.test(f.type)) { push({ id: mid(), role: 'mello', text: 'Use a JPEG, PNG, WebP or GIF image.' }); return }
+    if (f.size > 8 * 1024 * 1024) { push({ id: mid(), role: 'mello', text: 'That image is over 8MB — try a smaller one.' }); return }
+    setUploading(true); push({ id: mid(), role: 'user', text: '📎 Uploaded a new creative' })
     try {
       const dataB64 = await new Promise<string>((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(',')[1] || ''); rd.onerror = () => rej(new Error('read')); rd.readAsDataURL(f) })
       const up = await fetch('/api/builder/image', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'upload', dataB64, mimeType: f.type }) }).then((r) => r.json())
       if (!up?.url) throw new Error(up?.error || 'Upload failed')
-      await plan(`Swap the creative of the live campaign "${campaignName}" to this newly uploaded image.`, { creativeUrl: up.url })
-    } catch (e) { setError((e as Error)?.message || 'Upload failed') }
-    finally { setUploading(false); if (fileRef.current) fileRef.current.value = '' }
+      setUploading(false)
+      await run('Swap in this new creative', `Swap the creative of the live campaign "${campaignName}" to this newly uploaded image.`, { creativeUrl: up.url })
+    } catch (e) { setUploading(false); push({ id: mid(), role: 'mello', text: (e as Error)?.message || 'Upload failed — try again.' }) }
+    finally { if (fileRef.current) fileRef.current.value = '' }
   }
 
   const Chip = ({ label, onClick }: { label: string; onClick: () => void }) => (
     <button onClick={onClick} disabled={busy || uploading}
-      style={{ border: `1px solid ${ORANGE}33`, background: '#fff', color: ORANGE, borderRadius: 100, padding: '6px 13px', fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: (busy || uploading) ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>{label}</button>
+      style={{ border: `1px solid ${ORANGE}33`, background: '#fff', color: ORANGE, borderRadius: 100, padding: '5px 12px', fontSize: 12, fontWeight: 750, fontFamily: 'inherit', cursor: (busy || uploading) ? 'default' : 'pointer', whiteSpace: 'nowrap' }}>{label}</button>
   )
 
   return (
     <div style={{ padding: '10px 0 4px', display: 'flex', flexDirection: 'column', gap: 10 }}>
       <input ref={fileRef} type="file" accept="image/*" onChange={(e) => onCreative(e.target.files?.[0] || null)} style={{ display: 'none' }} />
-      {/* Suggested tasks (one tap) */}
+
+      {/* conversation thread */}
+      <div ref={scrollRef} style={{ maxHeight: 340, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 9, padding: '4px 2px', border: '1px solid #efeae0', borderRadius: 12, background: '#fdfcfa' }}>
+        {msgs.map((m) => (
+          <div key={m.id} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', padding: '0 8px' }}>
+            <div style={{ maxWidth: '88%' }}>
+              {m.text && <div style={{ background: m.role === 'user' ? ORANGE : '#f1eee8', color: m.role === 'user' ? '#fff' : '#1a1410', borderRadius: 12, padding: '8px 12px', fontSize: 13, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{m.text}</div>}
+              {m.card && (
+                <div style={{ border: `1px solid ${ORANGE}33`, borderRadius: 12, background: '#fff', padding: 13, boxShadow: '0 10px 30px -22px rgba(239,74,30,.5)' }}>
+                  <div style={{ fontSize: 13.5, fontWeight: 800, color: '#111', marginBottom: 3 }}>{m.card.title}</div>
+                  <div style={{ fontSize: 12.5, color: '#555', marginBottom: m.card.lines?.length ? 8 : 10 }}>{m.card.summary}</div>
+                  {m.card.lines && m.card.lines.length > 0 && (
+                    <ul style={{ margin: '0 0 10px', paddingLeft: 17, display: 'flex', flexDirection: 'column', gap: 3 }}>
+                      {m.card.lines.map((l, i) => <li key={i} style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{l}</li>)}
+                    </ul>
+                  )}
+                  {m.approved
+                    ? <div style={{ fontSize: 12, fontWeight: 700, color: '#15803d' }}>✓ Approved</div>
+                    : (
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button onClick={() => approve(m.id, m.card!)} disabled={busy} style={{ background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '8px 16px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Working…' : m.card.confirmLabel}</button>
+                        <button onClick={() => dismiss(m.id)} disabled={busy} style={{ background: 'none', border: '1px solid #e3ded2', borderRadius: 100, padding: '8px 14px', fontSize: 13, fontWeight: 600, color: '#555', fontFamily: 'inherit', cursor: 'pointer' }}>Dismiss</button>
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
+          </div>
+        ))}
+        {(busy || uploading) && <div style={{ padding: '0 10px', fontSize: 12, color: '#8a8578' }}>{uploading ? 'Uploading…' : 'Mello is thinking…'}</div>}
+      </div>
+
+      {/* suggested tasks */}
       <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
-        <span style={{ fontSize: 11.5, fontWeight: 800, color: '#8a8578', textTransform: 'uppercase', letterSpacing: '.05em' }}>Suggested</span>
-        <Chip label="Scale +20%" onClick={() => plan(`Scale the campaign "${campaignName}" by +20% per day.`)} />
-        <Chip label="Scale +50%" onClick={() => plan(`Scale the campaign "${campaignName}" by +50% per day.`)} />
-        <Chip label="Pause" onClick={() => plan(`Pause the campaign "${campaignName}".`)} />
-        <Chip label="Duplicate" onClick={() => plan(`Duplicate the campaign "${campaignName}" as a fresh copy.`)} />
+        <Chip label="Scale +20%" onClick={() => run('Scale +20%', `Scale the campaign "${campaignName}" by +20% per day.`)} />
+        <Chip label="Scale +50%" onClick={() => run('Scale +50%', `Scale the campaign "${campaignName}" by +50% per day.`)} />
+        <Chip label="Pause" onClick={() => run('Pause it', `Pause the campaign "${campaignName}".`)} />
+        <Chip label="Duplicate" onClick={() => run('Duplicate it', `Duplicate the campaign "${campaignName}" as a fresh copy.`)} />
         <Chip label={uploading ? 'Uploading…' : '⬆ New creative'} onClick={() => fileRef.current?.click()} />
       </div>
-      {/* Free-text instruction — write anything, Mello plans it */}
+
+      {/* free-text message bar */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input value={instruction} onChange={(e) => setInstruction(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && send()}
-          placeholder={`Tell Mello what to do with this campaign — e.g. “raise budget to $30/day”, “change the copy to…”, “target women 25–40”`}
+          placeholder={`Message Mello — e.g. “raise budget to $30/day”, “change the copy to…”, “target women 25–40”`}
           style={{ flex: 1, minWidth: 240, padding: '10px 14px', fontSize: 13, borderRadius: 100, border: '1px solid #e3ded2', background: '#fff', color: '#1a1410', outline: 'none' }} />
         <button onClick={send} disabled={busy || uploading || !instruction.trim()}
-          style={{ background: instruction.trim() ? ORANGE : '#e3ded2', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: instruction.trim() ? 'pointer' : 'default' }}>{busy ? 'Thinking…' : 'Ask Mello'}</button>
+          style={{ background: instruction.trim() ? ORANGE : '#e3ded2', color: '#fff', border: 'none', borderRadius: 100, padding: '10px 18px', fontSize: 13, fontWeight: 800, fontFamily: 'inherit', cursor: instruction.trim() ? 'pointer' : 'default' }}>Send</button>
       </div>
-
-      {error && <div style={{ fontSize: 12.5, color: '#b42318', background: '#fef3f2', border: '1px solid #fecdca', borderRadius: 10, padding: '9px 12px' }}>{error}</div>}
-      {done && <div style={{ fontSize: 12.5, color: '#15803d', background: '#f0f9f2', border: '1px solid #bbe6c6', borderRadius: 10, padding: '9px 12px' }}>✅ {done}</div>}
-
-      {card && (
-        <div style={{ border: `1px solid ${ORANGE}33`, borderRadius: 12, background: '#fff', padding: 14, boxShadow: '0 18px 44px -28px rgba(239,74,30,.4)' }}>
-          <div style={{ fontSize: 14, fontWeight: 800, color: '#111', marginBottom: 4 }}>{card.title}</div>
-          <div style={{ fontSize: 13, color: '#555', marginBottom: card.lines?.length ? 9 : 12 }}>{card.summary}</div>
-          {card.lines && card.lines.length > 0 && (
-            <ul style={{ margin: '0 0 12px', paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {card.lines.map((l, i) => <li key={i} style={{ fontSize: 12, color: '#555', lineHeight: 1.5 }}>{l}</li>)}
-            </ul>
-          )}
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button onClick={approve} disabled={busy} style={{ background: ORANGE, color: '#fff', border: 'none', borderRadius: 100, padding: '9px 17px', fontSize: 13.5, fontWeight: 800, fontFamily: 'inherit', cursor: 'pointer' }}>{busy ? 'Working…' : card.confirmLabel}</button>
-            <button onClick={() => setCard(null)} disabled={busy} style={{ background: 'none', border: '1px solid #e3ded2', borderRadius: 100, padding: '9px 15px', fontSize: 13.5, fontWeight: 600, color: '#555', fontFamily: 'inherit', cursor: 'pointer' }}>Cancel</button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
