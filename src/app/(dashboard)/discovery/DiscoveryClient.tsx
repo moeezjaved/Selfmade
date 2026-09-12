@@ -785,6 +785,10 @@ const IMG_TRANSFORM = process.env.NEXT_PUBLIC_IMG_TRANSFORM === '1'
 // Full-res, but latency was the killer. (Custom domain via IMG_CDN later removes r2.dev rate limits.)
 const IMG_DIRECT = process.env.NEXT_PUBLIC_IMG_DIRECT === '1'
 const R2_HOST_RE = /^https?:\/\/[^/]*(r2\.dev|r2\.cloudflarestorage\.com)/i
+// Only raw Meta CDN URLs are hotlink-protected + oversized and NEED weserv (resize + referer-safe).
+// Everything else — our own R2 / CDN creatives, whatever the custom domain — is already on Cloudflare's
+// edge, so it serves DIRECT (no ~1.2s weserv hop, which was why Discovery cards sat blank).
+const META_IMG_HOST_RE = /fbcdn\.net|\.facebook\.com|\bscontent/i
 // Grid cards render at ~340px wide → 480px covers 1.4× DPR; the srcset lets the
 // browser pick 256/384/480/640 by column width & screen density.
 const IMG_WIDTHS = [256, 384, 480, 640]
@@ -814,9 +818,10 @@ const cdnAt = (url: string, w: number) => {
     // resize the external URL; otherwise fall through to weserv so it's still small.
     if (IMG_TRANSFORM) return `https://${IMG_CDN}/cdn-cgi/image/width=${w},quality=75,format=auto/${url}`
   }
-  // No custom domain: serve R2 creatives straight from r2.dev (already Cloudflare edge) to skip
-  // weserv's latency. Non-R2 (Meta) URLs still go through weserv so they're resized + hotlink-safe.
-  if (IMG_DIRECT && R2_HOST_RE.test(url)) return url
+  // Our OWN creatives (R2 via r2.dev OR our Cloudflare custom domain cdn.tryselfmade.ai) are already on
+  // Cloudflare's edge — serve them DIRECT so they skip weserv's ~1.2s proxy hop (this was why cards sat
+  // blank). Only foreign, hotlink-protected URLs (raw Meta CDN) still go through weserv for resize + safety.
+  if (!META_IMG_HOST_RE.test(url)) return url
   return `https://images.weserv.nl/?url=${encodeURIComponent(url)}&w=${w}&q=72&output=webp`
 }
 const cdnSrc = (url: string) => cdnAt(url, 480)
