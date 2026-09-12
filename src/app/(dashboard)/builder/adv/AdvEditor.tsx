@@ -61,11 +61,13 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [showMenu, setShowMenu] = useState(false)
   const [histDepth, setHistDepth] = useState(0)
   const [redoDepth, setRedoDepth] = useState(0)
-  const [tb, setTb] = useState<null | { top: number; left: number; width: number }>(null)
+  const [tb, setTb] = useState<null | { top: number; left: number; below: boolean }>(null)
+  const [zoom, setZoom] = useState(1)
 
   const history = useRef<PageDoc[]>([])
   const future = useRef<PageDoc[]>([])
   const canvasRef = useRef<HTMLDivElement | null>(null)
+  const mainRef = useRef<HTMLElement | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const version = useRef(0)
   const syncDepth = () => { setHistDepth(history.current.length); setRedoDepth(future.current.length) }
@@ -124,6 +126,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [sel, device, apply])
   const onHidden = useCallback(() => { if (sel) apply((d) => setHidden(d, sel)) }, [sel, apply])
   const onContent = useCallback((patch: Partial<Element['content']>) => { if (sel) apply((d) => patchElementContent(d, sel, patch)) }, [sel, apply])
+  const fitZoom = useCallback(() => {
+    const w = mainRef.current?.clientWidth || 900
+    const target = Math.min(1, Math.max(0.4, (w - 56) / (device === 'mobile' ? 402 : 1000)))
+    setZoom(Math.round(target * 20) / 20)
+  }, [device])
 
   /* ── publish: save the current doc, then push it to Shopify as native sections ── */
   const publish = useCallback(async () => {
@@ -225,15 +232,23 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     apply((d) => ({ ...d, settings: { ...(d.settings || { locale: 'en' }), seo: { ...((d.settings as { seo?: object })?.seo || {}), ...patch } } as PageDoc['settings'] }))
   }, [apply])
 
-  /* ── floating canvas toolbar: position it over the selected node (coords relative to the canvas root) ── */
-  useEffect(() => {
+  /* ── floating canvas toolbar: fixed to the viewport over the selected node (survives scroll + zoom) ── */
+  const measureTb = useCallback(() => {
     const root = canvasRef.current
     if (!root || !sel) { setTb(null); return }
     const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`) as HTMLElement | null
     if (!node) { setTb(null); return }
-    const r = node.getBoundingClientRect(), rr = root.getBoundingClientRect()
-    setTb({ top: Math.max(2, r.top - rr.top), left: Math.max(0, r.left - rr.left), width: r.width })
-  }, [sel, canvasHtml, device])
+    const r = node.getBoundingClientRect()
+    const below = r.top < 96                              // node hugs the top bar → drop the toolbar below it
+    setTb({ top: below ? r.top + 6 : r.top - 6, left: Math.max(8, r.left), below })
+  }, [sel])
+  useEffect(() => { measureTb() }, [measureTb, canvasHtml, device, zoom])
+  useEffect(() => {
+    const main = mainRef.current
+    const on = () => measureTb()
+    main?.addEventListener('scroll', on, { passive: true }); window.addEventListener('resize', on)
+    return () => { main?.removeEventListener('scroll', on); window.removeEventListener('resize', on) }
+  }, [measureTb])
 
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
@@ -242,7 +257,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const canvasWidth = device === 'mobile' ? 402 : 1000
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f2ee', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
+    <div style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f2ee', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
       {/* top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
         <Link href="/builder" style={{ color: SUB, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>← Builder</Link>
@@ -254,7 +269,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <button title="Undo (⌘Z)" onClick={undo} disabled={!histDepth} style={{ ...iconTopBtn, opacity: histDepth ? 1 : 0.35, cursor: histDepth ? 'pointer' : 'default' }}>↶</button>
           <button title="Redo (⇧⌘Z)" onClick={redo} disabled={!redoDepth} style={{ ...iconTopBtn, opacity: redoDepth ? 1 : 0.35, cursor: redoDepth ? 'pointer' : 'default' }}>↷</button>
         </div>
-        <SegToggle value={device} onChange={setDevice} />
+        <DeviceToggle value={device} onChange={(d) => { setDevice(d); setZoom(1) }} />
+        <ZoomControl zoom={zoom} setZoom={setZoom} onFit={fitZoom} />
         <SaveBadge status={status} />
         <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
           {publishing === 'saving' ? 'Saving…' : publishing === 'publishing' ? 'Publishing…' : 'Publish →'}
@@ -315,20 +331,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         </aside>
 
         {/* ── center: live canvas ── */}
-        <main style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
-          <div style={{ position: 'relative', width: canvasWidth, maxWidth: '100%', background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', alignSelf: 'flex-start' }}>
-            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} style={{ borderRadius: 12, overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
-            {tb && sel && (
-              <div style={{ position: 'absolute', top: tb.top, left: tb.left, transform: 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 6 }} onClick={(e) => e.stopPropagation()}>
-                <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
-                <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
-                <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>↑</TbBtn>
-                <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>↓</TbBtn>
-                {sel.blockId && !sel.elementId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
-                {!sel.blockId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
-                <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>🗑</TbBtn>
-              </div>
-            )}
+        <main ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
+          <div style={{ zoom, width: canvasWidth, maxWidth: '100%', background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
+            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
           </div>
         </main>
 
@@ -377,6 +382,17 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             )}
             <div style={{ textAlign: 'right', marginTop: 16 }}><button onClick={() => setPubResult(null)} style={btn}>Close</button></div>
           </div>
+        </div>
+      )}
+
+      {tb && sel && (
+        <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
+          <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
+          <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
+          <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>↑</TbBtn>
+          <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>↓</TbBtn>
+          {!sel.elementId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
+          <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>🗑</TbBtn>
         </div>
       )}
 
@@ -463,14 +479,27 @@ function SaveBadge({ status }: { status: string }) {
   const [txt, col] = map[status] || ['', SUB]
   return <span style={{ fontSize: 12, color: col, minWidth: 64, textAlign: 'right' }}>{txt}</span>
 }
-function SegToggle({ value, onChange }: { value: Device; onChange: (d: Device) => void }) {
+const MonitorIcon = ({ on }: { on: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={on ? '#fff' : SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="3" width="20" height="14" rx="2" /><path d="M8 21h8M12 17v4" /></svg>
+)
+const PhoneIcon = ({ on }: { on: boolean }) => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={on ? '#fff' : SUB} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="6" y="2" width="12" height="20" rx="2.5" /><path d="M11 18h2" /></svg>
+)
+function DeviceToggle({ value, onChange }: { value: Device; onChange: (d: Device) => void }) {
   return (
     <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 999, overflow: 'hidden' }}>
-      {(['base', 'mobile'] as Device[]).map((d) => (
-        <button key={d} onClick={() => onChange(d)} style={{ border: 0, background: value === d ? INK : '#fff', color: value === d ? '#fff' : SUB, padding: '6px 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>
-          {d === 'base' ? '🖥 Desktop' : '📱 Mobile'}
-        </button>
-      ))}
+      <button title="Desktop" onClick={() => onChange('base')} style={{ border: 0, background: value === 'base' ? INK : '#fff', padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><MonitorIcon on={value === 'base'} /></button>
+      <button title="Mobile" onClick={() => onChange('mobile')} style={{ border: 0, borderLeft: `1px solid ${LINE}`, background: value === 'mobile' ? INK : '#fff', padding: '7px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}><PhoneIcon on={value === 'mobile'} /></button>
+    </div>
+  )
+}
+function ZoomControl({ zoom, setZoom, onFit }: { zoom: number; setZoom: (z: number) => void; onFit: () => void }) {
+  const step = (d: number) => setZoom(Math.min(1, Math.max(0.4, Math.round((zoom + d) * 20) / 20)))
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 999, overflow: 'hidden' }}>
+      <button title="Zoom out" onClick={() => step(-0.1)} style={{ border: 0, background: '#fff', color: INK, padding: '6px 10px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>−</button>
+      <button title="Fit to width" onClick={onFit} style={{ border: 0, borderLeft: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#fff', color: SUB, padding: '6px 8px', cursor: 'pointer', fontSize: 12, fontWeight: 700, minWidth: 46 }}>{Math.round(zoom * 100)}%</button>
+      <button title="Zoom in" onClick={() => step(0.1)} style={{ border: 0, background: '#fff', color: INK, padding: '6px 10px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>+</button>
     </div>
   )
 }
