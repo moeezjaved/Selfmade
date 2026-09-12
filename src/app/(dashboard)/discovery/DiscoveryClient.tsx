@@ -1450,7 +1450,20 @@ export default function DiscoveryPage() {
   const [showDropdown, setShowDropdown] = useState(false)
   const [dropdownBrands, setDropdownBrands] = useState<{ pageId: string; name: string; picture: string | null; category: string; adCount: number | string }[]>([])
   const [dropdownLoading, setDropdownLoading] = useState(false)
+  const [pulling, setPulling] = useState(false)
   const searchContainerRef = useRef<HTMLDivElement>(null)
+  // A brand may not be in our library yet — let the user PULL its live ads by pasting the brand's Meta Ad
+  // Library link (or a page id). Restores the old "search by name OR paste their ad account URL" affordance.
+  const looksLikeAdLibrary = (s: string) => /facebook\.com\/ads\/library|view_all_page_id=|[?&]id=\d|^\d{6,}$|\/\d{7,}(?:[/?]|$)/.test((s || '').trim())
+  const pullNewBrand = async () => {
+    const input = searchInput.trim(); if (!input || pulling) return
+    setPulling(true)
+    try {
+      const d = await fetch('/api/discovery/brand-spy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: input }) }).then((r) => r.json())
+      if (d?.pageId) { setShowDropdown(false); router.push(`/discovery/brand-spy/${d.pageId}`) }
+      else alert(d?.error || 'Paste the brand’s Meta Ad Library link (Facebook Ad Library → the brand → copy the URL) to pull their live ads.')
+    } catch { alert('Something went wrong — try again.') } finally { setPulling(false) }
+  }
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -2080,7 +2093,14 @@ export default function DiscoveryPage() {
                     </button>
                   )}
                   {!dropdownLoading && dropdownBrands.length === 0 && (
-                    <div style={{ padding: '10px 12px', fontSize: 12, color: '#9ca3af' }}>No brands found — try searching by ad copy above</div>
+                    <div style={{ padding: '8px 8px 4px' }}>
+                      <button onMouseDown={(e) => { e.preventDefault(); pullNewBrand() }} disabled={pulling}
+                        style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '9px 10px', background: '#f0f7ff', border: '1px solid #d6e6ff', borderRadius: 8, cursor: pulling ? 'default' : 'pointer', textAlign: 'left', fontFamily: 'inherit' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="#1877F2"><path d="M24 12.073C24 5.404 18.627 0 12 0S0 5.404 0 12.073C0 18.1 4.388 23.094 10.125 24v-8.437H7.078v-3.49h3.047V9.41c0-3.025 1.792-4.697 4.533-4.697 1.313 0 2.686.236 2.686.236v2.97h-1.514c-1.491 0-1.956.93-1.956 1.886v2.267h3.328l-.532 3.49h-2.796V24C19.612 23.094 24 18.1 24 12.073z"/></svg>
+                        <span style={{ fontSize: 12.5, color: '#1877F2', fontWeight: 700 }}>{pulling ? 'Pulling their ads…' : looksLikeAdLibrary(searchInput) ? `Pull this brand’s live ads →` : `Pull “${searchInput}” from the Meta Ad Library →`}</span>
+                      </button>
+                      <div style={{ padding: '7px 4px 2px', fontSize: 11, color: '#9ca3af', lineHeight: 1.5 }}>Not in our library yet. {looksLikeAdLibrary(searchInput) ? 'We’ll pull their live ads now.' : 'Paste the brand’s Meta Ad Library link for the exact match, or search by ad copy above.'}</div>
+                    </div>
                   )}
                 </div>
               </div>
