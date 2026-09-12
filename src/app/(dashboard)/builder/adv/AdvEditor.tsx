@@ -57,11 +57,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
   const [publishing, setPublishing] = useState<'idle' | 'saving' | 'publishing'>('idle')
   const [pubResult, setPubResult] = useState<null | { url?: string; previewUrl?: string; error?: string }>(null)
+  const [showProduct, setShowProduct] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
+  const [histDepth, setHistDepth] = useState(0)
+  const [redoDepth, setRedoDepth] = useState(0)
+  const [tb, setTb] = useState<null | { top: number; left: number; width: number }>(null)
 
   const history = useRef<PageDoc[]>([])
+  const future = useRef<PageDoc[]>([])
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const version = useRef(0)
+  const syncDepth = () => { setHistDepth(history.current.length); setRedoDepth(future.current.length) }
 
   /* ── load ── */
   useEffect(() => {
@@ -94,15 +101,20 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     setDoc((cur) => {
       if (!cur) return cur
       history.current.push(cur); if (history.current.length > 80) history.current.shift()
+      future.current = []                    // a new edit clears the redo stack
       const next = mut(cur)
       save(next)
       if (nextSel !== undefined) setSel(nextSel)
+      syncDepth()
       return next
     })
   }, [save])
 
   const undo = useCallback(() => {
-    setDoc((cur) => { const prev = history.current.pop(); if (!prev || !cur) return cur; save(prev); return prev })
+    setDoc((cur) => { if (!cur) return cur; const prev = history.current.pop(); if (!prev) return cur; future.current.push(cur); save(prev); syncDepth(); return prev })
+  }, [save])
+  const redo = useCallback(() => {
+    setDoc((cur) => { if (!cur) return cur; const nxt = future.current.pop(); if (!nxt) return cur; history.current.push(cur); save(nxt); syncDepth(); return nxt })
   }, [save])
 
   /* ── property-panel writes (style is written for the device shown on the canvas) ── */
@@ -196,12 +208,32 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const onKey = (e: KeyboardEvent) => {
       const editing = (e.target as HTMLElement)?.isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)
       if (editing) return
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo() }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo() }
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo() }
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
       else if ((e.key === 'Backspace' || e.key === 'Delete') && sel) { e.preventDefault(); apply((d) => removeNode(d, sel), null) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [sel, undo, apply])
+  }, [sel, undo, redo, apply])
+
+  /* ── Edit Product + page settings write into the doc ── */
+  const onProduct = useCallback((patch: Record<string, unknown>) => {
+    apply((d) => ({ ...d, productRef: { ...d.productRef, importedProduct: { ...(d.productRef?.importedProduct || {}), ...patch } } }))
+  }, [apply])
+  const onSettings = useCallback((patch: Record<string, unknown>) => {
+    apply((d) => ({ ...d, settings: { ...(d.settings || { locale: 'en' }), seo: { ...((d.settings as { seo?: object })?.seo || {}), ...patch } } as PageDoc['settings'] }))
+  }, [apply])
+
+  /* ── floating canvas toolbar: position it over the selected node (coords relative to the canvas root) ── */
+  useEffect(() => {
+    const root = canvasRef.current
+    if (!root || !sel) { setTb(null); return }
+    const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`) as HTMLElement | null
+    if (!node) { setTb(null); return }
+    const r = node.getBoundingClientRect(), rr = root.getBoundingClientRect()
+    setTb({ top: Math.max(2, r.top - rr.top), left: Math.max(0, r.left - rr.left), width: r.width })
+  }, [sel, canvasHtml, device])
 
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
@@ -216,12 +248,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <Link href="/builder" style={{ color: SUB, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>← Builder</Link>
         <span style={{ fontFamily: SERIF, fontSize: 18 }}>Page editor</span>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, background: WASH, borderRadius: 999, padding: '3px 9px' }}>Advanced · beta</span>
+        <button onClick={() => setShowProduct(true)} style={{ ...btn, padding: '6px 12px' }}>Edit product</button>
         <div style={{ flex: 1 }} />
+        <div style={{ display: 'inline-flex', gap: 2 }}>
+          <button title="Undo (⌘Z)" onClick={undo} disabled={!histDepth} style={{ ...iconTopBtn, opacity: histDepth ? 1 : 0.35, cursor: histDepth ? 'pointer' : 'default' }}>↶</button>
+          <button title="Redo (⇧⌘Z)" onClick={redo} disabled={!redoDepth} style={{ ...iconTopBtn, opacity: redoDepth ? 1 : 0.35, cursor: redoDepth ? 'pointer' : 'default' }}>↷</button>
+        </div>
         <SegToggle value={device} onChange={setDevice} />
         <SaveBadge status={status} />
         <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
           {publishing === 'saving' ? 'Saving…' : publishing === 'publishing' ? 'Publishing…' : 'Publish →'}
         </button>
+        <button title="Page settings" onClick={() => setShowMenu(true)} style={{ ...iconTopBtn, fontSize: 18 }}>⋯</button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
@@ -278,8 +316,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
         {/* ── center: live canvas ── */}
         <main style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
-          <div style={{ width: canvasWidth, maxWidth: '100%', background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' }}>
-            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
+          <div style={{ position: 'relative', width: canvasWidth, maxWidth: '100%', background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', alignSelf: 'flex-start' }}>
+            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} style={{ borderRadius: 12, overflow: 'hidden' }} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
+            {tb && sel && (
+              <div style={{ position: 'absolute', top: tb.top, left: tb.left, transform: 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 6 }} onClick={(e) => e.stopPropagation()}>
+                <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
+                <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
+                <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>↑</TbBtn>
+                <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>↓</TbBtn>
+                {sel.blockId && !sel.elementId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
+                {!sel.blockId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
+                <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>🗑</TbBtn>
+              </div>
+            )}
           </div>
         </main>
 
@@ -330,12 +379,78 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           </div>
         </div>
       )}
+
+      {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
+      {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
     </div>
   )
 }
 
+/* ── Edit Product — the product the page's bound elements read from ── */
+function EditProductModal({ doc, onChange, onClose }: { doc: PageDoc; onChange: (p: Record<string, unknown>) => void; onClose: () => void }) {
+  const p = (doc.productRef?.importedProduct || {}) as Record<string, unknown>
+  const field = (label: string, key: string, placeholder = '', numeric = false) => (
+    <label style={{ display: 'block' }}>
+      <span style={{ fontSize: 12, color: SUB, fontWeight: 600 }}>{label}</span>
+      <input defaultValue={p[key] != null ? String(p[key]) : ''} placeholder={placeholder}
+        onBlur={(e) => onChange({ [key]: numeric ? (e.target.value ? Number(e.target.value) : undefined) : e.target.value })}
+        style={{ width: '100%', marginTop: 5, border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', fontSize: 13, color: INK, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+    </label>
+  )
+  return (
+    <Modal title="Edit product" onClose={onClose} hint="These feed the product-bound elements (title, price, rating, image) and the canvas preview.">
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+        {field('Title', 'title', 'Product name')}
+        {field('Price', 'price', '$49.00')}
+        {field('Compare-at price', 'compareAtPrice', '$69.00')}
+        {field('Rating (0–5)', 'rating', '4.9', true)}
+        {field('Review count', 'ratingCount', '1240', true)}
+        {field('Image URL', 'image', 'https://…')}
+      </div>
+      <div style={{ marginTop: 10 }}>{field('Description', 'description', 'Short product description')}</div>
+    </Modal>
+  )
+}
+
+/* ── Page settings — SEO title + description (stored in doc.settings.seo) ── */
+function SettingsModal({ doc, onChange, onClose }: { doc: PageDoc; onChange: (p: Record<string, unknown>) => void; onClose: () => void }) {
+  const seo = ((doc.settings as { seo?: Record<string, unknown> })?.seo || {}) as Record<string, unknown>
+  return (
+    <Modal title="Page settings" onClose={onClose} hint="SEO title and description for the published page.">
+      <label style={{ display: 'block', marginBottom: 10 }}>
+        <span style={{ fontSize: 12, color: SUB, fontWeight: 600 }}>SEO title</span>
+        <input defaultValue={seo.title != null ? String(seo.title) : ''} onBlur={(e) => onChange({ title: e.target.value })}
+          style={{ width: '100%', marginTop: 5, border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', fontSize: 13, color: INK, fontFamily: 'inherit', boxSizing: 'border-box' }} />
+      </label>
+      <label style={{ display: 'block' }}>
+        <span style={{ fontSize: 12, color: SUB, fontWeight: 600 }}>SEO description</span>
+        <textarea defaultValue={seo.description != null ? String(seo.description) : ''} onBlur={(e) => onChange({ description: e.target.value })}
+          style={{ width: '100%', marginTop: 5, border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', fontSize: 13, color: INK, fontFamily: 'inherit', minHeight: 70, resize: 'vertical', boxSizing: 'border-box' }} />
+      </label>
+    </Modal>
+  )
+}
+
+function Modal({ title, hint, children, onClose }: { title: string; hint?: string; children: React.ReactNode; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 460, maxWidth: '92vw', background: '#fff', borderRadius: 16, padding: 22, boxShadow: '0 20px 60px rgba(20,18,15,.25)' }}>
+        <div style={{ fontFamily: SERIF, fontSize: 22 }}>{title}</div>
+        {hint && <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, marginBottom: 14, lineHeight: 1.5 }}>{hint}</div>}
+        {children}
+        <div style={{ textAlign: 'right', marginTop: 16 }}><button onClick={onClose} style={btn}>Done</button></div>
+      </div>
+    </div>
+  )
+}
+
+function TbBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
+  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 12.5, lineHeight: 1, padding: '5px 7px', borderRadius: 6 }}>{children}</button>
+}
+
 /* ── small pieces ── */
 const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
+const iconTopBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, width: 30, height: 30, fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
 
 function Center({ children }: { children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: SUB, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14 }}>{children}</div>
