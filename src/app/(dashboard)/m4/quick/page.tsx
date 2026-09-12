@@ -88,6 +88,42 @@ function Section({ icon, glyph, n, title, children }: { icon?: string; glyph?: s
   )
 }
 
+// A Facebook/Instagram feed ad mockup that updates live as the form is filled — so you see exactly what
+// buyers will see (page name, primary text, creative, headline, CTA) before you launch.
+function AdPreview({ image, pageName, igUsername, primaryText, headline, cta, urlText }: { image?: string; pageName?: string; igUsername?: string; primaryText: string; headline: string; cta: string; urlText: string }) {
+  const ctaLabel = (cta || 'SHOP_NOW').replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase())
+  const domain = (urlText || '').replace(/^https?:\/\//, '').replace(/^www\./, '').replace(/\/.*$/, '').toUpperCase()
+  const body = (primaryText || '').replace(/\*\*(.+?)\*\*/g, '$1')
+  return (
+    <div>
+      <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: FAINT, marginBottom: 8 }}>Live preview</div>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 14, overflow: 'hidden', background: '#fff', boxShadow: '0 1px 2px rgba(20,18,15,.05)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 13px' }}>
+          <div style={{ width: 38, height: 38, borderRadius: '50%', background: INSET, display: 'grid', placeItems: 'center', fontWeight: 800, color: SUB, fontSize: 15, flex: 'none' }}>{(pageName || 'A').charAt(0).toUpperCase()}</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 13.5, fontWeight: 700, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{pageName || 'Your Page'}</div>
+            <div style={{ fontSize: 11.5, color: FAINT }}>Sponsored · {igUsername ? `Facebook + IG @${igUsername}` : 'Facebook'}</div>
+          </div>
+        </div>
+        {body
+          ? <div style={{ padding: '0 13px 11px', fontSize: 13.5, color: INK, lineHeight: 1.45, whiteSpace: 'pre-wrap' }}>{body.length > 220 ? body.slice(0, 220) + '…' : body}</div>
+          : <div style={{ padding: '0 13px 11px', fontSize: 13, color: FAINT }}>Your primary text appears here…</div>}
+        <div style={{ aspectRatio: '1 / 1', background: INSET, display: 'grid', placeItems: 'center' }}>
+          {image ? /* eslint-disable-next-line @next/next/no-img-element */ <img src={image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 12, color: FAINT }}>Pick a creative to preview</span>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '11px 13px', background: '#f7f6f4', borderTop: `1px solid ${LINE2}` }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
+            {domain && <div style={{ fontSize: 11, color: FAINT, textTransform: 'uppercase', letterSpacing: '.04em', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{domain}</div>}
+            <div style={{ fontSize: 13.5, fontWeight: 750, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{headline || 'Your headline'}</div>
+          </div>
+          <button style={{ flex: 'none', border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, padding: '8px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'default' }}>{ctaLabel}</button>
+        </div>
+      </div>
+      <div style={{ fontSize: 11.5, color: FAINT, marginTop: 8, lineHeight: 1.5 }}>Approximate — real placement varies by feed.{igUsername ? ' Runs on Facebook + Instagram.' : ''}</div>
+    </div>
+  )
+}
+
 export default function QuickLaunch() {
   // data
   const [creatives, setCreatives] = useState<Creative[] | null>(null)
@@ -106,6 +142,7 @@ export default function QuickLaunch() {
   const [primaryText, setPrimaryText] = useState('')
   const [headline, setHeadline] = useState('')
   const [cta, setCta] = useState('SHOP_NOW')
+  const [wide, setWide] = useState(true)   // ≥1080px → form + live ad preview side by side
   const [url, setUrl] = useState('')
   const [budget, setBudget] = useState('20')
   // Locations come straight from Facebook (countries, regions, cities) — not a hardcoded list.
@@ -302,6 +339,13 @@ export default function QuickLaunch() {
     return () => document.removeEventListener('mousedown', onDoc)
   }, [])
 
+  // Side-by-side form + live preview only when there's room for it.
+  useEffect(() => {
+    const onResize = () => setWide(window.innerWidth >= 1080)
+    onResize(); window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+
   // ── upload from computer (image or video) ──
   const onUpload = async (file: File) => {
     setUploadErr('')
@@ -439,7 +483,9 @@ export default function QuickLaunch() {
           <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
         </div>
       ) : (
-        <div style={{ marginTop: 22, display: 'grid', gap: 14 }}>
+        <div style={{ marginTop: 22, display: 'grid', gridTemplateColumns: wide ? 'minmax(0,1fr) 380px' : '1fr', gap: wide ? 22 : 14, alignItems: 'start' }}>
+        {/* LEFT — the form */}
+        <div style={{ display: 'grid', gap: 14, minWidth: 0 }}>
           {/* AD ACCOUNT — where this ad runs (scoped to the brand, like Reports). Everything below follows it. */}
           {accounts.length > 0 && (
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, background: INSET, border: `1px solid ${LINE2}`, borderRadius: 14, padding: '12px 15px', flexWrap: 'wrap' }}>
@@ -702,6 +748,13 @@ export default function QuickLaunch() {
                 : <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>)}
             </div>
           )}
+        </div>
+        {/* RIGHT — live ad preview (Facebook feed mockup) */}
+        {wide && (
+          <div style={{ position: 'sticky', top: 20 }}>
+            <AdPreview image={chosen[0]?.image_url || undefined} pageName={page?.name} igUsername={page?.instagram?.username} primaryText={primaryText} headline={headline} cta={cta} urlText={url} />
+          </div>
+        )}
         </div>
       )}
 
