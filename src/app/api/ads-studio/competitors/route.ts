@@ -139,11 +139,18 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // overall deadline so the run ALWAYS returns in time to write the cache — rivals whose pull finished get
   // their full set; the rest keep their shallow ads and deepen on a later run (durable union accumulates).
   const deepPulls = Promise.all(targets.map(async (b) => {
-    const deep: any[] = await Promise.race([
-      fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).then(liveToCards).catch(() => []),
-      new Promise<any[]>((r) => setTimeout(() => r([]), 50_000)),   // per-rival cap
+    const raw: LiveAd[] = await Promise.race([
+      fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).catch(() => [] as LiveAd[]),
+      new Promise<LiveAd[]>((r) => setTimeout(() => r([]), 50_000)),   // per-rival cap
     ])
+    const deep = liveToCards(raw)
     if (deep.length >= b.liveAds.length) b.liveAds = deep
+    // Durably save this rival's IMAGE ads → R2 + the shared discovery library (permanent; powers Discover).
+    // Purely additive background side-effect — the cards above are unchanged. Best-effort.
+    if (raw.length && b.c.pageId) {
+      waitUntil(import('@/lib/discovery/persist').then(({ persistPulledAds }) =>
+        persistPulledAds(admin, String(b.c.pageId), b.c.name, raw, { imagesOnly: true })).then(() => {}, () => {}))
+    }
   }))
   await Promise.race([deepPulls, new Promise<void>((r) => setTimeout(r, 60_000))])   // OVERALL cap → always leaves budget to write
   return base.map(({ c, dna, liveAds }) => {
