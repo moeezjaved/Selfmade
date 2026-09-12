@@ -90,8 +90,18 @@ export default function BuilderPage() {
   // The click-anywhere visual editor is now the DEFAULT way to edit a page. `?editor=form` opts back to
   // the classic copy form (kept as a rollback while the team pressure-tests the visual editor).
   const editorV2 = search?.get('editor') !== 'form'
-  // Advanced PagePilot-style 3-pane editor (Phase 2, dormant) — opt-in via ?adv=1 until it reaches parity.
-  const advEditor = search?.get('adv') === '1'
+  // Advanced PagePilot-style 3-pane editor — opt-in via ?adv=1 (kept until it reaches parity). Sticky:
+  // once enabled it persists in localStorage so the ⚡ Advanced button survives in-app navigation that
+  // drops the query string; ?adv=0 turns it back off.
+  const [advEditor, setAdvEditor] = useState(false)
+  useEffect(() => {
+    const q = search?.get('adv')
+    try {
+      if (q === '1') { localStorage.setItem('sf_adv_editor', '1'); setAdvEditor(true) }
+      else if (q === '0') { localStorage.removeItem('sf_adv_editor'); setAdvEditor(false) }
+      else setAdvEditor(localStorage.getItem('sf_adv_editor') === '1')
+    } catch { setAdvEditor(q === '1') }
+  }, [search])
   const [step, setStep] = useState<Step>('list')
 
   /* ── landing: the user's already-generated pages ── */
@@ -546,9 +556,14 @@ export default function BuilderPage() {
                             <a href={pg.shopify_url} target="_blank" rel="noopener noreferrer" style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13 }}>View →</a>
                           )}
                           <button onClick={() => deleteDraft(pg.id, pg.product_name)} disabled={deleting === pg.id} title="Delete page" style={{ border: `1px solid ${LINE}`, background: '#fff', color: '#9a2b2b', borderRadius: 999, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: deleting === pg.id ? 'default' : 'pointer', opacity: deleting === pg.id ? 0.6 : 1 }}>{deleting === pg.id ? 'Deleting…' : 'Delete'}</button>
-                          <button onClick={() => editorV2 ? openVisualEditor(pg.id) : editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>{editorV2 ? '✨ Edit' : 'Edit'}</button>
-                          {advEditor && (
-                            <Link href={`/builder/adv?pageId=${encodeURIComponent(pg.id)}`} style={{ border: `1px solid ${ORANGE}`, background: WASH, color: ORANGE, textDecoration: 'none', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 13 }}>⚡ Advanced</Link>
+                          {advEditor ? (
+                            // Flag on: the NEW 3-pane editor is the primary edit action; the old visual editor stays as a small fallback.
+                            <>
+                              <button onClick={() => openVisualEditor(pg.id)} disabled={opening === pg.id} title="Old visual editor" style={{ border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '8px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }}>Old editor</button>
+                              <Link href={`/builder/adv?pageId=${encodeURIComponent(pg.id)}`} style={{ border: `1px solid ${ORANGE}`, background: ORANGE, color: '#fff', textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13 }}>⚡ Edit (new)</Link>
+                            </>
+                          ) : (
+                            <button onClick={() => editorV2 ? openVisualEditor(pg.id) : editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>{editorV2 ? '✨ Edit' : 'Edit'}</button>
                           )}
                           <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
                         </div>
@@ -935,11 +950,19 @@ export default function BuilderPage() {
 
           {/* ── PREVIEW ── */}
           {step === 'editor' && pageId && (
-            <BuilderEditor
-              pageId={pageId}
-              onBack={() => { loadPages(); setStep('list') }}
-              onPublish={() => { setStep('preview'); openThemePicker() }}
-            />
+            <>
+              {advEditor && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, background: WASH, border: `1px solid ${ORANGE}`, borderRadius: 12, padding: '10px 14px', marginBottom: 12 }}>
+                  <span style={{ fontSize: 13, color: INK }}>You’re in the <b>old</b> visual editor. The new PagePilot-style editor is ready to try.</span>
+                  <Link href={`/builder/adv?pageId=${encodeURIComponent(pageId)}`} style={{ border: 0, background: ORANGE, color: '#fff', textDecoration: 'none', borderRadius: 999, padding: '8px 16px', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>⚡ Open new editor →</Link>
+                </div>
+              )}
+              <BuilderEditor
+                pageId={pageId}
+                onBack={() => { loadPages(); setStep('list') }}
+                onPublish={() => { setStep('preview'); openThemePicker() }}
+              />
+            </>
           )}
 
           {step === 'preview' && (
