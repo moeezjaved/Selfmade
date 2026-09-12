@@ -66,8 +66,17 @@ export default function QuickLaunch() {
   const [headline, setHeadline] = useState('')
   const [cta, setCta] = useState('SHOP_NOW')
   const [url, setUrl] = useState('')
-  const [country, setCountry] = useState('')
   const [budget, setBudget] = useState('20')
+  // Locations come straight from Facebook (countries, regions, cities) — not a hardcoded list.
+  const [locations, setLocations] = useState<{ key: string; name: string; type: string; country_name?: string }[]>([])
+  const [locQuery, setLocQuery] = useState('')
+  const [locResults, setLocResults] = useState<any[]>([])
+  const [locSearching, setLocSearching] = useState(false)
+  // Conversion pixel(s) from the connected account.
+  const [pixels, setPixels] = useState<{ id: string; name: string; active: boolean }[]>([])
+  const [pixelId, setPixelId] = useState('')
+  const [copyBusy, setCopyBusy] = useState(false)   // AI copy (re)generation
+  const detected = useRef<{ product: string; description: string; targetCustomer: string; brand: string }>({ product: '', description: '', targetCustomer: '', brand: '' })
   // audience
   const [broad, setBroad] = useState(true)                        // Advantage+ vs interest-targeted
   const [interests, setInterests] = useState<Interest[]>([])
@@ -111,19 +120,42 @@ export default function QuickLaunch() {
       if (ps[0]) { setPageId(ps[0].id); if (ps[0].website && !url) setUrl(ps[0].website) }
     }).catch(() => setMetaConnected(true))
 
+    // Conversion pixel(s) — real, from the connected account. Auto-select the active one.
+    fetch('/api/m4/pixels').then((r) => r.json()).then((d) => {
+      const px = Array.isArray(d.pixels) ? d.pixels : []
+      setPixels(px)
+      const pick = px.find((p: any) => p.active) || px[0]
+      if (pick) setPixelId(pick.id)
+    }).catch(() => {})
+
     ;(async () => {
       try {
         const d = await fetch('/api/m4/detect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then((r) => r.json())
         if (d?.website && !url) setUrl(String(d.website))
-        if (d?.country) setCountry(toCode(d.country) || '')
-        if (d?.product || d?.description) {
-          const cp = await fetch('/api/m4/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product: d.product || '', description: d.description || '', targetCustomer: d.targetCustomer || '', type: 'main', tone: 'benefit' }) }).then((r) => r.json()).catch(() => null)
-          if (cp && !copyEdited.current) { if (cp.primaryText) setPrimaryText(cp.primaryText); if (cp.headline) setHeadline(cp.headline) }
-        }
+        // Pre-add the detected country as a REAL Facebook location chip (buildGeo reads {type,key}).
+        const cc = toCode(d?.country)
+        if (cc) setLocations((l) => l.length ? l : [{ key: cc, name: COUNTRIES.find(([c]) => c === cc)?.[1] || cc, type: 'country' }])
+        detected.current = { product: d?.product || '', description: d?.description || '', targetCustomer: d?.targetCustomer || '', brand: d?.brand || '' }
       } catch { /* best-effort */ }
-      finally { setPrefilling(false) }
+      await genCopy()   // ALWAYS write copy (falls back to brand/site when detect is thin)
+      setPrefilling(false)
     })()
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // AI copy — always produce something. Uses detected product/desc, falling back to the brand name or the
+  // site domain so the fields never sit empty. `force` rewrites even if the user has edited.
+  const genCopy = async (force = false) => {
+    if (copyEdited.current && !force) return
+    const dc = detected.current
+    const domain = (url || '').replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+    const product = dc.product || dc.brand || domain || 'our product'
+    const description = dc.description || `Products from ${dc.brand || domain || 'our store'}`
+    setCopyBusy(true)
+    try {
+      const cp = await fetch('/api/m4/copy', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ product, description, targetCustomer: dc.targetCustomer || '', type: 'main', tone: 'benefit' }) }).then((r) => r.json())
+      if (cp) { if (cp.primaryText) setPrimaryText(cp.primaryText); if (cp.headline) setHeadline(String(cp.headline).slice(0, 40)); if (force) copyEdited.current = false }
+    } catch { /* keep whatever's there */ } finally { setCopyBusy(false) }
+  }
 
   // ── interest search (debounced) ──
   useEffect(() => {
@@ -138,6 +170,20 @@ export default function QuickLaunch() {
     }, 280)
     return () => clearTimeout(t)
   }, [iQuery, broad]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── location search — real Facebook locations (countries, regions, cities) ──
+  useEffect(() => {
+    if (locQuery.trim().length < 2) { setLocResults([]); return }
+    const t = setTimeout(async () => {
+      setLocSearching(true)
+      try {
+        const d = await fetch(`/api/m4/locations?q=${encodeURIComponent(locQuery.trim())}`).then((r) => r.json())
+        const res = (Array.isArray(d.results) ? d.results : []).filter((x: any) => !locations.some((l) => l.key === x.key))
+        setLocResults(res.slice(0, 8))
+      } catch { setLocResults([]) } finally { setLocSearching(false) }
+    }, 280)
+    return () => clearTimeout(t)
+  }, [locQuery]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── upload from computer (image or video) ──
   const onUpload = async (file: File) => {
@@ -165,7 +211,7 @@ export default function QuickLaunch() {
   if (!pageId) missing.push('a Facebook Page')
   if (!url.trim()) missing.push('a destination URL')
   if (!headline.trim() || !primaryText.trim()) missing.push('ad copy')
-  if (!country) missing.push('a country')
+  if (!locations.length) missing.push('a location')
   if (!broad && interests.length === 0) missing.push('at least one interest (or switch to Advantage+)')
   const ready = missing.length === 0 && !busy
 
@@ -194,6 +240,7 @@ export default function QuickLaunch() {
         budget: String(parseFloat(budget) || 20),
         ageMin, ageMax, gender,
         objective,
+        pixelId,
         pageId,
         instagramActorId: page?.instagram?.id || '',
         retargetingCreatives: retarget ? creativesBody : [],
@@ -201,7 +248,8 @@ export default function QuickLaunch() {
         headline: headline.trim().slice(0, 40),
         primaryText: primaryText.trim().slice(0, 300),
         cta,
-        location: country || 'US',
+        locations: locations.map((l) => ({ key: l.key, name: l.name, type: l.type })),
+        location: locations.find((l) => l.type === 'country')?.key || 'US',
       }
       const r = await fetch('/api/m4/launch', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
       const d = await r.json()
@@ -355,6 +403,9 @@ export default function QuickLaunch() {
 
           {/* 4 · COPY */}
           <Section icon={ICONS.copy} n={4} title="Ad copy">
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: -40, marginBottom: 12 }}>
+              <button onClick={() => genCopy(true)} disabled={copyBusy} style={{ border: `1px solid ${LINE}`, background: '#fff', color: ORANGE, borderRadius: 999, padding: '6px 13px', fontSize: 12.5, fontWeight: 750, cursor: copyBusy ? 'default' : 'pointer', fontFamily: SANS }}>{copyBusy ? 'Writing…' : '✨ Rewrite with AI'}</button>
+            </div>
             <div style={{ display: 'grid', gap: 12 }}>
               <div>{label('Primary text', 'what people read')}<textarea value={primaryText} onChange={(e) => { copyEdited.current = true; setPrimaryText(e.target.value) }} rows={3} placeholder={prefilling ? 'Writing your copy…' : 'Say why they should care…'} style={{ ...input, resize: 'vertical', lineHeight: 1.45 }} /></div>
               <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -366,14 +417,35 @@ export default function QuickLaunch() {
 
           {/* 5 · DESTINATION */}
           <Section icon={ICONS.pin} n={5} title="Where it goes">
-            <div style={{ display: 'grid', gap: 12 }}>
-              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                <div style={{ flex: 2, minWidth: 220 }}>{label('Facebook Page', 'posts from here')}
-                  {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page — <Link href="/connect-meta?next=/m4/quick" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
-                    : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
-                </div>
-                <div style={{ flex: 1, minWidth: 150 }}>{label('Country')}<select value={country} onChange={(e) => setCountry(e.target.value)} style={{ ...input, cursor: 'pointer' }}><option value="">Select…</option>{COUNTRIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}</select></div>
+            <div style={{ display: 'grid', gap: 14 }}>
+              <div>{label('Facebook Page', 'the ad posts from here')}
+                {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page — <Link href="/connect-meta?next=/m4/quick" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
+                  : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
               </div>
+              {/* Location — real Facebook targeting locations (country / region / city). */}
+              <div>{label('Location', 'search Facebook — country, region or city')}
+                {locations.length > 0 && (
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
+                    {locations.map((l) => (
+                      <span key={l.key} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, background: '#fff5f2', border: `1px solid ${ORANGE}44`, color: ORANGE, borderRadius: 999, padding: '5px 11px', fontSize: 12.5, fontWeight: 700 }}>{l.name}{l.type !== 'country' && <span style={{ color: FAINT, fontWeight: 500, textTransform: 'capitalize' }}>· {l.type}</span>}<button onClick={() => setLocations((x) => x.filter((y) => y.key !== l.key))} style={{ border: 0, background: 'none', color: ORANGE, cursor: 'pointer', fontSize: 13, lineHeight: 1 }}>×</button></span>
+                    ))}
+                  </div>
+                )}
+                <input value={locQuery} onChange={(e) => setLocQuery(e.target.value)} placeholder="e.g. Pakistan, Lahore, California…" style={input} />
+                {(locSearching || locResults.length > 0) && (
+                  <div style={{ marginTop: 6, border: `1px solid ${LINE}`, borderRadius: 11, overflow: 'hidden', background: '#fff' }}>
+                    {locSearching && <div style={{ padding: '10px 12px', fontSize: 13, color: FAINT }}>Searching…</div>}
+                    {locResults.map((r: any) => (
+                      <button key={r.key} onClick={() => { setLocations((x) => [...x, { key: r.key, name: r.name, type: r.type, country_name: r.country_name }]); setLocQuery(''); setLocResults([]) }} style={{ display: 'flex', width: '100%', textAlign: 'left', border: 0, borderTop: `1px solid ${LINE2}`, background: '#fff', padding: '10px 12px', fontSize: 13.5, color: INK, cursor: 'pointer', fontFamily: SANS, gap: 6, alignItems: 'baseline' }}>{r.name}<span style={{ color: FAINT, fontSize: 12, textTransform: 'capitalize' }}>{r.type}{r.country_name && r.type !== 'country' ? ` · ${r.country_name}` : ''}</span></button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {pixels.length > 0 && (
+                <div>{label('Conversion tracking', 'your Meta pixel')}
+                  <select value={pixelId} onChange={(e) => setPixelId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pixels.map((p) => <option key={p.id} value={p.id}>{p.name}{p.active ? ' · active' : ''}</option>)}</select>
+                </div>
+              )}
               <div>{label('Where clicks go')}<input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://yourstore.com" style={input} /></div>
             </div>
           </Section>
