@@ -329,7 +329,9 @@ export async function GET(req: NextRequest) {
     merged = merged.filter((c: any) => !(WRONG_INDUSTRY.test(c?.name || '') && c?.source !== 'spied'))
     // Dedup each card by the actual IMAGE (not ad id) so no repeats, images first, AND drop any catalog/DPA
     // product ads (serve-time filter, so already-cached results are cleaned without waiting for a re-scan).
-    for (const c of merged) c.ads = uniqueByImage((c.ads || []).filter((a: any) => !isCatalogAd(a?.copy)))
+    // Check EVERY text field, not just `copy` — legacy cached ads stored the DPA token under body/title/text,
+    // so a copy-only check let "{{product.brand}}" cards leak. Also drop cards with no usable image.
+    for (const c of merged) c.ads = uniqueByImage((c.ads || []).filter((a: any) => a?.thumb && !isCatalogAd(a?.copy, a?.body, a?.title, a?.text, a?.name)))
     merged.forEach((c: any) => { c.adCount = c.ads.length })
     // Brands with real ad-DNA / live ads rise to the top.
     merged.sort((a, b) => (b.ads.length - a.ads.length) || ((b.hasAdDna ? 1 : 0) - (a.hasAdDna ? 1 : 0)))
