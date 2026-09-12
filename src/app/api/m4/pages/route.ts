@@ -4,6 +4,8 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
 
 const V = process.env.META_API_VERSION || 'v20.0'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 30
 
 export async function GET() {
   const supabase = await createClient()
@@ -18,22 +20,29 @@ export async function GET() {
   const token = decryptToken(metaAccount.access_token)
 
   try {
-    // First get pages with their access tokens
-    const res = await fetch(
-      `https://graph.facebook.com/${V}/me/accounts?` +
-      new URLSearchParams({ 
-        fields: 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website',
-        access_token: token,
-        limit: '20',
-      })
-    )
-    const data = await res.json()
-    if (data.error) throw new Error(data.error.message)
+    // Page through ALL the Pages this person manages — /me/accounts is paginated (default ~25) and the
+    // old limit:20 silently dropped everyone past the first batch. Follow paging.next until exhausted.
+    const fields = 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website'
+    let next: string | null = `https://graph.facebook.com/${V}/me/accounts?` + new URLSearchParams({ fields, access_token: token, limit: '100' })
+    const rawPages: any[] = []
+    for (let guard = 0; next && guard < 20; guard++) {   // up to ~2000 pages
+      const res: Response = await fetch(next)
+      const data: any = await res.json()
+      if (data.error) throw new Error(data.error.message)
+      if (Array.isArray(data.data)) rawPages.push(...data.data)
+      next = data.paging?.next || null
+    }
+    // De-dupe by id (a Page can appear under multiple businesses) and sort by reach.
+    const seen = new Set<string>()
+    const uniq = rawPages.filter((p) => p?.id && !seen.has(p.id) && seen.add(p.id)).sort((a, b) => (b.fan_count || 0) - (a.fan_count || 0))
 
-    // For each page fetch Instagram using page token
-    const pages = await Promise.all((data.data || []).map(async (p: any) => {
+    // For each page fetch Instagram using page token. Cap the IG lookups (they're an extra Graph call each)
+    // to the top pages so a big Page portfolio doesn't time out — the rest still appear, just without the
+    // "+ Instagram" badge (it resolves when that Page is actually selected/launched).
+    const pages = await Promise.all(uniq.map(async (p: any, idx: number) => {
       let instagram = null
       const pageToken = p.access_token || token
+      if (idx >= 50) return { id: p.id, name: p.name, category: p.category, fan_count: p.fan_count, instagram: null, about: p.about || p.products || p.description || '', website: p.website || '' }
 
       // Try all known Instagram fields
       try {
