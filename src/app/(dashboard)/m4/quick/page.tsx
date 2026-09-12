@@ -49,6 +49,22 @@ const ICONS = {
   money: 'M12 2v20|M17 6.5c0-2-2.2-3.5-5-3.5s-5 1.3-5 3.3S9 12 12 12s5 1 5 3.2-2.2 3.3-5 3.3-5-1.5-5-3.5',
 }
 
+// Defined at MODULE scope (not inside the component) — a component defined inside render is a NEW type
+// every keystroke, so React remounts the whole subtree, which resets scroll + steals focus. This was the
+// "fill budget → jumps up to creatives" bug.
+function Section({ icon, n, title, children }: { icon: string; n: number; title: string; children: React.ReactNode }) {
+  return (
+    <section style={{ background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 16, padding: '18px 18px 20px', boxShadow: '0 1px 2px rgba(20,18,15,.04)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
+        <span style={{ width: 30, height: 30, borderRadius: 9, background: INSET, color: INK, display: 'grid', placeItems: 'center' }}><Ic d={icon} /></span>
+        <span style={{ fontSize: 15, fontWeight: 750, color: INK }}>{title}</span>
+        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: FAINT }}>{n}</span>
+      </div>
+      {children}
+    </section>
+  )
+}
+
 export default function QuickLaunch() {
   // data
   const [creatives, setCreatives] = useState<Creative[] | null>(null)
@@ -58,8 +74,10 @@ export default function QuickLaunch() {
   const [prefilling, setPrefilling] = useState(true)
 
   // launch selections
-  const [selected, setSelected] = useState<string[]>([])          // creative ids chosen (multi)
-  const [pickerOpen, setPickerOpen] = useState(false)
+  const [selected, setSelected] = useState<string[]>([])          // main (prospecting) creative ids
+  const [retargetSel, setRetargetSel] = useState<string[]>([])    // optional separate creatives for retargeting
+  const [retainSel, setRetainSel] = useState<string[]>([])        // optional separate creatives for retention
+  const [pickerFor, setPickerFor] = useState<null | 'main' | 'retarget' | 'retain'>(null)   // which selection the modal edits
   const [pageId, setPageId] = useState('')
   const [objective, setObjective] = useState('OUTCOME_SALES')
   const [primaryText, setPrimaryText] = useState('')
@@ -202,14 +220,19 @@ export default function QuickLaunch() {
       if (!d?.hash) { setUploadErr(d?.error || 'Couldn’t prepare that file for Meta — try another.'); setUploading(false); return }
       const id = `_up_${Date.now()}`
       const c: Creative = { id, image_url: URL.createObjectURL(file), media_type: isVideo ? 'video' : 'image', brand_name: file.name, hash: String(d.hash), local: true }
-      setUploaded((u) => [c, ...u]); setSelected((s) => [id, ...s])
+      setUploaded((u) => [c, ...u]); setSelFor(pickerFor || 'main')((s) => [id, ...s])
     } catch { setUploadErr('Upload failed — try again.') } finally { setUploading(false) }
   }
 
   const allCreatives: Creative[] = [...uploaded, ...(creatives || [])]
-  const chosen = allCreatives.filter((c) => selected.includes(c.id))
+  const setSelFor = (k: 'main' | 'retarget' | 'retain') => k === 'retarget' ? setRetargetSel : k === 'retain' ? setRetainSel : setSelected
+  const selFor = (k: 'main' | 'retarget' | 'retain') => k === 'retarget' ? retargetSel : k === 'retain' ? retainSel : selected
+  const creativesOf = (ids: string[]) => allCreatives.filter((c) => ids.includes(c.id))
+  const chosen = creativesOf(selected)                          // main (prospecting) creatives
+  const activeSel = pickerFor ? selFor(pickerFor) : selected
   const page = pages.find((p) => p.id === pageId) || null
-  const toggle = (id: string) => setSelected((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
+  // Toggle within the selection the modal is currently editing (main / retarget / retain).
+  const toggle = (id: string) => setSelFor(pickerFor || 'main')((s) => s.includes(id) ? s.filter((x) => x !== id) : [...s, id])
 
   const missing: string[] = []
   if (!chosen.length) missing.push('an ad')
@@ -233,9 +256,12 @@ export default function QuickLaunch() {
     setResult(null)
     try {
       setBusy('uploading')
-      const resolved = await Promise.all(chosen.map(async (c) => { const h = await hashFor(c); return h ? { id: c.id, name: c.brand_name || 'Your ad', pack: 1, type: h.type, hash: h.hash } : null }))
-      const creativesBody = resolved.filter(Boolean) as any[]
+      const resolveList = async (cs: Creative[]) => (await Promise.all(cs.map(async (c) => { const h = await hashFor(c); return h ? { id: c.id, name: c.brand_name || 'Your ad', pack: 1, type: h.type, hash: h.hash } : null }))).filter(Boolean) as any[]
+      const creativesBody = await resolveList(chosen)
       if (!creativesBody.length) { setBusy(''); setResult({ ok: false, msg: 'Couldn’t prepare your creative(s) for Meta — try again or pick another.' }); return }
+      // Retargeting/Retention use their OWN creatives if picked, else reuse the main ad.
+      const retargetBody = retarget ? (retargetSel.length ? await resolveList(creativesOf(retargetSel)) : creativesBody) : []
+      const retainBody = retention ? (retainSel.length ? await resolveList(creativesOf(retainSel)) : creativesBody) : []
 
       setBusy('launching')
       const body = {
@@ -250,8 +276,8 @@ export default function QuickLaunch() {
         instagramActorId: page?.instagram?.id || '',
         // Retargeting (warm visitors) + Retention (past buyers) campaigns — reuse the chosen creatives, with
         // their own message (falls back to the main copy). includeRetainer flips the retention campaign on.
-        retargetingCreatives: retarget ? creativesBody : [],
-        retainerCreatives: retention ? creativesBody : [],
+        retargetingCreatives: retargetBody,
+        retainerCreatives: retainBody,
         includeRetainer: retention,
         retargetingCopy: retarget ? { primaryText: (retargetMsg || primaryText).trim().slice(0, 300), headline: headline.trim().slice(0, 40), cta, destinationUrl: url.trim() } : {},
         retainerCopy: retention ? { primaryText: (retainMsg || primaryText).trim().slice(0, 300), headline: headline.trim().slice(0, 40), cta, destinationUrl: url.trim() } : {},
@@ -277,16 +303,6 @@ export default function QuickLaunch() {
   // ── shared bits ──
   const input: React.CSSProperties = { width: '100%', border: `1px solid ${LINE}`, borderRadius: 11, padding: '12px 13px', fontSize: 15, fontFamily: SANS, color: INK, background: '#fff', boxSizing: 'border-box', outline: 'none' }
   const label = (t: string, hint?: string) => <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 7 }}><span style={{ fontSize: 13, color: INK, fontWeight: 650 }}>{t}</span>{hint && <span style={{ fontSize: 12, color: FAINT }}>{hint}</span>}</div>
-  const Section = ({ icon, n, title, children }: { icon: string; n: number; title: string; children: React.ReactNode }) => (
-    <section style={{ background: '#fff', border: `1px solid ${LINE2}`, borderRadius: 16, padding: '18px 18px 20px', boxShadow: '0 1px 2px rgba(20,18,15,.04)' }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <span style={{ width: 30, height: 30, borderRadius: 9, background: INSET, color: INK, display: 'grid', placeItems: 'center' }}><Ic d={icon} /></span>
-        <span style={{ fontSize: 15, fontWeight: 750, color: INK }}>{title}</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, fontWeight: 800, color: FAINT }}>{n}</span>
-      </div>
-      {children}
-    </section>
-  )
   const pill = (on: boolean): React.CSSProperties => ({ border: `1.5px solid ${on ? ORANGE : LINE}`, background: on ? '#fff5f2' : '#fff', color: on ? ORANGE : INK, borderRadius: 999, padding: '8px 15px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS })
 
   return (
@@ -328,7 +344,7 @@ export default function QuickLaunch() {
           {/* 1 · YOUR AD */}
           <Section icon={ICONS.ad} n={1} title="Your ad">
             {chosen.length === 0 ? (
-              <button onClick={() => setPickerOpen(true)} style={{ width: '100%', border: `1.5px dashed ${LINE}`, borderRadius: 14, background: PAPER, padding: '26px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
+              <button onClick={() => setPickerFor('main')} style={{ width: '100%', border: `1.5px dashed ${LINE}`, borderRadius: 14, background: PAPER, padding: '26px 18px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, color: SUB, fontFamily: SANS }}>
                 <span style={{ color: ORANGE }}><Ic d="M12 5v14|M5 12h14" size={22} /></span>
                 <span style={{ fontSize: 14.5, fontWeight: 750, color: INK }}>Select your ad{`(s)`}</span>
                 <span style={{ fontSize: 12.5, color: FAINT }}>Choose from your creatives, or upload from your computer</span>
@@ -345,7 +361,7 @@ export default function QuickLaunch() {
                       <button onClick={() => toggle(c.id)} aria-label="Remove" style={{ position: 'absolute', top: 4, right: 4, width: 20, height: 20, borderRadius: '50%', border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', fontSize: 13, cursor: 'pointer', lineHeight: 1 }}>×</button>
                     </div>
                   ))}
-                  <button onClick={() => setPickerOpen(true)} style={{ width: 80, height: 100, borderRadius: 10, border: `1.5px dashed ${LINE}`, background: '#fff', cursor: 'pointer', color: SUB, display: 'grid', placeItems: 'center' }}><Ic d="M12 5v14|M5 12h14" size={20} /></button>
+                  <button onClick={() => setPickerFor('main')} style={{ width: 80, height: 100, borderRadius: 10, border: `1.5px dashed ${LINE}`, background: '#fff', cursor: 'pointer', color: SUB, display: 'grid', placeItems: 'center' }}><Ic d="M12 5v14|M5 12h14" size={20} /></button>
                 </div>
                 <div style={{ fontSize: 12.5, color: FAINT, marginTop: 9 }}>{chosen.length} selected · they’ll run as separate ads in one campaign</div>
               </div>
@@ -425,19 +441,36 @@ export default function QuickLaunch() {
               </div>
 
               {([
-                { on: retarget, set: setRetarget, msg: retargetMsg, setMsg: setRetargetMsg, title: 'Retargeting', sub: 'People who visited or engaged but didn’t buy — the warmest audience.', ph: 'Message for returning visitors — e.g. “Still thinking it over? Here’s 10% off.”' },
-                { on: retention, set: setRetention, msg: retainMsg, setMsg: setRetainMsg, title: 'Retention', sub: 'Past buyers — bring them back for another order.', ph: 'Message for past buyers — e.g. “Time to restock? Members save today.”' },
-              ] as const).map((c) => (
+                { kind: 'retarget' as const, on: retarget, set: setRetarget, msg: retargetMsg, setMsg: setRetargetMsg, sel: retargetSel, title: 'Retargeting', sub: 'People who visited or engaged but didn’t buy — the warmest audience.', ph: 'Message for returning visitors — e.g. “Still thinking it over? Here’s 10% off.”' },
+                { kind: 'retain' as const, on: retention, set: setRetention, msg: retainMsg, setMsg: setRetainMsg, sel: retainSel, title: 'Retention', sub: 'Past buyers — bring them back for another order.', ph: 'Message for past buyers — e.g. “Time to restock? Members save today.”' },
+              ]).map((c) => {
+                const pics = creativesOf(c.sel)
+                return (
                 <div key={c.title} style={{ border: `1.5px solid ${c.on ? ORANGE : LINE}`, background: c.on ? '#fff5f2' : '#fff', borderRadius: 13, padding: '13px 15px' }}>
                   <label style={{ display: 'flex', alignItems: 'center', gap: 9, cursor: 'pointer' }}>
                     <input type="checkbox" checked={c.on} onChange={(e) => c.set(e.target.checked)} style={{ width: 16, height: 16, accentColor: ORANGE }} />
                     <span style={{ fontSize: 14, fontWeight: 750, color: c.on ? ORANGE : INK }}>{c.title}</span>
                   </label>
                   <div style={{ fontSize: 12.5, color: SUB, marginTop: 4, paddingLeft: 26 }}>{c.sub}</div>
-                  {c.on && <textarea value={c.msg} onChange={(e) => c.setMsg(e.target.value)} rows={2} placeholder={c.ph} style={{ ...input, marginTop: 10, resize: 'vertical', lineHeight: 1.45, fontSize: 13.5 }} />}
+                  {c.on && <>
+                    <textarea value={c.msg} onChange={(e) => c.setMsg(e.target.value)} rows={2} placeholder={c.ph} style={{ ...input, marginTop: 10, resize: 'vertical', lineHeight: 1.45, fontSize: 13.5 }} />
+                    {/* Optional: a DIFFERENT creative for this audience. Empty = reuse the main ad above. */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 10, flexWrap: 'wrap' }}>
+                      {pics.map((p) => (
+                        <div key={p.id} style={{ position: 'relative', width: 46, height: 58, borderRadius: 8, overflow: 'hidden', border: `1px solid ${LINE}`, background: INSET }}>
+                          {p.media_type === 'video' ? <video src={p.image_url!} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                            /* eslint-disable-next-line @next/next/no-img-element */
+                            : <img src={p.image_url!} alt="" referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />}
+                          <button onClick={() => setSelFor(c.kind)((s) => s.filter((x) => x !== p.id))} aria-label="Remove" style={{ position: 'absolute', top: 2, right: 2, width: 16, height: 16, borderRadius: '50%', border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', fontSize: 10, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                        </div>
+                      ))}
+                      <button onClick={() => setPickerFor(c.kind)} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 13px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS }}>{pics.length ? 'Change creative' : '+ Different creative'}</button>
+                      {!pics.length && <span style={{ fontSize: 12, color: FAINT }}>reusing your main ad</span>}
+                    </div>
+                  </>}
                 </div>
-              ))}
-              {(retarget || retention) && <div style={{ fontSize: 12, color: FAINT }}>Budget is split automatically — ~60% to new customers, ~40% to warm audiences. Reuses your chosen creative unless you write a different message above.</div>}
+              )})}
+              {(retarget || retention) && <div style={{ fontSize: 12, color: FAINT }}>Budget is split automatically — ~60% to new customers, ~40% to warm audiences.</div>}
             </div>
           </Section>
 
@@ -522,13 +555,13 @@ export default function QuickLaunch() {
       )}
 
       {/* CREATIVE PICKER MODAL */}
-      {pickerOpen && (
-        <div onClick={(e) => { if (e.target === e.currentTarget) setPickerOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(20,18,15,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
+      {pickerFor && (
+        <div onClick={(e) => { if (e.target === e.currentTarget) setPickerFor(null) }} style={{ position: 'fixed', inset: 0, zIndex: 120, background: 'rgba(20,18,15,.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', padding: 0 }}>
           <div style={{ background: '#fff', width: '100%', maxWidth: 760, maxHeight: '88vh', borderRadius: '20px 20px 0 0', display: 'flex', flexDirection: 'column', boxShadow: '0 -20px 60px -30px rgba(0,0,0,.5)' }}>
             <div style={{ padding: '16px 20px', borderBottom: `1px solid ${LINE2}`, display: 'flex', alignItems: 'center', gap: 12 }}>
-              <div style={{ fontSize: 17, fontWeight: 800 }}>Choose your ad{`(s)`}</div>
-              <span style={{ fontSize: 13, color: FAINT }}>{selected.length} selected</span>
-              <button onClick={() => setPickerOpen(false)} style={{ marginLeft: 'auto', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: SANS }}>Done</button>
+              <div style={{ fontSize: 17, fontWeight: 800 }}>{pickerFor === 'retarget' ? 'Retargeting creative(s)' : pickerFor === 'retain' ? 'Retention creative(s)' : 'Choose your ad(s)'}</div>
+              <span style={{ fontSize: 13, color: FAINT }}>{activeSel.length} selected</span>
+              <button onClick={() => setPickerFor(null)} style={{ marginLeft: 'auto', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 20px', fontSize: 14, fontWeight: 800, cursor: 'pointer', fontFamily: SANS }}>Done</button>
             </div>
             <div style={{ padding: 20, overflowY: 'auto' }}>
               {uploadErr && <div style={{ marginBottom: 12, fontSize: 13, color: ORANGE }}>{uploadErr}</div>}
@@ -539,7 +572,7 @@ export default function QuickLaunch() {
                   <span style={{ fontSize: 10.5, color: FAINT }}>from your computer</span>
                 </button>
                 {creatives === null ? <div style={{ color: FAINT, fontSize: 13, alignSelf: 'center' }}>Loading…</div> : allCreatives.map((c) => {
-                  const on = selected.includes(c.id)
+                  const on = activeSel.includes(c.id)
                   return (
                     <button key={c.id} onClick={() => toggle(c.id)} style={{ position: 'relative', padding: 0, border: `2.5px solid ${on ? ORANGE : LINE}`, borderRadius: 12, overflow: 'hidden', background: INSET, cursor: 'pointer', aspectRatio: '4/5' }}>
                       {c.media_type === 'video'
