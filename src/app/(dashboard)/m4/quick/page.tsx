@@ -148,6 +148,8 @@ export default function QuickLaunch() {
   const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string; external?: boolean } | null>(null)
   const copyEdited = useRef(false)
   const budgetTouched = useRef(false)
+  const brandHost = useRef('')                 // the active brand's website host → prefer the matching FB page
+  const locBoxRef = useRef<HTMLDivElement>(null)
   const acctCurrency = accounts.find((a) => a.account_id === accountId)?.currency || 'USD'
   const cur = CURRENCY(acctCurrency)
 
@@ -182,6 +184,7 @@ export default function QuickLaunch() {
       try {
         const d = await fetch('/api/m4/detect', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) }).then((r) => r.json())
         if (d?.website && !url) setUrl(String(d.website))
+        if (d?.website) { try { brandHost.current = new URL(String(d.website).startsWith('http') ? d.website : `https://${d.website}`).host.replace(/^www\./, '') } catch { /* ignore */ } }
         // Pre-add the detected country as a REAL Facebook location chip (buildGeo reads {type,key}).
         const cc = toCode(d?.country)
         if (cc) setLocations((l) => l.length ? l : [{ key: cc, name: COUNTRIES.find(([c]) => c === cc)?.[1] || cc, type: 'country' }])
@@ -220,7 +223,11 @@ export default function QuickLaunch() {
       setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
       const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
       setPages(ps)
-      setPageId((cur) => cur && ps.some((p) => p.id === cur) ? cur : (ps[0]?.id || ''))
+      // Prefer the page that belongs to THIS brand (its website host matches the brand's), not just the
+      // first page the token returns — otherwise a multi-page account defaults to the wrong brand's page.
+      const hostOf = (w?: string) => { try { return new URL(String(w).startsWith('http') ? String(w) : `https://${w}`).host.replace(/^www\./, '') } catch { return '' } }
+      const brandPage = brandHost.current ? ps.find((p) => p.website && hostOf(p.website) === brandHost.current) : undefined
+      setPageId((cur) => cur && ps.some((p) => p.id === cur) ? cur : (brandPage?.id || ps[0]?.id || ''))
       if (ps[0]?.website) setUrl((u) => u || ps[0].website || '')
     }).catch(() => setMetaConnected(true))
 
@@ -285,6 +292,13 @@ export default function QuickLaunch() {
     }, 280)
     return () => clearTimeout(t)
   }, [locQuery]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Close the location results when clicking anywhere outside the location box (so it never gets "stuck open").
+  useEffect(() => {
+    const onDoc = (e: MouseEvent) => { if (locBoxRef.current && !locBoxRef.current.contains(e.target as Node)) setLocResults([]) }
+    document.addEventListener('mousedown', onDoc)
+    return () => document.removeEventListener('mousedown', onDoc)
+  }, [])
 
   // ── upload from computer (image or video) ──
   const onUpload = async (file: File) => {
@@ -614,7 +628,7 @@ export default function QuickLaunch() {
                   : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
               </div>
               {/* Location — real Facebook targeting locations (country / region / city). */}
-              <div>{label('Location', 'search Facebook — country, region or city')}
+              <div ref={locBoxRef}>{label('Location', 'search Facebook — country, region or city')}
                 {locations.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
                     {locations.map((l) => (
@@ -622,7 +636,12 @@ export default function QuickLaunch() {
                     ))}
                   </div>
                 )}
-                <input value={locQuery} onChange={(e) => setLocQuery(e.target.value)} placeholder="e.g. Pakistan, Lahore, California…" style={input} />
+                <input value={locQuery} onChange={(e) => setLocQuery(e.target.value)} onKeyDown={(e) => { if (e.key === 'Escape') { setLocResults([]); setLocQuery('') } }} placeholder="e.g. Pakistan, Lahore, California…" style={input} />
+                {(locSearching || locResults.length > 0) && (
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 4 }}>
+                    <button onClick={() => { setLocResults([]); setLocQuery('') }} style={{ border: 0, background: 'none', color: FAINT, fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: SANS }}>Close ✕</button>
+                  </div>
+                )}
                 {(locSearching || locResults.length > 0) && (
                   <div style={{ marginTop: 6, border: `1px solid ${LINE}`, borderRadius: 11, overflow: 'hidden', background: '#fff' }}>
                     {locSearching && <div style={{ padding: '10px 12px', fontSize: 13, color: FAINT }}>Searching…</div>}

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { resolveBrandScopedAccount } from '@/lib/meta/scope'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { decryptToken } from '@/lib/meta/client'
+import { resolveActiveBrandId } from '@/lib/brand/active'
 import { llm } from '@/lib/llm'
 
 export const maxDuration = 30
@@ -43,6 +44,47 @@ async function fetchWebsiteContext(url: string): Promise<string> {
   } catch {
     return ''
   }
+}
+
+/**
+ * POST /api/m4/detect — lightweight, brand-scoped grounding for the Quick Launch copy + destination.
+ * Returns the ACTIVE BRAND's own name + website (flat shape the launcher reads) so the ad copy, the
+ * "where clicks go" URL, and the Brand Hub lookup are about THIS brand — not whatever Facebook page the
+ * token happens to return first. Falls back to the connected page's website only when the brand has none.
+ */
+export async function POST() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const admin = createAdminClient()
+
+  let name = '', website = ''
+  try {
+    const brandId = await resolveActiveBrandId(admin, user.id).catch(() => null)
+    if (brandId) {
+      const { data } = await admin.from('brands').select('name, website').eq('id', brandId).maybeSingle()
+      name = String((data as any)?.name || '')
+      website = String((data as any)?.website || '')
+    }
+  } catch { /* fall through to page website */ }
+
+  // If the brand has no website on file, fall back to its connected Facebook page's website.
+  if (!website) {
+    try {
+      const ma = await resolveBrandScopedAccount(admin, user.id)
+      if (ma) {
+        const token = decryptToken(ma.access_token)
+        const pageRes = await fetch(`https://graph.facebook.com/${V}/me/accounts?` + new URLSearchParams({ fields: 'name,website', access_token: token, limit: '1' })).then(r => r.json()).catch(() => ({}))
+        const page = pageRes?.data?.[0] || {}
+        website = String(page.website || '')
+        if (!name) name = String(page.name || '')
+      }
+    } catch { /* best-effort */ }
+  }
+
+  const domain = website.replace(/^https?:\/\//, '').replace(/\/.*$/, '')
+  // product/description are enriched from Brand Hub on the client (it already does this for `website`).
+  return NextResponse.json({ website, product: name, brand: name, description: '', country: '', domain })
 }
 
 export async function GET() {
