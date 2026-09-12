@@ -10,7 +10,7 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { Mark } from '@/components/brand/Mark'
 import { usePathname, useRouter } from 'next/navigation'
-import { Home, Users, Brain, FileText, Wand2, Image as ImageIcon, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles, LayoutTemplate } from 'lucide-react'
+import { Home, Users, Brain, FileText, Wand2, BarChart2, Rocket, Plug, Radar, Eye, Bookmark, Store, Menu, X, Settings, CreditCard, LogOut, LifeBuoy, ClipboardList, ChevronsUpDown, Zap, Sparkles, LayoutTemplate } from 'lucide-react'
 import { useIsMobile } from '@/lib/useIsMobile'
 import { useCredits, CreditCounter } from '@/components/credits/CreditCounter'
 import { PLANS, normalizePlan } from '@/lib/plans'
@@ -40,13 +40,12 @@ const NAV: Group[] = [
   { label: 'Ads', items: [
     { href: '/ads-workspace', label: 'Ad Studio', icon: Wand2 },
     { href: '/creative-studio', label: 'My Creatives', icon: Sparkles },
-    { href: '/ads-workspace/your-ads', label: 'Your Ads', icon: ImageIcon },
+    { href: '/m4/quick', label: 'Your Ads', icon: Rocket },   // launch NEW ads + manage LIVE ones (one page)
     { href: '/ads-workspace/competitors', label: 'My Competitors', icon: Eye },
     { href: '/discovery', label: 'Discover', icon: Radar },
     { href: '/discovery/saved', label: 'Boards', icon: Bookmark },
     { href: '/ads-workspace/brand', label: 'Brand Hub', icon: Wand2 },
     { href: '/reports', label: 'Reports', icon: BarChart2 },
-    { href: '/m4/quick', label: 'Launch Ads', icon: Rocket },
   ] },
   { label: 'Website', items: [
     { href: '/builder', label: 'Page Builder', icon: LayoutTemplate },

@@ -8,6 +8,8 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
+import MelloAdsChat from '@/components/ads/MelloAdsChat'
+import FacebookAdsCard from '@/components/brief/FacebookAdsCard'
 
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15,.12)', INSET = '#f7f6f4', ORANGE = '#e02f06', GOOD = '#12a150'
 const SANS = 'Inter, system-ui, sans-serif'
@@ -42,6 +44,7 @@ export default function QuickLaunch() {
   const [country, setCountry] = useState('')
   const [budget, setBudget] = useState('10')
   const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
+  const [tab, setTab] = useState<'launch' | 'manage'>('launch')   // one page: launch a NEW ad, or manage LIVE ads
   const [prefilling, setPrefilling] = useState(true)
   const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
   const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
@@ -58,7 +61,11 @@ export default function QuickLaunch() {
     // A specific creative can arrive via ?img=<url> (e.g. "Run on Facebook" from a single ad) — pre-select it,
     // injecting a synthetic entry when it isn't in the recent list so that exact ad is what gets launched.
     let wantImg = ''
-    try { wantImg = new URLSearchParams(window.location.search).get('img') || '' } catch { /* SSR-safe */ }
+    try {
+      const sp = new URLSearchParams(window.location.search)
+      wantImg = sp.get('img') || ''
+      if (sp.get('tab') === 'manage') setTab('manage')   // deep-link straight to the live-ads view
+    } catch { /* SSR-safe */ }
 
     fetch('/api/creatives?limit=60').then((r) => r.json()).then((d) => {
       let list: Creative[] = (Array.isArray(d.creatives) ? d.creatives : []).filter((c: Creative) => c.image_url && c.media_type !== 'video')
@@ -175,10 +182,19 @@ export default function QuickLaunch() {
     <div style={{ maxWidth: 880, margin: '0 auto', padding: '28px 22px 70px', fontFamily: SANS, color: INK }}>
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
-          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Launch an ad</h1>
-          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
+          <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Your ads</h1>
+          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : tab === 'manage' ? 'See what’s live and tell Mello what to do — scale, pause, or launch, just by typing.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
         </div>
       </div>
+
+      {/* One page, two jobs: launch a NEW ad, or manage the ads already LIVE. */}
+      {metaConnected === true && (
+        <div style={{ display: 'flex', gap: 4, marginTop: 18, background: INSET, borderRadius: 999, padding: 4, width: 'fit-content' }}>
+          {([['launch', '🚀 Launch a new ad'], ['manage', '📊 Your live ads']] as const).map(([k, lbl]) => (
+            <button key={k} onClick={() => setTab(k)} style={{ border: 0, background: tab === k ? '#fff' : 'transparent', color: tab === k ? INK : SUB, boxShadow: tab === k ? '0 1px 2px rgba(20,18,15,.12)' : 'none', borderRadius: 999, padding: '8px 16px', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: SANS }}>{lbl}</button>
+          ))}
+        </div>
+      )}
 
       {metaConnected !== true ? (
         metaConnected === false ? (
@@ -193,6 +209,13 @@ export default function QuickLaunch() {
         ) : (
           <div style={{ marginTop: 40, textAlign: 'center', color: FAINT, fontSize: 14 }}>Checking your Facebook connection…</div>
         )
+      ) : tab === 'manage' ? (
+        <div style={{ marginTop: 22 }}>
+          <MelloAdsChat website={url || undefined} />
+          <div style={{ marginTop: 20 }}>
+            <FacebookAdsCard initial={{ accounts: [] } as any} ctaHref="/reports" ctaLabel="See the full report" />
+          </div>
+        </div>
       ) : (<>
 
       {heading('1', 'Pick your ad')}
