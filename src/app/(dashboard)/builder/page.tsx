@@ -90,6 +90,8 @@ export default function BuilderPage() {
   // The click-anywhere visual editor is now the DEFAULT way to edit a page. `?editor=form` opts back to
   // the classic copy form (kept as a rollback while the team pressure-tests the visual editor).
   const editorV2 = search?.get('editor') !== 'form'
+  // Advanced PagePilot-style 3-pane editor (Phase 2, dormant) — opt-in via ?adv=1 until it reaches parity.
+  const advEditor = search?.get('adv') === '1'
   const [step, setStep] = useState<Step>('list')
 
   /* ── landing: the user's already-generated pages ── */
@@ -545,6 +547,9 @@ export default function BuilderPage() {
                           )}
                           <button onClick={() => deleteDraft(pg.id, pg.product_name)} disabled={deleting === pg.id} title="Delete page" style={{ border: `1px solid ${LINE}`, background: '#fff', color: '#9a2b2b', borderRadius: 999, padding: '8px 14px', fontWeight: 600, fontSize: 13, cursor: deleting === pg.id ? 'default' : 'pointer', opacity: deleting === pg.id ? 0.6 : 1 }}>{deleting === pg.id ? 'Deleting…' : 'Delete'}</button>
                           <button onClick={() => editorV2 ? openVisualEditor(pg.id) : editDraft(pg.id)} disabled={opening === pg.id} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '8px 16px', fontWeight: 600, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer' }}>{editorV2 ? '✨ Edit' : 'Edit'}</button>
+                          {advEditor && (
+                            <Link href={`/builder/adv?pageId=${encodeURIComponent(pg.id)}`} style={{ border: `1px solid ${ORANGE}`, background: WASH, color: ORANGE, textDecoration: 'none', borderRadius: 999, padding: '8px 14px', fontWeight: 700, fontSize: 13 }}>⚡ Advanced</Link>
+                          )}
                           <button onClick={() => openDraft(pg.id)} disabled={opening === pg.id} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '8px 18px', fontWeight: 700, fontSize: 13, cursor: opening === pg.id ? 'default' : 'pointer', opacity: opening === pg.id ? 0.6 : 1 }}>{opening === pg.id ? 'Opening…' : 'Open →'}</button>
                         </div>
                       </div>
