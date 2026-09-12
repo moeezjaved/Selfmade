@@ -346,7 +346,18 @@ export async function POST(request: NextRequest) {
     // unwanted interests campaign — this was creating an M4 Interests campaign even on Advantage+.
     let intCamp: any = null
     const hasInterest = Array.isArray(interests) && (interests as any[]).length > 0
-    const newShare = hasInterest ? 0.3 : 0.6   // new-customer budget: split with interests, or broad gets it all
+    // Budget split — USER-controlled: newPct (10–90) is the % of the daily budget going to NEW customers
+    // (broad + interest); the rest goes to the warm campaigns (retargeting + retention), split evenly. When
+    // there are no warm campaigns, new customers get 100%.
+    const hasRt = Array.isArray(retargetingCreatives) && (retargetingCreatives as any[]).length > 0
+    const hasRn = includeRetainer && Array.isArray(retainerCreatives) && (retainerCreatives as any[]).length > 0
+    const warmN = (hasRt ? 1 : 0) + (hasRn ? 1 : 0)
+    const newPct = Math.max(10, Math.min(90, parseInt(String(body.newPct)) || 60))
+    const newFrac = warmN > 0 ? newPct / 100 : 1
+    const warmFrac = warmN > 0 ? 1 - newPct / 100 : 0
+    const newShare = newFrac / (hasInterest ? 2 : 1)      // broad's share
+    const interestShare = hasInterest ? newFrac / 2 : 0
+    const warmEachShare = warmN > 0 ? warmFrac / warmN : 0
 
     // Get or create exclusion audience (shared across all campaigns — reused not duplicated)
     if (pixelId) {
@@ -411,7 +422,7 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
-      daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
+      daily_budget: Math.max(minBudget, Math.round(safeBudget * interestShare)),
       bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       is_adset_budget_sharing_enabled: false,
     })
@@ -483,8 +494,7 @@ export async function POST(request: NextRequest) {
           throw new Error(`Couldn't build the website-visitor audience for the Pixel (${why}). Retargeting was skipped so it wouldn't run as a broad ad set. An empty audience is fine (a new Pixel fills over time) — if Meta refused it, it's usually the Custom Audience terms not yet accepted for this ad account (Ads Manager → Audiences), or the Pixel isn't shared with this ad account.`)
         }
 
-        const rtPct = includeRetainer ? 0.2 : 0.4
-        const rtBudget = Math.max(minBudget, Math.round(safeBudget * rtPct))
+        const rtBudget = Math.max(minBudget, Math.round(safeBudget * warmEachShare))
         const rtCamp = await post(`${adAccountId}/campaigns`, {
           name: `${campaignName} — M4 Retargeting`,
           objective: apiObjective,
@@ -549,7 +559,7 @@ export async function POST(request: NextRequest) {
           throw new Error(`Couldn't build the past-purchasers audience for the Pixel (${why}). Retainer was skipped so it wouldn't run as a broad ad set.`)
         }
 
-        const rnBudget = Math.max(minBudget, Math.round(safeBudget * 0.2))
+        const rnBudget = Math.max(minBudget, Math.round(safeBudget * warmEachShare))
         const rnCamp = await post(`${adAccountId}/campaigns`, {
           name: `${campaignName} — M4 Retainer`,
           objective: apiObjective,

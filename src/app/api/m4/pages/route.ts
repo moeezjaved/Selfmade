@@ -35,6 +35,24 @@ export async function GET(request: NextRequest) {
       if (Array.isArray(data.data)) rawPages.push(...data.data)
       next = data.paging?.next || null
     }
+
+    // ALSO pages the ad account can advertise for via Business Manager — owned_pages + client_pages. These
+    // are NOT in /me/accounts when you're not a direct Page admin (e.g. "Shopoo", run by ROY1's business),
+    // so without this the Page the ad actually posts from was missing from the picker.
+    try {
+      const bizRes = await fetch(`https://graph.facebook.com/${V}/me/businesses?fields=id&limit=50&access_token=${encodeURIComponent(token)}`)
+      const biz: any = await bizRes.json()
+      const bizIds: string[] = (Array.isArray(biz?.data) ? biz.data : []).map((b: any) => String(b.id)).slice(0, 20)
+      const bizFields = 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website'
+      await Promise.all(bizIds.flatMap((bid) => ['owned_pages', 'client_pages'].map(async (edge) => {
+        try {
+          const pr = await fetch(`https://graph.facebook.com/${V}/${bid}/${edge}?` + new URLSearchParams({ fields: bizFields, access_token: token, limit: '200' }))
+          const pd: any = await pr.json()
+          if (Array.isArray(pd?.data)) rawPages.push(...pd.data)
+        } catch { /* per-edge best-effort */ }
+      })))
+    } catch { /* businesses best-effort — /me/accounts pages still returned */ }
+
     // De-dupe by id (a Page can appear under multiple businesses) and sort by reach.
     const seen = new Set<string>()
     const uniq = rawPages.filter((p) => p?.id && !seen.has(p.id) && seen.add(p.id)).sort((a, b) => (b.fan_count || 0) - (a.fan_count || 0))

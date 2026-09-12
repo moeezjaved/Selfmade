@@ -121,7 +121,7 @@ async function adDnaFor(admin: any, name: string, domain?: string | null) {
 
 /** Enrich each discovered rival with our ad-DNA (corpus) or its live ads. Shared by the inline (anon) path
  * and the background job so both produce identical cards. */
-const MAX_DEEP_PULLS = 4        // rivals deep-pulled per background run (bounded for the shared droplet; union accumulates the rest across runs)
+const MAX_DEEP_PULLS = 8        // rivals deep-pulled per background run — pull more competitors' full sets each run (union accumulates the rest)
 const DEEP_PULL_LIMIT = 500     // ads scrolled per rival — their FULL live Ad Library page (droplet scroll cap)
 async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   // Pass 1: corpus DNA for everyone + any ads already attached during discovery (cheap).

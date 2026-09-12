@@ -136,6 +136,7 @@ export default function QuickLaunch() {
   const [retention, setRetention] = useState(false)
   const [retargetMsg, setRetargetMsg] = useState('')
   const [retainMsg, setRetainMsg] = useState('')
+  const [newPct, setNewPct] = useState(60)   // % of budget to NEW customers; the rest goes to warm audiences
 
   // upload
   const [uploaded, setUploaded] = useState<Creative[]>([])         // uploaded-from-computer creatives (carry Meta hash)
@@ -349,6 +350,7 @@ export default function QuickLaunch() {
         ageMin, ageMax, gender,
         objective,
         accountId,
+        newPct,
         pixelId,
         pageId,
         instagramActorId: page?.instagram?.id || '',
@@ -569,7 +571,24 @@ export default function QuickLaunch() {
                   </>}
                 </div>
               )})}
-              {(retarget || retention) && <div style={{ fontSize: 12, color: FAINT }}>Budget is split automatically — ~60% to new customers, ~40% to warm audiences.</div>}
+              {(retarget || retention) && (() => {
+                const warmN = (retarget ? 1 : 0) + (retention ? 1 : 0)
+                const warmPct = 100 - newPct
+                const each = warmN ? Math.round(warmPct / warmN) : 0
+                return (
+                  <div style={{ border: `1px solid ${LINE2}`, background: PAPER, borderRadius: 13, padding: '14px 15px' }}>
+                    <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 10 }}>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: INK }}>Budget split</span>
+                      <span style={{ fontSize: 12, color: SUB }}>New <b style={{ color: ORANGE }}>{newPct}%</b> · Warm <b style={{ color: INK }}>{warmPct}%</b></span>
+                    </div>
+                    <input type="range" min={10} max={90} step={5} value={newPct} onChange={(e) => setNewPct(parseInt(e.target.value))} style={{ width: '100%', accentColor: ORANGE }} />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11.5, color: FAINT, marginTop: 6 }}>
+                      <span>New customers: {cur.sym}{Math.round((parseFloat(budget) || 0) * newPct / 100)}/day</span>
+                      <span>{retarget && `Retargeting ${cur.sym}${Math.round((parseFloat(budget) || 0) * each / 100)}`}{retarget && retention ? ' · ' : ''}{retention && `Retention ${cur.sym}${Math.round((parseFloat(budget) || 0) * each / 100)}`}</span>
+                    </div>
+                  </div>
+                )
+              })()}
             </div>
           </Section>
 
