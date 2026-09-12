@@ -39,19 +39,31 @@ export async function GET(request: NextRequest) {
     // ALSO pages the ad account can advertise for via Business Manager — owned_pages + client_pages. These
     // are NOT in /me/accounts when you're not a direct Page admin (e.g. "Shopoo", run by ROY1's business),
     // so without this the Page the ad actually posts from was missing from the picker.
-    try {
-      const bizRes = await fetch(`https://graph.facebook.com/${V}/me/businesses?fields=id&limit=50&access_token=${encodeURIComponent(token)}`)
-      const biz: any = await bizRes.json()
-      const bizIds: string[] = (Array.isArray(biz?.data) ? biz.data : []).map((b: any) => String(b.id)).slice(0, 20)
-      const bizFields = 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website'
-      await Promise.all(bizIds.flatMap((bid) => ['owned_pages', 'client_pages'].map(async (edge) => {
+    const bizFields = 'id,name,category,fan_count,access_token,instagram_business_account,connected_instagram_account,about,description,products,website'
+    const pullBusinessPages = async (bizId: string) => {
+      await Promise.all(['owned_pages', 'client_pages'].map(async (edge) => {
         try {
-          const pr = await fetch(`https://graph.facebook.com/${V}/${bid}/${edge}?` + new URLSearchParams({ fields: bizFields, access_token: token, limit: '200' }))
+          const pr = await fetch(`https://graph.facebook.com/${V}/${bizId}/${edge}?` + new URLSearchParams({ fields: bizFields, access_token: token, limit: '200' }))
           const pd: any = await pr.json()
           if (Array.isArray(pd?.data)) rawPages.push(...pd.data)
         } catch { /* per-edge best-effort */ }
-      })))
-    } catch { /* businesses best-effort — /me/accounts pages still returned */ }
+      }))
+    }
+    const bizIdSet = new Set<string>()
+    // (a) The SELECTED ad account's OWN business — the surest source for the page the ad runs from
+    // (e.g. Shopoo under ROY1's business), even when the user isn't a top-level member of that business.
+    try {
+      const acctRes = await fetch(`https://graph.facebook.com/${V}/act_${metaAccount.account_id}?fields=business{id}&access_token=${encodeURIComponent(token)}`)
+      const acctData: any = await acctRes.json()
+      if (acctData?.business?.id) bizIdSet.add(String(acctData.business.id))
+    } catch { /* best-effort */ }
+    // (b) Every business the user belongs to.
+    try {
+      const bizRes = await fetch(`https://graph.facebook.com/${V}/me/businesses?fields=id&limit=50&access_token=${encodeURIComponent(token)}`)
+      const biz: any = await bizRes.json()
+      for (const b of (Array.isArray(biz?.data) ? biz.data : []).slice(0, 20)) bizIdSet.add(String(b.id))
+    } catch { /* best-effort */ }
+    await Promise.all(Array.from(bizIdSet).map(pullBusinessPages))
 
     // De-dupe by id (a Page can appear under multiple businesses) and sort by reach.
     const seen = new Set<string>()
@@ -75,13 +87,11 @@ export async function GET(request: NextRequest) {
           })
         )
         const igData = await igRes.json()
-        console.log('IG data for', p.name, ':', JSON.stringify(igData))
-        
         const ig = igData.instagram_business_account || igData.connected_instagram_account
         if (ig?.id) {
           instagram = { id: ig.id, username: ig.username || 'instagram', name: ig.name || ig.username }
         }
-      } catch(e: any) { console.log('IG fetch error:', e.message) }
+      } catch { /* IG is optional — the page still lists without it */ }
 
       // Use about > products > description — in order of usefulness for ad targeting context
       const pageAbout = p.about || p.products || p.description || ''

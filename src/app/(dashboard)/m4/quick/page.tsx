@@ -14,7 +14,7 @@ const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a', LINE = 'rgba(20,18,15
 const SANS = 'Inter, system-ui, sans-serif'
 
 type Creative = { id: string; image_url: string | null; media_type?: string | null; prompt?: string | null; brand_name?: string | null; hash?: string; local?: boolean }
-type Page = { id: string; name: string; website?: string; instagram?: { id: string } | null }
+type Page = { id: string; name: string; website?: string; instagram?: { id: string; username?: string; name?: string } | null }
 type Interest = { id: string; name: string }
 
 const COUNTRIES: [string, string][] = [
@@ -628,6 +628,15 @@ export default function QuickLaunch() {
               <div>{label('Facebook Page', 'the ad posts from here')}
                 {pages.length === 0 ? <div style={{ ...input, color: ORANGE }}>No Page — <Link href="/connect-meta?next=/m4/quick" style={{ color: ORANGE, fontWeight: 700 }}>connect Meta →</Link></div>
                   : <select value={pageId} onChange={(e) => setPageId(e.target.value)} style={{ ...input, cursor: 'pointer' }}>{pages.map((p) => <option key={p.id} value={p.id}>{p.name}{p.instagram ? ' · + Instagram' : ''}</option>)}</select>}
+                {/* Where the ad also shows on Instagram — the account linked to the selected Page. */}
+                {page && (
+                  <div style={{ marginTop: 6, fontSize: 12.5, color: SUB, display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span style={{ fontSize: 13 }}>📷</span>
+                    {page.instagram
+                      ? <span>Also runs on Instagram <b style={{ color: INK }}>@{page.instagram.username || 'your account'}</b></span>
+                      : <span>No Instagram linked to this Page — the ad runs on Facebook only. <Link href="https://www.facebook.com/business/help/connect-instagram-to-page" target="_blank" rel="noopener noreferrer" style={{ color: ORANGE, fontWeight: 700, textDecoration: 'none' }}>Link one →</Link></span>}
+                  </div>
+                )}
               </div>
               {/* Location — real Facebook targeting locations (country / region / city). */}
               <div ref={locBoxRef}>{label('Location', 'search Facebook — country, region or city')}
