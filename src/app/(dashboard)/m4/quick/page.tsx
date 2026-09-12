@@ -35,6 +35,29 @@ const OBJECTIVES: { key: string; label: string; sub: string }[] = [
   { key: 'OUTCOME_TRAFFIC', label: 'Traffic', sub: 'Clicks to your site' },
   { key: 'OUTCOME_LEADS', label: 'Leads', sub: 'Sign-ups & enquiries' },
 ]
+// Budget symbol + sensible daily presets PER the ad account's currency (Meta rejects sub-minimum budgets —
+// e.g. PKR min is ~Rs281/day — so a "$20" default on a PKR account was floored). Dynamic from the account.
+const CURRENCY = (c: string): { sym: string; presets: string[]; def: string } => {
+  const m: Record<string, { sym: string; presets: string[]; def: string }> = {
+    USD: { sym: '$', presets: ['10', '20', '50', '100'], def: '20' },
+    GBP: { sym: '£', presets: ['10', '20', '50', '100'], def: '20' },
+    EUR: { sym: '€', presets: ['10', '20', '50', '100'], def: '20' },
+    CAD: { sym: 'C$', presets: ['15', '30', '70', '150'], def: '30' },
+    AUD: { sym: 'A$', presets: ['15', '30', '70', '150'], def: '30' },
+    PKR: { sym: 'Rs', presets: ['500', '1000', '2500', '5000'], def: '1000' },
+    INR: { sym: '₹', presets: ['500', '1000', '2500', '5000'], def: '1000' },
+    AED: { sym: 'AED', presets: ['40', '80', '200', '400'], def: '80' },
+    SAR: { sym: 'SAR', presets: ['40', '80', '200', '400'], def: '80' },
+    NGN: { sym: '₦', presets: ['5000', '10000', '25000', '50000'], def: '10000' },
+    BRL: { sym: 'R$', presets: ['50', '100', '250', '500'], def: '100' },
+    MXN: { sym: 'MX$', presets: ['200', '400', '1000', '2000'], def: '400' },
+    ZAR: { sym: 'R', presets: ['150', '300', '750', '1500'], def: '300' },
+    PHP: { sym: '₱', presets: ['500', '1000', '2500', '5000'], def: '1000' },
+    IDR: { sym: 'Rp', presets: ['150000', '300000', '750000', '1500000'], def: '300000' },
+    MYR: { sym: 'RM', presets: ['40', '80', '200', '400'], def: '80' },
+  }
+  return m[c] || { sym: `${c} `, presets: ['10', '20', '50', '100'], def: '20' }
+}
 
 // ── tiny line icons (single-colour, match the app) ──
 const Ic = ({ d, size = 18 }: { d: string; size?: number }) => (
@@ -121,8 +144,11 @@ export default function QuickLaunch() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
-  const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
+  const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string; external?: boolean } | null>(null)
   const copyEdited = useRef(false)
+  const budgetTouched = useRef(false)
+  const acctCurrency = accounts.find((a) => a.account_id === accountId)?.currency || 'USD'
+  const cur = CURRENCY(acctCurrency)
 
   // ── load creatives + pages + detect brand → prefill url/country → generate copy ──
   useEffect(() => {
@@ -185,6 +211,9 @@ export default function QuickLaunch() {
   // Pages + pixel follow the SELECTED ad account (so they match where the ad runs — not a fallback account).
   useEffect(() => {
     if (!accountId) return
+    // Default the budget to something sensible for THIS account's currency (unless the user set it).
+    const curNow = accounts.find((a) => a.account_id === accountId)?.currency || 'USD'
+    if (!budgetTouched.current) setBudget(CURRENCY(curNow).def)
     const q = `?account_id=${encodeURIComponent(accountId)}`
     fetch(`/api/m4/pages${q}`).then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) })).then(({ ok, d }) => {
       setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
@@ -345,7 +374,10 @@ export default function QuickLaunch() {
       if (!r.ok || d.error) { setResult({ ok: false, msg: d.error || 'Launch failed — try again.', href: d.needsReconnect ? '/settings' : (r.status === 402 ? '/upgrade' : d.tosUrl || undefined), hrefLabel: 'Fix it →' }); return }
       const total = (d.broad_adsets || 0) + (d.interest_adsets || 0) + (d.retargeting_adsets || 0) + (d.retainer_adsets || 0)
       const kinds = [d.broad_adsets && 'new customers', d.interest_adsets && 'interest audiences', d.retargeting_adsets && 'retargeting', d.retainer_adsets && 'retention'].filter(Boolean).join(', ')
-      setResult({ ok: true, msg: `Your ad is set up on ${d.account || 'Meta'}${kinds ? ` — ${kinds}` : ''} — paused for your review.`, note: total ? `${total} ad set${total === 1 ? '' : 's'} created.` : d.note, href: '/reports', hrefLabel: 'Review & turn it on →' })
+      // "Turn it on" happens in Meta (the ads launched PAUSED there) — deep-link straight to this account's
+      // Ads Manager, not our Reports page.
+      const adsMgr = `https://www.facebook.com/adsmanager/manage/campaigns?act=${String(accountId || '').replace(/^act_/, '')}`
+      setResult({ ok: true, msg: `Your ad is set up on ${d.account || 'Meta'}${kinds ? ` — ${kinds}` : ''} — paused for your review.`, note: total ? `${total} ad set${total === 1 ? '' : 's'} created.` : d.note, href: adsMgr, hrefLabel: 'Review & turn it on in Meta →', external: true })
     } catch { setBusy(''); setResult({ ok: false, msg: 'Something went wrong — try again.' }) }
   }
 
@@ -594,12 +626,13 @@ export default function QuickLaunch() {
           <Section icon={ICONS.money} n={7} title="Daily budget">
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', alignItems: 'center', border: `1px solid ${LINE}`, borderRadius: 11, padding: '0 12px', background: '#fff' }}>
-                <span style={{ color: SUB, fontSize: 15 }}>$</span>
-                <input value={budget} onChange={(e) => setBudget(e.target.value.replace(/[^\d.]/g, ''))} inputMode="decimal" style={{ border: 0, outline: 0, padding: '13px 6px', fontSize: 17, width: 80, fontFamily: SANS, color: INK, fontWeight: 700 }} />
+                <span style={{ color: SUB, fontSize: 15 }}>{cur.sym}</span>
+                <input value={budget} onChange={(e) => { budgetTouched.current = true; setBudget(e.target.value.replace(/[^\d.]/g, '')) }} inputMode="decimal" style={{ border: 0, outline: 0, padding: '13px 6px', fontSize: 17, width: 90, fontFamily: SANS, color: INK, fontWeight: 700 }} />
                 <span style={{ color: FAINT, fontSize: 13 }}>/day</span>
               </div>
-              <div style={{ display: 'flex', gap: 6 }}>{['10', '20', '50', '100'].map((b) => <button key={b} onClick={() => setBudget(b)} style={{ ...pill(budget === b), padding: '8px 13px' }}>${b}</button>)}</div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>{cur.presets.map((b) => <button key={b} onClick={() => { budgetTouched.current = true; setBudget(b) }} style={{ ...pill(budget === b), padding: '8px 13px' }}>{cur.sym}{b}</button>)}</div>
             </div>
+            <div style={{ fontSize: 12, color: FAINT, marginTop: 8 }}>In {acctCurrency} — the currency of the selected ad account.</div>
           </Section>
 
           {/* LAUNCH */}
@@ -607,7 +640,7 @@ export default function QuickLaunch() {
             <button onClick={launch} disabled={!ready} style={{ width: '100%', border: 0, background: ORANGE, color: '#fff', borderRadius: 14, padding: '15px 24px', fontWeight: 820, fontSize: 15.5, cursor: ready ? 'pointer' : 'default', opacity: ready ? 1 : 0.5, fontFamily: SANS }}>
               {busy === 'uploading' ? 'Preparing…' : busy === 'launching' ? 'Launching…' : '🚀 Launch ad'}
             </button>
-            <div style={{ textAlign: 'center', fontSize: 12.5, color: SUB, marginTop: 9 }}>{missing.length ? `Add ${missing.join(', ')}` : `$${parseFloat(budget) || 20}/day · ${broad ? 'Advantage+ audience' : `${interests.length} interest${interests.length === 1 ? '' : 's'}`} · created paused for your review`}</div>
+            <div style={{ textAlign: 'center', fontSize: 12.5, color: SUB, marginTop: 9 }}>{missing.length ? `Add ${missing.join(', ')}` : `${cur.sym}${parseFloat(budget) || cur.def}/day · ${broad ? 'Advantage+ audience' : `${interests.length} interest${interests.length === 1 ? '' : 's'}`} · created paused for your review`}</div>
           </div>
 
           {result && (
@@ -615,7 +648,9 @@ export default function QuickLaunch() {
               <div style={{ fontWeight: 800, color: result.ok ? GOOD : ORANGE }}>{result.ok ? '✓ Ready to go live' : 'Couldn’t launch'}</div>
               <div style={{ marginTop: 4 }}>{result.msg}</div>
               {result.note && <div style={{ marginTop: 6, color: SUB, fontSize: 13 }}>{result.note}</div>}
-              {result.href && <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>}
+              {result.href && (result.external
+                ? <a href={result.href} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</a>
+                : <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>)}
             </div>
           )}
         </div>

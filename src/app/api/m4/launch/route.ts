@@ -341,6 +341,12 @@ export async function POST(request: NextRequest) {
     let exclusionAudienceId: string | null = null
     let broadCount = 0
     let intCount = 0
+    // Only build the Interests campaign when the user actually chose interest targeting. When they didn't
+    // (Advantage+ / broad), broad takes the FULL new-customer share instead of splitting it with an
+    // unwanted interests campaign — this was creating an M4 Interests campaign even on Advantage+.
+    let intCamp: any = null
+    const hasInterest = Array.isArray(interests) && (interests as any[]).length > 0
+    const newShare = hasInterest ? 0.3 : 0.6   // new-customer budget: split with interests, or broad gets it all
 
     // Get or create exclusion audience (shared across all campaigns — reused not duplicated)
     if (pixelId) {
@@ -356,7 +362,7 @@ export async function POST(request: NextRequest) {
       objective: apiObjective,
       status: 'PAUSED',
       special_ad_categories: [],
-      daily_budget: Math.max(minBudget, Math.round(safeBudget * 0.3)),
+      daily_budget: Math.max(minBudget, Math.round(safeBudget * newShare)),
       bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       is_adset_budget_sharing_enabled: false,
     })
@@ -394,8 +400,13 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // ── CAMPAIGN 2: Interests (manual targeting) ──────────────
-    const intCamp = await post(`${adAccountId}/campaigns`, {
+    // ── CAMPAIGN 2: Interests (manual targeting) — ONLY when the user picked interests ──────────────
+    // Use first creative's hash for interest ads
+    const firstCreative = (creatives as any[])[0]
+    const firstHash = firstCreative?.hash || null
+
+    if (hasInterest) {
+    intCamp = await post(`${adAccountId}/campaigns`, {
       name: `${campaignName} — M4 Interests`,
       objective: apiObjective,
       status: 'PAUSED',
@@ -404,10 +415,6 @@ export async function POST(request: NextRequest) {
       bid_strategy: 'LOWEST_COST_WITHOUT_CAP',
       is_adset_budget_sharing_enabled: false,
     })
-
-    // Use first creative's hash for interest ads
-    const firstCreative = (creatives as any[])[0]
-    const firstHash = firstCreative?.hash || null
 
     for (const interest of (interests as any[]).slice(0, 6)) {
       try {
@@ -450,6 +457,7 @@ export async function POST(request: NextRequest) {
         errors.push(`Interest "${interest.name}": ${e.message}`)
       }
     }
+    } // end if (hasInterest)
 
     // ── CAMPAIGN 3: Retargeting (website visitors 60 days) ──────
     let retargetingCount = 0
@@ -595,7 +603,7 @@ export async function POST(request: NextRequest) {
         user_id: user.id,
         action_type: 'M4_LAUNCHED',
         entity_type: 'campaign',
-        description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp.id}`,
+        description: `M4 launched in ${metaAccount.account_name}: Broad ${broadCamp.id}, Interests ${intCamp?.id || "—"}`,
         performed_by: 'user',
         brand_id: (metaAccount as any).brand_id || null,   // scope to the brand this ad account is linked to
       })
@@ -648,7 +656,7 @@ export async function POST(request: NextRequest) {
         success: true,
         account: metaAccount.account_name,
         broad_campaign_id: broadCamp.id,
-        interest_campaign_id: intCamp.id,
+        interest_campaign_id: intCamp?.id || null,
         broad_adsets: broadCount,
         interest_adsets: intCount,
         retargeting_adsets: retargetingCount,
@@ -663,7 +671,7 @@ export async function POST(request: NextRequest) {
       success: true,
       account: metaAccount.account_name,
       broad_campaign_id: broadCamp.id,
-      interest_campaign_id: intCamp.id,
+      interest_campaign_id: intCamp?.id || null,
       broad_adsets: broadCount,
       interest_adsets: intCount,
       retargeting_adsets: retargetingCount,
