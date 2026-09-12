@@ -80,11 +80,7 @@ export default function PropertyPanel({ doc, sel, device, onStyle, onHidden, onC
       )}
       {el?.type === 'video' && (
         <Group title="Video">
-          <label style={{ display: 'block' }}>
-            <span style={rowLabel}>Source URL</span>
-            <input defaultValue={el.content.src || ''} key={el.id + 'src'} onBlur={(e) => onContent({ src: e.target.value })} placeholder="https://…" style={input} />
-          </label>
-          <div style={hintNote}>Paste a hosted video URL (mp4). Upload lands in a later pass.</div>
+          <VideoControl el={el} onContent={onContent} />
         </Group>
       )}
       {el?.content.bind && <div style={{ ...hintNote, marginTop: 8 }}>Bound to <b>{el.content.bind.replace('product.', '')}</b> — value comes from the product.</div>}
@@ -212,6 +208,55 @@ function ImageControl({ el, product, onContent }: { el: Element; product?: Impor
         </div>
         {!isPaid && <div style={{ ...hintNote, marginTop: 6 }}>Generating product images is a Creator-plan feature and uses credits. Upgrade to turn it on.</div>}
       </div>
+      {err && <div style={{ fontSize: 12, color: ORANGE }}>{err}</div>}
+    </div>
+  )
+}
+
+/* ── video control: upload a clip from the computer (presigned R2) or paste a URL. AI video generation later. ── */
+function VideoControl({ el, onContent }: { el: Element; onContent: (patch: Partial<Element['content']>) => void }) {
+  const [busy, setBusy] = useState(false)
+  const [pct, setPct] = useState(0)
+  const [err, setErr] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+  const src = el.content.src || ''
+
+  const upload = async (f: File | null) => {
+    if (!f) return
+    if (!/^video\/(mp4|webm|quicktime|x-m4v)$/.test(f.type)) { setErr('Use an MP4, WebM or MOV video.'); return }
+    if (f.size > 120 * 1024 * 1024) { setErr('Video must be under 120MB.'); return }
+    setBusy(true); setErr(''); setPct(0)
+    try {
+      const r = await fetch('/api/builder/upload-url', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ contentType: f.type, size: f.size }) })
+      const j = await r.json(); if (!r.ok) throw new Error(j?.error || 'Upload failed')
+      await new Promise<void>((res, rej) => {
+        const xhr = new XMLHttpRequest(); xhr.open('PUT', j.uploadUrl); xhr.setRequestHeader('Content-Type', f.type)
+        xhr.upload.onprogress = (e) => { if (e.lengthComputable) setPct(Math.round((e.loaded / e.total) * 100)) }
+        xhr.onload = () => (xhr.status >= 200 && xhr.status < 300 ? res() : rej(new Error('Upload failed')))
+        xhr.onerror = () => rej(new Error('Upload failed')); xhr.send(f)
+      })
+      onContent({ src: j.publicUrl })
+    } catch (e) { setErr((e as Error)?.message || 'Upload failed') }
+    finally { setBusy(false); setPct(0); if (fileRef.current) fileRef.current.value = '' }
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <input ref={fileRef} type="file" accept="video/mp4,video/webm,video/quicktime" onChange={(e) => upload(e.target.files?.[0] || null)} style={{ display: 'none' }} />
+      <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+        <div style={{ width: 64, height: 64, borderRadius: 10, overflow: 'hidden', flex: 'none', background: INSET, border: `1px solid ${LINE}`, display: 'grid', placeItems: 'center' }}>
+          {src ? <video src={src} muted playsInline style={{ width: '100%', height: '100%', objectFit: 'cover' }} /> : <span style={{ fontSize: 10, color: FAINT }}>No video</span>}
+        </div>
+        <div style={{ flex: 1, display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          <button onClick={() => fileRef.current?.click()} disabled={busy} style={miniAction}>{busy ? `Uploading ${pct}%…` : '⬆ Upload video'}</button>
+          {src && <button onClick={() => onContent({ src: '' })} disabled={busy} style={miniAction}>Remove</button>}
+        </div>
+      </div>
+      <label style={{ display: 'block' }}>
+        <span style={rowLabel}>…or paste a video URL</span>
+        <input defaultValue={src} key={el.id + 'vsrc'} onBlur={(e) => onContent({ src: e.target.value })} placeholder="https://…mp4" style={input} />
+      </label>
+      <div style={hintNote}>MP4/WebM/MOV up to 120MB. AI video generation is coming soon.</div>
       {err && <div style={{ fontSize: 12, color: ORANGE }}>{err}</div>}
     </div>
   )
