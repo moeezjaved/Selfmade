@@ -41,6 +41,7 @@ export default function QuickLaunch() {
   const [url, setUrl] = useState('')
   const [country, setCountry] = useState('')
   const [budget, setBudget] = useState('10')
+  const [metaConnected, setMetaConnected] = useState<boolean | null>(null)
   const [prefilling, setPrefilling] = useState(true)
   const [busy, setBusy] = useState<'' | 'uploading' | 'launching'>('')
   const [result, setResult] = useState<{ ok: boolean; msg: string; note?: string; href?: string; hrefLabel?: string } | null>(null)
@@ -69,11 +70,13 @@ export default function QuickLaunch() {
       setCreatives(list)
     }).catch(() => { if (wantImg) { setCreatives([{ id: '_img', image_url: wantImg, media_type: 'image' }]); setPicked('_img') } else setCreatives([]) })
 
-    fetch('/api/m4/pages').then((r) => r.json()).then((d) => {
+    fetch('/api/m4/pages').then(async (r) => ({ ok: r.ok, d: await r.json().catch(() => ({})) })).then(({ ok, d }) => {
+      // A "No Meta account" error (400) means Facebook isn't connected at all — gate the whole flow on it.
+      setMetaConnected(ok && !d?.error ? true : (d?.error === 'No Meta account' ? false : true))
       const ps: Page[] = Array.isArray(d.pages) ? d.pages : []
       setPages(ps)
       if (ps[0]) { setPageId(ps[0].id); if (ps[0].website && !url) setUrl(ps[0].website) }
-    }).catch(() => {})
+    }).catch(() => setMetaConnected(true))
 
     ;(async () => {
       try {
@@ -177,6 +180,17 @@ export default function QuickLaunch() {
         </div>
       </div>
 
+      {metaConnected === false ? (
+        <div style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, padding: '28px 24px', background: INSET, textAlign: 'center' }}>
+          <div style={{ fontSize: 34, marginBottom: 10 }}>📘</div>
+          <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 6 }}>Connect Facebook to launch ads</div>
+          <div style={{ fontSize: 14, color: SUB, maxWidth: 440, margin: '0 auto 18px', lineHeight: 1.5 }}>
+            Ads run inside your own Meta ad account, so we need to connect Facebook first. It takes about a minute — then come back here and your ad is one click away.
+          </div>
+          <Link href="/connect-meta?next=/m4/quick" style={{ display: 'inline-block', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '12px 26px', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Connect Facebook →</Link>
+        </div>
+      ) : (<>
+
       {heading('1', 'Pick your ad')}
       <input ref={fileRef} type="file" accept="image/*,video/*" hidden onChange={(e) => { const f = e.target.files?.[0]; if (f) onUpload(f); e.target.value = '' }} />
       {creatives === null ? <div style={{ color: FAINT, fontSize: 14 }}>Loading your creatives…</div>
@@ -249,6 +263,7 @@ export default function QuickLaunch() {
           {result.href && <Link href={result.href} style={{ display: 'inline-block', marginTop: 10, fontWeight: 800, color: ORANGE, textDecoration: 'none' }}>{result.hrefLabel || 'Open →'}</Link>}
         </div>
       )}
+      </>)}
     </div>
   )
 }

@@ -33,6 +33,9 @@ export default function SavedAdsPage() {
   const [tagFilter, setTagFilter] = useState('')  // '' = all; else a single tag
   const [tagInput, setTagInput] = useState<string | null>(null)  // saved_ad_id whose add-tag box is open
   const [cloneImg, setCloneImg] = useState<SavedAd | null>(null)   // open image-clone modal for this saved ad
+  const [hideExt, setHideExt] = useState(true)   // extension banner — start hidden, reveal after reading the dismiss flag (no SSR flash)
+  useEffect(() => { try { setHideExt(localStorage.getItem('sf_hide_ext_banner') === '1') } catch { setHideExt(false) } }, [])
+  const dismissExt = () => { try { localStorage.setItem('sf_hide_ext_banner', '1') } catch { /* ignore */ } setHideExt(true) }
   const [cloneVid, setCloneVid] = useState<SavedAd | null>(null)   // open video-clone modal for this saved ad
   const [vidFailed, setVidFailed] = useState<Set<string>>(new Set())   // saved videos whose src can't load
 
@@ -284,6 +287,34 @@ export default function SavedAdsPage() {
 
       {/* ── Main ── */}
       <div style={{ flex: 1, padding: isMobile ? 12 : 24, overflowY: 'auto' }}>
+        {!hideExt && (
+          <div style={{ position: 'relative', border: '1px solid #f0d9cf', background: 'linear-gradient(180deg,#fff8f5,#fff)', borderRadius: 16, padding: isMobile ? '16px 16px 18px' : '18px 20px', marginBottom: 20 }}>
+            <button onClick={dismissExt} aria-label="Dismiss" style={{ position: 'absolute', top: 10, right: 12, background: 'none', border: 0, color: '#b9b3ab', fontSize: 20, lineHeight: 1, cursor: 'pointer' }}>×</button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 4 }}>
+              <span style={{ fontSize: 20 }}>🧩</span>
+              <div style={{ fontSize: 16, fontWeight: 800, color: '#111' }}>Save any ad you find, from anywhere</div>
+            </div>
+            <div style={{ fontSize: 13.5, color: '#6b6a63', marginBottom: 14, maxWidth: 640, lineHeight: 1.5 }}>
+              Add the free Chrome extension and a <b style={{ color: '#111' }}>＋ Save</b> button appears on every ad you scroll past — no copy-pasting screenshots.
+            </div>
+            <div style={{ display: 'flex', gap: isMobile ? 10 : 18, flexWrap: 'wrap', marginBottom: 16 }}>
+              {[
+                ['1', 'Install it', 'One click from the Chrome Web Store — sign in with your Selfmade account.'],
+                ['2', 'Browse & hover', 'On Instagram, the Facebook Ad Library or TikTok, hover any ad and hit ＋ Save.'],
+                ['3', 'It lands here', 'The ad — image or video, copy and brand — drops straight into your Boards, ready to remake.'],
+              ].map(([n, t, d]) => (
+                <div key={n} style={{ flex: isMobile ? '1 1 100%' : '1 1 0', minWidth: isMobile ? 'auto' : 170, display: 'flex', gap: 9, alignItems: 'flex-start' }}>
+                  <span style={{ flex: 'none', width: 22, height: 22, borderRadius: '50%', background: '#ef4a1e', color: '#fff', fontSize: 12, fontWeight: 800, display: 'grid', placeItems: 'center' }}>{n}</span>
+                  <div><div style={{ fontSize: 13, fontWeight: 700, color: '#111' }}>{t}</div><div style={{ fontSize: 12, color: '#8a857d', lineHeight: 1.45, marginTop: 1 }}>{d}</div></div>
+                </div>
+              ))}
+            </div>
+            <a href="https://chromewebstore.google.com/detail/selfmade-%E2%80%94-save-winning-a/eekbcgdoonpmhoojoaggpfmfgcplaefi" target="_blank" rel="noopener noreferrer"
+              style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '10px 22px', background: '#ef4a1e', color: '#fff', borderRadius: 100, fontSize: 14, fontWeight: 800, textDecoration: 'none' }}>
+              🧩 Add to Chrome — it’s free
+            </a>
+          </div>
+        )}
         {!currentBoard ? (
           <div style={{ textAlign: 'center', padding: '80px 20px', color: '#6b7280' }}>
             <div style={{ fontSize: 48, marginBottom: 16 }}><Bookmark size={48} strokeWidth={1} /></div>
