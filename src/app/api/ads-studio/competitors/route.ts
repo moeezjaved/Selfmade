@@ -17,7 +17,7 @@ import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
-export const maxDuration = 180   // Ad Library search runs on the droplet (Playwright) — allow headroom
+export const maxDuration = 300   // Ad Library search + deep per-rival scrolls run on the droplet (Playwright) — max headroom
 
 const AD_COLS = 'ad_id, page_id, page_name, thumbnail_url, raw_image_urls, body, title, format, days_running, is_active, hook_type, angle, persona'
 
@@ -141,7 +141,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
   const deepPulls = Promise.all(targets.map(async (b) => {
     const raw: LiveAd[] = await Promise.race([
       fetchLiveAdsByPage(String(b.c.pageId), DEEP_PULL_LIMIT).catch(() => [] as LiveAd[]),
-      new Promise<LiveAd[]>((r) => setTimeout(() => r([]), 50_000)),   // per-rival cap
+      new Promise<LiveAd[]>((r) => setTimeout(() => r([]), 88_000)),   // per-rival cap — just under the droplet's 90s fetch, so a big library (200+ ads) finishes instead of getting cut to the shallow sample
     ])
     const deep = liveToCards(raw)
     if (deep.length >= b.liveAds.length) b.liveAds = deep
@@ -152,7 +152,7 @@ async function enrichDiscovered(admin: any, res: DiscoveryResult) {
         persistPulledAds(admin, String(b.c.pageId), b.c.name, raw, { imagesOnly: true })).then(() => {}, () => {}))
     }
   }))
-  await Promise.race([deepPulls, new Promise<void>((r) => setTimeout(r, 60_000))])   // OVERALL cap → always leaves budget to write
+  await Promise.race([deepPulls, new Promise<void>((r) => setTimeout(r, 200_000))])   // OVERALL cap — rivals pull in PARALLEL so this rarely bites; still leaves budget (of the 300s) to write the cache
   return base.map(({ c, dna, liveAds }) => {
     // Prefer the deep LIVE pull (the rival's actual current ads, ALL of them); fall back to our corpus DNA.
     const ads = imagesFirst(liveAds.length ? liveAds : (dna?.ads ?? []))
