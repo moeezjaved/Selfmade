@@ -16,5 +16,8 @@ worker/.env
 # Vercel env pulls (may contain secrets — never commit)
 .env.probe
 .env*.local
+.env.prod
+.env.*
+!.env.example
 selfmade-extension.zip
 .gstack/
