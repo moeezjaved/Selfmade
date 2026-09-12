@@ -175,3 +175,12 @@ export function renderDocHtml(doc: PageDoc, opts: RenderOpts = {}): string {
   const { html, css } = renderDoc(doc, opts)
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${html}</body></html>`
 }
+
+/** Render the doc for Shopify publish: body + css where each <section> becomes an editable native theme
+ * section. The wrapper is renamed to `pgbld` so shopify-sections.splitPageIntoSections() splits per section
+ * (matching every other builder template's publish path — canonical structure / native-theme editability). */
+export function renderDocForPublish(doc: PageDoc, product?: RenderProduct): { body: string; css: string } {
+  const { html, css } = renderDoc(doc, { mode: 'publish', device: 'base', product })
+  const body = html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')
+  return { body, css }
+}

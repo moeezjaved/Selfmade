@@ -55,6 +55,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('loading')
   const [err, setErr] = useState('')
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
+  const [publishing, setPublishing] = useState<'idle' | 'saving' | 'publishing'>('idle')
+  const [pubResult, setPubResult] = useState<null | { url?: string; previewUrl?: string; error?: string }>(null)
 
   const history = useRef<PageDoc[]>([])
   const canvasRef = useRef<HTMLDivElement | null>(null)
@@ -110,6 +112,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [sel, device, apply])
   const onHidden = useCallback(() => { if (sel) apply((d) => setHidden(d, sel)) }, [sel, apply])
   const onContent = useCallback((patch: Partial<Element['content']>) => { if (sel) apply((d) => patchElementContent(d, sel, patch)) }, [sel, apply])
+
+  /* ── publish: save the current doc, then push it to Shopify as native sections ── */
+  const publish = useCallback(async () => {
+    if (!doc) return
+    setPublishing('saving')
+    setPubResult(null)
+    try {
+      await fetch('/api/builder/doc', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, doc }) })
+      setPublishing('publishing')
+      const r = await fetch('/api/builder/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, target: 'this' }) })
+      const d = await r.json().catch(() => ({}))
+      if (!r.ok || d?.error) setPubResult({ error: d?.message || d?.error || 'Publish failed' })
+      else setPubResult({ url: d.url, previewUrl: d.previewUrl })
+    } catch (e) { setPubResult({ error: (e as Error)?.message || 'Publish failed' }) }
+    setPublishing('idle')
+  }, [doc, pageId])
 
   /* ── canvas render (edit mode) ── */
   const product = useMemo(() => (doc ? editorProduct(doc) : {}), [doc])
@@ -201,7 +219,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <div style={{ flex: 1 }} />
         <SegToggle value={device} onChange={setDevice} />
         <SaveBadge status={status} />
-        <button disabled title="Publishing on the new model is Phase 5" style={{ ...btn, opacity: .5, cursor: 'not-allowed' }}>Publish</button>
+        <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
+          {publishing === 'saving' ? 'Saving…' : publishing === 'publishing' ? 'Publishing…' : 'Publish →'}
+        </button>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
@@ -286,6 +306,29 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           }}
           onClose={() => setAddMenu(null)}
         />
+      )}
+
+      {pubResult && (
+        <div onClick={() => setPubResult(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <div onClick={(e) => e.stopPropagation()} style={{ width: 440, maxWidth: '92vw', background: '#fff', borderRadius: 16, padding: 22, boxShadow: '0 20px 60px rgba(20,18,15,.25)' }}>
+            {pubResult.error ? (
+              <>
+                <div style={{ fontFamily: SERIF, fontSize: 22, marginBottom: 8 }}>Couldn’t publish</div>
+                <div style={{ fontSize: 13.5, color: SUB, lineHeight: 1.6 }}>{pubResult.error}</div>
+              </>
+            ) : (
+              <>
+                <div style={{ fontFamily: SERIF, fontSize: 22, marginBottom: 8 }}>Published to Shopify 🎉</div>
+                <div style={{ fontSize: 13.5, color: SUB, lineHeight: 1.6, marginBottom: 14 }}>Your page is live as native, theme-editable sections. Open it in Shopify to fine-tune or set it live.</div>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {pubResult.url && <a href={pubResult.url} target="_blank" rel="noopener noreferrer" style={{ border: 0, background: ORANGE, color: '#fff', textDecoration: 'none', borderRadius: 999, padding: '9px 18px', fontWeight: 700, fontSize: 13 }}>Open in Shopify →</a>}
+                  {pubResult.previewUrl && <a href={pubResult.previewUrl} target="_blank" rel="noopener noreferrer" style={{ ...btn }}>Preview</a>}
+                </div>
+              </>
+            )}
+            <div style={{ textAlign: 'right', marginTop: 16 }}><button onClick={() => setPubResult(null)} style={btn}>Close</button></div>
+          </div>
+        </div>
       )}
     </div>
   )
