@@ -66,11 +66,17 @@ const imgSig = (thumb?: string | null): string => {
 // we have for them, bounded only by this generous safety cap.
 const uniqueByImage = (ads: any[]): any[] => {
   const seen = new Set<string>()
+  const seenCopy = new Set<string>()
   const out: any[] = []
   for (const a of imagesFirst(ads || [])) {
     const s = imgSig(a?.thumb) || a?.id
     if (!s || seen.has(s)) continue
-    seen.add(s); out.push(a)
+    // Meta serves the SAME creative under different CDN URLs (so imgSig misses them) — the classic
+    // "same ad shown 3×". Collapse by exact ad copy too: if we've already shown a card with this exact
+    // (substantial) copy, it's the same creative repeated. Short/empty copies are never deduped this way.
+    const csig = String(a?.copy || '').toLowerCase().replace(/\s+/g, ' ').trim()
+    if (csig.length > 25 && seenCopy.has(csig)) continue
+    seen.add(s); if (csig.length > 25) seenCopy.add(csig); out.push(a)
   }
   return out.slice(0, AD_CARD_CAP)
 }
