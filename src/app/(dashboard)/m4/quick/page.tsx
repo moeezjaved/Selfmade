@@ -176,19 +176,23 @@ export default function QuickLaunch() {
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 30, fontWeight: 800, letterSpacing: '-.02em' }}>Launch an ad</h1>
-          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</p>
+          <p style={{ margin: '6px 0 0', color: SUB, fontSize: 14.5 }}>{metaConnected === false ? 'Connect your Facebook account to get started.' : <>We pre-filled everything we could and wrote your copy — just confirm and set a budget. {prefilling && <span style={{ color: ORANGE, fontWeight: 700 }}>Setting things up…</span>}</>}</p>
         </div>
       </div>
 
-      {metaConnected === false ? (
-        <div style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, padding: '28px 24px', background: INSET, textAlign: 'center' }}>
-          <div style={{ fontSize: 34, marginBottom: 10 }}>📘</div>
-          <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 6 }}>Connect Facebook to launch ads</div>
-          <div style={{ fontSize: 14, color: SUB, maxWidth: 440, margin: '0 auto 18px', lineHeight: 1.5 }}>
-            Ads run inside your own Meta ad account, so we need to connect Facebook first. It takes about a minute — then come back here and your ad is one click away.
+      {metaConnected !== true ? (
+        metaConnected === false ? (
+          <div style={{ marginTop: 26, border: `1px solid ${LINE}`, borderRadius: 16, padding: '28px 24px', background: INSET, textAlign: 'center' }}>
+            <div style={{ fontSize: 34, marginBottom: 10 }}>📘</div>
+            <div style={{ fontSize: 19, fontWeight: 800, marginBottom: 6 }}>Connect Facebook to launch ads</div>
+            <div style={{ fontSize: 14, color: SUB, maxWidth: 440, margin: '0 auto 18px', lineHeight: 1.5 }}>
+              Ads run inside your own Meta ad account, so we need to connect Facebook first. It takes about a minute — then come back here and your ad is one click away.
+            </div>
+            <Link href="/connect-meta?next=/m4/quick" style={{ display: 'inline-block', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '12px 26px', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Connect Facebook →</Link>
           </div>
-          <Link href="/connect-meta?next=/m4/quick" style={{ display: 'inline-block', border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '12px 26px', fontWeight: 800, fontSize: 15, textDecoration: 'none' }}>Connect Facebook →</Link>
-        </div>
+        ) : (
+          <div style={{ marginTop: 40, textAlign: 'center', color: FAINT, fontSize: 14 }}>Checking your Facebook connection…</div>
+        )
       ) : (<>
 
       {heading('1', 'Pick your ad')}
