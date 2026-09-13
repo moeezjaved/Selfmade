@@ -66,6 +66,8 @@ const css = `
 .pgbld .ppill{display:grid;grid-template-columns:auto 1fr;border-radius:999px;overflow:hidden;font-size:10.5px;font-weight:800;box-shadow:0 3px 8px -5px rgba(63,75,214,.5)}
 .pgbld .ppill .a{background:var(--blue);color:#fff;padding:6px 11px;white-space:nowrap}
 .pgbld .ppill .b{background:#fff;color:var(--ink);padding:6px 11px;border:1px solid var(--line);border-left:0}
+.pgbld .ppill.solo{display:inline-flex;grid-template-columns:none}
+.pgbld .ppill.solo .a{border-radius:999px;padding:6px 15px}
 .pgbld .hbottle,.pgbld .hbottle.ph{aspect-ratio:3/4;border-radius:12px;min-height:0}
 .pgbld .thumbs{display:flex;gap:8px;margin-top:12px}
 .pgbld .thumbs img,.pgbld .thumbs .ph{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line);min-height:0}
@@ -219,7 +221,10 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   const pills = (arr(c.hero_pills).length ? arr(c.hero_pills) : [
     { a: 'Supercharges', b: 'Brainpower' }, { a: 'Increases', b: 'Oxygen Utilization' }, { a: 'Supports', b: 'Mitochondria' }, { a: 'Balances', b: 'Mood & Stress' }, { a: 'High-Potency', b: 'Ultra-Pure' },
-  ]).slice(0, 5).map((p: any) => `<div class="ppill"><span class="a">${escp(p.a || p.label)}</span><span class="b">${escp(p.b || p.body)}</span></div>`).join('')
+  ]).slice(0, 5).map((p: any) => {
+    const a = escp(p.a || p.label || p.title), b = escp(p.b || p.body)
+    return b ? `<div class="ppill"><span class="a">${a}</span><span class="b">${b}</span></div>` : `<div class="ppill solo"><span class="a">${a}</span></div>`
+  }).join('')
 
   const checks = (arr(c.hero_benefits).length ? arr(c.hero_benefits) : ['Steady mental clarity', 'No afternoon crash', 'Uplifted daily mood', 'Simple glass dropper'].map((l) => ({ label: l })))
     .slice(0, 4).map((f) => `<div class="c"><span class="t">${TICK}</span>${escp(f.label)}</div>`).join('')
