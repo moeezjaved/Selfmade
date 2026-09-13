@@ -33,9 +33,9 @@ const img = (url: any, alt: string, cls: string, label?: string): string =>
     : `<div class="${cls} ph"><span class="phi">${PH_ICON}</span><span class="phl">${esc(label || 'Image')}</span></div>`
 
 const css = `
-@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500;1,9..144,600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500;1,9..144,600&display=swap');
 .pgbld{--gold:#f7c948;--gold2:#f3b93a;--amber:#e6a52c;--cream:#fdf6e6;--cream2:#faeecf;--card:#fffaf0;--ink:#2a2318;--sub:#8f8672;--line:#ecdfc1;--dark:#282521;--dark2:#1f1c18;--good:#e6a52c;
-  font-family:'Figtree',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);line-height:1.5;background:#fff;-webkit-font-smoothing:antialiased}
+  font-family:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);line-height:1.5;background:#fff;-webkit-font-smoothing:antialiased}
 .pgbld *{box-sizing:border-box}
 .pgbld img{max-width:100%;display:block}
 .pgbld .ph{background:#f7edd4;border:1.5px dashed #e6d3a6;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#c3ab74;font-size:12px;min-height:120px;border-radius:14px;text-align:center;padding:14px}
@@ -90,9 +90,11 @@ const css = `
 .pgbld .fwd .grid{display:grid;grid-template-columns:.9fr 1.1fr;gap:40px;align-items:start;margin-top:6px}
 .pgbld .ba{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px}
 .pgbld .ba .cap{font-family:'Fraunces',Georgia,serif;font-style:italic;font-size:20px;text-align:center;margin-bottom:14px}
-.pgbld .ba .pair{display:grid;grid-template-columns:1fr 1fr;gap:10px}
-.pgbld .ba .im,.pgbld .ba .im.ph{aspect-ratio:4/5;border-radius:12px;position:relative;min-height:0;overflow:hidden}
-.pgbld .ba .badge{position:absolute;left:8px;bottom:8px;background:rgba(42,35,24,.82);color:#fdf6e6;font-size:10px;font-weight:800;padding:3px 9px;border-radius:999px;letter-spacing:.04em}
+.pgbld .ba .pair{display:grid;grid-template-columns:1fr 1fr;gap:2px;border-radius:14px;overflow:hidden;background:var(--line)}
+.pgbld .ba .im,.pgbld .ba .im.ph{aspect-ratio:4/5;border-radius:0;position:relative;min-height:0;overflow:hidden}
+.pgbld .ba .badge{position:absolute;bottom:10px;background:rgba(42,35,24,.82);color:#fdf6e6;font-size:10.5px;font-weight:800;padding:4px 11px;border-radius:999px;letter-spacing:.05em}
+.pgbld .ba .badge.bl{left:10px}
+.pgbld .ba .badge.br{right:10px}
 .pgbld .tl details{border:1px solid var(--line);border-radius:12px;margin-bottom:10px;background:var(--card);overflow:hidden}
 .pgbld .tl summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:14px 16px}
 .pgbld .tl summary::-webkit-details-marker{display:none}
@@ -307,8 +309,8 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="sectsub">${esc(c.forward_sub || 'Finding your glow feels simple and grounding. Start today to rediscover a sense of quiet confidence.')}</div>
     <div class="grid">
       <div class="ba"><div class="cap">${hl(c.ba_caption || 'Real People, Real Results')}</div><div class="pair">
-        <div class="im">${img(c.image_before || P, o.productName, 'gimg', 'Before')}<span class="badge">Before</span></div>
-        <div class="im">${img(c.image_after || P, o.productName, 'gimg', 'After')}<span class="badge">After</span></div>
+        <div class="im">${img(c.image_before || P, o.productName, 'gimg', 'Before')}<span class="badge bl">${escp(c.ba_before_label || 'Before')}</span></div>
+        <div class="im">${img(c.image_after || P, o.productName, 'gimg', 'After')}<span class="badge br">${escp(c.ba_after_label || 'After')}</span></div>
       </div></div>
       <div class="tl">${weeks}</div>
     </div>
@@ -426,6 +428,8 @@ export const radianceV1: PageTemplate = {
     { key: 'forward_head', type: 'text', label: '"Move forward" heading' },
     { key: 'forward_sub', type: 'text', label: '"Move forward" subhead' },
     { key: 'ba_caption', type: 'text', label: 'Before/after card caption' },
+    { key: 'ba_before_label', type: 'text', label: 'Before/after — left label', hint: 'e.g. "Before".' },
+    { key: 'ba_after_label', type: 'text', label: 'Before/after — right label', hint: 'e.g. "After".' },
     { key: 'image_before', type: 'image', role: 'lifestyle', label: 'Before photo' },
     { key: 'image_after', type: 'image', role: 'lifestyle', label: 'After photo' },
     { key: 'timeline', type: 'reasons', label: 'Weekly timeline (4)', count: 4, hint: 'label = "Week 1"…; title = the week’s headline; body = one or two sentences.' },
