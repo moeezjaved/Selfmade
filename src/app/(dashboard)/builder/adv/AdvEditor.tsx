@@ -14,7 +14,7 @@ import { renderDoc, type RenderProduct } from '@/lib/builder/render'
 import type { PageDoc, Section, Block, Element, Device } from '@/lib/builder/schema'
 import {
   type NodeRef, findNode, findElement, descendantCount,
-  moveNode, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
+  moveNode, moveSectionToIndex, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
 } from '@/lib/builder/docOps'
 import { writeField, type StyleKey } from '@/lib/builder/styleField'
 import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
@@ -55,6 +55,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('loading')
   const [err, setErr] = useState('')
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
+  const [dragSec, setDragSec] = useState<string | null>(null)   // section being dragged in the tree
+  const [dropSec, setDropSec] = useState<string | null>(null)   // section currently hovered as a drop target
   const [publishing, setPublishing] = useState<'idle' | 'saving' | 'publishing'>('idle')
   const [pubResult, setPubResult] = useState<null | { url?: string; previewUrl?: string; error?: string }>(null)
   const [showProduct, setShowProduct] = useState(false)
@@ -298,6 +300,10 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                   onUp={() => apply((d) => moveNode(d, sRef, -1))} onDown={() => apply((d) => moveNode(d, sRef, 1))}
                   onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sRef); queueMicrotask(() => setSel(newRef)); return nd })}
                   onHide={() => apply((d) => setHidden(d, sRef))} onDel={() => apply((d) => removeNode(d, sRef), sameRef(sel, sRef) ? null : sel)}
+                  draggable dragging={dragSec === s.id} dropHint={dropSec === s.id && dragSec !== s.id}
+                  onDragStart={() => setDragSec(s.id)} onDragEnd={() => { setDragSec(null); setDropSec(null) }}
+                  onDragOver={(e) => { e.preventDefault(); if (dragSec && dragSec !== s.id) setDropSec(s.id) }}
+                  onDrop={() => { if (dragSec && dragSec !== s.id) apply((d) => moveSectionToIndex(d, dragSec, d.sections.findIndex((x) => x.id === s.id))); setDragSec(null); setDropSec(null) }}
                 />
                 {open && s.blocks.map((b) => {
                   const bRef: NodeRef = { sectionId: s.id, blockId: b.id }
@@ -517,12 +523,17 @@ function AddBtn({ label, onClick, depth, primary }: { label: string; onClick: ()
 function TreeRow(props: {
   depth: number; label: string; count?: number; hidden?: boolean; selected: boolean; open?: boolean; hasChildren?: boolean
   onToggle?: () => void; onSelect: () => void; onUp: () => void; onDown: () => void; onDup: () => void; onHide: () => void; onDel: () => void
+  draggable?: boolean; dragging?: boolean; dropHint?: boolean
+  onDragStart?: () => void; onDragEnd?: () => void; onDragOver?: (e: React.DragEvent) => void; onDrop?: () => void
 }) {
-  const { depth, label, count, hidden, selected, open, hasChildren, onToggle, onSelect } = props
+  const { depth, label, count, hidden, selected, open, hasChildren, onToggle, onSelect, draggable } = props
   const [hover, setHover] = useState(false)
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: hidden ? 0.5 : 1 }}>
+      draggable={draggable} onDragStart={props.onDragStart} onDragEnd={props.onDragEnd}
+      onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
+      style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
+      {draggable && <span title="Drag to reorder" style={{ cursor: 'grab', color: hover ? SUB : 'transparent', fontSize: 13, flex: 'none', lineHeight: 1, userSelect: 'none' }}>⠿</span>}
       <span onClick={(e) => { e.stopPropagation(); onToggle?.() }} style={{ width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: SUB, fontSize: 13, cursor: hasChildren ? 'pointer' : 'default', flex: 'none' }}>{hasChildren ? (open ? '▾' : '▸') : ''}</span>
       <span onClick={onSelect} style={{ flex: 1, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}

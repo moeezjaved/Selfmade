@@ -96,6 +96,16 @@ export function moveNode(doc: PageDoc, ref: NodeRef, dir: -1 | 1): PageDoc {
   }
 }
 
+/** Move a section to an explicit index (drag-and-drop reorder). Bounds-safe; no-op if not found. */
+export function moveSectionToIndex(doc: PageDoc, sectionId: string, toIndex: number): PageDoc {
+  const from = doc.sections.findIndex((s) => s.id === sectionId)
+  if (from < 0) return doc
+  const sections = doc.sections.slice()
+  const [item] = sections.splice(from, 1)
+  sections.splice(Math.max(0, Math.min(sections.length, toIndex)), 0, item)
+  return { ...doc, sections }
+}
+
 /** Toggle (or force) a node's hidden flag. */
 export function setHidden(doc: PageDoc, ref: NodeRef, hidden?: boolean): PageDoc {
   const flip = <T extends { hidden?: boolean }>(n: T): T => ({ ...n, hidden: hidden ?? !n.hidden })
