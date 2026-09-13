@@ -106,6 +106,28 @@ export function moveSectionToIndex(doc: PageDoc, sectionId: string, toIndex: num
   return { ...doc, sections }
 }
 
+/** Move a block to an explicit index within its section (drag-and-drop reorder). */
+export function moveBlockToIndex(doc: PageDoc, sectionId: string, blockId: string, toIndex: number): PageDoc {
+  return updateSection(doc, sectionId, (s) => {
+    const from = s.blocks.findIndex((b) => b.id === blockId)
+    if (from < 0) return s
+    const blocks = s.blocks.slice(); const [item] = blocks.splice(from, 1)
+    blocks.splice(Math.max(0, Math.min(blocks.length, toIndex)), 0, item)
+    return { ...s, blocks }
+  })
+}
+
+/** Move an element to an explicit index within its block (drag-and-drop reorder). */
+export function moveElementToIndex(doc: PageDoc, sectionId: string, blockId: string, elementId: string, toIndex: number): PageDoc {
+  return updateBlock(doc, sectionId, blockId, (b) => {
+    const from = b.elements.findIndex((e) => e.id === elementId)
+    if (from < 0) return b
+    const elements = b.elements.slice(); const [item] = elements.splice(from, 1)
+    elements.splice(Math.max(0, Math.min(elements.length, toIndex)), 0, item)
+    return { ...b, elements }
+  })
+}
+
 /** Toggle (or force) a node's hidden flag. */
 export function setHidden(doc: PageDoc, ref: NodeRef, hidden?: boolean): PageDoc {
   const flip = <T extends { hidden?: boolean }>(n: T): T => ({ ...n, hidden: hidden ?? !n.hidden })

@@ -14,7 +14,7 @@ import { renderDoc, type RenderProduct } from '@/lib/builder/render'
 import type { PageDoc, Section, Block, Element, Device } from '@/lib/builder/schema'
 import {
   type NodeRef, findNode, findElement, descendantCount,
-  moveNode, moveSectionToIndex, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
+  moveNode, moveSectionToIndex, moveBlockToIndex, moveElementToIndex, levelOf, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
 } from '@/lib/builder/docOps'
 import { writeField, type StyleKey } from '@/lib/builder/styleField'
 import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
@@ -55,8 +55,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('loading')
   const [err, setErr] = useState('')
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
-  const [dragSec, setDragSec] = useState<string | null>(null)   // section being dragged in the tree
-  const [dropSec, setDropSec] = useState<string | null>(null)   // section currently hovered as a drop target
+  const [drag, setDrag] = useState<NodeRef | null>(null)   // node being dragged in the tree
+  const [dropKey, setDropKey] = useState<string | null>(null)   // refKey of the node hovered as a drop target
   const [publishing, setPublishing] = useState<'idle' | 'saving' | 'publishing'>('idle')
   const [pubResult, setPubResult] = useState<null | { url?: string; previewUrl?: string; error?: string }>(null)
   const [showProduct, setShowProduct] = useState(false)
@@ -136,6 +136,30 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Fit the canvas to the available width when a page loads or the device changes, so the preview is
   // never cropped by the side panels.
   useEffect(() => { const t = setTimeout(fitZoom, 60); return () => clearTimeout(t) }, [status, device, fitZoom])
+
+  /* ── drag-to-reorder (sections, blocks within a section, elements within a block) ── */
+  const canDropOn = (ref: NodeRef): boolean => {
+    if (!drag || sameRef(drag, ref) || levelOf(drag) !== levelOf(ref)) return false
+    if (levelOf(ref) === 'section') return true
+    if (levelOf(ref) === 'block') return drag.sectionId === ref.sectionId
+    return drag.sectionId === ref.sectionId && drag.blockId === ref.blockId
+  }
+  const dragProps = (ref: NodeRef) => ({
+    draggable: true, dragging: sameRef(drag, ref), dropHint: dropKey === refKey(ref) && canDropOn(ref),
+    onDragStart: () => setDrag(ref), onDragEnd: () => { setDrag(null); setDropKey(null) },
+    onDragOver: (e: React.DragEvent) => { if (canDropOn(ref)) { e.preventDefault(); setDropKey(refKey(ref)) } },
+    onDrop: () => {
+      const d0 = drag
+      if (d0 && canDropOn(ref)) apply((d) => {
+        if (levelOf(ref) === 'section') return moveSectionToIndex(d, d0.sectionId, d.sections.findIndex((x) => x.id === ref.sectionId))
+        const sec = d.sections.find((x) => x.id === ref.sectionId)
+        if (levelOf(ref) === 'block') return moveBlockToIndex(d, d0.sectionId, d0.blockId!, sec ? sec.blocks.findIndex((b) => b.id === ref.blockId) : 0)
+        const blk = sec?.blocks.find((b) => b.id === ref.blockId)
+        return moveElementToIndex(d, d0.sectionId, d0.blockId!, d0.elementId!, blk ? blk.elements.findIndex((e) => e.id === ref.elementId) : 0)
+      })
+      setDrag(null); setDropKey(null)
+    },
+  })
 
   /* ── publish: save the current doc, then push it to Shopify as native sections ── */
   const publish = useCallback(async () => {
@@ -300,10 +324,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                   onUp={() => apply((d) => moveNode(d, sRef, -1))} onDown={() => apply((d) => moveNode(d, sRef, 1))}
                   onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sRef); queueMicrotask(() => setSel(newRef)); return nd })}
                   onHide={() => apply((d) => setHidden(d, sRef))} onDel={() => apply((d) => removeNode(d, sRef), sameRef(sel, sRef) ? null : sel)}
-                  draggable dragging={dragSec === s.id} dropHint={dropSec === s.id && dragSec !== s.id}
-                  onDragStart={() => setDragSec(s.id)} onDragEnd={() => { setDragSec(null); setDropSec(null) }}
-                  onDragOver={(e) => { e.preventDefault(); if (dragSec && dragSec !== s.id) setDropSec(s.id) }}
-                  onDrop={() => { if (dragSec && dragSec !== s.id) apply((d) => moveSectionToIndex(d, dragSec, d.sections.findIndex((x) => x.id === s.id))); setDragSec(null); setDropSec(null) }}
+                  {...dragProps(sRef)}
                 />
                 {open && s.blocks.map((b) => {
                   const bRef: NodeRef = { sectionId: s.id, blockId: b.id }
@@ -318,6 +339,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                         onUp={() => apply((d) => moveNode(d, bRef, -1))} onDown={() => apply((d) => moveNode(d, bRef, 1))}
                         onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, bRef); queueMicrotask(() => setSel(newRef)); return nd })}
                         onHide={() => apply((d) => setHidden(d, bRef))} onDel={() => apply((d) => removeNode(d, bRef), sameRef(sel, bRef) ? null : sel)}
+                        {...dragProps(bRef)}
                       />
                       {bOpen && b.elements.map((el) => {
                         const eRef: NodeRef = { sectionId: s.id, blockId: b.id, elementId: el.id }
@@ -326,7 +348,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                             selected={sameRef(sel, eRef)} onSelect={() => setSel(eRef)}
                             onUp={() => apply((d) => moveNode(d, eRef, -1))} onDown={() => apply((d) => moveNode(d, eRef, 1))}
                             onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, eRef); queueMicrotask(() => setSel(newRef)); return nd })}
-                            onHide={() => apply((d) => setHidden(d, eRef))} onDel={() => apply((d) => removeNode(d, eRef), sameRef(sel, eRef) ? null : sel)} />
+                            onHide={() => apply((d) => setHidden(d, eRef))} onDel={() => apply((d) => removeNode(d, eRef), sameRef(sel, eRef) ? null : sel)} {...dragProps(eRef)} />
                         )
                       })}
                       <AddBtn label="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: s.id })} depth={1} />
