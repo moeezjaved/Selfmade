@@ -191,8 +191,8 @@ const css = `
 .pgbld .final .prod .name{font-size:11px;font-weight:800;letter-spacing:.1em;color:#c7cbf5;text-transform:uppercase;margin-bottom:6px}
 .pgbld .final .prod .big{font-size:26px;font-weight:900;line-height:1.05;margin-bottom:14px}
 .pgbld .final .prod .im,.pgbld .final .prod .im.ph{aspect-ratio:5/4;border-radius:16px;min-height:0}
-.pgbld .final .forms{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
-.pgbld .final .forms span{font-size:10.5px;font-weight:700;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);border-radius:999px;padding:5px 11px}
+.pgbld .final .forms{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px}
+.pgbld .final .forms span{font-size:10.5px;font-weight:800;background:rgba(20,24,90,.55);border:1px solid rgba(255,255,255,.45);color:#fff;border-radius:999px;padding:6px 12px;backdrop-filter:blur(3px)}
 .pgbld .final .cta{text-align:center}
 .pgbld .final .cta .hz{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
 .pgbld .final .cta h2{font-size:28px;font-weight:800;margin-bottom:10px}
@@ -310,7 +310,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="acc">${accItems}</div>
       <div class="hclaim">${escp(c.hero_claim || 'Join thousands of customers who trust our money-back guarantee.')}</div>
       <div class="hrev"><div class="av">${img(c.image_reviewer, 'Reviewer', 'avim', '')}</div><div><div class="q">${esc(c.hero_review || 'Actually feels like clean fuel. No racing heart or crash later, just a steady sense of being ‘on’ while I work through my day.')}</div><div class="who">${escp(c.hero_review_name || 'Verified Buyer')}</div></div></div>
-      <div class="warn">⚠ <span><b>Low Stock Notice.</b> ${esc(c.warn_line || 'This product sold out fast this year. We encourage you to take advantage of the limited sale while it lasts. It’s only available here and not sold in stores.')}</span></div>
+      <div class="warn">⚠ <span><b>Low Stock Notice.</b> ${bd(c.warn_line || 'This product sold out fast this year. We encourage you to take advantage of the limited sale while it lasts. It’s only available here and not sold in stores.')}</span></div>
     </div>
   </div></div></section>
 
