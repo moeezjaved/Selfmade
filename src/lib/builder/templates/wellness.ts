@@ -11,8 +11,13 @@ import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../type
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
 const hl = (s: any) => esc(String(s ?? '')).replace(/\*\*([^*]+)\*\*/g, '<span class="hl">$1</span>')
+// body text with **bold** → <strong> (markdown the copy model leaves in paragraphs)
+const bd = (s: any) => esc(String(s ?? '')).replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+const em = (s: any) => esc(String(s ?? '')).replace(/\*\*([^*]+)\*\*/g, '<em>$1</em>')   // **x** → italic
 const arr = (v: SlotValue | undefined) => (Array.isArray(v) ? v : [])
 const PH_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5L5 20"/></svg>'
+const CHK = '<svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="#2f8a4e" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.4 12.4l2.4 2.4 4.7-5"/></svg>'
+const XMARK = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#d9534f" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
 function img(url: any, alt: string, cls: string, label?: string): string {
   if (url && typeof url === 'string') return `<img class="${cls}" src="${esc(url)}" alt="${esc(alt)}" loading="lazy">`
   return `<div class="${cls} ph"><span class="phi">${PH_ICON}</span><span class="phl">${esc(label || 'Image')}</span></div>`
@@ -29,10 +34,13 @@ const ICONS = [
   S('<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M18 6l-2.5 2.5M8.5 15.5 6 18"/>'),   // sun — routine
   S('<path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/>'),                       // heart — quality
 ]
+const CAL = S('<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>')            // calendar
+const TICK = S('<path d="M20 6 9 17l-5-5"/>')                                                                 // plain check
 
 const css = `
+@import url('https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800;900&display=swap');
 .pgbld{--grn:#14311f;--grn2:#1d4029;--cream:#efece3;--ink:#16241a;--sub:#6b7268;--line:#e3ded2;--btn:#2f5d3f;--good:#2f8a4e;--bad:#d9534f;--paper:#fbfaf7;
-  font-family:'Inter',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);line-height:1.5;background:#fff;-webkit-font-smoothing:antialiased}
+  font-family:'Figtree',system-ui,-apple-system,Segoe UI,sans-serif;color:var(--ink);line-height:1.5;background:#fff;-webkit-font-smoothing:antialiased}
 .pgbld *{box-sizing:border-box}
 .pgbld img{max-width:100%;display:block}
 .pgbld .ph{background:#f2efe7;border:1.5px dashed #cfc9ba;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:#9a9384;font-size:12px;min-height:120px;border-radius:12px;text-align:center;padding:14px}
@@ -55,27 +63,40 @@ const css = `
 .pgbld .stars{color:#2f8a4e;letter-spacing:2px;font-size:14px}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:6px 0 8px}
 .pgbld .ptitle{font-size:30px;font-weight:800}
-.pgbld .badge{display:inline-block;background:#eef4ee;color:var(--btn);font-size:11px;font-weight:800;border-radius:6px;padding:3px 9px;margin-bottom:8px;text-transform:uppercase;letter-spacing:.04em}
+.pgbld .badge{display:inline-block;background:#eef4ee;color:var(--btn);font-size:12px;font-weight:700;border-radius:6px;padding:4px 10px;margin-bottom:10px}
 .pgbld .price{display:flex;align-items:baseline;gap:10px;margin:10px 0}
 .pgbld .price .now{font-size:24px;font-weight:800}
 .pgbld .price .was{font-size:15px;color:#9a958a;text-decoration:line-through}
 .pgbld .price .save{font-size:11px;font-weight:800;color:#fff;background:var(--good);border-radius:5px;padding:3px 8px}
-.pgbld .psub{font-size:14px;color:var(--sub);margin-bottom:14px}
-.pgbld .checks{display:flex;flex-direction:column;gap:9px;margin:14px 0 16px}
-.pgbld .checks .c{display:flex;align-items:center;gap:9px;font-size:13.5px}
-.pgbld .checks .c b{width:20px;height:20px;border-radius:50%;background:#eef4ee;color:var(--good);display:grid;place-items:center;font-size:12px;flex:none}
-.pgbld .titlesel{border:1px solid var(--line);border-radius:10px;padding:11px 13px;font-size:13px;color:var(--ink);margin-bottom:12px;background:#fff}
-.pgbld .titlesel small{display:block;color:var(--sub);font-size:11px;margin-bottom:3px;text-transform:uppercase;letter-spacing:.05em}
-.pgbld .hquote{margin-top:16px;border-top:1px solid var(--line);padding-top:14px;font-size:13px;color:var(--sub);font-style:italic}
-.pgbld .tpilot{display:flex;align-items:center;gap:8px;margin-top:12px;font-size:12.5px;color:var(--sub)}
+.pgbld .psub{font-size:15px;color:var(--ink);margin-bottom:12px}
+/* benefit rows — line icon + text + divider under each (like the reference buy-box) */
+.pgbld .checks{display:flex;flex-direction:column;margin:8px 0 18px;border-top:1px solid var(--line)}
+.pgbld .checks .c{display:flex;align-items:center;gap:13px;font-size:14.5px;color:var(--ink);padding:13px 2px;border-bottom:1px solid var(--line)}
+.pgbld .checks .c .ci{color:var(--btn);width:23px;height:23px;flex:none;display:flex;align-items:center;justify-content:center}
+.pgbld .checks .c .ci svg{width:23px;height:23px}
+.pgbld .titlesel{border:1px solid var(--line);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--ink);margin-bottom:14px;background:#fff}
+.pgbld .titlesel small{display:block;color:var(--sub);font-size:11px;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em}
+/* hero review card with customer photo + arrows */
+.pgbld .hrev{background:var(--cream);border-radius:16px;padding:16px 40px;margin-top:16px;position:relative}
+.pgbld .hrev .st{color:#16241a;font-size:15px;letter-spacing:2px;text-align:center;margin-bottom:9px}
+.pgbld .hrev .row{display:flex;gap:13px;align-items:center}
+.pgbld .hrev .rimg,.pgbld .hrev .rimg.ph{width:60px;height:60px;border-radius:50%;object-fit:cover;flex:none;min-height:0;padding:0}
+.pgbld .hrev .rimg.ph svg{width:22px;height:22px}.pgbld .hrev .rimg.ph .phl{display:none}
+.pgbld .hrev p{font-size:12.5px;color:var(--ink);margin:0 0 6px;line-height:1.45;font-style:italic}
+.pgbld .hrev .who{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:5px;color:var(--ink)}
+.pgbld .hrev .who::before{content:'✓';font-size:9px;color:#fff;background:#1d9bf0;width:14px;height:14px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pgbld .hrev .arw{position:absolute;top:50%;transform:translateY(-50%);width:26px;height:26px;border-radius:50%;background:#fff;border:1px solid var(--line);color:var(--sub);display:flex;align-items:center;justify-content:center;font-size:14px}
+.pgbld .hrev .arw.l{left:8px}.pgbld .hrev .arw.r{right:8px}
+.pgbld .tpilot{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px;font-size:13px;color:var(--sub)}
 .pgbld .tpilot b{color:var(--ink)}
 
-/* 2 · HOLISTIC */
-.pgbld .holistic{background:var(--cream);padding:56px 0}
-.pgbld .holistic .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
-.pgbld .hcol h2{font-size:26px;text-align:center;margin-bottom:26px}
-.pgbld .hbag{max-width:300px;margin:22px auto 0}
-.pgbld .icgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px 16px}
+/* 2 · HOLISTIC — dark-green band; cream card on the left, white text + accordion on the green at right */
+.pgbld .holistic{background:var(--grn);padding:52px 0}
+.pgbld .holistic .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:stretch}
+.pgbld .hcol.card{background:var(--cream);border-radius:22px;padding:34px 30px 0;overflow:hidden;display:flex;flex-direction:column}
+.pgbld .hcol.card h2{font-size:26px;text-align:center;margin-bottom:26px;color:var(--ink)}
+.pgbld .hbag{max-width:290px;margin:26px auto -6px}
+.pgbld .icgrid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:22px 16px}
 .pgbld .icg{text-align:center}
 .pgbld .icg .ic{color:var(--btn);margin-bottom:6px;display:flex;justify-content:center}
 .pgbld .icg .ic svg{width:28px;height:28px}
@@ -83,15 +104,17 @@ const css = `
 .pgbld .minf .ic{color:var(--btn);display:flex;justify-content:center}
 .pgbld .fb .ic svg{width:19px;height:19px;color:#fff}
 .pgbld .icg .t{font-size:12.5px;color:var(--sub);line-height:1.35}
-.pgbld .fhead{font-size:26px;margin-bottom:12px}
-.pgbld .fbody{font-size:14.5px;color:var(--sub);margin-bottom:20px}
-.pgbld .acc{border-top:1px solid #dcd7ca}
-.pgbld .acc details{border-bottom:1px solid #dcd7ca}
-.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:15px 2px;font-weight:700;font-size:15px}
+.pgbld .fcol{align-self:center}
+.pgbld .fhead{font-size:29px;margin-bottom:14px;color:#fff;font-weight:500}
+.pgbld .fhead .hl{color:#fff;font-weight:800}
+.pgbld .fbody{font-size:14.5px;color:#c3cfc4;margin-bottom:22px}
+.pgbld .acc{border-top:1px solid rgba(255,255,255,.16)}
+.pgbld .acc details{border-bottom:1px solid rgba(255,255,255,.16)}
+.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:12px;padding:16px 2px;font-weight:700;font-size:15px;color:#fff}
 .pgbld .acc summary::-webkit-details-marker{display:none}
-.pgbld .acc summary::after{content:'⌄';margin-left:auto;color:var(--sub);font-size:18px}
-.pgbld .acc .tag{font-size:10.5px;font-weight:800;color:var(--btn);background:#e3ebe4;border-radius:5px;padding:3px 8px;text-transform:uppercase}
-.pgbld .acc .body{padding:0 2px 15px;font-size:13.5px;color:var(--sub)}
+.pgbld .acc summary::after{content:'⌄';margin-left:auto;color:rgba(255,255,255,.6);font-size:18px}
+.pgbld .acc .tag{font-size:10.5px;font-weight:800;color:#d6e2d8;background:rgba(255,255,255,.12);border-radius:5px;padding:3px 8px;text-transform:uppercase}
+.pgbld .acc .body{padding:0 2px 15px;font-size:13.5px;color:#b9c6bb}
 
 /* 3 · STARTER + UPGRADE */
 .pgbld .starter{padding:56px 0}
@@ -103,23 +126,27 @@ const css = `
 .pgbld .minf .ic{font-size:20px;margin-bottom:5px}
 .pgbld .minf .t{font-size:11.5px;color:var(--sub);line-height:1.35}
 .pgbld .upgrade{background:var(--cream);border-radius:18px;padding:28px;display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:center}
-.pgbld .upgrade h3{font-size:22px;margin-bottom:14px}
-.pgbld .upgrade h3 em{font-style:italic;color:var(--btn)}
-.pgbld .upgrade .ulist{display:flex;flex-direction:column;gap:10px}
-.pgbld .upgrade .u{display:flex;gap:8px;font-size:12.5px;color:var(--ink)}
-.pgbld .upgrade .u b{color:var(--good);flex:none}
+.pgbld .upgrade h3{font-size:23px;margin-bottom:16px;line-height:1.15}
+.pgbld .upgrade h3 em{font-style:italic;color:var(--ink)}
+.pgbld .upgrade .ulist{display:flex;flex-direction:column}
+.pgbld .upgrade .u{display:flex;gap:10px;font-size:12.5px;color:var(--ink);align-items:flex-start;padding:11px 0;border-bottom:1px dashed #cfc9ba}
+.pgbld .upgrade .u:last-child{border-bottom:0}
+.pgbld .upgrade .u svg{width:18px;height:18px;flex:none;margin-top:1px}
 
-/* 4 · FOCUS BAND (dark green, angled) */
+/* 4 · FOCUS BAND (dark green, angled) — 4 benefits + centre photo inside a soft card */
 .pgbld .focus{background:var(--grn);color:#eef1ea;padding:70px 0 64px;clip-path:polygon(0 3%,100% 0,100% 100%,0 100%)}
-.pgbld .focus h2{font-size:28px;text-align:center;color:#fff;max-width:640px;margin:0 auto 8px}
+.pgbld .focus h2{font-size:30px;text-align:center;color:#fff;max-width:660px;margin:0 auto 8px}
 .pgbld .focus .sub{text-align:center;color:#b9c6bb;font-size:14px;max-width:620px;margin:0 auto 40px}
-.pgbld .fbwrap{display:grid;grid-template-columns:1fr auto 1fr;gap:28px;align-items:center;max-width:900px;margin:0 auto}
-.pgbld .fbcol{display:flex;flex-direction:column;gap:30px}
-.pgbld .fbcol.r{text-align:left}.pgbld .fbcol.l{text-align:right}
-.pgbld .fb .ic{width:38px;height:38px;border-radius:50%;background:rgba(255,255,255,.12);display:inline-grid;place-items:center;font-size:17px;margin-bottom:7px}
-.pgbld .fb h4{font-size:15px;color:#fff;margin:0 0 4px}
+.pgbld .fbcard{background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09);border-radius:24px;padding:40px 34px;max-width:1000px;margin:0 auto}
+.pgbld .fbwrap{display:grid;grid-template-columns:1fr auto 1fr;gap:30px;align-items:center}
+.pgbld .fbcol{display:flex;flex-direction:column;gap:38px}
+.pgbld .fb{text-align:center}
+.pgbld .fb .ic{width:50px;height:50px;border-radius:50%;background:rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 11px}
+.pgbld .fb .ic svg{width:24px;height:24px;color:#eef1ea}
+.pgbld .fb h4{font-size:17px;color:#fff;margin:0 0 5px;font-weight:700}
 .pgbld .fb p{font-size:12.5px;color:#b9c6bb;margin:0;line-height:1.45}
-.pgbld .fbimg{width:190px;height:190px;border-radius:50%;object-fit:cover;border:5px solid rgba(255,255,255,.1)}
+.pgbld .fbimg{width:250px;height:250px;border-radius:50%;object-fit:cover;border:6px solid rgba(255,255,255,.08)}
+.pgbld .fbimg.ph{border-style:dashed}
 
 /* 5 · STATS */
 .pgbld .stats{background:var(--grn);color:#eef1ea;padding:20px 0 70px}
@@ -142,15 +169,16 @@ const css = `
 .pgbld .compare .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
 .pgbld .compare h2{font-size:26px;margin-bottom:12px}
 .pgbld .compare p{font-size:14px;color:var(--sub);margin-bottom:20px}
-.pgbld .ctable{background:var(--cream);border-radius:16px;padding:10px 16px}
-.pgbld .ctop{display:grid;grid-template-columns:1fr 90px 90px;padding:12px 4px;font-size:11.5px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.03em;text-align:center}
+.pgbld .ctable{position:relative;padding:0 4px}
+/* continuous pale-green band behind the "Our product" column, capped above the header */
+.pgbld .ctable::before{content:'';position:absolute;top:-20px;bottom:6px;right:104px;width:96px;background:#e9f2df;border-radius:16px;z-index:0}
+.pgbld .ctop,.pgbld .cr{position:relative;z-index:1;display:grid;grid-template-columns:1fr 100px 100px;align-items:center}
+.pgbld .ctop{padding:14px 4px 12px;font-size:11px;font-weight:800;color:var(--sub);text-transform:uppercase;letter-spacing:.03em;text-align:center}
 .pgbld .ctop span:first-child{text-align:left}
 .pgbld .ctop .ours{color:var(--btn)}
-.pgbld .cr{display:grid;grid-template-columns:1fr 90px 90px;align-items:center;padding:13px 4px;border-top:1px solid #dcd7ca;font-size:13.5px}
-.pgbld .cr .yes{color:var(--good);font-weight:900}
-.pgbld .cr .no{color:var(--bad);font-weight:900}
-.pgbld .cr .m{text-align:center}
-.pgbld .cr .ourcol{background:#e6efe7;border-radius:8px}
+.pgbld .cr{padding:15px 4px;border-top:1px solid #efeadd;font-size:14px}
+.pgbld .cr>div:first-child{text-align:left;color:var(--ink)}
+.pgbld .cr .m{text-align:center;display:flex;justify-content:center;align-items:center}
 
 /* 7 · PRESS */
 .pgbld .press{background:var(--grn2);padding:20px 0}
@@ -160,15 +188,19 @@ const css = `
 /* 8 · REVIEWS */
 .pgbld .reviews{background:var(--cream);padding:56px 0}
 .pgbld .reviews .rh{text-align:center;margin-bottom:30px}
-.pgbld .reviews .rh .st{color:#2f8a4e;letter-spacing:3px;margin-bottom:8px}
-.pgbld .reviews h2{font-size:26px;margin-bottom:8px}
+.pgbld .reviews .rh .st{color:#16241a;letter-spacing:3px;margin-bottom:8px;font-size:17px}
+.pgbld .reviews h2{font-size:28px;margin-bottom:8px}
 .pgbld .reviews .rsub{font-size:14px;color:var(--sub)}
-.pgbld .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-.pgbld .rcard{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
-.pgbld .rcard .rimg,.pgbld .rcard .rimg.ph{width:100%;aspect-ratio:1/1;object-fit:cover}
-.pgbld .rcard .rb{padding:13px}
-.pgbld .rcard .rname{font-weight:700;font-size:13.5px}
-.pgbld .rcard .rst{color:#2f8a4e;font-size:12px;letter-spacing:1px;margin:2px 0 6px}
+.pgbld .reviews .rwrap{position:relative}
+.pgbld .reviews .arw{position:absolute;top:40%;transform:translateY(-50%);width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid var(--line);color:var(--ink);display:flex;align-items:center;justify-content:center;font-size:17px;box-shadow:0 3px 10px rgba(20,18,15,.08);z-index:2}
+.pgbld .reviews .arw.l{left:-10px}.pgbld .reviews .arw.r{right:-10px}
+.pgbld .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.pgbld .rcard{background:transparent;border:0;border-radius:14px;overflow:visible}
+.pgbld .rcard .rimg,.pgbld .rcard .rimg.ph{width:100%;aspect-ratio:3/4;object-fit:cover;border-radius:14px}
+.pgbld .rcard .rb{padding:12px 2px 0}
+.pgbld .rcard .rname{font-weight:700;font-size:14px;display:flex;align-items:center;gap:5px}
+.pgbld .rcard .rname::before{content:'✓';font-size:10px;color:#fff;background:#1d9bf0;width:15px;height:15px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;flex:none}
+.pgbld .rcard .rst{color:#16241a;font-size:16px;letter-spacing:2px;margin:3px 0 7px}
 .pgbld .rcard p{font-size:12.5px;color:var(--sub);margin:0;line-height:1.45}
 
 /* ── responsive ── */
@@ -191,8 +223,9 @@ const css = `
 
 function render(c: FilledContent, o: RenderOpts): string {
   const rating = o.rating ? `${o.rating.stars}` : '4.9'
+  const HB_ICONS = [ICONS[2], CAL, ICONS[4], TICK]   // bolt · calendar · smile · check
   const checks = (arr(c.hero_benefits).length ? arr(c.hero_benefits) : ['Refreshing taste', 'Fits into your routine', 'Feel centered daily', 'Support for busy days'].map((l) => ({ label: l })))
-    .slice(0, 4).map((b) => `<div class="c"><b>✓</b>${escp(b.label)}</div>`).join('')
+    .slice(0, 4).map((b, i) => `<div class="c"><span class="ci">${HB_ICONS[i % 4]}</span>${escp(b.label)}</div>`).join('')
   const thumbs = [c.image_main, c.image_g2, c.image_g3, c.image_g4].map((u) => img(u || o.productImage, o.productName, '', 'Product')).join('')
 
   const holFeat = (arr(c.holistic_features).length ? arr(c.holistic_features) : ['70+ ingredients', 'Supports digestion', 'Supports energy', 'Supports immune system', 'Stress & mood balance', 'Focus & concentration'].map((l) => ({ label: l })))
@@ -203,10 +236,10 @@ function render(c: FilledContent, o: RenderOpts): string {
   const minf = (arr(c.morning_features).length ? arr(c.morning_features) : ['Smoothly dissolving blend', 'Steady focus for deep work', 'Reliable energy all day'].map((l) => ({ label: l })))
     .slice(0, 3).map((m, i) => `<div class="m"><div class="ic">${ICONS[i % ICONS.length]}</div><div class="t">${escp(m.label)}</div></div>`).join('')
   const upg = (arr(c.upgrade_items).length ? arr(c.upgrade_items) : ['Clinically shown to support digestive function', '5 optimized bacterial cultures', '10x more beneficial gut bacteria', 'Backed by 4 clinical trials'].map((l) => ({ label: l })))
-    .slice(0, 4).map((u) => `<div class="u"><b>✓</b>${escp(u.label)}</div>`).join('')
+    .slice(0, 4).map((u) => `<div class="u">${CHK}<span>${escp(u.label)}</span></div>`).join('')
 
   const focusB = (arr(c.focus_benefits).length ? arr(c.focus_benefits) : [{ title: 'Morning Routine', body: 'Replace a cabinet of supplements with one simple scoop.' }, { title: 'Balanced Mood', body: 'A calm feeling of steady support all day.' }, { title: 'Steady Focus', body: 'The vitamins and minerals your brain needs.' }, { title: 'Trusted Quality', body: 'Third-party tested for purity and safety.' }])
-  const FB_ICONS = [ICONS[6], ICONS[4], ICONS[5], ICONS[3]]   // routine · mood · focus · quality
+  const FB_ICONS = [ICONS[2], ICONS[4], ICONS[5], ICONS[3]]   // routine(bolt) · mood(smile) · focus(target) · quality(shield)
   const fb = (b: any, i: number) => `<div class="fb"><div class="ic">${FB_ICONS[i] || ICONS[0]}</div><h4>${escp(b.title || b.label)}</h4><p>${esc(b.body)}</p></div>`
 
   const scards = (arr(c.stats).length ? arr(c.stats) : [{ label: '100%', title: 'Sustained focus', body: 'Throughout their workday' }, { label: '99%', title: 'Improved mood', body: 'Within the first week' }, { label: '99%', title: 'Steady energy', body: 'When they start their day' }, { label: '95%', title: 'Consistent performance', body: 'Through consistent use' }])
@@ -215,7 +248,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     .map((l) => `<span>${escp(l.label)}</span>`).join('')
 
   const cmpRows = (arr(c.compare_rows).length ? arr(c.compare_rows) : ['Steady Focus', 'Easy Swaps', 'Daily Synergy', 'Zero Crashes', 'Better Mornings'].map((l) => ({ label: l })))
-    .map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="m ourcol"><span class="yes">✓</span></div><div class="m"><span class="no">✕</span></div></div>`).join('')
+    .map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="m">${CHK}</div><div class="m">${XMARK}</div></div>`).join('')
 
   const logos = (arr(c.press_logos).length ? arr(c.press_logos) : ['New Scientist', 'Bloomberg', 'Cosmopolitan', "Women's Health", 'Allure'].map((l) => ({ label: l })))
     .map((l: any) => l.image ? `<img src="${esc(l.image)}" alt="${escp(l.label)}" style="height:20px">` : `<span>${escp(l.label)}</span>`).join('')
@@ -238,26 +271,26 @@ function render(c: FilledContent, o: RenderOpts): string {
       ${c.badge || o.productName ? `<div class="badge">${escp(c.badge || 'Best Seller')}</div>` : ''}
       <h1 class="ptitle">${esc(c.headline || o.productName)}</h1>
       <div class="price">${price ? `<span class="now">${esc(price)}</span>` : ''}${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
-      <div class="psub">${esc(c.psub || c.subhead || '')}</div>
+      <div class="psub">${bd(c.subhead || c.psub || '')}</div>
       <div class="checks">${checks}</div>
       <div class="titlesel"><small>Title</small>${escp(c.title_option || 'Default')}</div>
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'Add to Cart')}</a>
-      <div class="pays"><span>VISA</span><span>Mastercard</span><span>AMEX</span><span>PayPal</span><span>G Pay</span><span>Shop</span></div>
-      ${c.hero_quote ? `<div class="hquote">“${esc(c.hero_quote)}”</div>` : ''}
+      <div class="pays" style="justify-content:center"><span>VISA</span><span>Mastercard</span><span>AMEX</span><span>PayPal</span><span>G Pay</span><span>Shop</span></div>
+      ${c.hero_quote ? `<div class="hrev"><span class="arw l">‹</span><span class="arw r">›</span><div class="st">★★★★★</div><div class="row">${img(c.image_hero_review, 'Customer', 'rimg', 'Photo')}<div><p>“${esc(c.hero_quote)}”</p><div class="who">${escp(c.hero_reviewer || 'Verified Buyer')}</div></div></div></div>` : ''}
       <div class="tpilot"><b>Excellent</b> <span class="stars">★★★★★</span> ${escp(c.trust_label || 'Trustpilot')}</div>
     </div>
   </div></div></section>
 
   <!-- 2 · HOLISTIC -->
   <section class="holistic"><div class="wrap"><div class="grid">
-    <div class="hcol">
+    <div class="hcol card">
       <h2>${hl(c.holistic_head || 'Holistic support for your health')}</h2>
       <div class="icgrid">${holFeat}</div>
       <div class="hbag">${img(c.image_holistic || o.productImage, o.productName, 'gimg', 'Product photo')}</div>
     </div>
-    <div class="hcol">
-      <h2 class="fhead">${hl(c.foundation_head || 'Your daily foundation for focus.')}</h2>
-      <div class="fbody">${esc(c.foundation_body || '')}</div>
+    <div class="hcol fcol">
+      <h2 class="fhead">${hl(c.foundation_head || 'Your daily **foundation for focus.**')}</h2>
+      <div class="fbody">${bd(c.foundation_body || '')}</div>
       <div class="acc">${steps}</div>
     </div>
   </div></div></section>
@@ -266,25 +299,25 @@ function render(c: FilledContent, o: RenderOpts): string {
   <section class="starter"><div class="wrap"><div class="grid">
     <div>
       <h2>${hl(c.morning_head || 'Smooth Morning Mental Momentum Starter')}</h2>
-      <p>${esc(c.morning_body || '')}</p>
-      <a class="btn" style="width:auto" href="${esc(o.ctaHref || '#')}">${escp(c.morning_cta || 'Buy It Now')}</a>
+      <p>${bd(c.morning_body || '')}</p>
+      <a class="btn" href="${esc(o.ctaHref || '#')}">${escp(c.morning_cta || 'Buy It Now')}</a>
       <div class="minf">${minf}</div>
     </div>
     <div class="upgrade">
       <div>${img(c.image_upgrade || o.productImage, o.productName, 'gimg', 'Product photo')}</div>
-      <div><h3>${hl(c.upgrade_head || 'The <em>Upgrade</em>')}</h3><div class="ulist">${upg}</div></div>
+      <div><h3>${em(c.upgrade_head || 'The **Upgrade**')}</h3><div class="ulist">${upg}</div></div>
     </div>
   </div></div></section>
 
   <!-- 4 · FOCUS BAND -->
   <section class="focus"><div class="wrap">
     <h2>${hl(c.focus_head || 'Start your day with a focused mind and steady energy')}</h2>
-    <div class="sub">${esc(c.focus_sub || '')}</div>
-    <div class="fbwrap">
+    <div class="sub">${bd(c.focus_sub || '')}</div>
+    <div class="fbcard"><div class="fbwrap">
       <div class="fbcol l">${fb(focusB[0] || {}, 0)}${fb(focusB[2] || {}, 2)}</div>
       <div>${img(c.image_focus || o.productImage, o.productName, 'fbimg', 'Lifestyle photo')}</div>
       <div class="fbcol r">${fb(focusB[1] || {}, 1)}${fb(focusB[3] || {}, 3)}</div>
-    </div>
+    </div></div>
   </div></section>
 
   <!-- 5 · STATS -->
@@ -300,8 +333,8 @@ function render(c: FilledContent, o: RenderOpts): string {
   <section class="compare"><div class="wrap"><div class="grid">
     <div>
       <h2>${hl(c.compare_head || 'The Difference Between Surviving and Thriving')}</h2>
-      <p>${esc(c.compare_body || '')}</p>
-      <a class="btn" style="width:auto" href="${esc(o.ctaHref || '#')}">${escp(c.compare_cta || 'Get Yours')}</a>
+      <p>${bd(c.compare_body || '')}</p>
+      <a class="btn" href="${esc(o.ctaHref || '#')}">${escp(c.compare_cta || 'Get Yours')}</a>
       <div class="pays"><span>VISA</span><span>Mastercard</span><span>AMEX</span><span>PayPal</span><span>Shop</span></div>
     </div>
     <div class="ctable">
@@ -316,7 +349,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   <!-- 8 · REVIEWS -->
   <section class="reviews"><div class="wrap">
     <div class="rh"><div class="st">★★★★★</div><h2>${hl(c.reviews_head || 'See Why Everyone Stays Consistent')}</h2><div class="rsub">${esc(c.reviews_sub || 'Join the community focusing on consistent energy.')}</div></div>
-    <div class="rgrid">${revs}</div>
+    <div class="rwrap"><span class="arw l">‹</span><div class="rgrid">${revs}</div><span class="arw r">›</span></div>
   </div></section>
 
   </div>`
@@ -339,6 +372,8 @@ export const wellnessV1: PageTemplate = {
     { key: 'hero_benefits', type: 'list', label: 'Hero benefit checks', count: 4, hint: 'Each label only: a short benefit with a ✓.' },
     { key: 'cta_label', type: 'text', label: 'Add-to-cart label', hint: 'e.g. "Add to Cart".' },
     { key: 'hero_quote', type: 'text', label: 'Hero review quote', hint: 'A short real-sounding customer quote.' },
+    { key: 'hero_reviewer', type: 'text', label: 'Hero reviewer name', hint: 'e.g. "Elena". Shown with a verified badge.' },
+    { key: 'image_hero_review', type: 'image', role: 'lifestyle', label: 'Hero reviewer photo' },
     { key: 'trust_label', type: 'text', label: 'Trust line', hint: 'e.g. "Trustpilot" or a review count.' },
     { key: 'image_main', type: 'image', role: 'product', label: 'Main product image' },
     { key: 'image_g2', type: 'image', role: 'product', label: 'Gallery image 2' },
