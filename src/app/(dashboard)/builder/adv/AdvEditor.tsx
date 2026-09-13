@@ -131,6 +131,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const target = Math.min(1, Math.max(0.4, (w - 56) / (device === 'mobile' ? 402 : 1000)))
     setZoom(Math.round(target * 20) / 20)
   }, [device])
+  // Fit the canvas to the available width when a page loads or the device changes, so the preview is
+  // never cropped by the side panels.
+  useEffect(() => { const t = setTimeout(fitZoom, 60); return () => clearTimeout(t) }, [status, device, fitZoom])
 
   /* ── publish: save the current doc, then push it to Shopify as native sections ── */
   const publish = useCallback(async () => {
@@ -269,7 +272,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <button title="Undo (⌘Z)" onClick={undo} disabled={!histDepth} style={{ ...iconTopBtn, opacity: histDepth ? 1 : 0.35, cursor: histDepth ? 'pointer' : 'default' }}>↶</button>
           <button title="Redo (⇧⌘Z)" onClick={redo} disabled={!redoDepth} style={{ ...iconTopBtn, opacity: redoDepth ? 1 : 0.35, cursor: redoDepth ? 'pointer' : 'default' }}>↷</button>
         </div>
-        <DeviceToggle value={device} onChange={(d) => { setDevice(d); setZoom(1) }} />
+        <DeviceToggle value={device} onChange={(d) => setDevice(d)} />
         <ZoomControl zoom={zoom} setZoom={setZoom} onFit={fitZoom} />
         <SaveBadge status={status} />
         <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
@@ -332,7 +335,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
         {/* ── center: live canvas ── */}
         <main ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
-          <div style={{ zoom, width: canvasWidth, maxWidth: '100%', background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
+          <div style={{ zoom, width: canvasWidth, background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
             <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
           </div>
         </main>
@@ -519,8 +522,8 @@ function TreeRow(props: {
   const [hover, setHover] = useState(false)
   return (
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, paddingRight: 4, height: 30, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: hidden ? 0.5 : 1 }}>
-      <span onClick={(e) => { e.stopPropagation(); onToggle?.() }} style={{ width: 14, textAlign: 'center', color: FAINT, fontSize: 10, cursor: hasChildren ? 'pointer' : 'default' }}>{hasChildren ? (open ? '▾' : '▸') : ''}</span>
+      style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: hidden ? 0.5 : 1 }}>
+      <span onClick={(e) => { e.stopPropagation(); onToggle?.() }} style={{ width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: SUB, fontSize: 13, cursor: hasChildren ? 'pointer' : 'default', flex: 'none' }}>{hasChildren ? (open ? '▾' : '▸') : ''}</span>
       <span onClick={onSelect} style={{ flex: 1, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
@@ -537,7 +540,7 @@ function TreeRow(props: {
   )
 }
 function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 12, lineHeight: 1, padding: '3px 4px', borderRadius: 6, color: danger ? ORANGE : SUB }}>{children}</button>
+  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '6px 7px', borderRadius: 7, color: danger ? ORANGE : SUB }}>{children}</button>
 }
 
 function AddMenu({ title, options, onPick, onClose }: { title: string; options: { id: string; label: string }[]; onPick: (id: string) => void; onClose: () => void }) {
