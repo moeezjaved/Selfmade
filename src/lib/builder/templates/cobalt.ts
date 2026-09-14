@@ -66,7 +66,7 @@ const css = `
 .pgbld .ppill{display:grid;grid-template-columns:auto 1fr;border-radius:999px;overflow:hidden;font-size:10.5px;font-weight:800;box-shadow:0 3px 8px -5px rgba(63,75,214,.5)}
 .pgbld .ppill .a{background:var(--blue);color:#fff;padding:6px 11px;white-space:nowrap}
 .pgbld .ppill .b{background:#fff;color:var(--ink);padding:6px 11px;border:1px solid var(--line);border-left:0}
-.pgbld .ppill.solo{display:inline-flex;grid-template-columns:none}
+.pgbld .ppill.solo{display:inline-flex;grid-template-columns:none;align-self:flex-start;box-shadow:none}
 .pgbld .ppill.solo .a{border-radius:999px;padding:6px 15px}
 .pgbld .hbottle,.pgbld .hbottle.ph{aspect-ratio:3/4;border-radius:12px;min-height:0}
 .pgbld .thumbs{display:flex;gap:8px;margin-top:12px}
