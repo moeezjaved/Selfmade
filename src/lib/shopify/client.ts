@@ -25,6 +25,13 @@ export function hasThemeScopes(granted?: string | null): boolean {
   return SHOPIFY_THEME_SCOPES.every((s) => set.has(s))
 }
 
+/** Whether the granted scopes allow creating/updating products — needed to turn an imported
+ * (external-URL) product page into a real Shopify PDP. Checked live via fetchAccessScopes. */
+export function hasProductWriteScope(granted?: string[] | string | null): boolean {
+  const list = Array.isArray(granted) ? granted : String(granted || '').split(',')
+  return new Set(list.map((s) => s.trim())).has('write_products')
+}
+
 export type StoreRow = {
   id: string
   brand_id: string | null

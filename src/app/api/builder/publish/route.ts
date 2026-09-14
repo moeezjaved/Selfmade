@@ -4,7 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
-import { resolveStore, shopifyRest, tokenFor, type StoreRow } from '@/lib/shopify/client'
+import { resolveStore, shopifyRest, tokenFor, fetchAccessScopes, hasProductWriteScope, type StoreRow } from '@/lib/shopify/client'
 import { getTemplate } from '@/lib/builder/templates'
 import { bodyHtml } from '@/lib/builder/assemble'
 import { paletteOverrideCss } from '@/lib/builder/palettes'
@@ -50,19 +50,44 @@ export async function POST(req: NextRequest) {
   // advertorial/listicle become a native page-template on a Shopify Page) — so all four types are edited
   // the same way in Shopify's customizer with the same settings panels.
   const target = (['this', 'selected', 'store'].includes(b?.target) ? b.target : 'this') as ThemeTarget
-  const productIds: string[] = Array.isArray(b?.productIds) && b.productIds.length
+  // A REAL Shopify product id is a numeric id or a Product gid. The import-from-URL flow stores a sentinel
+  // ("url:https://…") in product_id to remember the source — that is NOT a real product, so it must not be
+  // treated as one (it would make publishToTheme build a bogus /products/<slug> link that 404s to home).
+  const isRealShopifyProductId = (s: string) => /^gid:\/\/shopify\/Product\/\d+$/.test(s) || /^\d+$/.test(s)
+  const productIds: string[] = (Array.isArray(b?.productIds) && b.productIds.length
     ? b.productIds.map((x: any) => String(x))
     : (row.product_id ? [String(row.product_id)] : [])
+  ).filter(isRealShopifyProductId)
 
   // A product page built from an imported / external (AliExpress/Amazon/…) URL has no Shopify product yet,
   // so the template would be assigned to ZERO products and the link would fall back to the store home.
   // Create the product in Shopify Admin (title/images/description/price) and bind the page to it, so the
   // result is a REAL, connected product page. Idempotent: only when a product page has no bound product.
   if (kind === 'product' && !productIds.length) {
-    const created = await createShopifyProduct(store, { title, content: row.content || {}, opts, doc: rowDoc }).catch(() => null)
-    if (created?.id) {
-      productIds.push(created.id)
-      await admin.from('builder_pages').update({ product_id: created.id, updated_at: new Date().toISOString() }).eq('id', pageId)
+    // Creating the product needs write_products; an older connection may predate that scope. Check live
+    // and prompt a one-time reconnect (same pattern as needs_theme_scopes) rather than failing opaquely.
+    const scopes = await fetchAccessScopes(store.shop_domain, tokenFor(store))
+    if (!hasProductWriteScope(scopes)) {
+      return NextResponse.json({
+        error: 'needs_product_scope',
+        message: 'This page was built from an external product URL, so we need to create it in your Shopify catalog first — but the store connection is missing product write access. Reconnect your store (it will now request write_products) and publish again.',
+      }, { status: 409 })
+    }
+    try {
+      const created = await createShopifyProduct(store, { title, content: row.content || {}, opts, doc: rowDoc })
+      if (created?.id) {
+        productIds.push(created.id)
+        await admin.from('builder_pages').update({ product_id: created.id, updated_at: new Date().toISOString() }).eq('id', pageId)
+      }
+    } catch (e: any) {
+      const msg = String(e?.message || e || '')
+      const scope = /403|scope|permission|denied|write_product/i.test(msg)
+      return NextResponse.json({
+        error: 'product_create_failed',
+        message: scope
+          ? 'Couldn’t create the product in Shopify — the store connection is missing write access to products. Reconnect your store with the write_products scope, then publish again.'
+          : `Couldn’t create the product in Shopify: ${msg}`,
+      }, { status: 400 })
     }
   }
   // Source of truth for the published HTML:
@@ -118,17 +143,26 @@ async function createShopifyProduct(
   const description = String(ip?.description || c.subhead || c.hero_subline || c.description || '').replace(/\*\*/g, '').trim()
   const price = num(src.opts.priceLabel) || num(ip?.price) || '0.00'
   const compareAt = num(c.compare_at) || num(ip?.compareAtPrice)
+  // Create the product WITHOUT images first: some source CDNs (Death Wish, AliExpress) block Shopify's
+  // image fetcher and return 422 for the whole request. Creating bare then attaching images one-by-one
+  // means a single un-fetchable image can never stop the product (and its connected page) from existing.
+  const token = tokenFor(store)
   const productBody = {
     product: {
       title: (src.title || src.opts.productName || 'Imported product').slice(0, 250),
       body_html: description ? `<p>${description}</p>` : '',
       status: 'active',
-      images: imgs.slice(0, 12).map((s) => ({ src: s })),
+      published: true,               // publish to the Online Store sales channel so the PDP is reachable
+      published_scope: 'web',
       variants: [{ price, ...(compareAt ? { compare_at_price: compareAt } : {}) }],
     },
   }
-  const cr = await shopifyRest(store.shop_domain, tokenFor(store), 'products.json', { method: 'POST', body: productBody })
+  const cr = await shopifyRest(store.shop_domain, token, 'products.json', { method: 'POST', body: productBody })
   const p = cr?.product
-  if (!p?.id) return null
+  if (!p?.id) throw new Error('Shopify did not return a product id')
+  // Best-effort: attach images one at a time so a rejected URL only drops that image, not the product.
+  for (const imgSrc of imgs.slice(0, 12)) {
+    await shopifyRest(store.shop_domain, token, `products/${p.id}/images.json`, { method: 'POST', body: { image: { src: imgSrc } } }).catch(() => null)
+  }
   return { id: `gid://shopify/Product/${p.id}`, handle: String(p.handle || '') }
 }
