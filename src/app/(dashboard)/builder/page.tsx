@@ -77,19 +77,40 @@ const GRADS = [
 const PREVIEW_SCALE = 0.34 // shrink desktop → card; iframe is oversized then scaled back to fill the card
 function Thumb({ src, seed, label, height = 300, preview }: { src?: string; seed: number; label?: string; height?: number; preview?: string | null }) {
   const [broken, setBroken] = useState(false)
+  const [fullH, setFullH] = useState(0)     // measured full page height (unscaled) once the iframe loads
+  const [hover, setHover] = useState(false)
+  const iframeRef = useRef<HTMLIFrameElement>(null)
   const grad = GRADS[seed % GRADS.length]
   if (preview) {
+    const scaledH = fullH * PREVIEW_SCALE
+    const maxTop = Math.min(0, height - scaledH)     // how far up to scroll so the page bottom shows (negative)
+    const dur = Math.min(9, Math.max(3, Math.abs(maxTop) / 200)) // scan speed ≈ 200 visible px/s
+    const canScroll = maxTop < -4
+    const top = hover && canScroll ? maxTop : 0
+    // Measure the real page height on load, then set the iframe to that height so the whole page is present
+    // (clipped by the card) and can be scrolled by animating `top`. Same-origin srcDoc → readable; no scripts run.
+    const onLoad = () => {
+      const ifr = iframeRef.current
+      try { const d = ifr?.contentDocument; const h = d ? (d.documentElement?.scrollHeight || d.body?.scrollHeight || 0) : 0; if (h) setFullH(h) } catch { /* opaque — keep default */ }
+    }
     return (
-      <div style={{ height, borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', position: 'relative' }}>
+      <div
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+        style={{ height, borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', position: 'relative' }}
+      >
         <iframe
+          ref={iframeRef}
           title={label || 'Template preview'}
           srcDoc={preview}
           scrolling="no"
-          sandbox=""
+          sandbox="allow-same-origin"
           tabIndex={-1}
           aria-hidden
-          style={{ width: `${100 / PREVIEW_SCALE}%`, height: Math.round(height / PREVIEW_SCALE), border: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left', pointerEvents: 'none' }}
+          onLoad={onLoad}
+          style={{ position: 'absolute', left: 0, top, width: `${100 / PREVIEW_SCALE}%`, height: fullH ? fullH : Math.round(height / PREVIEW_SCALE), border: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left', pointerEvents: 'none', transition: `top ${hover ? dur : 0.7}s ${hover ? 'linear' : 'ease'}` }}
         />
+        {canScroll && <div style={{ position: 'absolute', right: 8, bottom: 8, fontSize: 10, fontWeight: 700, color: '#fff', background: 'rgba(20,18,15,.5)', borderRadius: 999, padding: '2px 8px', opacity: hover ? 0 : 1, transition: 'opacity .2s', pointerEvents: 'none' }}>Hover to preview</div>}
       </div>
     )
   }
