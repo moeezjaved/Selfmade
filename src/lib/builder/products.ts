@@ -21,6 +21,32 @@ function priceLabel(currency: string | null | undefined, amount: number | null |
 
 const numericId = (gid: string): string => String(gid || '').split('/').pop() || String(gid || '')
 
+/** Resolve to a fallback value if the promise doesn't settle in time — so a slow/stuck Shopify call can
+ * never hang the product picker (it was getting stuck on "Loading…"). */
+function withTimeout<T>(p: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return Promise.race([p.catch(() => fallback), new Promise<T>((res) => setTimeout(() => res(fallback), ms))])
+}
+
+/** Live product list straight from the Admin API — used when the synced catalog cache is empty (store
+ * connected but not yet synced) so the picker still shows products. Best-effort, timeout-guarded. */
+async function listProductsLive(store: StoreRow, q?: string): Promise<BuilderProduct[]> {
+  const token = tokenFor(store)
+  const search = (q || '').trim()
+  const data = await shopifyGraphql(
+    store.shop_domain, token,
+    /* GraphQL */ `query($q:String){ products(first:48, query:$q, sortKey:TITLE){ nodes{ id title handle featuredImage{ url } priceRangeV2{ minVariantPrice{ amount } } } } }`,
+    { q: search ? `title:*${search}*` : null },
+  )
+  return (data?.products?.nodes || []).map((n: any) => ({
+    id: String(n.id),
+    title: String(n.title || ''),
+    handle: String(n.handle || ''),
+    price: priceLabel(store.currency, n?.priceRangeV2?.minVariantPrice?.amount),
+    image: n?.featuredImage?.url ? String(n.featuredImage.url) : null,
+    sku: null,
+  }))
+}
+
 /**
  * List the connected store's products for the builder's product picker. Pulls from the synced catalog
  * (active products only), optionally filtered by a title query, then best-effort enriches each with its
@@ -51,8 +77,16 @@ export async function listBuilderProducts(
     sku: null,
   }))
 
+  // Cache empty (store connected but not synced yet) → fetch live from the Admin API so the picker isn't
+  // stuck empty. Timeout-guarded so it can't hang the request.
+  if (!products.length) {
+    const live = await withTimeout(listProductsLive(store, q), 6000, [] as BuilderProduct[])
+    return { products: live }
+  }
+
   // Best-effort: fetch featured images for the shown products in ONE call (sync stores no image URLs).
-  await enrichFeaturedImages(store, products).catch(() => { /* thumbnails are optional */ })
+  // Timeout-guarded — a slow Shopify call must NEVER hang the picker (returns products without thumbnails).
+  await withTimeout(enrichFeaturedImages(store, products), 3500, undefined as unknown as void)
   return { products }
 }
 

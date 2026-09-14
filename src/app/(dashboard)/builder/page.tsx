@@ -64,6 +64,10 @@ function ErrorStrip({ msg, onRetry }: { msg: string; onRetry?: () => void }) {
   )
 }
 
+// Bespoke templates carry their OWN designed palette (the colour-palette override doesn't affect them),
+// so the picker hides the palette option for these — it only applies to the generic classic templates.
+const BESPOKE_TEMPLATES = new Set(['wellness_v1', 'botanical_v1', 'radiance_v1', 'cobalt_v1'])
+
 /* ── gradient fallback for a thumbnail that 404s ── */
 const GRADS = [
   'linear-gradient(135deg,#ffd9c9,#ff8a5c)',
@@ -670,8 +674,9 @@ export default function BuilderPage() {
                 {!isPaid && <div style={{ fontSize: 12.5, color: SUB, marginTop: 10 }}>Available on the <b>Creator</b> plan. <Link href="/upgrade" style={{ color: ORANGE, fontWeight: 700 }}>Upgrade now →</Link></div>}
               </div>}
 
-              {/* colour palette — re-skins the whole generated page; shown once a template is chosen */}
-              {tplId && <div style={{ ...CARD, marginTop: 12, padding: '14px 16px' }}>
+              {/* colour palette — re-skins the whole generated page; shown once a template is chosen, and
+                  only for classic templates (bespoke templates carry their own designed palette). */}
+              {tplId && !BESPOKE_TEMPLATES.has(tplId) && <div style={{ ...CARD, marginTop: 12, padding: '14px 16px' }}>
                 <div style={{ fontSize: 14, fontWeight: 700 }}>Colour palette</div>
                 <div style={{ fontSize: 12.5, color: SUB, marginTop: 2 }}>Sets the accent + gradient for the whole page. You can fine-tune copy and images later.</div>
                 <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 14 }}>
