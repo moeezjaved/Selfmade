@@ -22,7 +22,7 @@ const ORANGE = '#e02f06', WASH = '#fdeee9', INSET = '#f7f6f4', GOOD = '#12a150'
 const SERIF = '"Hedvig Letters Serif", Georgia, "Times New Roman", serif'
 
 /* ── types mirroring the API contract ── */
-type Template = { id: string; type: string; name: string; description: string; thumbnail?: string }
+type Template = { id: string; type: string; name: string; description: string; thumbnail?: string; preview?: string | null }
 type Product = { id: string; title: string; handle?: string; price?: string; image?: string; sku?: string }
 type Angle = { id: string; title: string; promise: string }
 type Persona = { id: string; name: string; description: string; angles: Angle[]; custom?: boolean }
@@ -71,9 +71,28 @@ const GRADS = [
   'linear-gradient(135deg,#e6dcff,#b59bff)',
   'linear-gradient(135deg,#d8f3e0,#7ed6a0)',
 ]
-function Thumb({ src, seed, label, height = 132 }: { src?: string; seed: number; label?: string; height?: number }) {
+// Renders a real, scaled-down miniature of the template's own HTML/CSS (like PagePilot's cards):
+// the template renders at desktop width inside a sandboxed iframe, then we CSS-scale it to fit the
+// card and clip to the hero. Falls back to a thumbnail image, then to a labelled gradient.
+const PREVIEW_SCALE = 0.34 // shrink desktop → card; iframe is oversized then scaled back to fill the card
+function Thumb({ src, seed, label, height = 300, preview }: { src?: string; seed: number; label?: string; height?: number; preview?: string | null }) {
   const [broken, setBroken] = useState(false)
   const grad = GRADS[seed % GRADS.length]
+  if (preview) {
+    return (
+      <div style={{ height, borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', position: 'relative' }}>
+        <iframe
+          title={label || 'Template preview'}
+          srcDoc={preview}
+          scrolling="no"
+          sandbox=""
+          tabIndex={-1}
+          aria-hidden
+          style={{ width: `${100 / PREVIEW_SCALE}%`, height: Math.round(height / PREVIEW_SCALE), border: 0, transform: `scale(${PREVIEW_SCALE})`, transformOrigin: 'top left', pointerEvents: 'none' }}
+        />
+      </div>
+    )
+  }
   if (!src || broken) {
     return (
       <div style={{ height, borderRadius: 12, background: grad, display: 'grid', placeItems: 'center', color: 'rgba(255,255,255,.9)', fontFamily: SERIF, fontSize: 20, letterSpacing: '-.01em' }}>
@@ -585,7 +604,7 @@ export default function BuilderPage() {
                   const on = tplId === t.id
                   return (
                     <button key={t.id} className="bld-card-btn" onClick={() => setTplId(t.id)} style={{ ...CARD, textAlign: 'left', cursor: 'pointer', padding: 12, font: 'inherit', color: INK, borderColor: on ? ORANGE : LINE, boxShadow: on ? `0 0 0 2px ${ORANGE}` : CARD.boxShadow as string }}>
-                      <Thumb src={t.thumbnail} seed={i} label={t.name} />
+                      <Thumb src={t.thumbnail} seed={i} label={t.name} preview={t.preview} />
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12 }}>
                         <span style={{ fontSize: 15, fontWeight: 700 }}>{t.name}</span>
                         <input type="radio" className="bld-radio" checked={on} readOnly />
