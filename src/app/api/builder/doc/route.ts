@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { starterProductDoc } from '@/lib/builder/seed'
 import { pageDocFromContent, pageDocFromTemplate } from '@/lib/builder/docFromContent'
-import { getTemplate } from '@/lib/builder/templates'
+import { getTemplate, isBlockNative } from '@/lib/builder/templates'
 import type { PageDoc } from '@/lib/builder/schema'
 
 export const dynamic = 'force-dynamic'
@@ -28,9 +28,12 @@ export async function GET(req: NextRequest) {
 
   const tpl = getTemplate(row.template_id)
   const bespoke = !!(tpl && typeof tpl.render === 'function' && tpl.css)
-  // A pre-faithful generic doc (no rawCss) on a page that HAS a bespoke template is stale — the editor
-  // wouldn't match the live page and it over-splits on publish. Upgrade it to the template-faithful render.
-  const stale = !!row.doc && !(row.doc as any).rawCss && bespoke
+  const blockNative = isBlockNative(tpl?.id)
+  // Staleness (→ re-seed): a BLOCK-NATIVE template must be a granular block doc (no rawCss, no `raw`
+  // sections) — a stored faithful/raw doc is stale and re-seeds to blocks. A non-block-native bespoke
+  // template wants the faithful render — a stored generic doc without rawCss is stale (existing behaviour).
+  const hasRaw = !!row.doc && (!!(row.doc as any).rawCss || ((row.doc as any).sections || []).some((s: any) => s.type === 'raw'))
+  const stale = blockNative ? (!!row.doc && hasRaw) : (!!row.doc && !(row.doc as any).rawCss && bespoke)
   if (row.doc && !stale) return NextResponse.json({ doc: row.doc, version: row.doc_version || 0, seeded: false })
 
   // Seed (or re-seed a stale doc). Preferred path: TEMPLATE-FAITHFUL — render the page's real template and
@@ -39,8 +42,11 @@ export async function GET(req: NextRequest) {
   const palette = (row.render_opts && (row.render_opts as any).paletteId) || 'greens'
   let doc: PageDoc
   try {
-    if (tpl && typeof tpl.render === 'function' && tpl.css) {
-      doc = pageDocFromTemplate(tpl, row.content || {}, row.render_opts || undefined, { productId: row.product_id || undefined }, palette, row.edited_html)
+    if (blockNative && row.content && Object.keys(row.content).length) {
+      // BLOCK-NATIVE: seed granular sections → editable blocks (add/remove/hide/reorder + per-block settings).
+      doc = pageDocFromContent(tpl, row.content, row.render_opts || undefined, { productId: row.product_id || undefined }, palette)
+    } else if (bespoke) {
+      doc = pageDocFromTemplate(tpl!, row.content || {}, row.render_opts || undefined, { productId: row.product_id || undefined }, palette, row.edited_html)
     } else if (row.content && Object.keys(row.content).length) {
       doc = pageDocFromContent(tpl, row.content, row.render_opts || undefined, { productId: row.product_id || undefined })
     } else {

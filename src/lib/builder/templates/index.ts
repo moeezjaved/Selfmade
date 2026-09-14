@@ -14,6 +14,13 @@ import { cobaltV1 } from './cobalt'
 
 export const TEMPLATES: PageTemplate[] = [advertorialV1, listicleV1, productV1, homeV1, wellnessV1, botanicalV1, radianceV1, cobaltV1]
 
+// Templates migrated to the BLOCK-NATIVE model: they seed/publish as native sections → editable blocks
+// (add/remove/hide/reorder + per-block settings) via pageDocFromContent, instead of a frozen `raw` render.
+// Rolled out one template at a time so each is verified before the next. `isBlockNative(id)` gates the
+// seeding + publish paths.
+export const BLOCK_NATIVE_TEMPLATES = new Set<string>(['cobalt_v1'])
+export const isBlockNative = (id?: string | null): boolean => !!id && BLOCK_NATIVE_TEMPLATES.has(id)
+
 export function getTemplate(id: string): PageTemplate | undefined {
   return TEMPLATES.find((t) => t.id === id)
 }

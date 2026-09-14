@@ -5,9 +5,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveStore, shopifyRest, tokenFor, fetchAccessScopes, hasProductWriteScope, type StoreRow } from '@/lib/shopify/client'
-import { getTemplate } from '@/lib/builder/templates'
+import { getTemplate, isBlockNative } from '@/lib/builder/templates'
 import { bodyHtml } from '@/lib/builder/assemble'
-import { pageDocFromTemplate } from '@/lib/builder/docFromContent'
+import { pageDocFromTemplate, pageDocFromContent } from '@/lib/builder/docFromContent'
 import { paletteOverrideCss } from '@/lib/builder/palettes'
 import { publishToTheme, type ThemeTarget } from '@/lib/builder/publish-theme'
 import { renderDocForPublish, type RenderProduct } from '@/lib/builder/render'
@@ -38,6 +38,17 @@ export async function POST(req: NextRequest) {
   // template isn't in code. Only require a template when there's no doc to render from.
   let rowDoc = row.doc as PageDoc | undefined
   const bespoke = !!(tpl && typeof tpl.render === 'function' && tpl.css)
+  const blockNative = isBlockNative(tpl?.id)
+  // BLOCK-NATIVE template → publish from the granular block doc. A stored faithful/raw doc (or none) is
+  // re-seeded to blocks so publish emits native Shopify sections + blocks; a valid block doc (with edits) stays.
+  if (blockNative) {
+    const rawish = !!rowDoc && (!!(rowDoc as any).rawCss || (Array.isArray(rowDoc.sections) && rowDoc.sections.some((s) => s.type === 'raw')))
+    const emptyish = !rowDoc || !Array.isArray(rowDoc.sections) || rowDoc.sections.length === 0
+    if ((rawish || emptyish) && row.content && Object.keys(row.content).length) {
+      const palette = (row.render_opts && (row.render_opts as any).paletteId) || 'greens'
+      try { rowDoc = pageDocFromContent(tpl, row.content, row.render_opts || undefined, { productId: row.product_id || undefined }, palette) } catch { /* keep stored */ }
+    }
+  }
   // A STALE doc (pre-faithful: no rawCss) or a missing/empty doc on a bespoke-template page must NOT publish
   // through the generic doc path — that drops the template's scoped `.pgbld` layout (→ compressed/overlapping
   // on the live page) and over-splits into opaque blocks. The editor seeds a template-faithful doc on load
@@ -46,7 +57,7 @@ export async function POST(req: NextRequest) {
   // doc (rawCss + real sections, carrying the merchant's edits) is kept as-is.
   const staleDoc = !!rowDoc && !(rowDoc as any).rawCss && bespoke
   const emptyDoc = !rowDoc || !Array.isArray(rowDoc.sections) || rowDoc.sections.length === 0
-  if (bespoke && (staleDoc || emptyDoc)) {
+  if (bespoke && !blockNative && (staleDoc || emptyDoc)) {
     const palette = (row.render_opts && (row.render_opts as any).paletteId) || 'greens'
     try {
       rowDoc = pageDocFromTemplate(tpl!, row.content || {}, row.render_opts || undefined, { productId: row.product_id || undefined }, palette, row.edited_html)
