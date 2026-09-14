@@ -1,7 +1,7 @@
 'use client'
 /**
  * Page Builder wizard (Atlas-style). A single self-contained client component that walks the merchant
- * through Template → Product → Research → Persona+Angle → Build → Preview → Publish. It only talks to
+ * through Product → Template → Research → Persona+Angle → Build → Preview → Publish. It only talks to
  * the /api/builder/* endpoints via fetch (another dev owns those routes); nothing here imports server
  * lib. Visual language matches HqRunable / Reports: cream/white cards, ink text, orange accent (#e02f06),
  * rounded pills, inline styles + one <style jsx> tag for the bits inline styles can't express.
@@ -41,7 +41,7 @@ const ITEM_FIELDS: Record<string, { field: string; label: string; area?: boolean
   faq: [{ field: 'q', label: 'Question' }, { field: 'a', label: 'Answer', area: true }],
 }
 
-const STEP_LABELS = ['Template', 'Product', 'Research', 'Persona & angle']
+const STEP_LABELS = ['Product', 'Template', 'Research', 'Persona & angle']
 const LANGUAGES = ['English', 'Spanish', 'French', 'German', 'Italian', 'Portuguese (Brazil)', 'Portuguese (Portugal)', 'Dutch', 'Polish', 'Swedish', 'Danish', 'Norwegian', 'Finnish', 'Turkish', 'Japanese', 'Korean', 'Chinese (Simplified)', 'Arabic', 'Hindi', 'Urdu']
 
 const CARD: React.CSSProperties = {
@@ -472,14 +472,14 @@ export default function BuilderPage() {
 
   /* ── step gating ── */
   const canNext = (
-    step === 1 ? !!tplId :
-    step === 2 ? (!!productId || !!importedProduct) :
+    step === 1 ? (!!productId || !!importedProduct) :   // step 1 = product
+    step === 2 ? !!tplId :                              // step 2 = template
     step === 3 ? true :          // research is optional
     false
   )
   const goNext = () => {
     if (step === 1) setStep(2)
-    // Imported (pasted-URL) products skip persona/angle and build straight away.
+    // Imported (pasted-URL) products skip persona/angle and build straight away once a template is picked.
     else if (step === 2) { if (importedProduct && !productId) runBuild(); else setStep(3) }
     else if (step === 3) setStep(4)
   }
@@ -592,8 +592,8 @@ export default function BuilderPage() {
             </div>
           )}
 
-          {/* ── STEP 1 · TEMPLATE ── */}
-          {step === 1 && (
+          {/* ── STEP 2 · TEMPLATE ── */}
+          {step === 2 && (
             <div>
               <h2 style={cardTitle}>Pick a template</h2>
               <p style={{ fontSize: 14, color: SUB, marginTop: 6 }}>A hand-built, high-converting layout. Your copy and product images get swapped in.</p>
@@ -670,8 +670,8 @@ export default function BuilderPage() {
             </div>
           )}
 
-          {/* ── STEP 2 · PRODUCT ── */}
-          {step === 2 && (
+          {/* ── STEP 1 · PRODUCT ── */}
+          {step === 1 && (
             <div>
               <h2 style={cardTitle}>Pick a product</h2>
               <p style={{ fontSize: 14, color: SUB, marginTop: 6 }}>Import a product via URL from any website, or select one from your connected store.</p>
@@ -1048,8 +1048,8 @@ export default function BuilderPage() {
         {typeof step === 'number' && !isMobile && (
           <aside style={{ ...CARD, padding: 16, position: 'sticky', top: 26 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800, letterSpacing: '.06em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>Summary</div>
-            <SummaryRow label="Template" value={selectedTemplate?.name} />
             <SummaryRow label="Product" value={selectedProduct?.title || (productId && !selectedProduct ? 'Selected' : undefined)} />
+            <SummaryRow label="Template" value={selectedTemplate?.name} />
             <SummaryRow label="Research" value={researchName ? `${researchName} · ${researchMode === 'close' ? 'Stick closely' : 'Inspiration'}` : 'Skipped'} muted={!researchName} />
             <SummaryRow label="Persona" value={selectedPersona?.name} />
             <SummaryRow label="Angle" value={selectedAngle?.title} />
