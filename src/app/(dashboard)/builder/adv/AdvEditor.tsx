@@ -76,21 +76,33 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img'
-/** Apply an op to the node at `path` within a raw slice's HTML; returns the new HTML (unchanged on miss). */
-function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): string {
-  if (!path.length) return html
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style'
+/** Resolve the node at `path` inside a raw slice's HTML; returns {box,node} or null on miss. */
+function rawNodeAt(html: string, path: number[]): { box: HTMLElement; node: HTMLElement } | null {
+  if (!path.length) return null
   const box = document.createElement('div')
   box.innerHTML = html
   let node: HTMLElement = box
-  for (const idx of path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) return html; node = kid }
-  if (node === box) return html
+  for (const idx of path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) return null; node = kid }
+  return node === box ? null : { box, node }
+}
+/** Apply an op to the node at `path` within a raw slice's HTML; returns the new HTML (unchanged on miss).
+ * op 'style' sets/clears one inline CSS property (arg = "prop::value"; empty value removes it) so a piece of
+ * the bespoke template can be restyled (colour, size, padding, margin, background, radius) IN PLACE. */
+function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): string {
+  const hit = rawNodeAt(html, path)
+  if (!hit) return html
+  const { box, node } = hit
   const parent = node.parentElement
   if (op === 'delete') node.remove()
   else if (op === 'hide') node.style.display = node.style.display === 'none' ? '' : 'none'
   else if (op === 'up') { const s = node.previousElementSibling; if (s && parent) parent.insertBefore(node, s) }
   else if (op === 'down') { const s = node.nextElementSibling; if (s && parent) parent.insertBefore(s, node) }
   else if (op === 'img' && arg != null) { const img = node.tagName === 'IMG' ? node : node.querySelector('img'); if (img) img.setAttribute('src', arg) }
+  else if (op === 'style' && arg != null) {
+    const i = arg.indexOf('::'); const prop = arg.slice(0, i); const val = arg.slice(i + 2)
+    if (val) node.style.setProperty(prop, val); else node.style.removeProperty(prop)
+  }
   return box.innerHTML
 }
 
@@ -393,6 +405,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     apply((d) => patchElementContent(d, ref, { html: next }))
     if (op === 'delete') setRawSel(null)
   }, [rawSel, doc, apply])
+  // Set one inline CSS property on the selected raw piece (colour, size, padding, …) — edits the real
+  // template design in place so the look is preserved and every piece is individually styleable.
+  const rawStyle = useCallback((prop: string, value: string) => {
+    if (!rawSel || !doc) return
+    const cur = findElement(doc, rawSel.ref)
+    const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return
+    const next = rawHtmlOp(html, rawSel.path, 'style', `${prop}::${value}`)
+    if (next === html) return
+    const ref = rawSel.ref
+    apply((d) => patchElementContent(d, ref, { html: next }))
+  }, [rawSel, doc, apply])
+  // Current inline value of a CSS prop on the selected raw piece (for the settings panel inputs).
+  const rawStyleVal = useCallback((prop: string): string => {
+    const n = rawNodeEl(); return n ? (n.style.getPropertyValue(prop) || '') : ''
+  }, [rawNodeEl])
 
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
@@ -486,9 +514,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           </div>
         </main>
 
-        {/* ── right: property panel (minimal in Phase 2) ── */}
+        {/* ── right: property panel ── raw sub-selection gets the in-place element settings ── */}
         <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
-          {!sel ? (
+          {rawSel ? (
+            <RawElementSettings key={rawSel.path.join('.')} isImg={rawSel.isImg} getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
+          ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
           ) : (
             <PropertyPanel doc={doc} sel={sel} device={device} onStyle={onStyle} onHidden={onHidden} onContent={onContent} />
@@ -562,6 +592,67 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     </div>
   )
 }
+
+/* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
+ * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
+function RawElementSettings({ isImg, getVal, onStyle, onOp, onClear }: { isImg: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+  const pxNum = (p: string) => { const n = parseFloat(getVal(p)); return isFinite(n) ? n : '' }
+  const NumRow = ({ label, prop, min = 0, max = 120 }: { label: string; prop: string; min?: number; max?: number }) => {
+    const v = pxNum(prop)
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="range" min={min} max={max} value={v === '' ? min : v} onChange={(e) => onStyle(prop, `${e.target.value}px`)} style={{ flex: 1, accentColor: ORANGE }} />
+          <input type="number" value={v} onChange={(e) => onStyle(prop, e.target.value ? `${e.target.value}px` : '')} style={{ width: 56, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, boxSizing: 'border-box' }} />
+        </div>
+      </div>
+    )
+  }
+  const ColorRow = ({ label, prop }: { label: string; prop: string }) => {
+    const v = getVal(prop)
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <input type="color" value={/^#/.test(v) ? v : '#000000'} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: 30, height: 30, border: `1px solid ${LINE}`, borderRadius: 8, background: 'none', cursor: 'pointer' }} />
+          <span style={{ flex: 1, fontSize: 12.5, color: v ? INK : FAINT }}>{v || 'inherit'}</span>
+          {v && <button onClick={() => onStyle(prop, '')} style={{ border: 0, background: 'transparent', color: ORANGE, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>clear</button>}
+        </div>
+      </div>
+    )
+  }
+  return (
+    <div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Item</div>
+        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.1 }}>Edit this piece</div>
+      </div>
+      <div style={{ fontSize: 11.5, color: SUB, background: INSET, borderRadius: 9, padding: '8px 10px', lineHeight: 1.5, marginBottom: 12 }}>
+        Styling the exact piece you clicked — the template design stays intact. <b>Double-click text on the canvas to edit the words.</b>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        {isImg && <button onClick={() => onOp('img')} style={miniActionA}>🖼 Replace image</button>}
+        <button onClick={() => onOp('hide')} style={miniActionA}>👁 Hide/show</button>
+        <button onClick={() => onOp('delete')} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
+      </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Text</div>
+        <ColorRow label="Text color" prop="color" />
+        <NumRow label="Text size" prop="font-size" min={10} max={72} />
+      </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Box</div>
+        <ColorRow label="Background" prop="background-color" />
+        <NumRow label="Padding" prop="padding" max={80} />
+        <NumRow label="Margin top" prop="margin-top" max={80} />
+        <NumRow label="Rounded corners" prop="border-radius" max={60} />
+      </div>
+      <button onClick={onClear} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
+    </div>
+  )
+}
+const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
 
 /* ── Edit Product — the product the page's bound elements read from ── */
 function EditProductModal({ doc, onChange, onClose }: { doc: PageDoc; onChange: (p: Record<string, unknown>) => void; onClose: () => void }) {
