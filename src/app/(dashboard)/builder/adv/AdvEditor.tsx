@@ -47,6 +47,53 @@ function editorProduct(doc: PageDoc): RenderProduct {
 const SECTION_TYPES: Section['type'][] = ['productInfo', 'imageText', 'imageBenefits', 'imageTimeline', 'imagePercentage', 'productDifferences', 'asSeenOn', 'reviewsCarousel', 'recommendedProducts', 'stickyAtc', 'shapeDivider']
 const BLOCK_TYPES: Block['type'][] = ['text', 'media', 'gallery', 'productDetails']
 
+/* ── granular editing inside a `raw` (bespoke-template) section ──────────────────────────────────────
+ * A raw section renders its template slice verbatim (pixel-perfect). To let merchants edit/hide/delete/
+ * move/swap the INDIVIDUAL pieces inside it (not just the whole section), we operate on the slice's HTML:
+ * a click resolves the clicked DOM node to a child-index PATH from the raw root, and each op re-writes the
+ * slice's HTML. Design is preserved (verbatim HTML in, verbatim HTML out) — only the edited node changes. */
+
+/** Snap a clicked node up to the nearest MEANINGFUL item: climb through only-child wrappers (e.g. a lone
+ * <span> inside a pill → the pill) so move/hide/delete act on the piece the user means, not a bare leaf. */
+function snapUp(el: HTMLElement, rawRoot: HTMLElement): HTMLElement {
+  let n = el
+  while (n !== rawRoot && n.parentElement && n.parentElement !== rawRoot && n.parentElement.children.length === 1) {
+    n = n.parentElement
+  }
+  return n
+}
+
+/** Child-index path from `clicked` up to (but excluding) `rawRoot`; null if not a descendant. [] = the root itself. */
+function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null {
+  const path: number[] = []
+  let n: HTMLElement | null = clicked
+  while (n && n !== rawRoot) {
+    const p: HTMLElement | null = n.parentElement
+    if (!p) return null
+    path.unshift(Array.prototype.indexOf.call(p.children, n as HTMLElement))
+    n = p
+  }
+  return n === rawRoot ? path : null
+}
+
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img'
+/** Apply an op to the node at `path` within a raw slice's HTML; returns the new HTML (unchanged on miss). */
+function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): string {
+  if (!path.length) return html
+  const box = document.createElement('div')
+  box.innerHTML = html
+  let node: HTMLElement = box
+  for (const idx of path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) return html; node = kid }
+  if (node === box) return html
+  const parent = node.parentElement
+  if (op === 'delete') node.remove()
+  else if (op === 'hide') node.style.display = node.style.display === 'none' ? '' : 'none'
+  else if (op === 'up') { const s = node.previousElementSibling; if (s && parent) parent.insertBefore(node, s) }
+  else if (op === 'down') { const s = node.nextElementSibling; if (s && parent) parent.insertBefore(s, node) }
+  else if (op === 'img' && arg != null) { const img = node.tagName === 'IMG' ? node : node.querySelector('img'); if (img) img.setAttribute('src', arg) }
+  return box.innerHTML
+}
+
 export default function AdvEditor({ pageId }: { pageId: string }) {
   const [doc, setDoc] = useState<PageDoc | null>(null)
   const [sel, setSel] = useState<NodeRef | null>(null)
@@ -66,6 +113,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [redoDepth, setRedoDepth] = useState(0)
   const [tb, setTb] = useState<null | { top: number; left: number; below: boolean }>(null)
   const [zoom, setZoom] = useState(1)
+  // Sub-selection INSIDE a raw (bespoke-template) section: the raw element + the clicked node's child-path.
+  const [rawSel, setRawSel] = useState<null | { ref: NodeRef; path: number[]; isImg: boolean }>(null)
+  const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
 
   const history = useRef<PageDoc[]>([])
   const future = useRef<PageDoc[]>([])
@@ -203,10 +253,29 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [sel, canvasHtml])
 
   const onCanvasClick = useCallback((e: React.MouseEvent) => {
-    const target = (e.target as HTMLElement).closest('[data-node-id]') as HTMLElement | null
-    if (!target || !doc) { setSel(null); return }
+    const clicked = e.target as HTMLElement
+    const target = clicked.closest('[data-node-id]') as HTMLElement | null
+    if (!target || !doc) { setSel(null); setRawSel(null); return }
     const id = target.getAttribute('data-node-id') || ''
-    const type = (target.getAttribute('data-node-type') || '').split(':')[0]
+    const nodeType = target.getAttribute('data-node-type') || ''
+    const type = nodeType.split(':')[0]
+    // Click INSIDE a raw section on one of its inner pieces → sub-select that piece so it can be moved,
+    // hidden, deleted or (if an image) swapped — granular editing that keeps the template's exact design.
+    if (nodeType === 'element:raw' && clicked !== target) {
+      const item = snapUp(clicked, target)
+      const path = subPathTo(item, target)
+      if (path && path.length) {
+        const isImg = item.tagName === 'IMG' || !!item.querySelector('img')
+        for (const s of doc.sections) for (const b of s.blocks) for (const el of b.elements) if (el.id === id) {
+          setExpanded((x) => { const n = new Set(x); n.add(s.id); n.add(b.id); return n })
+          setSel({ sectionId: s.id, blockId: b.id, elementId: el.id })
+          setRawSel({ ref: { sectionId: s.id, blockId: b.id, elementId: el.id }, path, isImg })
+          return
+        }
+        return
+      }
+    }
+    setRawSel(null)
     // resolve id → NodeRef by walking the model; also expand the tree so the selected node is revealed there
     for (const s of doc.sections) {
       if (s.id === id) { setSel({ sectionId: s.id }); return }
@@ -284,6 +353,46 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     main?.addEventListener('scroll', on, { passive: true }); window.addEventListener('resize', on)
     return () => { main?.removeEventListener('scroll', on); window.removeEventListener('resize', on) }
   }, [measureTb])
+
+  /* ── raw sub-selection toolbar: over the individual piece clicked inside a raw section ── */
+  const rawNodeEl = useCallback((): HTMLElement | null => {
+    const root = canvasRef.current
+    if (!root || !rawSel) return null
+    const rawRoot = root.querySelector(`[data-node-id="${rawSel.ref.elementId}"]`) as HTMLElement | null
+    if (!rawRoot) return null
+    let node: HTMLElement = rawRoot
+    for (const idx of rawSel.path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) return null; node = kid }
+    return node === rawRoot ? null : node
+  }, [rawSel])
+  const measureRawTb = useCallback(() => {
+    const node = rawNodeEl()
+    if (!node) { setRawTb(null); return }
+    const r = node.getBoundingClientRect()
+    const below = r.top < 96
+    setRawTb({ top: below ? r.bottom + 6 : r.top - 6, left: Math.max(8, r.left), below })
+  }, [rawNodeEl])
+  useEffect(() => { measureRawTb() }, [measureRawTb, canvasHtml, device, zoom])
+  useEffect(() => {
+    const main = mainRef.current
+    const on = () => measureRawTb()
+    main?.addEventListener('scroll', on, { passive: true }); window.addEventListener('resize', on)
+    return () => { main?.removeEventListener('scroll', on); window.removeEventListener('resize', on) }
+  }, [measureRawTb])
+  // Drop the raw sub-selection when the main selection moves off the raw element (tree click, etc.).
+  useEffect(() => { if (rawSel && (!sel || sel.elementId !== rawSel.ref.elementId)) setRawSel(null) }, [sel, rawSel])
+  const rawOp = useCallback((op: RawOp) => {
+    if (!rawSel || !doc) return
+    const cur = findElement(doc, rawSel.ref)
+    const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return
+    let arg: string | undefined
+    if (op === 'img') { const url = window.prompt('New image URL'); if (!url || !url.trim()) return; arg = url.trim() }
+    const next = rawHtmlOp(html, rawSel.path, op, arg)
+    if (next === html) return
+    const ref = rawSel.ref
+    apply((d) => patchElementContent(d, ref, { html: next }))
+    if (op === 'delete') setRawSel(null)
+  }, [rawSel, doc, apply])
 
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
@@ -425,7 +534,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         </div>
       )}
 
-      {tb && sel && (
+      {tb && sel && !rawSel && (
         <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
           <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
           <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
@@ -433,6 +542,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>↓</TbBtn>
           {!sel.elementId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
           <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>🗑</TbBtn>
+        </div>
+      )}
+
+      {/* granular toolbar for a piece clicked INSIDE a raw (bespoke-template) section */}
+      {rawTb && rawSel && (
+        <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
+          <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase' }}>Item</span>
+          {rawSel.isImg && <TbBtn title="Replace image" onClick={() => rawOp('img')}>🖼</TbBtn>}
+          <TbBtn title="Move up" onClick={() => rawOp('up')}>↑</TbBtn>
+          <TbBtn title="Move down" onClick={() => rawOp('down')}>↓</TbBtn>
+          <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>👁</TbBtn>
+          <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>🗑</TbBtn>
         </div>
       )}
 
