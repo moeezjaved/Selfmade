@@ -13,6 +13,7 @@ export type SectionType =
   | 'productInfo' | 'stickyAtc' | 'imageBenefits' | 'reviewsCarousel' | 'asSeenOn'
   | 'imageTimeline' | 'imageText' | 'imagePercentage' | 'productDifferences'
   | 'recommendedProducts' | 'shapeDivider'
+  | 'raw'   // a verbatim slice of a bespoke template section (keeps the template's exact design)
 
 export type BlockType =
   | 'gallery' | 'productDetails' | 'title' | 'price' | 'rating' | 'benefitList'
@@ -22,6 +23,7 @@ export type BlockType =
 export type ElementType =
   | 'text' | 'heading' | 'image' | 'video' | 'icon' | 'button' | 'badge'
   | 'divider' | 'stars' | 'countdown' | 'price' | 'bind'
+  | 'raw'   // verbatim HTML from a bespoke template section (content.html); text stays inline-editable
 
 // Product-bound values (read live from the Shopify product; still individually stylable).
 export type ProductBind =
@@ -108,6 +110,7 @@ export interface Section {
   style: StyleProps
   hidden?: boolean
   settings?: Record<string, unknown>
+  name?: string   // human label for the tree (e.g. a bespoke section's heading)
 }
 
 export interface FontSet { heading?: string; body?: string }
@@ -127,6 +130,9 @@ export interface PageDoc {
   theme: { paletteId: string; fonts: FontSet; tokens: DesignTokens }
   settings: { seo?: { title?: string; description?: string }; locale?: string }
   sections: Section[]
+  /** A bespoke template's own CSS, carried with the doc so `raw` sections render pixel-faithfully on the
+   * canvas AND on publish. Only set for template-faithful docs; empty for generic (block-built) docs. */
+  rawCss?: string
 }
 
 // ── StyleProps → CSS ─────────────────────────────────────────────────────────

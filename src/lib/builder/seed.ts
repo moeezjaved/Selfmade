@@ -77,6 +77,7 @@ export const SECTION_BLOCK_PALETTE: Record<Section['type'], Block['type'][]> = {
   productDifferences: ['diffTable', 'text'],
   recommendedProducts: ['productCard', 'text'],
   shapeDivider: ['media'],
+  raw: [], // bespoke-template section — edited in place, not via the add-block menu
 }
 
 // ── repeatable item builders (each item is its own block → reorder/duplicate as a unit in the tree) ──

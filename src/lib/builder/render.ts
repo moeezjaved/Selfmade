@@ -80,6 +80,10 @@ function renderElement(el: Element, tokens: DesignTokens, o: Required<Pick<Rende
       return `<div class="sf-el sf-countdown" data-until="${attr(c.until || '')}"${styleAttr}${idAttr}>${esc(c.text || '')}</div>`
     case 'bind':
       return `<div class="sf-el"${styleAttr}${idAttr}>${esc(c.bind ? bindValue(c.bind, o.product) : '')}</div>`
+    case 'raw':
+      // Verbatim bespoke-template HTML. NOT escaped — this is the template's own markup, rendered as-is
+      // so the design stays pixel-faithful. In edit mode it's a selectable, inline-editable unit.
+      return `<div class="sf-el sf-raw"${styleAttr}${idAttr}>${typeof c.html === 'string' ? c.html : ''}</div>`
     default:
       return `<div class="sf-el"${styleAttr}${idAttr}>${esc(c.text || '')}</div>`
   }
@@ -109,6 +113,12 @@ function renderSection(s: Section, tokens: DesignTokens, o: Required<Pick<Render
   const outerAttr = outerCss ? ` style="${attr(outerCss)}"` : ''
   const innerAttr = innerCss ? ` style="${attr(innerCss)}"` : ''
   const idAttr = o.mode === 'edit' ? ` data-node-id="${attr(s.id)}" data-node-type="section:${attr(s.type)}"` : ''
+  // A raw (bespoke-template) section renders its slice FULL-BLEED — no .sf-section-inner max-width wrapper —
+  // so the template's own bands/wraps keep their exact widths. The bespoke CSS (doc.rawCss) does the rest.
+  if (s.type === 'raw') {
+    const inner = s.blocks.map((b) => renderBlock(b, tokens, o)).join('')
+    return `<section class="sf-section sf-section-raw"${outerAttr}${idAttr}>${inner}</section>`
+  }
   // Shape divider is a decorative section — a full-width SVG wave (color = its background/Primary token).
   const inner = s.type === 'shapeDivider'
     ? `<svg class="sf-shape-divider" viewBox="0 0 1200 70" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg"><path d="M0,32 C240,88 480,0 720,24 C960,48 1080,16 1200,36 L1200,70 L0,70 Z"></path></svg>`
@@ -167,7 +177,10 @@ export function renderDoc(doc: PageDoc, opts: RenderOpts = {}): { html: string; 
   const o = { device: opts.device || 'base', mode: opts.mode || 'publish', product: opts.product } as Required<Pick<RenderOpts, 'device' | 'mode'>> & { product?: RenderProduct }
   const tokens = doc.theme?.tokens || {}
   const body = (doc.sections || []).map((s) => renderSection(s, tokens, o)).join('')
-  return { html: `<div class="sf-page">${body}</div>`, css: baseCss(tokens) }
+  // A template-faithful doc carries the bespoke template's own CSS → append it so `raw` sections render
+  // pixel-identically on the canvas and on publish.
+  const css = doc.rawCss ? `${baseCss(tokens)}\n${doc.rawCss}` : baseCss(tokens)
+  return { html: `<div class="sf-page">${body}</div>`, css }
 }
 
 /** Convenience: a full standalone HTML document (used by the editor iframe + as a publish fallback). */

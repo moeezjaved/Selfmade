@@ -11,11 +11,14 @@
 import { nodeId, type PageDoc, type Section, type Block, type Element, type ProductBind } from './schema'
 import type { PageTemplate, SlotDef, FilledContent, SlotValue, RenderOpts } from './types'
 import { emptyDoc } from './seed'
+import { bodyHtml } from './assemble'
+import { paletteOverrideCss } from './palettes'
+import { splitPageIntoSections } from './shopify-sections'
 
 /* tiny node factories (local so this file doesn't depend on seed's private ones) */
 const el = (type: Element['type'], content: Element['content'], style: Element['style'] = {}): Element => ({ id: nodeId('e'), type, content, style })
 const block = (type: Block['type'], elements: Element[], style: Block['style'] = {}): Block => ({ id: nodeId('b'), type, elements, style })
-const section = (type: Section['type'], blocks: Block[], style: Section['style'] = {}): Section => ({ id: nodeId('s'), type, blocks, style })
+const section = (type: Section['type'], blocks: Block[], style: Section['style'] = {}, name?: string): Section => ({ id: nodeId('s'), type, blocks, style, ...(name ? { name } : {}) })
 
 const str = (v: SlotValue | undefined): string => (typeof v === 'string' ? v : typeof v === 'number' ? String(v) : '')
 const plain = (v: SlotValue | undefined): string => str(v).replace(/\*\*(.+?)\*\*/g, '$1').trim() // drop **bold** markup
@@ -24,6 +27,58 @@ const isHeadKey = (k: string, role?: string) => role === 'headline' || /head|tit
 
 const heading = (text: string, style: Element['style'] = {}) => el('heading', { text }, { fontSize: '22px', fontWeight: 800, ...style })
 const body = (text: string, style: Element['style'] = {}) => el('text', { text }, { color: 'Sub', ...style })
+
+/**
+ * Template-FAITHFUL doc: seed the editor from the template's REAL rendered HTML so the canvas and publish
+ * keep the bespoke design pixel-for-pixel. Each of the template's visual sections becomes one `raw` doc
+ * section (verbatim HTML) — still reorderable / hideable / deletable / duplicable, and its text stays
+ * inline-editable. The template's own CSS travels on `doc.rawCss`. Preferred for any template that has a
+ * `render` + `css`; falls back to the generic block adapter (pageDocFromContent) otherwise.
+ */
+export function pageDocFromTemplate(
+  template: PageTemplate,
+  content: FilledContent,
+  renderOpts?: Partial<RenderOpts>,
+  productRef: PageDoc['productRef'] = {},
+  paletteId = 'greens',
+  editedHtml?: string | null,
+): PageDoc {
+  const palette = renderOpts?.paletteId || paletteId
+  const doc = emptyDoc(productRef, palette)
+  const opts: RenderOpts = {
+    productName: renderOpts?.productName || 'Product',
+    productImage: renderOpts?.productImage || '',
+    priceLabel: renderOpts?.priceLabel || '',
+    ctaHref: renderOpts?.ctaHref || '#',
+    rating: renderOpts?.rating,
+    paletteId: palette,
+  }
+  const body = bodyHtml(template, content || {}, opts, editedHtml)
+  const parts = splitPageIntoSections(body)
+  doc.sections = parts.map((p) => section('raw', [block('group', [el('raw', { html: p.html }, {})], { width: '100%' })], { paddingY: '0' }, p.name))
+  // Carry the template CSS (+ chosen palette) so raw sections render faithfully on canvas and publish.
+  doc.rawCss = `${template.css}\n${paletteOverrideCss(palette) || ''}`.trim()
+
+  // Expose every image URL in the content (+ product photo) so the editor's image control can "pick from product".
+  const imgs: string[] = []
+  const push = (u?: string) => { const s = (u || '').trim(); if (/^https?:\/\//.test(s) && !imgs.includes(s)) imgs.push(s) }
+  push(renderOpts?.productImage)
+  for (const v of Object.values(content || {})) {
+    if (typeof v === 'string') push(v)
+    else if (Array.isArray(v)) for (const it of v) { if (it && typeof it === 'object') { push((it as any).image); push((it as any).thumb) } }
+  }
+  doc.productRef = {
+    ...doc.productRef,
+    importedProduct: {
+      ...(doc.productRef.importedProduct || {}),
+      image: renderOpts?.productImage || doc.productRef.importedProduct?.image || null,
+      images: imgs,
+      ...(renderOpts?.productName ? { title: renderOpts.productName } : {}),
+      ...(renderOpts?.priceLabel ? { price: renderOpts.priceLabel } : {}),
+    },
+  }
+  return doc
+}
 
 /** Build a PageDoc from a template's schema + a page's filled content. Generic across all templates. */
 export function pageDocFromContent(

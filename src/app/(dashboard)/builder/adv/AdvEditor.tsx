@@ -221,19 +221,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const target = (e.target as HTMLElement).closest('[data-node-type^="element:"]') as HTMLElement | null
     if (!target || !doc) return
     const type = (target.getAttribute('data-node-type') || '').split(':')[1]
-    if (!['text', 'heading', 'price', 'button', 'badge'].includes(type)) return
+    if (!['text', 'heading', 'price', 'button', 'badge', 'raw'].includes(type)) return
     const id = target.getAttribute('data-node-id') || ''
     let ref: NodeRef | null = null
     for (const s of doc.sections) for (const b of s.blocks) for (const el of b.elements) if (el.id === id) ref = { sectionId: s.id, blockId: b.id, elementId: el.id }
     if (!ref) return
     const cur = findElement(doc, ref)
     if (cur?.content.bind) return // bound to product — not free-text editable here
+    // A `raw` (bespoke-template) section is edited in place: the whole slice is contentEditable and we save
+    // its innerHTML, so any text on the real design can be changed without leaving the template's layout.
+    const isRaw = type === 'raw'
     target.setAttribute('contenteditable', 'true')
     ;(target as HTMLElement).focus()
     const finish = () => {
       target.removeAttribute('contenteditable')
-      const txt = target.textContent || ''
-      apply((d) => patchElementContent(d, ref!, { text: txt }))
+      if (isRaw) apply((d) => patchElementContent(d, ref!, { html: target.innerHTML }))
+      else apply((d) => patchElementContent(d, ref!, { text: target.textContent || '' }))
       target.removeEventListener('blur', finish)
     }
     target.addEventListener('blur', finish)
@@ -319,7 +322,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                 <TreeRow
                   depth={0} open={open} hasChildren={s.blocks.length > 0}
                   onToggle={() => setExpanded((x) => toggle(x, s.id))}
-                  label={SECTION_LABEL(s.type)} count={descendantCount(s)} hidden={s.hidden}
+                  label={s.name || SECTION_LABEL(s.type)} count={descendantCount(s)} hidden={s.hidden}
                   selected={sameRef(sel, sRef)} onSelect={() => setSel(sRef)}
                   onUp={() => apply((d) => moveNode(d, sRef, -1))} onDown={() => apply((d) => moveNode(d, sRef, 1))}
                   onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sRef); queueMicrotask(() => setSel(newRef)); return nd })}
