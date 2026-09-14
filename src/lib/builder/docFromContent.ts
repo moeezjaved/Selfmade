@@ -69,84 +69,79 @@ export function pageDocFromContent(
   heroBlocks.push(block('productDetails', detailEls, { gap: '12px', direction: 'column', width: heroImg ? '48%' : '100%' }))
   doc.sections.push(section('productInfo', heroBlocks, { paddingY: '32px', direction: 'row', gap: '32px', align: 'start' }))
 
-  // ── remaining slots in schema order → one section per array slot, scalars grouped into text sections ──
-  let textRun: Block[] = []
-  const flushText = () => { if (textRun.length) { doc.sections.push(section('imageText', textRun, { paddingY: '32px', direction: 'column', gap: '16px' })); textRun = [] } }
+  // ── remaining slots → grouped into visual sections ──────────────────────────────────────────────
+  // A new section opens at each heading slot; the content that follows (lists, reviews, paragraphs, …)
+  // accumulates into it until the next heading. This mirrors how the page actually reads AND keeps the
+  // published Shopify section count ≈ the template's real sections. (Before: one section per array slot,
+  // so a dense template blew past Shopify's 25-section limit and couldn't publish after editing.)
   const galleryImgs: Element[] = []
   const videos: Element[] = []
 
-  // Iterate the schema in order, then sweep any content keys the schema didn't declare (schema/content
-  // drift, or a template that under-declares) so no real copy is ever silently dropped.
+  // One slot's value → the block(s) that represent it. Layout comes from the section type + block classes.
+  const contentBlocks = (slot: SlotDef, v: SlotValue): Block[] => {
+    switch (slot.type) {
+      case 'reasons': return arr(v).map((it, i) => { addImg(it.image); return block('benefitList', [
+        el('badge', { text: it.label || `#${i + 1}` }, { background: 'Primary', color: '#fff', paddingX: '10px', paddingY: '4px', radius: '999px', fontSize: '12px', fontWeight: 800 }),
+        heading(plain(it.title) || `Reason ${i + 1}`, { fontSize: '18px' }),
+        ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
+        ...(it.image ? [el('image', { src: it.image, alt: '' }, { radius: '12px', width: '100%' })] : []),
+      ], { direction: 'column', gap: '8px', width: '46%' }) })
+      case 'testimonials': return arr(v).map((it) => block('reviewCard', [
+        el('stars', { stars: 5 }),
+        body(`“${plain(it.quote)}”`, { fontSize: '15px', color: 'Ink' }),
+        heading([it.name, it.city].filter(Boolean).join(' · ') || 'Customer', { fontSize: '14px' }),
+      ], { direction: 'column', gap: '10px', width: '300px', paddingX: '18px', paddingY: '18px', background: 'Paper', radius: '14px' }))
+      case 'timeline': return arr(v).map((it) => block('timelineStep', [
+        el('badge', { text: it.label || 'Step' }, { background: 'Primary', color: '#fff', paddingX: '10px', paddingY: '4px', radius: '999px', fontSize: '12px', fontWeight: 800 }),
+        ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
+        ...(it.thumb ? [el('image', { src: it.thumb, alt: '' }, { radius: '10px', width: '120px' })] : []),
+      ], { direction: 'column', gap: '8px', width: '100%' }))
+      case 'list': case 'costs': {
+        const items = arr(v)
+        if (items.length && items.every((it) => it.label && !it.body)) return [block('logoStrip', items.map((it) => el('badge', { text: it.label || '' }, { background: 'Paper', color: 'Ink', paddingX: '12px', paddingY: '6px', radius: '999px', fontSize: '13px', fontWeight: 700 })), { direction: 'row', gap: '10px', align: 'center', width: '100%' })]
+        return items.map((it) => block('benefitList', [
+          ...(it.label ? [heading(plain(it.label), { fontSize: '16px' })] : []),
+          ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
+        ], { direction: 'column', gap: '6px', width: '46%' }))
+      }
+      case 'faq': return arr(v).map((it) => block('text', [heading(str(it.q), { fontSize: '17px' }), ...(it.a ? [body(plain(it.a), { fontSize: '14px' })] : [])], { direction: 'column', gap: '6px', width: '100%' }))
+      case 'text': case 'richtext': default: { const t = plain(v); return t ? [block('text', [body(t, { color: 'Ink', fontSize: '15px' })], { direction: 'column', width: '100%' })] : [] }
+    }
+  }
+  // Section type → layout: a group led by cards wraps them in a centered row; text-only stays a column.
+  const typeFor = (slot: SlotDef): Section['type'] =>
+    slot.type === 'testimonials' ? 'reviewsCarousel'
+    : slot.type === 'timeline' ? 'imageTimeline'
+    : (slot.type === 'reasons' || slot.type === 'list' || slot.type === 'costs') ? 'imageBenefits'
+    : 'imageText'
+
+  let curBlocks: Block[] | null = null
+  let curType: Section['type'] = 'imageText'
+  const flushCur = () => { if (curBlocks && curBlocks.length) doc.sections.push(section(curType, curBlocks, { paddingY: '40px', direction: 'column', gap: '18px' })); curBlocks = null; curType = 'imageText' }
+
+  // Iterate the schema in order, then sweep any content keys the schema didn't declare so no copy is dropped.
   const extraSlots = inferSchema(Object.fromEntries(Object.entries(c).filter(([k]) => !schema.some((s) => s.key === k))))
   for (const slot of [...schema, ...extraSlots]) {
     if (used.has(slot.key)) continue
     const v = c[slot.key]
     if (v == null || (typeof v === 'string' && !v.trim())) { used.add(slot.key); continue }
     used.add(slot.key)
-    switch (slot.type) {
-      case 'reasons': {
-        flushText()
-        const blocks = arr(v).map((it, i) => { addImg(it.image); return block('benefitList', [
-          el('badge', { text: it.label || `#${i + 1}` }, { background: 'Primary', color: '#fff', paddingX: '10px', paddingY: '4px', radius: '999px', fontSize: '12px', fontWeight: 800 }),
-          heading(plain(it.title) || `Reason ${i + 1}`, { fontSize: '18px' }),
-          ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
-          ...(it.image ? [el('image', { src: it.image, alt: '' }, { radius: '12px', width: '100%' })] : []),
-        ], { direction: 'column', gap: '8px', width: '46%' }) })
-        doc.sections.push(withHead(slot, section('imageBenefits', blocks, { paddingY: '40px' })))
-        break
-      }
-      case 'testimonials': {
-        flushText()
-        const blocks = arr(v).map((it) => block('reviewCard', [
-          el('stars', { stars: 5 }),
-          body(`“${plain(it.quote)}”`, { fontSize: '15px', color: 'Ink' }),
-          heading([it.name, it.city].filter(Boolean).join(' · ') || 'Customer', { fontSize: '14px' }),
-        ], { direction: 'column', gap: '10px', width: '300px', paddingX: '18px', paddingY: '18px', background: 'Paper', radius: '14px' }))
-        doc.sections.push(withHead(slot, section('reviewsCarousel', blocks, { paddingY: '40px' })))
-        break
-      }
-      case 'timeline': {
-        flushText()
-        const blocks = arr(v).map((it) => block('timelineStep', [
-          el('badge', { text: it.label || 'Step' }, { background: 'Primary', color: '#fff', paddingX: '10px', paddingY: '4px', radius: '999px', fontSize: '12px', fontWeight: 800 }),
-          ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
-          ...(it.thumb ? [el('image', { src: it.thumb, alt: '' }, { radius: '10px', width: '120px' })] : []),
-        ], { direction: 'column', gap: '8px', width: '100%' }))
-        doc.sections.push(withHead(slot, section('imageTimeline', blocks, { paddingY: '40px' })))
-        break
-      }
-      case 'list': case 'costs': {
-        flushText()
-        const items = arr(v)
-        const shortLabels = items.every((it) => it.label && !it.body) // pill-style label-only list
-        if (shortLabels) {
-          doc.sections.push(withHead(slot, section('asSeenOn', [block('logoStrip', items.map((it) => el('badge', { text: it.label || '' }, { background: 'Paper', color: 'Ink', paddingX: '12px', paddingY: '6px', radius: '999px', fontSize: '13px', fontWeight: 700 })), { direction: 'row', gap: '10px', align: 'center', width: '100%' })], { paddingY: '24px' })))
-        } else {
-          const blocks = items.map((it) => block('benefitList', [
-            ...(it.label ? [heading(plain(it.label), { fontSize: '16px' })] : []),
-            ...(it.body ? [body(plain(it.body), { fontSize: '14px' })] : []),
-          ], { direction: 'column', gap: '6px', width: '46%' }))
-          doc.sections.push(withHead(slot, section('imageBenefits', blocks, { paddingY: '36px' })))
-        }
-        break
-      }
-      case 'faq': {
-        flushText()
-        const blocks = arr(v).map((it) => block('text', [heading(str(it.q), { fontSize: '17px' }), ...(it.a ? [body(plain(it.a), { fontSize: '14px' })] : [])], { direction: 'column', gap: '6px', width: '100%' }))
-        doc.sections.push(withHead(slot, section('imageText', blocks, { paddingY: '32px', direction: 'column', gap: '14px' })))
-        break
-      }
-      case 'image': addImg(str(v)); galleryImgs.push(el('image', { src: str(v), alt: slot.label || '' }, { radius: '12px', width: '31%' })); break
-      case 'video': videos.push(el('video', { src: str(v) }, { radius: '12px', width: '31%' })); break
-      case 'number': break // skip bare numbers (countdown handled elsewhere)
-      case 'text': case 'richtext': default: {
-        const t = plain(v)
-        if (t) textRun.push(block('text', [isHeadKey(slot.key, slot.role) ? heading(t, { fontSize: '20px' }) : body(t, { color: 'Ink', fontSize: '15px' })], { direction: 'column', width: '100%' }))
-        break
-      }
+    if (slot.type === 'image') { addImg(str(v)); galleryImgs.push(el('image', { src: str(v), alt: slot.label || '' }, { radius: '12px', width: '31%' })); continue }
+    if (slot.type === 'video') { videos.push(el('video', { src: str(v) }, { radius: '12px', width: '31%' })); continue }
+    if (slot.type === 'number') continue // skip bare numbers (countdown handled elsewhere)
+    // A heading slot opens a new section — its text becomes the section title.
+    if ((slot.type === 'text' || slot.type === 'richtext') && isHeadKey(slot.key, slot.role)) {
+      flushCur()
+      curBlocks = []
+      const t = plain(v)
+      if (t) curBlocks.push(block('text', [heading(t, { fontSize: '26px', letterSpacing: 'tight', textAlign: 'center' })], { width: '100%', align: 'center' }))
+      continue
     }
+    if (!curBlocks) curBlocks = []
+    if (curType === 'imageText') curType = typeFor(slot)
+    curBlocks.push(...contentBlocks(slot, v))
   }
-  flushText()
+  flushCur()
   if (galleryImgs.length) doc.sections.push(section('recommendedProducts', [block('media', galleryImgs, { direction: 'row', gap: '14px', width: '100%' })], { paddingY: '32px' }))
   if (videos.length) doc.sections.push(section('reviewsCarousel', [block('media', videos, { direction: 'row', gap: '14px', width: '100%' })], { paddingY: '32px' }))
 
@@ -163,14 +158,6 @@ export function pageDocFromContent(
   }
 
   return doc
-}
-
-/** Prefix an array section with a heading block if the schema slot has a human label worth showing. */
-function withHead(slot: SlotDef, s: Section): Section {
-  const title = (slot.label || '').trim()
-  if (!title || /image|logo|video/i.test(title)) return s
-  const head = block('text', [heading(title, { fontSize: '26px', letterSpacing: 'tight', textAlign: 'center' })], { width: '100%', align: 'center' })
-  return { ...s, blocks: [head, ...s.blocks] }
 }
 
 /** Fallback when a page has content but no known template — infer minimal slots from the content keys. */
