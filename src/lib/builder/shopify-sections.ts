@@ -19,6 +19,13 @@
 
 const FONT_IMPORT = "@import url('https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');\n"
 
+// Merchant themes ship low-specificity utility classes on generic names we also use (e.g. a `.grid` that
+// sets `grid-template-areas:"column-0 … column-13"` — a 12/14-col layout system). That bleeds into our
+// sections and forces our two-column grids to 14 content-sized tracks, collapsing the layout to the left
+// (QA: "on one side not in center"). None of our templates use grid areas, so neutralise any inherited
+// ones on every classed element inside .pgbld. Specificity (0,2,0) beats a bare `.grid` even with !important.
+const THEME_GUARD = '.pgbld [class]{grid-template-areas:none!important}\n'
+
 export type PageKind = 'product' | 'home' | 'advertorial' | 'listicle'
 export type PageSection = { key: string; name: string; html: string }
 export type ThemeAssets = {
@@ -910,7 +917,7 @@ ${JSON.stringify({
 export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: string; body: string; templateSuffix: string; dynamic?: DynamicMode }): ThemeAssets {
   const slug = `sf-${opts.pageId.replace(/[^a-z0-9]/gi, '').slice(0, 12)}`
   const cssKey = `assets/${slug}.css`
-  const cssValue = FONT_IMPORT + opts.css
+  const cssValue = FONT_IMPORT + THEME_GUARD + opts.css
   const parts = splitPageIntoSections(opts.body)
   // Product templates get live `{{ product.* }}` data + a real Add-to-Cart form.
   const dyn: DynamicMode = opts.kind === 'product' ? (opts.dynamic || 'none') : 'none'
