@@ -143,12 +143,17 @@ function baseCss(tokens: DesignTokens): string {
 
 /* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
 /* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */
+/* card/grid sections lay out as a centered wrapping ROW — !important so a section's inline
+   direction:column (set by the adapter) can't collapse the grid into a single stacked column. */
 .sf-section-imageBenefits .sf-section-inner,
 .sf-section-reviewsCarousel .sf-section-inner,
 .sf-section-imagePercentage .sf-section-inner,
 .sf-section-recommendedProducts .sf-section-inner,
 .sf-section-productDifferences .sf-section-inner,
-.sf-section-imageTimeline .sf-section-inner{display:flex;flex-wrap:wrap;justify-content:center;align-items:stretch;gap:22px}
+.sf-section-imageText .sf-section-inner,
+.sf-section-imageTimeline .sf-section-inner{display:flex!important;flex-direction:row!important;flex-wrap:wrap!important;justify-content:center;align-items:stretch;gap:22px}
+/* a full-width child (a section heading, a paragraph) always sits on its own line above the grid */
+.sf-section-imageText .sf-section-inner > .sf-block-text{flex:1 1 100%}
 /* sticky add-to-cart bar */
 .sf-section-stickyAtc{position:sticky;bottom:0;z-index:5;border-top:1px solid var(--sf-line,#e7e3dd);box-shadow:0 -6px 20px -12px rgba(20,18,15,.3)}
 .sf-block-atc{display:flex;align-items:center;gap:14px;width:100%}
@@ -169,6 +174,28 @@ function baseCss(tokens: DesignTokens): string {
 /* shape divider */
 .sf-shape-divider{display:block;width:100%;height:70px}
 .sf-shape-divider path{fill:var(--sf-primary,#e02f06)}
+
+/* ── polished, PagePilot-style defaults (element inline styles still override these) ── */
+.sf-heading{color:var(--sf-ink,#1b1a17);font-weight:800;text-wrap:balance;line-height:1.16}
+.sf-text{color:var(--sf-sub,#5b5750);line-height:1.6}
+.sf-img{border-radius:14px;object-fit:cover}
+.sf-btn{font-weight:800;border-radius:999px;padding:14px 26px}
+/* a heading-led section title block: centered, roomy */
+.sf-section-inner > .sf-block-text:first-child .sf-heading{font-size:30px;text-align:center;margin:0 auto 4px}
+/* cards: reviews / product / feature groups read as tidy cards */
+.sf-block-reviewCard,.sf-block-productCard{background:#fff;border:1px solid var(--sf-line,#e7e3dd);border-radius:16px;padding:20px 18px;box-shadow:0 2px 10px -6px rgba(20,18,15,.18)}
+/* benefit cards: soft tinted tile so a benefits grid looks designed, not a bare list */
+.sf-block-benefitList{background:var(--sf-paper,#faf9f7);border:1px solid var(--sf-line,#e7e3dd);border-radius:16px;padding:20px 16px;gap:8px}
+/* image blocks/galleries: never a lonely column — wrap into a centered responsive grid */
+.sf-block-media,.sf-block-gallery{display:flex;flex-wrap:wrap;justify-content:center;gap:14px}
+.sf-block-media .sf-img,.sf-block-gallery .sf-img{flex:1 1 220px;max-width:320px;aspect-ratio:1/1}
+/* card images stay a tidy banner, not a giant square that turns the card into a column of photos */
+.sf-block-benefitList .sf-img,.sf-block-reviewCard .sf-img,.sf-block-timelineStep .sf-img,.sf-block-productCard .sf-img{max-height:190px;object-fit:cover}
+/* alternating section bands give vertical rhythm like a designed page */
+.sf-page > .sf-section:nth-of-type(even){background:var(--sf-paper,#faf9f7)}
+.sf-section-productInfo{background:transparent!important}
+/* hero: two balanced columns, comfortably centered */
+.sf-section-productInfo .sf-section-inner{gap:40px;align-items:center;flex-wrap:wrap}
 `.trim()
 }
 

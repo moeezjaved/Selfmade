@@ -179,6 +179,15 @@ export function pageDocFromContent(
   // clean section, not piled together, so the editor reads like PagePilot (one coherent block group per
   // section) instead of one 20+-block dumping ground.
   const isGroupSlot = (t: SlotDef['type']) => t === 'reasons' || t === 'testimonials' || t === 'timeline' || t === 'list' || t === 'costs' || t === 'faq'
+  // A readable section title for a heading-less content group — by kind first, else the slot's own label.
+  const sectionNameFor = (slot: SlotDef): string => {
+    if (slot.type === 'testimonials') return 'Reviews'
+    if (slot.type === 'faq') return 'FAQ'
+    if (slot.type === 'timeline') return 'How it works'
+    if (slot.type === 'costs') return 'Comparison'
+    const raw = (slot.label || slot.key || 'Section').replace(/[_-]+/g, ' ').replace(/\b\w/g, (m) => m.toUpperCase()).trim()
+    return raw.length > 40 ? raw.slice(0, 40) : raw
+  }
 
   // Iterate the schema in order, then sweep any content keys the schema didn't declare so no copy is dropped.
   const extraSlots = inferSchema(Object.fromEntries(Object.entries(c).filter(([k]) => !schema.some((s) => s.key === k))))
@@ -205,6 +214,9 @@ export function pageDocFromContent(
     // (keeps each list/reviews/comparison as its own tidy section).
     if (isGroupSlot(slot.type) && curHasBody) flushCur()
     if (!curBlocks) curBlocks = []
+    // Name a heading-less section from its content slot so the tree/Shopify never shows a bare "Image with
+    // Benefits" — a review group → "Reviews", a comparison → "Comparison", else the slot's own label.
+    if (!curName) curName = sectionNameFor(slot)
     if (curType === 'imageText') curType = typeFor(slot)
     curBlocks.push(...blocks)
     // Only a GROUP (list/reviews/…) marks the section as "already holds a group" — a plain subhead does
