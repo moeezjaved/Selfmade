@@ -7,6 +7,7 @@ import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { resolveStore, shopifyRest, tokenFor, fetchAccessScopes, hasProductWriteScope, type StoreRow } from '@/lib/shopify/client'
 import { getTemplate } from '@/lib/builder/templates'
 import { bodyHtml } from '@/lib/builder/assemble'
+import { pageDocFromTemplate } from '@/lib/builder/docFromContent'
 import { paletteOverrideCss } from '@/lib/builder/palettes'
 import { publishToTheme, type ThemeTarget } from '@/lib/builder/publish-theme'
 import { renderDocForPublish, type RenderProduct } from '@/lib/builder/render'
@@ -35,7 +36,22 @@ export async function POST(req: NextRequest) {
   const tpl = getTemplate(row.template_id)
   // The advanced editor's PageDoc is a source of truth on its own — publish it even for a page whose
   // template isn't in code. Only require a template when there's no doc to render from.
-  const rowDoc = row.doc as PageDoc | undefined
+  let rowDoc = row.doc as PageDoc | undefined
+  const bespoke = !!(tpl && typeof tpl.render === 'function' && tpl.css)
+  // A STALE doc (pre-faithful: no rawCss) or a missing/empty doc on a bespoke-template page must NOT publish
+  // through the generic doc path — that drops the template's scoped `.pgbld` layout (→ compressed/overlapping
+  // on the live page) and over-splits into opaque blocks. The editor seeds a template-faithful doc on load
+  // but doesn't persist it, so the stored doc can lag behind what the merchant sees. Re-seed the faithful doc
+  // here so publish always renders the real design as independent, editable native sections. A VALID faithful
+  // doc (rawCss + real sections, carrying the merchant's edits) is kept as-is.
+  const staleDoc = !!rowDoc && !(rowDoc as any).rawCss && bespoke
+  const emptyDoc = !rowDoc || !Array.isArray(rowDoc.sections) || rowDoc.sections.length === 0
+  if (bespoke && (staleDoc || emptyDoc)) {
+    const palette = (row.render_opts && (row.render_opts as any).paletteId) || 'greens'
+    try {
+      rowDoc = pageDocFromTemplate(tpl!, row.content || {}, row.render_opts || undefined, { productId: row.product_id || undefined }, palette, row.edited_html)
+    } catch { /* fall back to the direct-template render below */ }
+  }
   const hasDoc = !!rowDoc && Array.isArray(rowDoc.sections) && rowDoc.sections.length > 0
   if (!tpl && !hasDoc) return NextResponse.json({ error: 'unknown_template' }, { status: 400 })
 

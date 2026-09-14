@@ -49,7 +49,15 @@ export async function GET(req: NextRequest) {
   } catch {
     doc = starterProductDoc({ productId: row.product_id || undefined })
   }
-  return NextResponse.json({ doc, version: 0, seeded: true })
+  // Persist the seed/upgrade so the stored doc matches what the editor shows AND what publish will render.
+  // Without this, a stale/missing doc stays in the DB — the merchant sees the faithful design in the editor
+  // but publish reads the stale doc and ships a broken layout. Best-effort; never fail the load on it.
+  try {
+    await admin.from('builder_pages')
+      .update({ doc: { ...doc, version: row.doc_version || 0 }, doc_edited_at: new Date().toISOString() })
+      .eq('id', pageId)
+  } catch { /* persistence is best-effort — the editor still works from the returned doc */ }
+  return NextResponse.json({ doc, version: row.doc_version || 0, seeded: true })
 }
 
 export async function PUT(req: NextRequest) {
