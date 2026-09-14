@@ -76,7 +76,15 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert'
+// Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
+const RAW_INSERTS: { id: string; label: string; html: string }[] = [
+  { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
+  { id: 'text', label: 'Text', html: '<div class="wrap" style="padding:6px 0"><p style="font-size:15px;line-height:1.6;text-align:center;margin:8px auto;max-width:640px;color:#5b5750">New paragraph — double-click to edit this text.</p></div>' },
+  { id: 'image', label: 'Image', html: '<div class="wrap" style="padding:6px 0;text-align:center"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="max-width:100%;border-radius:14px"></div>' },
+  { id: 'button', label: 'Button', html: '<div class="wrap" style="padding:10px 0;text-align:center"><a href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Button</a></div>' },
+  { id: 'divider', label: 'Divider', html: '<div class="wrap" style="padding:6px 0"><hr style="border:0;border-top:1px solid #e7e3dd;margin:14px 0"></div>' },
+]
 /** Resolve the node at `path` inside a raw slice's HTML; returns {box,node} or null on miss. */
 function rawNodeAt(html: string, path: number[]): { box: HTMLElement; node: HTMLElement } | null {
   if (!path.length) return null
@@ -103,6 +111,18 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
     const i = arg.indexOf('::'); const prop = arg.slice(0, i); const val = arg.slice(i + 2)
     if (val) node.style.setProperty(prop, val); else node.style.removeProperty(prop)
   }
+  else if (op === 'insert' && arg != null) node.insertAdjacentHTML('afterend', arg)
+  return box.innerHTML
+}
+/** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
+function rawHtmlMove(html: string, from: number[], to: number[], after: boolean): string {
+  const box = document.createElement('div')
+  box.innerHTML = html
+  const at = (path: number[]): HTMLElement | null => { let n: HTMLElement = box; for (const i of path) { const k = n.children[i] as HTMLElement | undefined; if (!k) return null; n = k } return n === box ? null : n }
+  const src = at(from), dst = at(to)
+  if (!src || !dst || src === dst || !dst.parentElement) return html
+  if (src.contains(dst)) return html
+  dst.parentElement.insertBefore(src, after ? dst.nextSibling : dst)
   return box.innerHTML
 }
 
@@ -128,6 +148,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Sub-selection INSIDE a raw (bespoke-template) section: the raw element + the clicked node's child-path.
   const [rawSel, setRawSel] = useState<null | { ref: NodeRef; path: number[]; isImg: boolean }>(null)
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
+  const [rawAddOpen, setRawAddOpen] = useState(false)          // the "add a piece" menu for a raw section
+  const rawDrag = useRef<number[] | null>(null)                // path of the raw piece being dragged
 
   const history = useRef<PageDoc[]>([])
   const future = useRef<PageDoc[]>([])
@@ -392,6 +414,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [measureRawTb])
   // Drop the raw sub-selection when the main selection moves off the raw element (tree click, etc.).
   useEffect(() => { if (rawSel && (!sel || sel.elementId !== rawSel.ref.elementId)) setRawSel(null) }, [sel, rawSel])
+  useEffect(() => { if (!rawSel) setRawAddOpen(false) }, [rawSel])
+  // Make the selected raw piece draggable so it can be dragged to reorder among its siblings.
+  useEffect(() => { const n = rawNodeEl(); if (n) { n.setAttribute('draggable', 'true'); return () => n.removeAttribute('draggable') } }, [rawNodeEl, canvasHtml])
   const rawOp = useCallback((op: RawOp) => {
     if (!rawSel || !doc) return
     const cur = findElement(doc, rawSel.ref)
@@ -421,6 +446,47 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const rawStyleVal = useCallback((prop: string): string => {
     const n = rawNodeEl(); return n ? (n.style.getPropertyValue(prop) || '') : ''
   }, [rawNodeEl])
+  // Insert a ready-made piece right AFTER the selected raw piece (a sibling), then keep design intact.
+  const rawInsert = useCallback((insertHtml: string) => {
+    if (!rawSel || !doc) return
+    const cur = findElement(doc, rawSel.ref)
+    const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return
+    const next = rawHtmlOp(html, rawSel.path, 'insert', insertHtml)
+    if (next === html) return
+    const ref = rawSel.ref
+    apply((d) => patchElementContent(d, ref, { html: next }))
+  }, [rawSel, doc, apply])
+  // Drag-reorder a raw piece: move the dragged path to before/after the drop-target path.
+  const rawMove = useCallback((fromPath: number[], toPath: number[], after: boolean) => {
+    if (!rawSel || !doc) return
+    const cur = findElement(doc, rawSel.ref)
+    const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return
+    const next = rawHtmlMove(html, fromPath, toPath, after)
+    if (next === html) return
+    const ref = rawSel.ref
+    apply((d) => patchElementContent(d, ref, { html: next }))
+  }, [rawSel, doc, apply])
+  // Drag-to-reorder a raw piece on the canvas: grab the selected piece, drop it on a sibling.
+  const onCanvasDragStart = useCallback((e: React.DragEvent) => {
+    if (!rawSel) return
+    rawDrag.current = rawSel.path
+    try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'raw') } catch { /* noop */ }
+  }, [rawSel])
+  const onCanvasDragOver = useCallback((e: React.DragEvent) => { if (rawDrag.current) e.preventDefault() }, [])
+  const onCanvasDrop = useCallback((e: React.DragEvent) => {
+    const from = rawDrag.current; rawDrag.current = null
+    if (!from || !rawSel) return
+    e.preventDefault()
+    const root = canvasRef.current?.querySelector(`[data-node-id="${rawSel.ref.elementId}"]`) as HTMLElement | null
+    if (!root) return
+    const item = snapUp(e.target as HTMLElement, root)
+    const toPath = subPathTo(item, root)
+    if (!toPath || !toPath.length) return
+    const r = item.getBoundingClientRect()
+    rawMove(from, toPath, e.clientY > r.top + r.height / 2)
+  }, [rawSel, rawMove])
 
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
@@ -510,7 +576,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── center: live canvas ── */}
         <main ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
           <div style={{ zoom, width: canvasWidth, background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
-            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
+            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} onDragStart={onCanvasDragStart} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
           </div>
         </main>
 
@@ -582,8 +648,17 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           {rawSel.isImg && <TbBtn title="Replace image" onClick={() => rawOp('img')}>🖼</TbBtn>}
           <TbBtn title="Move up" onClick={() => rawOp('up')}>↑</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>↓</TbBtn>
+          <TbBtn title="Add a piece after this" onClick={() => setRawAddOpen((o) => !o)}>＋</TbBtn>
           <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>👁</TbBtn>
           <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>🗑</TbBtn>
+          {rawAddOpen && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px -8px rgba(20,18,15,.35)', padding: 6, display: 'flex', flexDirection: 'column', minWidth: 130, zIndex: 32 }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.06em', padding: '2px 8px 4px' }}>Add a piece</div>
+              {RAW_INSERTS.map((it) => (
+                <button key={it.id} onClick={() => { rawInsert(it.html); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
