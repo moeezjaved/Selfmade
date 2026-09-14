@@ -221,10 +221,10 @@ export default function BuilderPage() {
       setProducts(j.products || [])
     } catch (e: any) { setProdErr(e?.message || 'Could not load products') }
   }, [])
-  // debounce product search; only fetch once the user reaches step 2
+  // debounce product search; only fetch on the Product step (step 1 since the Product→Template reorder)
   const prodLoaded = useRef(false)
   useEffect(() => {
-    if (step !== 2) return
+    if (step !== 1) return
     const t = setTimeout(() => loadProducts(q), prodLoaded.current ? 300 : 0)
     prodLoaded.current = true
     return () => clearTimeout(t)
