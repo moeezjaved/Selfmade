@@ -172,7 +172,13 @@ export function pageDocFromContent(
 
   let curBlocks: Block[] | null = null
   let curType: Section['type'] = 'imageText'
-  const flushCur = () => { if (curBlocks && curBlocks.length) doc.sections.push(section(curType, curBlocks, { paddingY: '40px', direction: 'column', gap: '18px' })); curBlocks = null; curType = 'imageText' }
+  let curName: string | undefined                 // section title (from its heading) → readable tree + Shopify
+  let curHasBody = false                           // did a non-heading content group land in this section yet?
+  const flushCur = () => { if (curBlocks && curBlocks.length) doc.sections.push(section(curType, curBlocks, { paddingY: '40px', direction: 'column', gap: '18px' }, curName)); curBlocks = null; curType = 'imageText'; curName = undefined; curHasBody = false }
+  // Array-shaped content (a benefits list, reviews, a comparison, …) — each such group should be its OWN
+  // clean section, not piled together, so the editor reads like PagePilot (one coherent block group per
+  // section) instead of one 20+-block dumping ground.
+  const isGroupSlot = (t: SlotDef['type']) => t === 'reasons' || t === 'testimonials' || t === 'timeline' || t === 'list' || t === 'costs' || t === 'faq'
 
   // Iterate the schema in order, then sweep any content keys the schema didn't declare so no copy is dropped.
   const extraSlots = inferSchema(Object.fromEntries(Object.entries(c).filter(([k]) => !schema.some((s) => s.key === k))))
@@ -189,12 +195,21 @@ export function pageDocFromContent(
       flushCur()
       curBlocks = []
       const t = plain(v)
+      curName = t || undefined
       if (t) curBlocks.push(block('text', [heading(t, { fontSize: '26px', letterSpacing: 'tight', textAlign: 'center' })], { width: '100%', align: 'center' }))
       continue
     }
+    const blocks = contentBlocks(slot, v)
+    if (!blocks.length) continue
+    // Start a fresh section when a NEW group would otherwise pile onto a section that already holds a group
+    // (keeps each list/reviews/comparison as its own tidy section).
+    if (isGroupSlot(slot.type) && curHasBody) flushCur()
     if (!curBlocks) curBlocks = []
     if (curType === 'imageText') curType = typeFor(slot)
-    curBlocks.push(...contentBlocks(slot, v))
+    curBlocks.push(...blocks)
+    // Only a GROUP (list/reviews/…) marks the section as "already holds a group" — a plain subhead does
+    // not, so a heading + subhead + its first list stay together; a SECOND group opens a fresh section.
+    if (isGroupSlot(slot.type)) curHasBody = true
   }
   flushCur()
   if (galleryImgs.length) doc.sections.push(section('recommendedProducts', [block('media', galleryImgs, { direction: 'row', gap: '14px', width: '100%' })], { paddingY: '32px' }))
