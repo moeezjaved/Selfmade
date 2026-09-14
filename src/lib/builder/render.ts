@@ -189,10 +189,52 @@ export function renderDocHtml(doc: PageDoc, opts: RenderOpts = {}): string {
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${html}</body></html>`
 }
 
+/** Return the inner HTML of the first `.pgbld` wrapper (depth-balanced), else the html unchanged. Used to
+ * peel a faithful raw slice (`<div class="pgbld">…</div>`) back to its bare template markup for publish. */
+function pgbldInner(html: string): string {
+  const open = /<(\w+)([^>]*\bclass=["'][^"']*\bpgbld\b[^"']*["'][^>]*)>/i.exec(html)
+  if (!open) return html
+  const tag = open[1].toLowerCase()
+  const start = open.index + open[0].length
+  let depth = 1
+  const re = new RegExp(`<(/?)(${tag})\\b[^>]*?(/?)>`, 'gi')
+  re.lastIndex = start
+  let m: RegExpExecArray | null
+  while ((m = re.exec(html))) {
+    if (m[3] === '/') continue
+    if (m[1] === '/') { if (--depth === 0) return html.slice(start, m.index) } else depth++
+  }
+  return html.slice(start)
+}
+
+/** Collect the raw HTML carried by a section's `raw` elements (a faithful template slice). */
+function sectionRawHtml(s: Section): string {
+  const out: string[] = []
+  for (const b of s.blocks || []) for (const e of b.elements || []) {
+    if (e.type === 'raw' && typeof (e.content as any)?.html === 'string') out.push((e.content as any).html)
+  }
+  return out.join('')
+}
+
 /** Render the doc for Shopify publish: body + css where each <section> becomes an editable native theme
  * section. The wrapper is renamed to `pgbld` so shopify-sections.splitPageIntoSections() splits per section
  * (matching every other builder template's publish path — canonical structure / native-theme editability). */
 export function renderDocForPublish(doc: PageDoc, product?: RenderProduct): { body: string; css: string } {
+  // A template-faithful doc is a set of `raw` sections, each carrying one original template slice
+  // (`<div class="pgbld">…</div>`, with any inline text edits baked in). Publishing those slices wrapped in
+  // the editor's own sf-section/sf-raw scaffolding gives the page an EXTRA nesting layer, and the theme's
+  // section-style controls (which target `.pgbld > :first-child` / `.pgbld .wrap`) then hit those wrappers
+  // instead of the real bands — collapsing the hero grid ("compressed to the left / overlapping", QA). So
+  // for a faithful doc we reconstruct the template's NATIVE body (the slices concatenated back into one
+  // `.pgbld`), making publish byte-identical to the direct-template path that renders correctly — while the
+  // per-section split still yields independent, editable Shopify sections.
+  const sections = doc.sections || []
+  const visible = sections.filter((s) => !s.hidden)
+  const allRaw = visible.length > 0 && visible.every((s) => s.type === 'raw' && !!sectionRawHtml(s))
+  if (doc.rawCss && allRaw) {
+    const inner = visible.map((s) => pgbldInner(sectionRawHtml(s)).trim()).filter(Boolean).join('\n')
+    return { body: `<div class="pgbld">${inner}</div>`, css: doc.rawCss }
+  }
   const { html, css } = renderDoc(doc, { mode: 'publish', device: 'base', product })
   const body = html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')
   return { body, css }
