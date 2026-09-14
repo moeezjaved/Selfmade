@@ -915,7 +915,16 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
   // Product templates get live `{{ product.* }}` data + a real Add-to-Cart form.
   const dyn: DynamicMode = opts.kind === 'product' ? (opts.dynamic || 'none') : 'none'
 
-  const sections = parts.map((p, i) => {
+  // Shopify caps a JSON template at 25 sections. A dense template (or a PageDoc with many sections) can
+  // split into more than that, which makes the whole publish 502 ("sections/order: must have a maximum of
+  // 25"). Keep every section that fits, then merge the overflow tail into ONE trailing section so the page
+  // still publishes with all its content — those merged sections just edit together in the customizer.
+  const CAP = opts.kind === 'product' && dyn !== 'none' ? 24 : 25 // leave a slot for the recommendations section
+  const capped = parts.length > CAP
+    ? [...parts.slice(0, CAP - 1), { key: parts[CAP - 1].key, name: parts[CAP - 1].name, html: parts.slice(CAP - 1).map((p) => p.html).join('\n') }]
+    : parts
+
+  const sections = capped.map((p, i) => {
     const key = `${slug}-${i + 1}`
     // The product buy-box slice → a native main-product section composed of theme BLOCKS (add/remove/
     // reorder + @app). Every other slice → the normal dynamize + editablize pipeline.
