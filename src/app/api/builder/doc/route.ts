@@ -26,13 +26,16 @@ export async function GET(req: NextRequest) {
     .select('id, user_id, template_id, type, product_id, product_name, content, render_opts, edited_html, doc, doc_version').eq('id', pageId).maybeSingle()
   if (!row || row.user_id !== user.id) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  if (row.doc) return NextResponse.json({ doc: row.doc, version: row.doc_version || 0, seeded: false })
-
-  // No structured doc yet — seed one. Preferred path: TEMPLATE-FAITHFUL — render the page's real template
-  // and keep each visual section as a verbatim (still editable) `raw` section, so the bespoke design is
-  // preserved through editing AND publishing. Falls back to the generic block adapter (any template's
-  // schema+content), then to a product starter.
   const tpl = getTemplate(row.template_id)
+  const bespoke = !!(tpl && typeof tpl.render === 'function' && tpl.css)
+  // A pre-faithful generic doc (no rawCss) on a page that HAS a bespoke template is stale — the editor
+  // wouldn't match the live page and it over-splits on publish. Upgrade it to the template-faithful render.
+  const stale = !!row.doc && !(row.doc as any).rawCss && bespoke
+  if (row.doc && !stale) return NextResponse.json({ doc: row.doc, version: row.doc_version || 0, seeded: false })
+
+  // Seed (or re-seed a stale doc). Preferred path: TEMPLATE-FAITHFUL — render the page's real template and
+  // keep each visual section as a verbatim (still editable) `raw` section, so the bespoke design is
+  // preserved through editing AND publishing. Falls back to the generic block adapter, then a starter.
   const palette = (row.render_opts && (row.render_opts as any).paletteId) || 'greens'
   let doc: PageDoc
   try {

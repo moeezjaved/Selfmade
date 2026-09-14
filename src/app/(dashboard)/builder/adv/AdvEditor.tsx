@@ -53,6 +53,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [device, setDevice] = useState<Device>('base')
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
   const [status, setStatus] = useState<'idle' | 'loading' | 'saving' | 'saved' | 'error'>('loading')
+  const [dirty, setDirty] = useState(false)   // unsaved changes (Save is manual — no autosave)
   const [err, setErr] = useState('')
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
   const [drag, setDrag] = useState<NodeRef | null>(null)   // node being dragged in the tree
@@ -70,7 +71,6 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const future = useRef<PageDoc[]>([])
   const canvasRef = useRef<HTMLDivElement | null>(null)
   const mainRef = useRef<HTMLElement | null>(null)
-  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const version = useRef(0)
   const syncDepth = () => { setHistDepth(history.current.length); setRedoDepth(future.current.length) }
 
@@ -85,41 +85,39 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return () => { live = false }
   }, [pageId])
 
-  /* ── autosave (debounced) ── */
-  const save = useCallback((next: PageDoc) => {
-    if (saveTimer.current) clearTimeout(saveTimer.current)
-    saveTimer.current = setTimeout(async () => {
-      setStatus('saving')
-      try {
-        const r = await fetch('/api/builder/doc', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, doc: next }) })
-        const d = await r.json()
-        if (d?.error) throw new Error(d.error)
-        version.current = d.version || version.current + 1
-        setStatus('saved'); setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 1500)
-      } catch { setStatus('error') }
-    }, 700)
-  }, [pageId])
+  /* ── explicit save (NO autosave — changes persist only when the user clicks Save) ── */
+  const saveNow = useCallback(async () => {
+    if (!doc) return
+    setStatus('saving')
+    try {
+      const r = await fetch('/api/builder/doc', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, doc }) })
+      const d = await r.json()
+      if (d?.error) throw new Error(d.error)
+      version.current = d.version || version.current + 1
+      setDirty(false); setStatus('saved'); setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 1500)
+    } catch { setStatus('error') }
+  }, [doc, pageId])
 
-  /* ── apply a doc mutation: push undo, set, autosave ── */
+  /* ── apply a doc mutation: push undo, set, mark dirty (Save is manual) ── */
   const apply = useCallback((mut: (d: PageDoc) => PageDoc, nextSel?: NodeRef | null) => {
     setDoc((cur) => {
       if (!cur) return cur
       history.current.push(cur); if (history.current.length > 80) history.current.shift()
       future.current = []                    // a new edit clears the redo stack
       const next = mut(cur)
-      save(next)
+      setDirty(true)
       if (nextSel !== undefined) setSel(nextSel)
       syncDepth()
       return next
     })
-  }, [save])
+  }, [])
 
   const undo = useCallback(() => {
-    setDoc((cur) => { if (!cur) return cur; const prev = history.current.pop(); if (!prev) return cur; future.current.push(cur); save(prev); syncDepth(); return prev })
-  }, [save])
+    setDoc((cur) => { if (!cur) return cur; const prev = history.current.pop(); if (!prev) return cur; future.current.push(cur); setDirty(true); syncDepth(); return prev })
+  }, [])
   const redo = useCallback(() => {
-    setDoc((cur) => { if (!cur) return cur; const nxt = future.current.pop(); if (!nxt) return cur; history.current.push(cur); save(nxt); syncDepth(); return nxt })
-  }, [save])
+    setDoc((cur) => { if (!cur) return cur; const nxt = future.current.pop(); if (!nxt) return cur; history.current.push(cur); setDirty(true); syncDepth(); return nxt })
+  }, [])
 
   /* ── property-panel writes (style is written for the device shown on the canvas) ── */
   const onStyle = useCallback((key: StyleKey, value: unknown) => {
@@ -168,6 +166,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     setPubResult(null)
     try {
       await fetch('/api/builder/doc', { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, doc }) })
+      setDirty(false)   // publish persists the current doc
       setPublishing('publishing')
       const r = await fetch('/api/builder/publish', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ pageId, target: 'this' }) })
       const d = await r.json().catch(() => ({}))
@@ -195,8 +194,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (!root) return
     root.querySelectorAll('[data-sel="1"]').forEach((n) => n.removeAttribute('data-sel'))
     if (sel) {
-      const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`)
+      const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`) as HTMLElement | null
       node?.setAttribute('data-sel', '1')
+      // Selecting a section/block/element (from the tree or canvas) scrolls the preview to it — like Shopify.
+      // 'nearest' means a canvas click on an already-visible node won't jump.
+      node?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
     }
   }, [sel, canvasHtml])
 
@@ -205,12 +207,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (!target || !doc) { setSel(null); return }
     const id = target.getAttribute('data-node-id') || ''
     const type = (target.getAttribute('data-node-type') || '').split(':')[0]
-    // resolve id → NodeRef by walking the model
+    // resolve id → NodeRef by walking the model; also expand the tree so the selected node is revealed there
     for (const s of doc.sections) {
-      if (s.id === id) return setSel({ sectionId: s.id })
+      if (s.id === id) { setSel({ sectionId: s.id }); return }
       for (const b of s.blocks) {
-        if (b.id === id) return setSel({ sectionId: s.id, blockId: b.id })
-        for (const el of b.elements) if (el.id === id) return setSel({ sectionId: s.id, blockId: b.id, elementId: el.id })
+        if (b.id === id) { setExpanded((x) => new Set(x).add(s.id)); setSel({ sectionId: s.id, blockId: b.id }); return }
+        for (const el of b.elements) if (el.id === id) { setExpanded((x) => { const n = new Set(x); n.add(s.id); n.add(b.id); return n }); setSel({ sectionId: s.id, blockId: b.id, elementId: el.id }); return }
       }
     }
     void type
@@ -247,14 +249,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const onKey = (e: KeyboardEvent) => {
       const editing = (e.target as HTMLElement)?.isContentEditable || ['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)
       if (editing) return
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo() }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 's') { e.preventDefault(); if (dirty) saveNow() }
+      else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z' && e.shiftKey) { e.preventDefault(); redo() }
       else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); undo() }
       else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); redo() }
       else if ((e.key === 'Backspace' || e.key === 'Delete') && sel) { e.preventDefault(); apply((d) => removeNode(d, sel), null) }
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [sel, undo, redo, apply])
+  }, [sel, undo, redo, apply, dirty, saveNow])
 
   /* ── Edit Product + page settings write into the doc ── */
   const onProduct = useCallback((patch: Record<string, unknown>) => {
@@ -304,6 +307,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <DeviceToggle value={device} onChange={(d) => setDevice(d)} />
         <ZoomControl zoom={zoom} setZoom={setZoom} onFit={fitZoom} />
         <SaveBadge status={status} />
+        <button onClick={saveNow} disabled={!dirty || status === 'saving'} title="Save (⌘S)" style={{ border: `1px solid ${dirty ? ORANGE : LINE}`, background: dirty ? WASH : '#fff', color: dirty ? ORANGE : SUB, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: dirty && status !== 'saving' ? 'pointer' : 'default' }}>
+          {status === 'saving' ? 'Saving…' : dirty ? 'Save' : 'Saved'}
+        </button>
         <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
           {publishing === 'saving' ? 'Saving…' : publishing === 'publishing' ? 'Publishing…' : 'Publish →'}
         </button>
@@ -495,7 +501,7 @@ function Modal({ title, hint, children, onClose }: { title: string; hint?: strin
 }
 
 function TbBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 12.5, lineHeight: 1, padding: '5px 7px', borderRadius: 6 }}>{children}</button>
+  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7 }}>{children}</button>
 }
 
 /* ── small pieces ── */
@@ -559,12 +565,12 @@ function TreeRow(props: {
       onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
       style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
       {draggable && <span title="Drag to reorder" style={{ cursor: 'grab', color: hover ? SUB : 'transparent', fontSize: 13, flex: 'none', lineHeight: 1, userSelect: 'none' }}>⠿</span>}
-      <span onClick={(e) => { e.stopPropagation(); onToggle?.() }} style={{ width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: SUB, fontSize: 13, cursor: hasChildren ? 'pointer' : 'default', flex: 'none' }}>{hasChildren ? (open ? '▾' : '▸') : ''}</span>
+      <span onClick={(e) => { e.stopPropagation(); onToggle?.() }} style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? INK : 'transparent', fontSize: 17, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', borderRadius: 6, transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
       <span onClick={onSelect} style={{ flex: 1, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
       {hover && (
-        <span style={{ display: 'flex', gap: 1 }} onClick={(e) => e.stopPropagation()}>
+        <span style={{ display: 'flex', gap: 3 }} onClick={(e) => e.stopPropagation()}>
           <IconBtn title="Hide" onClick={props.onHide}>{hidden ? '◌' : '👁'}</IconBtn>
           <IconBtn title="Duplicate" onClick={props.onDup}>⧉</IconBtn>
           <IconBtn title="Move up" onClick={props.onUp}>↑</IconBtn>
@@ -576,7 +582,7 @@ function TreeRow(props: {
   )
 }
 function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', cursor: 'pointer', fontSize: 15, lineHeight: 1, padding: '6px 7px', borderRadius: 7, color: danger ? ORANGE : SUB }}>{children}</button>
+  return <button className="bld-iconbtn" title={title} onClick={onClick} style={{ border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, color: danger ? '#d64316' : SUB }}>{children}</button>
 }
 
 function AddMenu({ title, options, onPick, onClose }: { title: string; options: { id: string; label: string }[]; onPick: (id: string) => void; onClose: () => void }) {

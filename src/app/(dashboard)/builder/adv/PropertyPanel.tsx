@@ -44,6 +44,28 @@ export default function PropertyPanel({ doc, sel, device, onStyle, onHidden, onC
   const showTypography = !!el && TEXTY.has(el.type)
   const showText = !!el && !el.content.bind && 'text' in el.content
 
+  // A bespoke-template ("raw") section keeps its exact design — per-element style controls (typography,
+  // border, spacing) don't apply to its verbatim HTML. Show a focused panel instead of irrelevant controls.
+  const secOfSel = doc.sections.find((s) => s.id === sel.sectionId)
+  const isRaw = el?.type === 'raw' || (lvl === 'section' && (node as Section).type === 'raw') || secOfSel?.type === 'raw'
+  if (isRaw) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <div style={{ marginBottom: 8 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>{lvl}</div>
+          <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.1 }}>{secOfSel?.name || 'Template section'}</div>
+        </div>
+        <div style={{ ...hintNote, marginTop: 0 }}>This section keeps its template design. <b>Double-click any text on the canvas to edit it.</b> Use the tree (⠿ / ↑ ↓ / 👁 / 🗑) to reorder, hide, duplicate or delete the whole section.</div>
+        <Group title="Visibility">
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: SUB }}>
+            <input type="checkbox" checked={!!(node as { hidden?: boolean }).hidden} onChange={onHidden} />
+            Hidden on the page
+          </label>
+        </Group>
+      </div>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
       {/* header */}

@@ -919,7 +919,9 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
   // split into more than that, which makes the whole publish 502 ("sections/order: must have a maximum of
   // 25"). Keep every section that fits, then merge the overflow tail into ONE trailing section so the page
   // still publishes with all its content — those merged sections just edit together in the customizer.
-  const CAP = opts.kind === 'product' && dyn !== 'none' ? 24 : 25 // leave a slot for the recommendations section
+  // Keep a safe margin under Shopify's 25-section ceiling (some themes/templates reject at the boundary):
+  // aim for ≤20 total (product reserves a slot for the recommendations section).
+  const CAP = opts.kind === 'product' && dyn !== 'none' ? 19 : 20
   const capped = parts.length > CAP
     ? [...parts.slice(0, CAP - 1), { key: parts[CAP - 1].key, name: parts[CAP - 1].name, html: parts.slice(CAP - 1).map((p) => p.html).join('\n') }]
     : parts
