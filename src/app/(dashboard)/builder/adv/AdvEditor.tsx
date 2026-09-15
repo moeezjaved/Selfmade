@@ -76,7 +76,7 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'dup'
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
@@ -125,6 +125,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
   }
   else if (op === 'insert' && arg != null) node.insertAdjacentHTML('afterend', arg)
   else if (op === 'sethtml' && arg != null) node.innerHTML = arg      // replace ONE piece's text/inner markup (inline edit)
+  else if (op === 'dup') { const c = node.cloneNode(true) as HTMLElement; if (parent) parent.insertBefore(c, node.nextSibling) }
   return box.innerHTML
 }
 /** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
@@ -137,6 +138,76 @@ function rawHtmlMove(html: string, from: number[], to: number[], after: boolean)
   if (src.contains(dst)) return html
   dst.parentElement.insertBefore(src, after ? dst.nextSibling : dst)
   return box.innerHTML
+}
+
+// ── Raw section OUTLINE ─────────────────────────────────────────────────────────────────────────────
+// A bespoke-template section is stored as one raw HTML slice. To give it PagePilot-style editing, we parse
+// that HTML into a nested, NAMED outline of its real pieces (Headline, Price, Add-to-Cart, each pill, …) so
+// the left tree shows individual blocks instead of a single "raw" node. Each outline node carries the
+// child-path used by rawHtmlOp, so selecting / moving / editing a node maps straight onto the slice.
+export type RawOutlineNode = { path: number[]; label: string; isImg: boolean; hidden: boolean; children: RawOutlineNode[] }
+// Friendly names for the class vocabulary our templates use, so the tree reads like PagePilot's.
+const RAW_FRIENDLY: Record<string, string> = {
+  ppills: 'Benefit pills', hchecks: 'Benefit checks', price: 'Price', pays: 'Payment icons', grow: 'Guarantees',
+  acc: 'Details', hrev: 'Review', warn: 'Notice', thumbs: 'Thumbnails', hcre: 'Creative', bestseller: 'Badge',
+  rlabel: 'Rating', mid: 'Pills + image', strip: 'Pill strip', hd: 'Headline', sd: 'Subhead', pill: 'Pill',
+  ti: 'Check', now: 'Sale price', was: 'Old price', save: 'Save badge', btn: 'Button', stars: 'Stars',
+  stat: 'Stat', card: 'Card', feat: 'Feature', rev: 'Review', gallery: 'Gallery', buybox: 'Buy box',
+}
+function rawFriendly(cls: string): string {
+  if (!cls) return ''
+  if (RAW_FRIENDLY[cls]) return RAW_FRIENDLY[cls]
+  return cls.length <= 14 ? cls.charAt(0).toUpperCase() + cls.slice(1) : ''
+}
+function rawLabelFor(el: HTMLElement): string {
+  const tag = el.tagName.toLowerCase()
+  if (tag === 'img') return 'Image'
+  if (tag === 'hr') return 'Divider'
+  if (tag === 'table') return 'Table'
+  if (tag === 'ul' || tag === 'ol') return 'List'
+  const txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
+  const snip = (n: number) => txt.slice(0, n) + (txt.length > n ? '…' : '')
+  const cls = (el.getAttribute('class') || '').split(/\s+/)[0] || ''
+  const kids = el.children.length
+  if (kids === 0) {
+    if (!txt) return el.querySelector('img') ? 'Image' : (rawFriendly(cls) || tag)
+    if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
+    if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
+    if (tag === 'li') return `• ${snip(18)}`
+    return snip(24)
+  }
+  if (el.querySelector('img') && !txt) return 'Image'
+  if (RAW_FRIENDLY[cls]) return RAW_FRIENDLY[cls]
+  if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
+  if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
+  if (txt && txt.length <= 24) return snip(24)
+  return rawFriendly(cls) || 'Group'
+}
+function rawIsImg(el: HTMLElement): boolean {
+  return el.tagName === 'IMG' || (!!el.querySelector('img') && !(el.textContent || '').trim())
+}
+/** Parse a raw slice's HTML into a nested outline. Collapses single-child layout wrappers so the tree shows
+ *  meaningful pieces, not scaffolding; caps nodes + depth so it stays fast and legible. */
+function buildRawOutline(html: string): RawOutlineNode[] {
+  if (typeof document === 'undefined' || !html) return []
+  const box = document.createElement('div'); box.innerHTML = html
+  let budget = 400
+  const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
+    if (budget-- <= 0) return null
+    let cur: HTMLElement = el, curPath = path
+    // descend through wrappers that hold a single element child and add no own text (pure layout)
+    while (cur.children.length === 1 && depth < 12) {
+      const only = cur.children[0] as HTMLElement
+      const own = (cur.textContent || '').replace(only.textContent || '', '').trim()
+      if (own) break
+      cur = only; curPath = [...curPath, 0]
+    }
+    const kids = Array.from(cur.children) as HTMLElement[]
+    let children: RawOutlineNode[] = []
+    if (kids.length > 1 && depth < 4) children = kids.map((k, i) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
+    return { path: curPath, label: rawLabelFor(cur), isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
+  }
+  return (Array.from(box.children) as HTMLElement[]).map((k, i) => walk(k, [i], 0)).filter(Boolean) as RawOutlineNode[]
 }
 
 export default function AdvEditor({ pageId }: { pageId: string }) {
@@ -461,19 +532,37 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   useEffect(() => { if (!rawSel) setRawAddOpen(false) }, [rawSel])
   // Make the selected raw piece draggable so it can be dragged to reorder among its siblings.
   useEffect(() => { const n = rawNodeEl(); if (n) { n.setAttribute('draggable', 'true'); return () => n.removeAttribute('draggable') } }, [rawNodeEl, canvasHtml])
-  const rawOp = useCallback((op: RawOp) => {
-    if (!rawSel || !doc) return
-    const cur = findElement(doc, rawSel.ref)
+  // Apply a raw op to ANY piece by (ref, path) — the core used by both the canvas toolbar (via rawSel) and
+  // the left outline tree's per-row buttons (move / hide / duplicate / delete on a specific piece).
+  const rawApplyAt = useCallback((ref: NodeRef, path: number[], op: RawOp, arg?: string) => {
+    if (!doc) return
+    const cur = findElement(doc, ref)
     const html = (cur?.content as { html?: string } | undefined)?.html
     if (typeof html !== 'string') return
-    let arg: string | undefined
-    if (op === 'img') { const url = window.prompt('New image URL'); if (!url || !url.trim()) return; arg = url.trim() }
-    const next = rawHtmlOp(html, rawSel.path, op, arg)
+    let a = arg
+    if (op === 'img') { const url = window.prompt('New image URL'); if (!url || !url.trim()) return; a = url.trim() }
+    const next = rawHtmlOp(html, path, op, a)
     if (next === html) return
-    const ref = rawSel.ref
     apply((d) => patchElementContent(d, ref, { html: next }))
-    if (op === 'delete') setRawSel(null)
-  }, [rawSel, doc, apply])
+    if (op === 'delete' && rawSel && rawSel.ref.elementId === ref.elementId && rawSel.path.join('.') === path.join('.')) setRawSel(null)
+  }, [doc, apply, rawSel])
+  const rawOp = useCallback((op: RawOp) => {
+    if (!rawSel) return
+    rawApplyAt(rawSel.ref, rawSel.path, op)
+  }, [rawSel, rawApplyAt])
+  // Select a raw piece from the left tree: mirror a canvas click (main sel + raw sub-selection) and scroll
+  // the piece into view so the canvas + settings panel follow the tree.
+  const selectRawPath = useCallback((ref: NodeRef, path: number[], isImg: boolean) => {
+    setExpanded((x) => { const n = new Set(x); n.add(ref.sectionId); if (ref.blockId) n.add(ref.blockId); return n })
+    setSel(ref); setRawSel({ ref, path, isImg })
+    queueMicrotask(() => {
+      const root = canvasRef.current?.querySelector(`[data-node-id="${ref.elementId}"]`) as HTMLElement | null
+      if (!root) return
+      let node: HTMLElement = root
+      for (const idx of path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) return; node = kid }
+      node.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    })
+  }, [])
   // Set one inline CSS property on the selected raw piece (colour, size, padding, …) — edits the real
   // template design in place so the look is preserved and every piece is individually styleable.
   const rawStyle = useCallback((prop: string, value: string) => {
@@ -538,6 +627,39 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   const canvasWidth = device === 'mobile' ? 402 : 1000
 
+  // A "raw section" = one group block wrapping a single bespoke-template raw element. We render its parsed
+  // OUTLINE (named pieces) in place of the "Group"/"raw" rows, so the tree looks like PagePilot.
+  const rawSectionEl = (s: PageDoc['sections'][number]): { ref: NodeRef; html: string } | null => {
+    if (s.blocks.length !== 1) return null
+    const b = s.blocks[0]
+    if (b.elements.length !== 1 || b.elements[0].type !== 'raw') return null
+    const html = (b.elements[0].content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return null
+    return { ref: { sectionId: s.id, blockId: b.id, elementId: b.elements[0].id }, html }
+  }
+  // Recursively render outline rows for a raw slice. Each row selects / moves / hides / dups / deletes its
+  // exact piece by child-path (rawApplyAt), and expands to reveal nested pieces.
+  const renderRawOutline = (nodes: RawOutlineNode[], ref: NodeRef, depth: number): React.ReactNode =>
+    nodes.map((n) => {
+      const key = `${ref.elementId}#${n.path.join('.')}`
+      const isOpen = expanded.has(key)
+      const selected = !!rawSel && rawSel.ref.elementId === ref.elementId && rawSel.path.join('.') === n.path.join('.')
+      return (
+        <div key={key}>
+          <TreeRow
+            depth={depth} open={isOpen} hasChildren={n.children.length > 0}
+            onToggle={() => setExpanded((x) => toggle(x, key))}
+            label={n.label} hidden={n.hidden}
+            selected={selected} onSelect={() => selectRawPath(ref, n.path, n.isImg)}
+            onUp={() => rawApplyAt(ref, n.path, 'up')} onDown={() => rawApplyAt(ref, n.path, 'down')}
+            onDup={() => rawApplyAt(ref, n.path, 'dup')}
+            onHide={() => rawApplyAt(ref, n.path, 'hide')} onDel={() => rawApplyAt(ref, n.path, 'delete')}
+          />
+          {isOpen && n.children.length > 0 && renderRawOutline(n.children, ref, depth + 1)}
+        </div>
+      )
+    })
+
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f2ee', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
       {/* top bar */}
@@ -570,6 +692,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           {doc.sections.map((s) => {
             const sRef: NodeRef = { sectionId: s.id }
             const open = expanded.has(s.id)
+            const rawEl = rawSectionEl(s)
             return (
               <div key={s.id}>
                 <TreeRow
@@ -582,7 +705,14 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                   onHide={() => apply((d) => setHidden(d, sRef))} onDel={() => apply((d) => removeNode(d, sRef), sameRef(sel, sRef) ? null : sel)}
                   {...dragProps(sRef)}
                 />
-                {open && s.blocks.map((b) => {
+                {/* Bespoke-template section → PagePilot-style outline of its real pieces (not a "raw" blob). */}
+                {open && rawEl && (
+                  <>
+                    {renderRawOutline(buildRawOutline(rawEl.html), rawEl.ref, 1)}
+                    <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) selectRawPath(rawEl.ref, last.path, last.isImg); setRawLibOpen(true) }} depth={1} />
+                  </>
+                )}
+                {open && !rawEl && s.blocks.map((b) => {
                   const bRef: NodeRef = { sectionId: s.id, blockId: b.id }
                   const bOpen = expanded.has(b.id)
                   return (
@@ -675,7 +805,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
 
       {tb && sel && !rawSel && (
-        <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 30, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
           <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
           <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
           <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>↑</TbBtn>
@@ -687,8 +817,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {/* granular toolbar for a piece clicked INSIDE a raw (bespoke-template) section */}
       {rawTb && rawSel && (
-        <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
-          <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase' }}>Item</span>
+        <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
+          <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase', pointerEvents: 'auto' }}>Item</span>
           {rawSel.isImg && <TbBtn title="Replace image" onClick={() => rawOp('img')}>🖼</TbBtn>}
           <TbBtn title="Move up" onClick={() => rawOp('up')}>↑</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>↓</TbBtn>
@@ -696,7 +826,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>👁</TbBtn>
           <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>🗑</TbBtn>
           {rawAddOpen && (
-            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px -8px rgba(20,18,15,.35)', padding: 6, display: 'flex', flexDirection: 'column', minWidth: 130, zIndex: 32 }}>
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px -8px rgba(20,18,15,.35)', padding: 6, display: 'flex', flexDirection: 'column', minWidth: 130, zIndex: 32, pointerEvents: 'auto' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.06em', padding: '2px 8px 4px' }}>Add a piece</div>
               {RAW_INSERTS.map((it) => (
                 <button key={it.id} onClick={() => { rawInsert(it.html); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
@@ -905,7 +1035,7 @@ function Modal({ title, hint, children, onClose }: { title: string; hint?: strin
 }
 
 function TbBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7 }}>{children}</button>
+  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, pointerEvents: 'auto' }}>{children}</button>
 }
 
 /* ── small pieces ── */
