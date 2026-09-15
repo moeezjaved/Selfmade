@@ -168,13 +168,27 @@ function rawHtmlMove(html: string, from: number[], to: number[], after: boolean)
 // the left tree shows individual blocks instead of a single "raw" node. Each outline node carries the
 // child-path used by rawHtmlOp, so selecting / moving / editing a node maps straight onto the slice.
 export type RawOutlineNode = { path: number[]; label: string; isImg: boolean; hidden: boolean; children: RawOutlineNode[] }
-// Friendly names for the class vocabulary our templates use, so the tree reads like PagePilot's.
+// Friendly, PagePilot-style names for the class vocabulary our templates use, so the tree reads like theirs
+// ("Product Title", "Reviews Number", "Best Seller Badge") instead of raw text/tag guesses.
 const RAW_FRIENDLY: Record<string, string> = {
-  ppills: 'Benefit pills', hchecks: 'Benefit checks', price: 'Price', pays: 'Payment icons', grow: 'Guarantees',
-  acc: 'Details', hrev: 'Review', warn: 'Notice', thumbs: 'Thumbnails', hcre: 'Creative', bestseller: 'Badge',
-  rlabel: 'Rating', mid: 'Pills + image', strip: 'Pill strip', hd: 'Headline', sd: 'Subhead', pill: 'Pill',
-  ti: 'Check', now: 'Sale price', was: 'Old price', save: 'Save badge', btn: 'Button', stars: 'Stars',
-  stat: 'Stat', card: 'Card', feat: 'Feature', rev: 'Review', gallery: 'Gallery', buybox: 'Buy box',
+  // buy-box / hero
+  ptitle: 'Product Title', bestseller: 'Best Seller Badge', rlabel: 'Reviews Number', rpill: 'Eyebrow Badge',
+  price: 'Price', now: 'Sale Price', was: 'Compare Price', save: 'Save Badge', hchecks: 'Benefit Checks',
+  ti: 'Check', pays: 'Payment Icons', grow: 'Guarantees', acc: 'Details', pdetails: 'Details', pdesc: 'Description',
+  hrev: 'Featured Review', warn: 'Stock Notice', hclaim: 'Guarantee', qty: 'Quantity', newline: 'Tagline',
+  // gallery / creative
+  gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
+  hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
+  // sections / lists
+  strip: 'Pill Strip', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
+  fgrid: 'Feature Cards', rev: 'Review', revs: 'Reviews', press: 'Press', plogo: 'Logo', vs: 'Comparison',
+  gold: 'Comparison', avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Button',
+  buybox: 'Product Details', grid: 'Row', wrap: 'Row',
+}
+// Pick the class on this element that has a friendly name (so "rpill foo" → Eyebrow Badge), else the first.
+function friendlyClassOf(el: HTMLElement): string {
+  const classes = (el.getAttribute('class') || '').split(/\s+/).filter(Boolean)
+  return classes.find((c) => RAW_FRIENDLY[c]) || classes[0] || ''
 }
 function rawFriendly(cls: string): string {
   if (!cls) return ''
@@ -183,13 +197,15 @@ function rawFriendly(cls: string): string {
 }
 function rawLabelFor(el: HTMLElement): string {
   const tag = el.tagName.toLowerCase()
+  const cls = friendlyClassOf(el)
+  // A known class wins for BOTH leaves and containers → clean PagePilot-style names everywhere we know them.
+  if (RAW_FRIENDLY[cls]) return RAW_FRIENDLY[cls]
   if (tag === 'img') return 'Image'
   if (tag === 'hr') return 'Divider'
   if (tag === 'table') return 'Table'
   if (tag === 'ul' || tag === 'ol') return 'List'
   const txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
   const snip = (n: number) => txt.slice(0, n) + (txt.length > n ? '…' : '')
-  const cls = (el.getAttribute('class') || '').split(/\s+/)[0] || ''
   const kids = el.children.length
   if (kids === 0) {
     if (!txt) return el.querySelector('img') ? 'Image' : (rawFriendly(cls) || tag)
@@ -199,7 +215,6 @@ function rawLabelFor(el: HTMLElement): string {
     return snip(24)
   }
   if (el.querySelector('img') && !txt) return 'Image'
-  if (RAW_FRIENDLY[cls]) return RAW_FRIENDLY[cls]
   if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
   if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
   if (txt && txt.length <= 24) return snip(24)
