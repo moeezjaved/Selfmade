@@ -288,6 +288,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [rawBox, setRawBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // selection highlight rect
   const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
   const [rawLibOpen, setRawLibOpen] = useState(false)          // the full block LIBRARY (previews) modal
+  const [rawInsertTarget, setRawInsertTarget] = useState<null | { path: number[]; mode: 'after' | 'append' }>(null)  // where a picked block lands
   const rawDrag = useRef<number[] | null>(null)                // path of the raw piece being dragged
 
   const history = useRef<PageDoc[]>([])
@@ -780,6 +781,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const ref = rawSel.ref
     apply((d) => patchElementContent(d, ref, { html: next }))
   }, [rawSel, doc, apply])
+  // Insert a block at a chosen spot: 'append' drops it INSIDE the target container (PagePilot's per-container
+  // "Add block" — e.g. below Product Gallery / inside Product Details); 'after' drops it as a sibling.
+  const rawInsertAt = useCallback((insertHtml: string) => {
+    if (!rawSel) return
+    const target = rawInsertTarget || { path: rawSel.path, mode: 'after' as const }
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of target.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      if (target.mode === 'append') node.insertAdjacentHTML('beforeend', insertHtml)
+      else node.insertAdjacentHTML('afterend', insertHtml)
+    })
+    setRawInsertTarget(null)
+  }, [rawSel, rawInsertTarget, rawEditHtml])
   // Drag-reorder a raw piece: move the dragged path to before/after the drop-target path.
   const rawMove = useCallback((fromPath: number[], toPath: number[], after: boolean) => {
     if (!rawSel || !doc) return
@@ -854,6 +868,10 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             onHide={() => rawApplyAt(ref, n.path, 'hide')} onDel={() => rawApplyAt(ref, n.path, 'delete')}
           />
           {isOpen && n.children.length > 0 && renderRawOutline(n.children, ref, depth + 1)}
+          {/* PagePilot-style: add a block INSIDE this container, at this exact spot */}
+          {isOpen && n.children.length > 0 && (
+            <AddBtn label="Add block" depth={depth + 1} onClick={() => { selectRawPath(ref, n.path, n.isImg); setRawInsertTarget({ path: n.path, mode: 'append' }); setRawLibOpen(true) }} />
+          )}
         </div>
       )
     })
@@ -913,7 +931,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                 {open && rawEl && (
                   <>
                     {renderRawOutline(outlineNodes, rawEl.ref, 1)}
-                    <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) selectRawPath(rawEl.ref, last.path, last.isImg); setRawLibOpen(true) }} depth={1} />
+                    <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) { selectRawPath(rawEl.ref, last.path, last.isImg); setRawInsertTarget({ path: last.path, mode: 'after' }) } setRawLibOpen(true) }} depth={1} />
                   </>
                 )}
                 {open && !rawEl && s.blocks.map((b) => {
@@ -1051,7 +1069,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
-      {rawLibOpen && <RawLibraryModal onPick={(html) => { rawInsert(html); setRawLibOpen(false) }} onClose={() => setRawLibOpen(false)} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html) => { rawInsertAt(html); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
     </div>
   )
