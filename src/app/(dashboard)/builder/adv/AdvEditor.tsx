@@ -190,8 +190,9 @@ const RAW_FRIENDLY: Record<string, string> = {
   // buy-box / hero
   ptitle: 'Product Title', bestseller: 'Best Seller Badge', rlabel: 'Reviews Number', rpill: 'Eyebrow Badge',
   price: 'Price', now: 'Sale Price', was: 'Compare Price', save: 'Save Badge', hchecks: 'Benefit Checks',
-  ti: 'Check', pays: 'Payment Icons', grow: 'Guarantees', acc: 'Details', pdetails: 'Details', pdesc: 'Description',
+  ti: 'Check', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
   hrev: 'Featured Review', warn: 'Stock Notice', hclaim: 'Guarantee', qty: 'Quantity', newline: 'Tagline',
+  brow: 'Benefit Row', rc: 'Featured Review', rgrid: 'Featured Reviews Carousel', hcheck: 'Benefit Check',
   // gallery / creative
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
@@ -221,24 +222,29 @@ function rawLabelFor(el: HTMLElement): string {
   if (tag === 'table') return 'Table'
   if (tag === 'ul' || tag === 'ol') return 'List'
   const txt = (el.textContent || '').replace(/\s+/g, ' ').trim()
-  const snip = (n: number) => txt.slice(0, n) + (txt.length > n ? '…' : '')
   const kids = el.children.length
+  // PagePilot labels pieces by TYPE, not by their text ("Text", "Heading", "Icon", "Button", "Image").
+  const symbolic = !!txt && txt.length <= 2 && !/[a-z0-9]/i.test(txt)   // a lone glyph/emoji like ★ 🛒 ✓
+  const isIcon = (!!el.querySelector('svg') && txt.length <= 2) || symbolic
   if (kids === 0) {
-    if (!txt) return el.querySelector('img') ? 'Image' : (rawFriendly(cls) || tag)
-    if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
-    if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
-    if (tag === 'li') return `• ${snip(18)}`
-    return snip(24)
+    if (!txt) return el.querySelector('svg') ? 'Icon' : (el.querySelector('img') ? 'Image' : (rawFriendly(cls) || 'Text'))
+    if (isIcon) return 'Icon'
+    if (/^h[1-6]$/.test(tag) || /^(hd|sd|secttl|sectitle|stitle)$/.test(cls)) return 'Heading'
+    if (tag === 'a' || tag === 'button') return 'Button'
+    return 'Text'
   }
-  if (el.querySelector('img') && !txt) return 'Image'
-  if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
-  if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
+  if (el.querySelector('img') && !txt) return el.querySelector('svg') && !el.querySelector('img') ? 'Icon' : 'Image'
+  if (isIcon) return 'Icon'
+  if (/^h[1-6]$/.test(tag)) return 'Heading'
+  if (tag === 'a' || tag === 'button') return 'Button'
   // Unclassed container (a hero column) → infer a PagePilot-style group name from what it holds. The outer
   // row keeps its own friendly class ('grid'→'Row'), so only real columns reach here.
   if (el.querySelector('.ptitle, h1') && el.querySelector('.price, .now, .buy, .btn, [class*="cart"], [class*="atc"]')) return 'Product Details'
   if (rawIsImg(el) || el.querySelector('.thumbs, .gtrack, .gallery, .hbottle')) return 'Product Gallery'
-  if (txt && txt.length <= 24) return snip(24)
-  return rawFriendly(cls) || 'Group'
+  // Generic container → PagePilot's "Group (Horizontal/Vertical)" (direction inferred from inline style/class).
+  const st = (el.getAttribute('style') || '')
+  if (/flex-direction\s*:\s*column/.test(st) || /(^|\s)(ppills|col|vstack|vertical)(\s|$)/.test(el.className)) return 'Group (Vertical)'
+  return 'Group (Horizontal)'
 }
 function rawIsImg(el: HTMLElement): boolean {
   return el.tagName === 'IMG' || (!!el.querySelector('img') && !(el.textContent || '').trim())
@@ -956,6 +962,30 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const next = rawHtmlOp(re.html, [0], 'style', `${prop}::${value}`)
     if (next !== re.html) apply((d) => patchElementContent(d, re.ref, { html: next }))
   }
+  // The section's main content grid (for Gap / Columns) — the first grid/flex row inside the section.
+  const sectionGridEl = (box: HTMLElement): HTMLElement | null =>
+    (box.querySelector('.grid, .row, .rgrid, .fgrid, .sgrid, [style*="grid-template"], [style*="display:flex"], [style*="display: flex"]') as HTMLElement | null)
+  const sectionInnerVal = (sectionId: string, prop: string): string => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return ''
+    const box = document.createElement('div'); box.innerHTML = re.html
+    return (sectionGridEl(box)?.style.getPropertyValue(prop)) || ''
+  }
+  const sectionInnerStyle = (sectionId: string, prop: string, value: string) => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const g = sectionGridEl(box); if (!g) return
+    if (value) g.style.setProperty(prop, value); else g.style.removeProperty(prop)
+    apply((d) => patchElementContent(d, re.ref, { html: box.innerHTML }))
+  }
+  const sectionColumns = (sectionId: string): string => {
+    const v = sectionInnerVal(sectionId, 'grid-template-columns')
+    const m = v.match(/repeat\((\d+)/); if (m) return m[1]
+    return v ? String(v.split(' ').length) : ''
+  }
+  const setSectionColumns = (sectionId: string, n: string) => {
+    const c = parseInt(n, 10)
+    sectionInnerStyle(sectionId, 'grid-template-columns', c > 0 ? `repeat(${c}, minmax(0, 1fr))` : '')
+  }
   // Full-width vs contained: toggle the inner .wrap max-width (contained = the template default, full = edge to edge).
   const sectionFullWidth = (sectionId: string): boolean => {
     const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return false
@@ -975,7 +1005,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const flattenOutline = (nodes: RawOutlineNode[]): RawOutlineNode[] => {
     let out = nodes
     let guard = 0
-    while (out.length === 1 && out[0].children.length > 1 && /^(Row|Group|Section)$/.test(out[0].label) && guard++ < 4) out = out[0].children
+    while (out.length === 1 && out[0].children.length > 1 && /^(Row|Group|Section|Group \((Horizontal|Vertical)\))$/.test(out[0].label) && guard++ < 4) out = out[0].children
     return out
   }
   // Recursively render outline rows for a raw slice. Each row selects / moves / hides / dups / deletes its
@@ -1114,7 +1144,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
-              urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen}
+              urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
@@ -1123,6 +1153,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               name={(() => { const s = doc.sections.find((x) => x.id === sel.sectionId); const re = s ? rawSectionEl(s) : null; return re ? (/\bptitle\b/.test(re.html) && /\b(now|price|buy)\b/.test(re.html) ? 'Product Information' : rawSectionName(re.html, s?.name || '')) : (s?.name || 'Section') })()}
               getVal={(p) => sectionStyleVal(sel.sectionId, p)} onStyle={(p, v) => sectionStyle(sel.sectionId, p, v)}
               full={sectionFullWidth(sel.sectionId)} onFull={(v) => setSectionFullWidth(sel.sectionId, v)}
+              gridVal={(p) => sectionInnerVal(sel.sectionId, p)} onGrid={(p, v) => sectionInnerStyle(sel.sectionId, p, v)}
+              cols={sectionColumns(sel.sectionId)} onCols={(n) => setSectionColumns(sel.sectionId, n)}
+              device={device} onDevice={setDevice}
               onHide={() => apply((d) => setHidden(d, sel))} onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })} onDel={() => apply((d) => removeNode(d, sel), null)} />
           ) : (
             <PropertyPanel doc={doc} sel={sel} device={device} onStyle={onStyle} onHidden={onHidden} onContent={onContent} />
@@ -1268,7 +1301,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, device, onDevice, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; device: Device; onDevice: (d: Device) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1282,10 +1315,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   // padding input wouldn't accept typing (it lost focus after the first keystroke).
   return (
     <div>
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Block</div>
-        <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{name || 'Edit this piece'}</div>
-      </div>
+      <PanelHeader kind="Block" name={name || 'Edit this piece'} device={device} onDevice={onDevice} />
       {gallery && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
@@ -1399,15 +1429,36 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
 }
 const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
 
-// Section-level settings panel (bug D): PagePilot-style — the whole section's background, padding, width and
-// alignment. Styles the raw section's outer wrapper so "edit the entire section background" finally works.
-function RawSectionSettings({ name, getVal, onStyle, full, onFull, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
+// Shared panel header (PagePilot parity): the KIND label ("Section"/"Block"), the name, a ✏️ affordance, and a
+// desktop/mobile toggle — the same header PagePilot shows above every block's settings.
+function PanelHeader({ kind, name, device, onDevice }: { kind: string; name: string; device?: Device; onDevice?: (d: Device) => void }) {
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>{kind}</div>
+          <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || kind}</div>
+        </div>
+        <span title="Edit" style={{ color: FAINT, flex: 'none', marginTop: 2, cursor: 'default' }}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg></span>
+      </div>
+      {device && onDevice && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+          <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden' }}>
+            <button title="Desktop settings" onClick={() => onDevice('base')} style={{ border: 0, background: device === 'base' ? INK : '#fff', padding: '5px 10px', cursor: 'pointer', display: 'flex' }}><MonitorIcon on={device === 'base'} /></button>
+            <button title="Mobile settings" onClick={() => onDevice('mobile')} style={{ border: 0, borderLeft: `1px solid ${LINE}`, background: device === 'mobile' ? INK : '#fff', padding: '5px 10px', cursor: 'pointer', display: 'flex' }}><PhoneIcon on={device === 'mobile'} /></button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// Section-level settings panel (bug D): PagePilot-style — the whole section's Layout (width, columns, gap,
+// rounded), Background, and Spacing. Styles the raw section's outer wrapper + its content grid.
+function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGrid, cols, onCols, device, onDevice, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; gridVal: (p: string) => string; onGrid: (p: string, v: string) => void; cols: string; onCols: (n: string) => void; device: Device; onDevice: (d: Device) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
   return (
     <div>
-      <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Section</div>
-        <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{name || 'Section'}</div>
-      </div>
+      <PanelHeader kind="Section" name={name} device={device} onDevice={onDevice} />
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={onDup} style={miniActionA}>⧉ Duplicate</button>
         <button onClick={onHide} style={miniActionA}>👁 Hide/show</button>
@@ -1417,6 +1468,9 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, onHide, onDup
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Layout</div>
         <SegRow label="Width" prop="__full" options={[['0', 'Contained'], ['1', 'Full']]} getVal={() => (full ? '1' : '0')} onStyle={(_p, v) => onFull(v === '1')} />
         <SegRow label="Content alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Columns" prop="__cols" min={1} max={6} getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />
+        <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />
+        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Background</div>
