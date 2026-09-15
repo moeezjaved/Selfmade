@@ -1090,54 +1090,9 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
     inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBusy(true); const url = await uploadImage(f); setBusy(false); if (url) onUrl(url) }
     inp.click()
   }
-  const pxNum = (p: string) => { const n = parseFloat(getVal(p)); return isFinite(n) ? n : '' }
-  const NumRow = ({ label, prop, min = 0, max = 120 }: { label: string; prop: string; min?: number; max?: number }) => {
-    const v = pxNum(prop)
-    return (
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="range" min={min} max={max} value={v === '' ? min : v} onChange={(e) => onStyle(prop, `${e.target.value}px`)} style={{ flex: 1, accentColor: ORANGE }} />
-          <input type="number" value={v} onChange={(e) => onStyle(prop, e.target.value ? `${e.target.value}px` : '')} style={{ width: 56, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, boxSizing: 'border-box' }} />
-        </div>
-      </div>
-    )
-  }
-  const ColorRow = ({ label, prop }: { label: string; prop: string }) => {
-    const v = getVal(prop)
-    return (
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <input type="color" value={/^#/.test(v) ? v : '#000000'} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: 30, height: 30, border: `1px solid ${LINE}`, borderRadius: 8, background: 'none', cursor: 'pointer' }} />
-          <span style={{ flex: 1, fontSize: 12.5, color: v ? INK : FAINT }}>{v || 'inherit'}</span>
-          {v && <button onClick={() => onStyle(prop, '')} style={{ border: 0, background: 'transparent', color: ORANGE, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>clear</button>}
-        </div>
-      </div>
-    )
-  }
-  const SegRow = ({ label, prop, options }: { label: string; prop: string; options: [string, string][] }) => {
-    const cur = getVal(prop)
-    return (
-      <div style={{ marginBottom: 10 }}>
-        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-        <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', width: '100%' }}>
-          {options.map(([val, lbl]) => (
-            <button key={val} onClick={() => onStyle(prop, cur === val ? '' : val)} style={{ flex: 1, border: 0, borderLeft: `1px solid ${LINE}`, background: cur === val ? INK : '#fff', color: cur === val ? '#fff' : SUB, padding: '7px 4px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
-          ))}
-        </div>
-      </div>
-    )
-  }
-  const SelRow = ({ label, prop, options }: { label: string; prop: string; options: [string, string][] }) => (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <select value={getVal(prop)} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
-        <option value="">Default</option>
-        {options.map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
-      </select>
-    </div>
-  )
+  // NumRow / ColorRow / SegRow / SelRow are MODULE-LEVEL (below) so they keep a stable component identity and
+  // don't remount on every parent re-render — that remount was why colour/padding "only worked once" and the
+  // padding input wouldn't accept typing (it lost focus after the first keystroke).
   return (
     <div>
       <div style={{ marginBottom: 8 }}>
@@ -1201,22 +1156,22 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Text</div>
-        <ColorRow label="Text color" prop="color" />
-        <NumRow label="Text size" prop="font-size" min={10} max={72} />
-        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} />
-        <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} />
-        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} />
-        <NumRow label="Line height" prop="line-height" min={12} max={64} />
-        <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} />
+        <ColorRow label="Text color" prop="color" getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Text size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
+        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+        <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={getVal} onStyle={onStyle} />
+        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Line height" prop="line-height" min={12} max={64} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Box</div>
-        <ColorRow label="Background" prop="background-color" />
-        <NumRow label="Padding" prop="padding" max={80} />
-        <NumRow label="Margin top" prop="margin-top" max={80} />
-        <NumRow label="Margin bottom" prop="margin-bottom" max={80} />
-        <NumRow label="Rounded corners" prop="border-radius" max={60} />
-        <ColorRow label="Border color" prop="border-color" />
+        <ColorRow label="Background" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Padding" prop="padding" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Margin top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Margin bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+        <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
       </div>
       <button onClick={onClear} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
@@ -1383,13 +1338,22 @@ function TreeRow(props: {
   const { depth, label, count, hidden, selected, open, hasChildren, onToggle, onSelect, draggable } = props
   const [hover, setHover] = useState(false)
   const [menu, setMenu] = useState(false)
+  const rowRef = useRef<HTMLDivElement | null>(null)
   const act = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); setMenu(false); fn() }
+  // Keep the ⋯ menu open when the cursor moves off the row onto an option; close it on an outside click or scroll.
+  useEffect(() => {
+    if (!menu) return
+    const close = (e: Event) => { if (!rowRef.current?.contains(e.target as Node)) setMenu(false) }
+    document.addEventListener('mousedown', close)
+    window.addEventListener('scroll', () => setMenu(false), { capture: true, once: true })
+    return () => document.removeEventListener('mousedown', close)
+  }, [menu])
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setMenu(false) }}
+    <div ref={rowRef} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       onClick={onSelect}
       draggable={draggable} onDragStart={props.onDragStart} onDragEnd={props.onDragEnd}
       onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
-      style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 6, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 34, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
+      style={{ position: 'relative', zIndex: menu ? 20 : undefined, display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 6, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 34, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
       <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? SUB : 'transparent', fontSize: 15, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
       <span style={{ color: selected ? ORANGE : SUB, display: 'inline-flex', flex: 'none' }}>{treeIconFor(label, hasChildren)}</span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -1409,6 +1373,64 @@ function TreeRow(props: {
           )}
         </span>
       )}
+    </div>
+  )
+}
+// ── Right-panel style rows (MODULE-LEVEL so they keep focus / don't remount on every parent re-render) ──
+type RowBase = { label: string; prop: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void }
+// Number + slider: edits locally while dragging/typing, commits to the canvas on release / blur (so a full
+// re-render never interrupts the interaction — fixes "padding only works once / can't type").
+function NumRow({ label, prop, min = 0, max = 120, getVal, onStyle }: RowBase & { min?: number; max?: number }) {
+  const initial = () => { const n = parseFloat(getVal(prop)); return isFinite(n) ? String(n) : '' }
+  const [val, setVal] = useState(initial)
+  const commit = (v: string) => onStyle(prop, v !== '' ? `${v}px` : '')
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="range" min={min} max={max} value={val === '' ? min : val} onChange={(e) => setVal(e.target.value)} onMouseUp={() => commit(val)} onTouchEnd={() => commit(val)} style={{ flex: 1, accentColor: ORANGE }} />
+        <input type="number" value={val} onChange={(e) => setVal(e.target.value)} onBlur={() => commit(val)} onKeyDown={(e) => { if (e.key === 'Enter') commit(val) }} style={{ width: 56, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, boxSizing: 'border-box' }} />
+      </div>
+    </div>
+  )
+}
+// Colour: live-previews locally while the native picker is open (onInput), commits on release (onChange) so
+// the picker doesn't close mid-pick from a re-render.
+function ColorRow({ label, prop, getVal, onStyle }: RowBase) {
+  const [val, setVal] = useState(() => getVal(prop))
+  const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(val) ? val : '#000000'
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="color" value={hex} onInput={(e) => setVal((e.target as HTMLInputElement).value)} onChange={(e) => { setVal(e.target.value); onStyle(prop, e.target.value) }} style={{ width: 30, height: 30, border: `1px solid ${LINE}`, borderRadius: 8, background: 'none', cursor: 'pointer' }} />
+        <span style={{ flex: 1, fontSize: 12.5, color: val ? INK : FAINT }}>{val || 'inherit'}</span>
+        {val && <button onClick={() => { setVal(''); onStyle(prop, '') }} style={{ border: 0, background: 'transparent', color: ORANGE, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>clear</button>}
+      </div>
+    </div>
+  )
+}
+function SegRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, string][] }) {
+  const cur = getVal(prop)
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', width: '100%' }}>
+        {options.map(([v, lbl]) => (
+          <button key={v} onClick={() => onStyle(prop, cur === v ? '' : v)} style={{ flex: 1, border: 0, borderLeft: `1px solid ${LINE}`, background: cur === v ? INK : '#fff', color: cur === v ? '#fff' : SUB, padding: '7px 4px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+function SelRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, string][] }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <select value={getVal(prop)} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
+        <option value="">Default</option>
+        {options.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
+      </select>
     </div>
   )
 }
