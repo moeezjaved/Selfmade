@@ -76,7 +76,7 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup' | 'appendchild'
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
@@ -149,6 +149,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
   else if (op === 'sethtml' && arg != null) node.innerHTML = arg      // replace ONE piece's text/inner markup (inline edit)
   else if (op === 'settext' && arg != null) node.textContent = arg    // set a piece's plain text (panel content field)
   else if (op === 'dup') { const c = node.cloneNode(true) as HTMLElement; if (parent) parent.insertBefore(c, node.nextSibling) }
+  else if (op === 'appendchild' && arg != null) node.insertAdjacentHTML('beforeend', arg)   // add a child (gallery image)
   return box.innerHTML
 }
 /** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
@@ -640,6 +641,29 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return n.textContent || ''
   }, [rawNodeEl])
   const rawSetText = useCallback((t: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'settext', t) }, [rawSel, rawApplyAt])
+  // Upload an image file → presigned R2 PUT → returns the public URL (matches PagePilot's "Select files").
+  const uploadImage = useCallback(async (file: File): Promise<string | null> => {
+    try {
+      const r = await fetch('/api/builder/upload-url', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ contentType: file.type, size: file.size }) })
+      const j = await r.json()
+      if (!j.uploadUrl) throw new Error(j.error || 'upload failed')
+      const put = await fetch(j.uploadUrl, { method: 'PUT', headers: { 'content-type': file.type }, body: file })
+      if (!put.ok) throw new Error('upload failed')
+      return j.publicUrl as string
+    } catch { window.alert('Image upload failed — please try again.'); return null }
+  }, [])
+  // Gallery manager: when the selected raw piece is an image CONTAINER (a .thumbs strip / gallery with ≥2
+  // images), list its images so the panel can add / remove / replace them like PagePilot's Product Gallery.
+  const rawGallery = useCallback((): { src: string; i: number }[] | null => {
+    const n = rawNodeEl(); if (!n) return null
+    const kids = Array.from(n.children) as HTMLElement[]
+    const imgs = kids.map((k, i) => ({ i, src: (k.tagName === 'IMG' ? k : k.querySelector('img'))?.getAttribute('src') || '' })).filter((x) => x.src)
+    return imgs.length >= 2 ? imgs : null
+  }, [rawNodeEl])
+  const rawGalleryReplace = useCallback((i: number, url: string) => { if (rawSel) rawApplyAt(rawSel.ref, [...rawSel.path, i], 'img', url) }, [rawSel, rawApplyAt])
+  const rawGalleryRemove = useCallback((i: number) => { if (rawSel) rawApplyAt(rawSel.ref, [...rawSel.path, i], 'delete') }, [rawSel, rawApplyAt])
+  const rawGalleryAdd = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'appendchild', `<img src="${url.replace(/"/g, '&quot;')}" alt="" loading="lazy">`) }, [rawSel, rawApplyAt])
+  const rawSetImg = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'img', url) }, [rawSel, rawApplyAt])
   // Insert a ready-made piece right AFTER the selected raw piece (a sibling), then keep design intact.
   const rawInsert = useCallback((insertHtml: string) => {
     if (!rawSel || !doc) return
@@ -818,7 +842,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── right: property panel ── raw sub-selection gets the in-place element settings ── */}
         <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
           {rawSel ? (
-            <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg} getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
+            <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg}
+              gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
+              getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
           ) : (
@@ -961,8 +987,14 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; i: number }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (i: number) => void; onGalleryReplace: (i: number, url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
+  const [busy, setBusy] = useState(false)    // an image upload is in flight
+  const pickFile = (onUrl: (url: string) => void) => {
+    const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'
+    inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBusy(true); const url = await uploadImage(f); setBusy(false); if (url) onUrl(url) }
+    inp.click()
+  }
   const pxNum = (p: string) => { const n = parseFloat(getVal(p)); return isFinite(n) ? n : '' }
   const NumRow = ({ label, prop, min = 0, max = 120 }: { label: string; prop: string; min?: number; max?: number }) => {
     const v = pxNum(prop)
@@ -1017,10 +1049,30 @@ function RawElementSettings({ name, text, onText, isImg, getVal, onStyle, onOp, 
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Block</div>
         <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.15 }}>{name || 'Edit this piece'}</div>
       </div>
-      {isImg && (
+      {gallery && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 800 }}>Images</div>
+            <div style={{ fontSize: 11.5, color: FAINT }}>{gallery.length}</div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 10 }}>
+            {gallery.map((g) => (
+              <div key={g.i} style={{ position: 'relative', paddingTop: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7' }}>
+                <img src={g.src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                <button title="Replace" onClick={() => pickFile((url) => onGalleryReplace(g.i, url))} style={{ position: 'absolute', left: 4, bottom: 4, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 7, fontSize: 12, width: 24, height: 24, cursor: 'pointer' }}>🖼</button>
+                <button title="Remove" onClick={() => onGalleryRemove(g.i)} style={{ position: 'absolute', right: 4, top: 4, border: 0, background: 'rgba(214,67,22,.92)', color: '#fff', borderRadius: 999, fontSize: 13, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+              </div>
+            ))}
+          </div>
+          <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Uploading…' : '⬆ Add image'}</button>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>JPG, PNG, GIF, WEBP up to 120MB. Click a thumbnail on the page to set the main image.</div>
+        </div>
+      )}
+      {isImg && !gallery && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
-          <button onClick={() => onOp('img')} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🖼 Replace image</button>
+          <button disabled={busy} onClick={() => pickFile((url) => onSetImg(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Uploading…' : '⬆ Upload image'}</button>
+          <button onClick={() => onOp('img')} style={{ width: '100%', marginTop: 6, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
         </div>
       )}
       {text !== '' && (
