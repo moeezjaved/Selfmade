@@ -284,6 +284,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Sub-selection INSIDE a raw (bespoke-template) section: the raw element + the clicked node's child-path.
   const [rawSel, setRawSel] = useState<null | { ref: NodeRef; path: number[]; isImg: boolean }>(null)
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
+  const [rawBox, setRawBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // selection highlight rect
   const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
   const [rawLibOpen, setRawLibOpen] = useState(false)          // the full block LIBRARY (previews) modal
   const rawDrag = useRef<number[] | null>(null)                // path of the raw piece being dragged
@@ -576,10 +577,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [rawSel])
   const measureRawTb = useCallback(() => {
     const node = rawNodeEl()
-    if (!node) { setRawTb(null); return }
+    if (!node) { setRawTb(null); setRawBox(null); return }
     const r = node.getBoundingClientRect()
     const below = r.top < 96
     setRawTb({ top: below ? r.bottom + 6 : r.top - 6, left: Math.max(8, r.left), below })
+    setRawBox({ top: r.top, left: r.left, width: r.width, height: r.height })
   }, [rawNodeEl])
   useEffect(() => { measureRawTb() }, [measureRawTb, canvasHtml, device, zoom])
   useEffect(() => {
@@ -592,16 +594,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   useEffect(() => { if (rawSel && (!sel || sel.elementId !== rawSel.ref.elementId)) setRawSel(null) }, [sel, rawSel])
   useEffect(() => { if (!rawSel) setRawAddOpen(false) }, [rawSel])
   // Make the selected raw piece draggable so it can be dragged to reorder among its siblings.
-  // Make the selected piece draggable AND give it a clear outline so it's obvious which BLOCK is selected
-  // (not the whole section) — matching PagePilot's blue block highlight.
-  useEffect(() => {
-    const n = rawNodeEl()
-    if (!n) return
-    n.setAttribute('draggable', 'true')
-    const prevOutline = n.style.outline, prevOffset = n.style.outlineOffset, prevRadius = n.style.borderRadius
-    n.style.outline = `2px solid ${ORANGE}`; n.style.outlineOffset = '2px'
-    return () => { n.removeAttribute('draggable'); n.style.outline = prevOutline; n.style.outlineOffset = prevOffset; n.style.borderRadius = prevRadius }
-  }, [rawNodeEl, canvasHtml])
+  useEffect(() => { const n = rawNodeEl(); if (n) { n.setAttribute('draggable', 'true'); return () => n.removeAttribute('draggable') } }, [rawNodeEl, canvasHtml])
   // Apply a raw op to ANY piece by (ref, path) — the core used by both the canvas toolbar (via rawSel) and
   // the left outline tree's per-row buttons (move / hide / duplicate / delete on a specific piece).
   const rawApplyAt = useCallback((ref: NodeRef, path: number[], op: RawOp, arg?: string) => {
@@ -934,6 +927,10 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
 
       {/* granular toolbar for a piece clicked INSIDE a raw (bespoke-template) section */}
+      {/* selection highlight box over the exact block that's selected (PagePilot-style) */}
+      {rawBox && rawSel && (
+        <div style={{ position: 'fixed', top: rawBox.top - 2, left: rawBox.left - 2, width: rawBox.width + 4, height: rawBox.height + 4, border: `2px solid ${ORANGE}`, borderRadius: 6, zIndex: 29, pointerEvents: 'none', boxShadow: `0 0 0 3px ${WASH}` }} />
+      )}
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
           <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase', pointerEvents: 'auto' }}>Item</span>
