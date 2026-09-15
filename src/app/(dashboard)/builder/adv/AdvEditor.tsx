@@ -662,18 +662,84 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       return j.publicUrl as string
     } catch { window.alert('Image upload failed — please try again.'); return null }
   }, [])
-  // Gallery manager: when the selected raw piece is an image CONTAINER (a .thumbs strip / gallery with ≥2
-  // images), list its images so the panel can add / remove / replace them like PagePilot's Product Gallery.
-  const rawGallery = useCallback((): { src: string; i: number }[] | null => {
-    const n = rawNodeEl(); if (!n) return null
-    const kids = Array.from(n.children) as HTMLElement[]
-    const imgs = kids.map((k, i) => ({ i, src: (k.tagName === 'IMG' ? k : k.querySelector('img'))?.getAttribute('src') || '' })).filter((x) => x.src)
-    return imgs.length >= 2 ? imgs : null
-  }, [rawNodeEl])
-  const rawGalleryReplace = useCallback((i: number, url: string) => { if (rawSel) rawApplyAt(rawSel.ref, [...rawSel.path, i], 'img', url) }, [rawSel, rawApplyAt])
-  const rawGalleryRemove = useCallback((i: number) => { if (rawSel) rawApplyAt(rawSel.ref, [...rawSel.path, i], 'delete') }, [rawSel, rawApplyAt])
-  const rawGalleryAdd = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'appendchild', `<img src="${url.replace(/"/g, '&quot;')}" alt="" loading="lazy">`) }, [rawSel, rawApplyAt])
+  // Flexible raw editor: parse the selected slice's HTML, let a mutator edit any descendants, save the result.
+  const rawEditHtml = useCallback((ref: NodeRef, mutate: (box: HTMLElement) => void) => {
+    if (!doc) return
+    const cur = findElement(doc, ref)
+    const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string') return
+    const box = document.createElement('div'); box.innerHTML = html
+    mutate(box)
+    const next = box.innerHTML
+    if (next !== html) apply((d) => patchElementContent(d, ref, { html: next }))
+  }, [doc, apply])
+  // Gallery manager: list every <img> inside the selected gallery node with its child-path from the raw root,
+  // so add / remove / replace work whether you select "Product Gallery" or the thumbnail strip (PagePilot).
+  const rawGallery = useCallback((): { src: string; path: number[] }[] | null => {
+    if (!rawSel) return null
+    const root = canvasRef.current?.querySelector(`[data-node-id="${rawSel.ref.elementId}"]`) as HTMLElement | null
+    const n = rawNodeEl(); if (!root || !n) return null
+    const out = (Array.from(n.querySelectorAll('img')) as HTMLImageElement[])
+      .map((im) => ({ src: im.getAttribute('src') || '', path: subPathTo(im, root) || [] }))
+      .filter((x) => x.src && x.path.length) as { src: string; path: number[] }[]
+    return out.length ? out : null
+  }, [rawSel, rawNodeEl])
+  const rawGalleryReplace = useCallback((path: number[], url: string) => { if (rawSel) rawApplyAt(rawSel.ref, path, 'img', url) }, [rawSel, rawApplyAt])
+  const rawGalleryRemove = useCallback((path: number[]) => { if (rawSel) rawApplyAt(rawSel.ref, path, 'delete') }, [rawSel, rawApplyAt])
+  const rawGalleryAdd = useCallback((url: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const idx of rawSel.path) { const kid = node.children[idx] as HTMLElement | undefined; if (!kid) { node = box; break } node = kid }
+      const target = (node.querySelector('.thumbs') as HTMLElement | null) || node
+      target.insertAdjacentHTML('beforeend', `<img src="${url.replace(/"/g, '&quot;')}" alt="" loading="lazy">`)
+    })
+  }, [rawSel, rawEditHtml])
   const rawSetImg = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'img', url) }, [rawSel, rawApplyAt])
+  // ── Product Gallery settings (matches PagePilot: Images + Select files + Create with AI + Sticky) ──────
+  const galleryMainSel = '.hbottle, .gimg, .gtrack img'
+  // A raw piece is a "gallery" when it (or the slice under it) has a .thumbs strip or a known main image.
+  const rawIsGallery = useCallback((): boolean => {
+    const n = rawNodeEl(); if (!n) return false
+    return !!(n.querySelector('.thumbs, .hbottle, .gimg, .gtrack') || (Array.from(n.children).filter((c) => c.tagName === 'IMG' || c.querySelector('img')).length >= 2))
+  }, [rawNodeEl])
+  // The gallery COLUMN (direct child of the .grid that holds the main image) — the element we make sticky.
+  const galleryColOf = (box: HTMLElement): HTMLElement | null => {
+    const main = box.querySelector(galleryMainSel) as HTMLElement | null; if (!main) return null
+    const grid = (main.closest('.grid') as HTMLElement | null) || (main.closest('.wrap') as HTMLElement | null)
+    if (!grid) return (main.closest('.hcre') as HTMLElement | null) || main.parentElement
+    let col: HTMLElement | null = main
+    while (col && col.parentElement && col.parentElement !== grid) col = col.parentElement
+    return col
+  }
+  const rawGallerySticky = useCallback((): boolean => {
+    const n = rawNodeEl(); if (!n) return false
+    return !!Array.from(n.querySelectorAll<HTMLElement>('*')).concat(n).find((e) => e.style && e.style.position === 'sticky')
+  }, [rawNodeEl])
+  const setGallerySticky = useCallback((on: boolean) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      const col = galleryColOf(box); if (!col) return
+      if (on) { col.style.position = 'sticky'; col.style.top = '16px'; col.style.alignSelf = 'flex-start' }
+      else { col.style.position = ''; col.style.top = ''; col.style.alignSelf = '' }
+    })
+  }, [rawSel, rawEditHtml])
+  const [galleryAIbusy, setGalleryAIbusy] = useState(false)
+  // Create with AI — generate a product image (Gemini) via /api/builder/image and add it to the gallery.
+  const galleryCreateAI = useCallback(async () => {
+    if (!rawSel) return
+    const prompt = window.prompt('Describe the product image you want to create:')
+    if (!prompt || !prompt.trim()) return
+    const n = rawNodeEl()
+    const ref = (n?.querySelector(galleryMainSel) as HTMLImageElement | null)?.getAttribute('src') || undefined
+    setGalleryAIbusy(true)
+    try {
+      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'generate', prompt: prompt.trim(), referenceUrl: ref }) })
+      const j = await r.json()
+      if (j.url) rawGalleryAdd(j.url); else window.alert(j.error || 'Could not generate the image.')
+    } catch { window.alert('Could not generate the image — please try again.') }
+    finally { setGalleryAIbusy(false) }
+  }, [rawSel, rawNodeEl, rawGalleryAdd])
   // Insert a ready-made piece right AFTER the selected raw piece (a sibling), then keep design intact.
   const rawInsert = useCallback((insertHtml: string) => {
     if (!rawSel || !doc) return
@@ -868,6 +934,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           {rawSel ? (
             <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg}
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
+              isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
@@ -1015,7 +1082,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; i: number }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (i: number) => void; onGalleryReplace: (i: number, url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const pickFile = (onUrl: (url: string) => void) => {
@@ -1081,19 +1148,35 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800 }}>Images</div>
-            <div style={{ fontSize: 11.5, color: FAINT }}>{gallery.length}</div>
+            <div style={{ fontSize: 11.5, color: FAINT }}>{gallery.length}/15</div>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 8, marginBottom: 10 }}>
             {gallery.map((g) => (
-              <div key={g.i} style={{ position: 'relative', paddingTop: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7' }}>
+              <div key={g.path.join('.')} style={{ position: 'relative', paddingTop: '100%', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7' }}>
                 <img src={g.src} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                <button title="Replace" onClick={() => pickFile((url) => onGalleryReplace(g.i, url))} style={{ position: 'absolute', left: 4, bottom: 4, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 7, fontSize: 12, width: 24, height: 24, cursor: 'pointer' }}>🖼</button>
-                <button title="Remove" onClick={() => onGalleryRemove(g.i)} style={{ position: 'absolute', right: 4, top: 4, border: 0, background: 'rgba(214,67,22,.92)', color: '#fff', borderRadius: 999, fontSize: 13, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
+                <button title="Replace" onClick={() => pickFile((url) => onGalleryReplace(g.path, url))} style={{ position: 'absolute', left: 4, bottom: 4, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 7, fontSize: 12, width: 24, height: 24, cursor: 'pointer' }}>🖼</button>
+                <button title="Remove" onClick={() => onGalleryRemove(g.path)} style={{ position: 'absolute', right: 4, top: 4, border: 0, background: 'rgba(214,67,22,.92)', color: '#fff', borderRadius: 999, fontSize: 13, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button>
               </div>
             ))}
           </div>
-          <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Uploading…' : '⬆ Add image'}</button>
-          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>JPG, PNG, GIF, WEBP up to 120MB. Click a thumbnail on the page to set the main image.</div>
+          <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 12, padding: '18px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, textAlign: 'center' }}>
+            <div style={{ fontSize: 20, marginBottom: 4 }}>🖼</div>
+            {busy ? 'Uploading…' : 'Drag & Drop or click to select images'}
+            <div style={{ fontSize: 11, color: FAINT, fontWeight: 500, marginTop: 2 }}>JPG, PNG, GIF, WEBP up to 120MB</div>
+          </button>
+          <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>⬆ Select files</button>
+          <button disabled={aiBusy} onClick={onCreateAI} style={{ width: '100%', marginTop: 8, border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '11px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>{aiBusy ? 'Creating…' : '✨ Create with AI'}</button>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Add images to the gallery. The first image will be used as the main image.</div>
+        </div>
+      )}
+      {isGallery && (
+        <div style={{ marginBottom: 14, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>General</div>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: INK, cursor: 'pointer' }}>
+            Sticky
+            <input type="checkbox" checked={sticky} onChange={(e) => onSticky(e.target.checked)} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
+          </label>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>If enabled, the gallery stays fixed to the top of the screen as the customer scrolls.</div>
         </div>
       )}
       {isImg && !gallery && (
@@ -1326,6 +1409,17 @@ function TreeRow(props: {
           )}
         </span>
       )}
+    </div>
+  )
+}
+// A plain labeled <select> driven by value/onChange (for Gallery settings, unlike SelRow which uses CSS props).
+function PlainSel({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
+        {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+      </select>
     </div>
   )
 }
