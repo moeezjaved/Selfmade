@@ -249,14 +249,14 @@ function rawIsImg(el: HTMLElement): boolean {
 // stored/heading name so the tree reads one-to-one with PagePilot (e.g. the reviews grid → "Reviews Carousel").
 const PP_SECTION_NAME: Record<string, string> = {
   strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
-  feat: 'Image with Feature Cards', how: 'Image with Text', trust: 'As Seen On with Quotes', cmp: 'Product Differences',
+  feat: 'Image with Feature Cards', how: 'Image with Text', gold: 'Product Comparison',
 }
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback
   const box = document.createElement('div'); box.innerHTML = html
-  // 1) Known section type → PagePilot's exact name (matches the live app one-to-one).
-  const root = box.children[0] as HTMLElement | undefined
-  for (const cls of Array.from(root?.classList || [])) if (PP_SECTION_NAME[cls]) return PP_SECTION_NAME[cls]
+  // 1) Known section type → PagePilot's exact name (matches the live app one-to-one). The section's own class
+  // (.strip / .revs / .stats …) sits on a <section> INSIDE the .pgbld wrapper, so search the whole slice.
+  for (const cls of Object.keys(PP_SECTION_NAME)) if (box.querySelector('section.' + cls + ', .' + cls)) return PP_SECTION_NAME[cls]
   // 2) Keep a good stored name as-is (only fix bare "Section N" / empty). A long name is trimmed, not replaced.
   const stored = (fallback || '').trim()
   const generic = !stored || /^section\s*\d+$/i.test(stored)
@@ -1630,6 +1630,11 @@ function AddBtn({ label, onClick, depth, primary }: { label: string; onClick: ()
 function treeIconFor(label: string, hasChildren?: boolean): React.ReactNode {
   const l = (label || '').toLowerCase()
   const ic = (d: React.ReactNode) => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>{d}</svg>
+  // PagePilot section-type icons (checked first so e.g. "Reviews Carousel" gets a carousel, not a star).
+  if (/carousel|rotating|recommended/.test(l)) return ic(<><rect x="7" y="6" width="10" height="12" rx="1.5" /><path d="M4 8v8M20 8v8" /></>)   // carousel: center card + side pages
+  if (/statistics|percentage|feature ?card/.test(l)) return ic(<><path d="M4 5v14M20 5v14" /><path d="M8 9h8M8 13h5" /></>)   // brackets [ ]
+  if (/as seen|quote/.test(l)) return ic(<><path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M9 21h6M12 13v8" /></>)   // trophy
+  if (/difference|comparison|versus/.test(l)) return ic(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M12 4v16M3 10h18" /></>)   // table
   if (/gallery|thumbnail|image|photo|product image|avatar/.test(l)) return ic(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 16l-5-5L5 20" /></>)
   if (/best ?seller|badge|award|eyebrow/.test(l)) return ic(<><path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M9 21h6M12 13v8" /><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" /></>)
   if (/product title|^title|headline|heading|tagline|subhead/.test(l)) return ic(<><path d="M5 5h14M12 5v14M9 19h6" /></>)
