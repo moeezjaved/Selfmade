@@ -242,7 +242,7 @@ function rawIsImg(el: HTMLElement): boolean {
 function buildRawOutline(html: string): RawOutlineNode[] {
   if (typeof document === 'undefined' || !html) return []
   const box = document.createElement('div'); box.innerHTML = html
-  let budget = 400
+  let budget = 800
   const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
     if (budget-- <= 0) return null
     let cur: HTMLElement = el, curPath = path
@@ -255,7 +255,7 @@ function buildRawOutline(html: string): RawOutlineNode[] {
     }
     const kids = Array.from(cur.children) as HTMLElement[]
     let children: RawOutlineNode[] = []
-    if (kids.length > 1 && depth < 4) children = kids.map((k, i) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
+    if (kids.length > 1 && depth < 6) children = kids.map((k, i) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
     return { path: curPath, label: rawLabelFor(cur), isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
   }
   return (Array.from(box.children) as HTMLElement[]).map((k, i) => walk(k, [i], 0)).filter(Boolean) as RawOutlineNode[]
@@ -592,7 +592,16 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   useEffect(() => { if (rawSel && (!sel || sel.elementId !== rawSel.ref.elementId)) setRawSel(null) }, [sel, rawSel])
   useEffect(() => { if (!rawSel) setRawAddOpen(false) }, [rawSel])
   // Make the selected raw piece draggable so it can be dragged to reorder among its siblings.
-  useEffect(() => { const n = rawNodeEl(); if (n) { n.setAttribute('draggable', 'true'); return () => n.removeAttribute('draggable') } }, [rawNodeEl, canvasHtml])
+  // Make the selected piece draggable AND give it a clear outline so it's obvious which BLOCK is selected
+  // (not the whole section) — matching PagePilot's blue block highlight.
+  useEffect(() => {
+    const n = rawNodeEl()
+    if (!n) return
+    n.setAttribute('draggable', 'true')
+    const prevOutline = n.style.outline, prevOffset = n.style.outlineOffset, prevRadius = n.style.borderRadius
+    n.style.outline = `2px solid ${ORANGE}`; n.style.outlineOffset = '2px'
+    return () => { n.removeAttribute('draggable'); n.style.outline = prevOutline; n.style.outlineOffset = prevOffset; n.style.borderRadius = prevRadius }
+  }, [rawNodeEl, canvasHtml])
   // Apply a raw op to ANY piece by (ref, path) — the core used by both the canvas toolbar (via rawSel) and
   // the left outline tree's per-row buttons (move / hide / duplicate / delete on a specific piece).
   const rawApplyAt = useCallback((ref: NodeRef, path: number[], op: RawOp, arg?: string) => {
@@ -730,6 +739,14 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (typeof html !== 'string') return null
     return { ref: { sectionId: s.id, blockId: b.id, elementId: b.elements[0].id }, html }
   }
+  // Skip leading generic layout wrappers (the .grid "Row" / "Group") so the real blocks — Product Gallery,
+  // Product Details, etc. — sit at the top of the section, matching PagePilot's two-block hero.
+  const flattenOutline = (nodes: RawOutlineNode[]): RawOutlineNode[] => {
+    let out = nodes
+    let guard = 0
+    while (out.length === 1 && out[0].children.length > 1 && /^(Row|Group|Section)$/.test(out[0].label) && guard++ < 4) out = out[0].children
+    return out
+  }
   // Recursively render outline rows for a raw slice. Each row selects / moves / hides / dups / deletes its
   // exact piece by child-path (rawApplyAt), and expands to reveal nested pieces.
   const renderRawOutline = (nodes: RawOutlineNode[], ref: NodeRef, depth: number): React.ReactNode =>
@@ -786,12 +803,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             const sRef: NodeRef = { sectionId: s.id }
             const open = expanded.has(s.id)
             const rawEl = rawSectionEl(s)
+            // PagePilot names the buy-box section "Product Information" (not "Hero"); detect a buy-box slice.
+            const isBuyBoxSec = !!rawEl && /\bptitle\b/.test(rawEl.html) && /\b(now|price|buy)\b/.test(rawEl.html)
+            const secLabel = isBuyBoxSec ? 'Product Information' : (s.name || SECTION_LABEL(s.type))
+            // Flatten a single generic wrapper (the .grid "Row") so its columns (Product Gallery / Product
+            // Details) sit directly under the section — matching PagePilot's two-block hero.
+            const outlineNodes = rawEl ? flattenOutline(buildRawOutline(rawEl.html)) : []
             return (
               <div key={s.id}>
                 <TreeRow
                   depth={0} open={open} hasChildren={s.blocks.length > 0}
                   onToggle={() => setExpanded((x) => toggle(x, s.id))}
-                  label={s.name || SECTION_LABEL(s.type)} count={descendantCount(s)} hidden={s.hidden}
+                  label={secLabel} count={descendantCount(s)} hidden={s.hidden}
                   selected={sameRef(sel, sRef)} onSelect={() => setSel(sRef)}
                   onUp={() => apply((d) => moveNode(d, sRef, -1))} onDown={() => apply((d) => moveNode(d, sRef, 1))}
                   onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sRef); queueMicrotask(() => setSel(newRef)); return nd })}
@@ -801,7 +824,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                 {/* Bespoke-template section → PagePilot-style outline of its real pieces (not a "raw" blob). */}
                 {open && rawEl && (
                   <>
-                    {renderRawOutline(buildRawOutline(rawEl.html), rawEl.ref, 1)}
+                    {renderRawOutline(outlineNodes, rawEl.ref, 1)}
                     <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) selectRawPath(rawEl.ref, last.path, last.isImg); setRawLibOpen(true) }} depth={1} />
                   </>
                 )}
