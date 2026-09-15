@@ -1246,6 +1246,31 @@ function AddBtn({ label, onClick, depth, primary }: { label: string; onClick: ()
   )
 }
 
+// A PagePilot-style leading type icon for a tree row, inferred from its label (line icons, 15px).
+function treeIconFor(label: string, hasChildren?: boolean): React.ReactNode {
+  const l = (label || '').toLowerCase()
+  const ic = (d: React.ReactNode) => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" style={{ flex: 'none' }}>{d}</svg>
+  if (/gallery|thumbnail|image|photo|product image|avatar/.test(l)) return ic(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 16l-5-5L5 20" /></>)
+  if (/best ?seller|badge|award|eyebrow/.test(l)) return ic(<><path d="M7 4h10v4a5 5 0 0 1-10 0V4z" /><path d="M9 21h6M12 13v8" /><path d="M17 5h3v2a3 3 0 0 1-3 3M7 5H4v2a3 3 0 0 0 3 3" /></>)
+  if (/product title|^title|headline|heading|tagline|subhead/.test(l)) return ic(<><path d="M5 5h14M12 5v14M9 19h6" /></>)
+  if (/sale price|compare price|save|price/.test(l)) return ic(<><path d="M20 12l-8 8-9-9V4h7z" /><circle cx="7.5" cy="7.5" r="1.5" /></>)
+  if (/reviews number|rating|stars|review/.test(l)) return ic(<><path d="M12 3l2.9 5.9 6.1.9-4.4 4.3 1 6.1L12 17.8 6.4 20.6l1-6.1L3 10.2l6.1-.9z" /></>)
+  if (/add to cart|button|cta/.test(l)) return ic(<><rect x="3" y="8" width="18" height="8" rx="4" /><path d="M8 12h8" /></>)
+  if (/payment/.test(l)) return ic(<><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></>)
+  if (/guarantee/.test(l)) return ic(<><path d="M12 3l7 3v5c0 5-3 8-7 10-4-2-7-5-7-10V6z" /><path d="M9 12l2 2 4-4" /></>)
+  if (/details|description/.test(l)) return ic(<><path d="M6 3h9l4 4v14H6z" /><path d="M9 10h7M9 14h7M9 18h4" /></>)
+  if (/stock|notice|warn/.test(l)) return ic(<><path d="M12 3l10 18H2z" /><path d="M12 10v5M12 18h.01" /></>)
+  if (/check|benefit/.test(l)) return ic(<><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.4 2.4 4.6-5" /></>)
+  if (/pill|strip/.test(l)) return ic(<><rect x="3" y="9" width="18" height="6" rx="3" /></>)
+  if (/stat|percentage/.test(l)) return ic(<><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>)
+  if (/feature|card/.test(l)) return ic(<><path d="M12 3l2 5 5 .5-4 3.5 1.5 5L12 19l-4.5 3 1.5-5-4-3.5 5-.5z" /></>)
+  if (/divider/.test(l)) return ic(<><path d="M4 12h16" /></>)
+  if (/list|ingredient|numbered/.test(l)) return ic(<><path d="M8 6h12M8 12h12M8 18h12M3.5 6h.01M3.5 12h.01M3.5 18h.01" /></>)
+  if (/press|logo|as seen/.test(l)) return ic(<><rect x="3" y="4" width="18" height="16" rx="2" /><path d="M7 8h10M7 12h6" /></>)
+  if (hasChildren || /group|row|section|creative|buy box|product details|gallery/.test(l)) return ic(<><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /></>)
+  return ic(<><rect x="5" y="5" width="14" height="14" rx="2" /></>)
+}
+
 function TreeRow(props: {
   depth: number; label: string; count?: number; hidden?: boolean; selected: boolean; open?: boolean; hasChildren?: boolean
   onToggle?: () => void; onSelect: () => void; onUp: () => void; onDown: () => void; onDup: () => void; onHide: () => void; onDel: () => void
@@ -1254,29 +1279,39 @@ function TreeRow(props: {
 }) {
   const { depth, label, count, hidden, selected, open, hasChildren, onToggle, onSelect, draggable } = props
   const [hover, setHover] = useState(false)
+  const [menu, setMenu] = useState(false)
+  const act = (fn: () => void) => (e: React.MouseEvent) => { e.stopPropagation(); setMenu(false); fn() }
   return (
-    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => { setHover(false); setMenu(false) }}
       onClick={onSelect}
       draggable={draggable} onDragStart={props.onDragStart} onDragEnd={props.onDragEnd}
       onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
-      style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
-      {draggable && <span title="Drag to reorder" style={{ cursor: 'grab', color: hover ? SUB : 'transparent', fontSize: 13, flex: 'none', lineHeight: 1, userSelect: 'none' }}>⠿</span>}
-      <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? INK : 'transparent', fontSize: 17, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', borderRadius: 6, transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
-      <span style={{ flex: 1, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 6, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 34, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
+      <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? SUB : 'transparent', fontSize: 15, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
+      <span style={{ color: selected ? ORANGE : SUB, display: 'inline-flex', flex: 'none' }}>{treeIconFor(label, hasChildren)}</span>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
-      {hover && (
-        <span onClick={(e) => e.stopPropagation()}
-          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 1, alignItems: 'center', paddingLeft: 10, background: `linear-gradient(90deg, transparent, ${selected ? WASH : INSET} 12px)`, borderRadius: 8 }}>
-          <IconBtn title="Hide" onClick={props.onHide}>{hidden ? '◌' : '👁'}</IconBtn>
-          <IconBtn title="Duplicate" onClick={props.onDup}>⧉</IconBtn>
-          <IconBtn title="Move up" onClick={props.onUp}>↑</IconBtn>
-          <IconBtn title="Move down" onClick={props.onDown}>↓</IconBtn>
-          <IconBtn title="Delete" onClick={props.onDel} danger>🗑</IconBtn>
+      {(hover || menu) && (
+        <span onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', paddingLeft: 12, background: `linear-gradient(90deg, transparent, ${selected ? WASH : INSET} 14px)`, borderRadius: 8 }}>
+          <button title="Options" onClick={(e) => { e.stopPropagation(); setMenu((m) => !m) }} style={{ border: 0, background: 'transparent', color: SUB, cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}>⋯</button>
+          {menu && (
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 2, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 10px 28px -10px rgba(20,18,15,.4)', padding: 5, display: 'flex', flexDirection: 'column', minWidth: 150, zIndex: 40 }}>
+              <MenuItem onClick={act(props.onHide)}>{hidden ? '◌  Show' : '👁  Hide'}</MenuItem>
+              <MenuItem onClick={act(props.onDup)}>⧉  Duplicate</MenuItem>
+              <MenuItem onClick={act(props.onUp)}>↑  Move up</MenuItem>
+              <MenuItem onClick={act(props.onDown)}>↓  Move down</MenuItem>
+              <MenuItem onClick={act(props.onDel)} danger>🗑  Delete</MenuItem>
+            </div>
+          )}
         </span>
       )}
     </div>
   )
+}
+function MenuItem({ children, onClick, danger }: { children: React.ReactNode; onClick: (e: React.MouseEvent) => void; danger?: boolean }) {
+  const [h, setH] = useState(false)
+  return <button onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{ textAlign: 'left', border: 0, background: h ? INSET : 'transparent', color: danger ? '#d64316' : INK, fontSize: 13, fontWeight: 600, padding: '8px 10px', borderRadius: 7, cursor: 'pointer', whiteSpace: 'nowrap' }}>{children}</button>
 }
 function IconBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
   return <button className="bld-iconbtn" title={title} onClick={onClick} style={{ border: `1px solid ${LINE}`, background: '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 8, color: danger ? '#d64316' : SUB }}>{children}</button>
