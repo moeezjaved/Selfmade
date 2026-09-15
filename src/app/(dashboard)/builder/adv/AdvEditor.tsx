@@ -245,16 +245,19 @@ function rawIsImg(el: HTMLElement): boolean {
 // so the tree never shows a bare "Section 2". Falls back to the stored name only if nothing is detectable.
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback
+  // Keep a good stored name as-is (only fix bare "Section N" / empty). A long name is trimmed, not replaced.
+  const stored = (fallback || '').trim()
+  const generic = !stored || /^section\s*\d+$/i.test(stored)
+  if (!generic) return stored.length > 30 ? stored.slice(0, 30) + '…' : stored
   const box = document.createElement('div'); box.innerHTML = html
-  const generic = !fallback || /^section\s*\d+$/i.test(fallback.trim())
-  // A real heading wins (matches the sections PagePilot already names well: How It Works, Why Choose Us…).
-  const h = box.querySelector('h1, h2, h3, h4, .hd, .eyebrow, .kicker, .sectitle, .stitle') as HTMLElement | null
+  // Generic name → prefer a real heading (How It Works, Why Choose Us…), else classify by content.
+  const h = box.querySelector('h1, h2, h3, h4, .hd, .eyebrow, .kicker, .sectitle, .stitle, .secttl') as HTMLElement | null
   const ht = (h?.textContent || '').replace(/\s+/g, ' ').trim()
   if (ht && ht.length <= 40) return ht.length > 30 ? ht.slice(0, 30) + '…' : ht
-  if (!generic) return fallback   // stored name is fine (already content-derived) — keep it
-  // No heading + generic stored name → classify by what the section holds.
+  // No heading → classify by what the section holds.
+  if (box.querySelector('.strip')) return 'Rotating Benefits'   // the scrolling benefit-pill bar (PagePilot's name)
   if (box.querySelector('.pays, .payicon')) return 'Payment'
-  if (box.querySelector('.hchecks, .checks, .benefit, .ppill, .ppills, [class*="benefit"]') || /✓|✔/.test(box.textContent || '')) return 'Benefits'
+  if (box.querySelector('.hchecks, .checks, .benefit, .ppill, .ppills, .strip .p, [class*="benefit"]') || /✓|✔/.test(box.textContent || '')) return 'Benefits'
   if (box.querySelector('.stars, [class*="rating"], [class*="review"]') || /★/.test(box.textContent || '')) return 'Reviews'
   if (box.querySelector('.thumbs, .gtrack, .hbottle, .gallery, .gimg')) return 'Gallery'
   if (box.querySelector('[class*="stat"], [class*="percent"], [class*="ring"]')) return 'Stats'
@@ -893,6 +896,27 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     rawMove(from, toPath, e.clientY > r.top + r.height / 2)
   }, [rawSel, rawMove])
 
+  // "Add block" into a container: if its children are homogeneous (all the same tag+class — e.g. review
+  // cards, benefit rows, pills), one-click DUPLICATE the last one (PagePilot's "+ Add Block" on a carousel
+  // adds another item of the same kind). Otherwise open the block library to insert into this container.
+  const addIntoContainer = useCallback((ref: NodeRef, node: RawOutlineNode) => {
+    const root = canvasRef.current?.querySelector(`[data-node-id="${ref.elementId}"]`) as HTMLElement | null
+    let el: HTMLElement | null = root
+    if (el) for (const i of node.path) { el = (el.children[i] as HTMLElement) || null; if (!el) break }
+    const kids = el ? (Array.from(el.children) as HTMLElement[]).filter((k) => !k.classList.contains('garr')) : []
+    const sig = (k: HTMLElement) => k.tagName + '.' + (k.className || '')
+    const homogeneous = kids.length >= 2 && new Set(kids.map(sig)).size === 1
+    if (homogeneous) {
+      const lastPath = [...node.path, kids.length - 1]
+      rawApplyAt(ref, lastPath, 'dup')
+      selectRawPath(ref, lastPath, false)
+    } else {
+      selectRawPath(ref, node.path, node.isImg)
+      setRawInsertTarget({ path: node.path, mode: 'append' })
+      setRawLibOpen(true)
+    }
+  }, [rawApplyAt, selectRawPath])
+
   if (status === 'loading') return <Center>Loading editor…</Center>
   if (status === 'error' && !doc) return <Center>{err || 'Could not load the page.'} <Link href="/builder" style={{ color: ORANGE, marginLeft: 8 }}>Back</Link></Center>
   if (!doc) return <Center>No page.</Center>
@@ -908,6 +932,34 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const html = (b.elements[0].content as { html?: string } | undefined)?.html
     if (typeof html !== 'string') return null
     return { ref: { sectionId: s.id, blockId: b.id, elementId: b.elements[0].id }, html }
+  }
+  // ── Section-level settings (bug D): style the raw section's OUTER wrapper (path [0]) so the user can set the
+  // whole section's background, padding, width and alignment — matching PagePilot's section panel. ──────────
+  const secRaw = (sectionId: string) => { const s = doc?.sections.find((x) => x.id === sectionId); return s ? rawSectionEl(s) : null }
+  const sectionStyleVal = (sectionId: string, prop: string): string => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return ''
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const root = box.children[0] as HTMLElement | undefined
+    return root?.style.getPropertyValue(prop) || ''
+  }
+  const sectionStyle = (sectionId: string, prop: string, value: string) => {
+    const re = secRaw(sectionId); if (!re) return
+    const next = rawHtmlOp(re.html, [0], 'style', `${prop}::${value}`)
+    if (next !== re.html) apply((d) => patchElementContent(d, re.ref, { html: next }))
+  }
+  // Full-width vs contained: toggle the inner .wrap max-width (contained = the template default, full = edge to edge).
+  const sectionFullWidth = (sectionId: string): boolean => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return false
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const wrap = box.querySelector('.wrap') as HTMLElement | null
+    return wrap ? wrap.style.maxWidth === 'none' : false
+  }
+  const setSectionFullWidth = (sectionId: string, full: boolean) => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const wrap = box.querySelector('.wrap') as HTMLElement | null; if (!wrap) return
+    if (full) wrap.style.maxWidth = 'none'; else wrap.style.removeProperty('max-width')
+    apply((d) => patchElementContent(d, re.ref, { html: box.innerHTML }))
   }
   // Skip leading generic layout wrappers (the .grid "Row" / "Group") so the real blocks — Product Gallery,
   // Product Details, etc. — sit at the top of the section, matching PagePilot's two-block hero.
@@ -938,7 +990,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           {isOpen && n.children.length > 0 && renderRawOutline(n.children, ref, depth + 1)}
           {/* PagePilot-style: add a block INSIDE this container, at this exact spot */}
           {isOpen && n.children.length > 0 && (
-            <AddBtn label="Add block" depth={depth + 1} onClick={() => { selectRawPath(ref, n.path, n.isImg); setRawInsertTarget({ path: n.path, mode: 'append' }); setRawLibOpen(true) }} />
+            <AddBtn label="Add block" depth={depth + 1} onClick={() => addIntoContainer(ref, n)} />
           )}
         </div>
       )
@@ -1057,6 +1109,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
+          ) : (sel.sectionId && !sel.blockId && !sel.elementId && secRaw(sel.sectionId)) ? (
+            <RawSectionSettings key={sel.sectionId}
+              name={(() => { const s = doc.sections.find((x) => x.id === sel.sectionId); const re = s ? rawSectionEl(s) : null; return re ? (/\bptitle\b/.test(re.html) && /\b(now|price|buy)\b/.test(re.html) ? 'Product Information' : rawSectionName(re.html, s?.name || '')) : (s?.name || 'Section') })()}
+              getVal={(p) => sectionStyleVal(sel.sectionId, p)} onStyle={(p, v) => sectionStyle(sel.sectionId, p, v)}
+              full={sectionFullWidth(sel.sectionId)} onFull={(v) => setSectionFullWidth(sel.sectionId, v)}
+              onHide={() => apply((d) => setHidden(d, sel))} onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })} onDel={() => apply((d) => removeNode(d, sel), null)} />
           ) : (
             <PropertyPanel doc={doc} sel={sel} device={device} onStyle={onStyle} onHidden={onHidden} onContent={onContent} />
           )}
@@ -1332,6 +1390,39 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
 }
 const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
 
+// Section-level settings panel (bug D): PagePilot-style — the whole section's background, padding, width and
+// alignment. Styles the raw section's outer wrapper so "edit the entire section background" finally works.
+function RawSectionSettings({ name, getVal, onStyle, full, onFull, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
+  return (
+    <div>
+      <div style={{ marginBottom: 8 }}>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Section</div>
+        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.15 }}>{name || 'Section'}</div>
+      </div>
+      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
+        <button onClick={onDup} style={miniActionA}>⧉ Duplicate</button>
+        <button onClick={onHide} style={miniActionA}>👁 Hide/show</button>
+        <button onClick={onDel} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
+      </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Layout</div>
+        <SegRow label="Width" prop="__full" options={[['0', 'Contained'], ['1', 'Full']]} getVal={() => (full ? '1' : '0')} onStyle={(_p, v) => onFull(v === '1')} />
+        <SegRow label="Content alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Background</div>
+        <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Spacing</div>
+        <NumRow label="Padding top" prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Padding bottom" prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Padding sides" prop="padding-inline" max={120} getVal={getVal} onStyle={onStyle} />
+      </div>
+    </div>
+  )
+}
+
 // PagePilot-style rich text editor: a formatting toolbar (size, B/I/U, lists, link, undo/redo, color) over a
 // contentEditable of the selected text piece, plus "✨ Edit with AI". Commits the piece's innerHTML on blur.
 function RichText({ html, onCommit, context }: { html: string; onCommit: (html: string) => void; context: string }) {
@@ -1344,8 +1435,12 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
   const saveSel = () => { const s = window.getSelection(); if (s && s.rangeCount && ref.current?.contains(s.anchorNode)) savedRange.current = s.getRangeAt(0).cloneRange() }
   const restoreSel = () => { const r = savedRange.current; const s = window.getSelection(); if (r && s) { s.removeAllRanges(); s.addRange(r) } }
   const commit = () => { if (ref.current) onCommit(ref.current.innerHTML) }
-  const exec = (cmd: string, val?: string) => { ref.current?.focus(); restoreSel(); document.execCommand(cmd, false, val); saveSel(); commit() }
-  const applyLink = () => { const u = linkVal.trim(); setLinkOpen(false); if (!u) return; ref.current?.focus(); restoreSel(); document.execCommand('createLink', false, u); saveSel(); commit(); setLinkVal('') }
+  // Toolbar buttons preventDefault on mousedown, so the editor keeps focus + the live selection — run the
+  // command directly (calling focus() here would collapse the selection first, which is why it "did nothing").
+  const exec = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); saveSel(); commit() }
+  // Focus-stealing controls (size <select>, color <input>, link field) — refocus + restore the saved range first.
+  const execRestore = (cmd: string, val?: string) => { ref.current?.focus(); restoreSel(); document.execCommand(cmd, false, val); saveSel(); commit() }
+  const applyLink = () => { const u = linkVal.trim(); setLinkOpen(false); if (!u) return; execRestore('createLink', u); setLinkVal('') }
   const editAI = async () => {
     const text = ref.current?.textContent || ''
     if (!text.trim()) return
@@ -1365,7 +1460,7 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
       <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Text</div>
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', padding: '4px 5px', borderBottom: `1px solid ${LINE}`, background: INSET }}>
-          <select onMouseDown={saveSel} onChange={(e) => exec('fontSize', e.target.value)} defaultValue="" title="Text size" style={{ border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', fontSize: 12, padding: '2px 4px', marginRight: 3, cursor: 'pointer', color: INK }}>
+          <select onMouseDown={saveSel} onChange={(e) => execRestore('fontSize', e.target.value)} defaultValue="" title="Text size" style={{ border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', fontSize: 12, padding: '2px 4px', marginRight: 3, cursor: 'pointer', color: INK }}>
             <option value="" disabled>Aa</option>
             <option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">XL</option>
           </select>
@@ -1375,7 +1470,7 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
           <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => exec('insertUnorderedList'))}>•</button>
           <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => exec('insertOrderedList'))}>1.</button>
           <button title="Link" style={tbBtn} onMouseDown={noBlur(() => { saveSel(); setLinkOpen((o) => !o) })}>🔗</button>
-          <label title="Text color" style={{ ...tbBtn, position: 'relative' }} onMouseDown={saveSel}><span style={{ pointerEvents: 'none' }}>A</span><span style={{ position: 'absolute', bottom: 3, left: 6, right: 6, height: 3, background: ORANGE, borderRadius: 2 }} /><input type="color" onChange={(e) => exec('foreColor', e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
+          <label title="Text color" style={{ ...tbBtn, position: 'relative' }} onMouseDown={saveSel}><span style={{ pointerEvents: 'none' }}>A</span><span style={{ position: 'absolute', bottom: 3, left: 6, right: 6, height: 3, background: ORANGE, borderRadius: 2 }} /><input type="color" onChange={(e) => execRestore('foreColor', e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
           <div style={{ flex: 1 }} />
           <button title="Undo" style={tbBtn} onMouseDown={noBlur(() => exec('undo'))}>↺</button>
           <button title="Redo" style={tbBtn} onMouseDown={noBlur(() => exec('redo'))}>↻</button>
