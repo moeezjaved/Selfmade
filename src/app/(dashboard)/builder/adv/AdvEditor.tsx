@@ -85,6 +85,18 @@ const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'button', label: 'Button', html: '<div class="wrap" style="padding:10px 0;text-align:center"><a href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Button</a></div>' },
   { id: 'divider', label: 'Divider', html: '<div class="wrap" style="padding:6px 0"><hr style="border:0;border-top:1px solid #e7e3dd;margin:14px 0"></div>' },
 ]
+// Richer ready-made blocks for the "Add block" LIBRARY (self-contained inline styles → render in previews
+// and drop cleanly into any template section). Each is inserted after the selected piece.
+const RAW_LIBRARY: { id: string; label: string; html: string }[] = [
+  ...RAW_INSERTS,
+  { id: 'headsub', label: 'Heading + subtext', html: '<div class="wrap" style="text-align:center;padding:14px 0"><h2 style="font-size:30px;font-weight:800;color:#1b1a17;margin:0 0 8px">Section heading</h2><p style="font-size:15px;color:#6a6e93;max-width:560px;margin:0 auto;line-height:1.6">A short supporting sentence that explains this section.</p></div>' },
+  { id: 'cta', label: 'CTA band', html: '<div class="wrap" style="text-align:center;background:#3f4bd6;border-radius:18px;padding:34px 24px;margin:12px 0"><h3 style="color:#fff;font-size:24px;font-weight:800;margin:0 0 14px">Ready to get started?</h3><a href="#" style="display:inline-block;background:#fff;color:#3f4bd6;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Buy now</a></div>' },
+  { id: 'feature', label: 'Feature card', html: '<div style="flex:1 1 220px;max-width:300px;background:#fff;border:1px solid #e7e3dd;border-radius:16px;padding:22px 18px;text-align:center;box-shadow:0 2px 10px -6px rgba(20,18,15,.18)"><div style="font-size:30px;margin-bottom:8px">✨</div><h4 style="font-size:17px;font-weight:800;color:#1b1a17;margin:0 0 6px">Feature title</h4><p style="font-size:14px;color:#6a6e93;line-height:1.6;margin:0">A benefit customers care about, in one line.</p></div>' },
+  { id: 'review', label: 'Review card', html: '<div style="flex:1 1 240px;max-width:320px;background:#fff;border:1px solid #e7e3dd;border-radius:16px;padding:20px 18px;box-shadow:0 2px 10px -6px rgba(20,18,15,.18)"><div style="color:#f5a623;letter-spacing:2px;margin-bottom:8px">★★★★★</div><p style="font-size:15px;color:#1b1a17;line-height:1.5;margin:0 0 10px">"Genuinely the best I have tried — worth every penny."</p><div style="font-size:13px;font-weight:700;color:#6a6e93">— Happy customer</div></div>' },
+  { id: 'stat', label: 'Stat', html: '<div style="flex:1 1 160px;max-width:220px;text-align:center;padding:16px"><div style="font-size:40px;font-weight:900;color:#3f4bd6">90%</div><div style="font-size:13px;color:#6a6e93;margin-top:4px">reported better results</div></div>' },
+  { id: 'badges', label: 'Badge row', html: '<div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding:12px 0"><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Vegan</span><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Cruelty-free</span><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Lab tested</span></div>' },
+  { id: 'spacer', label: 'Spacer', html: '<div style="height:40px"></div>' },
+]
 /** Resolve the node at `path` inside a raw slice's HTML; returns {box,node} or null on miss. */
 function rawNodeAt(html: string, path: number[]): { box: HTMLElement; node: HTMLElement } | null {
   if (!path.length) return null
@@ -148,7 +160,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Sub-selection INSIDE a raw (bespoke-template) section: the raw element + the clicked node's child-path.
   const [rawSel, setRawSel] = useState<null | { ref: NodeRef; path: number[]; isImg: boolean }>(null)
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
-  const [rawAddOpen, setRawAddOpen] = useState(false)          // the "add a piece" menu for a raw section
+  const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
+  const [rawLibOpen, setRawLibOpen] = useState(false)          // the full block LIBRARY (previews) modal
   const rawDrag = useRef<number[] | null>(null)                // path of the raw piece being dragged
 
   const history = useRef<PageDoc[]>([])
@@ -657,6 +670,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               {RAW_INSERTS.map((it) => (
                 <button key={it.id} onClick={() => { rawInsert(it.html); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
               ))}
+              <button onClick={() => { setRawAddOpen(false); setRawLibOpen(true) }} style={{ textAlign: 'left', border: 0, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 8, background: 'transparent', color: ORANGE, fontSize: 13, fontWeight: 700, padding: '8px', cursor: 'pointer' }}>Browse library →</button>
             </div>
           )}
         </div>
@@ -664,6 +678,33 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html) => { rawInsert(html); setRawLibOpen(false) }} onClose={() => setRawLibOpen(false)} />}
+    </div>
+  )
+}
+
+/* ── Block library: a gallery of ready-made pieces (rendered previews) to drop into a template section. ── */
+function RawLibraryModal({ onPick, onClose }: { onPick: (html: string) => void; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(860px,94vw)', maxHeight: '86vh', overflow: 'auto', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: `1px solid ${LINE}`, position: 'sticky', top: 0, background: '#fff' }}>
+          <span style={{ fontFamily: SERIF, fontSize: 20 }}>Block library</span>
+          <span style={{ fontSize: 12.5, color: SUB }}>Click one to add it into this section</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ ...iconTopBtn, fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14, padding: 20 }}>
+          {RAW_LIBRARY.map((it) => (
+            <button key={it.id} onClick={() => onPick(it.html)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+              <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+                <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+              </div>
+              <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -697,6 +738,28 @@ function RawElementSettings({ isImg, getVal, onStyle, onOp, onClear }: { isImg: 
       </div>
     )
   }
+  const SegRow = ({ label, prop, options }: { label: string; prop: string; options: [string, string][] }) => {
+    const cur = getVal(prop)
+    return (
+      <div style={{ marginBottom: 10 }}>
+        <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+        <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', width: '100%' }}>
+          {options.map(([val, lbl]) => (
+            <button key={val} onClick={() => onStyle(prop, cur === val ? '' : val)} style={{ flex: 1, border: 0, borderLeft: `1px solid ${LINE}`, background: cur === val ? INK : '#fff', color: cur === val ? '#fff' : SUB, padding: '7px 4px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
+          ))}
+        </div>
+      </div>
+    )
+  }
+  const SelRow = ({ label, prop, options }: { label: string; prop: string; options: [string, string][] }) => (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
+      <select value={getVal(prop)} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
+        <option value="">Default</option>
+        {options.map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
+      </select>
+    </div>
+  )
   return (
     <div>
       <div style={{ marginBottom: 8 }}>
@@ -715,19 +778,42 @@ function RawElementSettings({ isImg, getVal, onStyle, onOp, onClear }: { isImg: 
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Text</div>
         <ColorRow label="Text color" prop="color" />
         <NumRow label="Text size" prop="font-size" min={10} max={72} />
+        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} />
+        <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} />
+        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} />
+        <NumRow label="Line height" prop="line-height" min={12} max={64} />
+        <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Box</div>
         <ColorRow label="Background" prop="background-color" />
         <NumRow label="Padding" prop="padding" max={80} />
         <NumRow label="Margin top" prop="margin-top" max={80} />
+        <NumRow label="Margin bottom" prop="margin-bottom" max={80} />
         <NumRow label="Rounded corners" prop="border-radius" max={60} />
+        <ColorRow label="Border color" prop="border-color" />
+        <BorderWidthRow getVal={getVal} onStyle={onStyle} />
       </div>
       <button onClick={onClear} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
     </div>
   )
 }
 const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
+
+/** Border width slider — also sets border-style:solid so the border actually shows (and clears it at 0). */
+function BorderWidthRow({ getVal, onStyle }: { getVal: (p: string) => string; onStyle: (p: string, v: string) => void }) {
+  const n = parseFloat(getVal('border-width')); const v = isFinite(n) ? n : 0
+  const set = (raw: string) => { const w = raw ? parseInt(raw, 10) : 0; if (w > 0) { onStyle('border-style', 'solid'); onStyle('border-width', `${w}px`) } else { onStyle('border-width', ''); onStyle('border-style', '') } }
+  return (
+    <div style={{ marginBottom: 10 }}>
+      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>Border width</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+        <input type="range" min={0} max={12} value={v} onChange={(e) => set(e.target.value)} style={{ flex: 1, accentColor: ORANGE }} />
+        <input type="number" value={v || ''} onChange={(e) => set(e.target.value)} style={{ width: 56, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, boxSizing: 'border-box' }} />
+      </div>
+    </div>
+  )
+}
 
 /* ── Edit Product — the product the page's bound elements read from ── */
 function EditProductModal({ doc, onChange, onClose }: { doc: PageDoc; onChange: (p: Record<string, unknown>) => void; onClose: () => void }) {
