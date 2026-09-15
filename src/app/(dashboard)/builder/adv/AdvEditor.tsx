@@ -24,7 +24,9 @@ import PropertyPanel from './PropertyPanel'
 /* theme tokens (shared with the builder / HqRunable) */
 const INK = '#1b1a17', SUB = '#6e6a63', FAINT = '#a6a29a'
 const LINE = 'rgba(20,18,15,.10)', ORANGE = '#e02f06', WASH = '#fdeee9', INSET = '#f7f6f4'
-const SERIF = '"Hedvig Letters Serif", Georgia, serif'
+// The editor UI font. PagePilot's builder is a clean sans throughout (no serif headings), so the editor
+// chrome uses a system sans stack to match; `SERIF` keeps its name only to avoid churn across usages.
+const SERIF = "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
 const sameRef = (a: NodeRef | null, b: NodeRef | null) =>
   !!a && !!b && a.sectionId === b.sectionId && a.blockId === b.blockId && a.elementId === b.elementId
@@ -1008,7 +1010,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {/* top bar */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
         <Link href="/builder" style={{ color: SUB, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>← Builder</Link>
-        <span style={{ fontFamily: SERIF, fontSize: 18 }}>Page editor</span>
+        <span style={{ fontFamily: SERIF, fontSize: 15, fontWeight: 700 }}>Page editor</span>
         <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, background: WASH, borderRadius: 999, padding: '3px 9px' }}>Advanced · beta</span>
         <button onClick={() => setShowProduct(true)} style={{ ...btn, padding: '6px 12px' }}>Edit product</button>
         <div style={{ flex: 1 }} />
@@ -1282,7 +1284,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
     <div>
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Block</div>
-        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.15 }}>{name || 'Edit this piece'}</div>
+        <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{name || 'Edit this piece'}</div>
       </div>
       {gallery && (
         <div style={{ marginBottom: 14 }}>
@@ -1404,7 +1406,7 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, onHide, onDup
     <div>
       <div style={{ marginBottom: 8 }}>
         <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Section</div>
-        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.15 }}>{name || 'Section'}</div>
+        <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2 }}>{name || 'Section'}</div>
       </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={onDup} style={miniActionA}>⧉ Duplicate</button>
