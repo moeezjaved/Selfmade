@@ -373,6 +373,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   const onCanvasClick = useCallback((e: React.MouseEvent) => {
     const clicked = e.target as HTMLElement
+    // Gallery: clicking a thumbnail swaps the MAIN image (preview interaction, like PagePilot and the
+    // published storefront). Replacing/editing gallery images is still available from the tree.
+    const thumb = clicked.closest('.thumbs img, img.gthumb, .gthumb img') as HTMLImageElement | null
+    if (thumb && thumb.tagName === 'IMG') {
+      const scope = (clicked.closest('[data-node-type^="section:"]') as HTMLElement | null) || canvasRef.current
+      const main = scope?.querySelector('.hbottle, .gimg, .gtrack img, .gallery img:not(.thumbs img)') as HTMLImageElement | null
+      const src = thumb.getAttribute('src')
+      if (main && src && main !== thumb) { main.setAttribute('src', src); e.stopPropagation(); return }
+    }
     const target = clicked.closest('[data-node-id]') as HTMLElement | null
     if (!target || !doc) { setSel(null); setRawSel(null); return }
     const id = target.getAttribute('data-node-id') || ''

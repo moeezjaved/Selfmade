@@ -384,6 +384,11 @@ function editablize(html: string): { html: string; settings: Setting[] } {
 // Scoped via the section's own `.pgbld` wrapper, so duplicating the section keeps each gallery independent.
 const GALLERY_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var tr=(root&&root.querySelector('.gtrack'))||document.querySelector('.gtrack');if(!tr)return;var scope=tr.closest('.pgbld')||root||document;var dots=[].slice.call(scope.querySelectorAll('.gdots .gdot'));var ths=[].slice.call(scope.querySelectorAll('.thumbs .gthumb'));var n=tr.children.length;if(n<2)return;function cur(){return Math.round(tr.scrollLeft/Math.max(1,tr.clientWidth));}function u(){var i=cur();dots.forEach(function(d,j){d.classList.toggle('on',j===i);});ths.forEach(function(x,j){x.classList.toggle('on',j===i);});}tr.addEventListener('scroll',function(){requestAnimationFrame(u);},{passive:true});ths.forEach(function(x){x.addEventListener('click',function(){tr.scrollTo({left:(+x.getAttribute('data-i'))*tr.clientWidth,behavior:'smooth'});});});var pv=scope.querySelector('.gprev'),nx=scope.querySelector('.gnext');function go(d){var i=((cur()+d)%n+n)%n;tr.scrollTo({left:i*tr.clientWidth,behavior:'smooth'});}if(pv)pv.addEventListener('click',function(){go(-1);});if(nx)nx.addEventListener('click',function(){go(1);});var t=setInterval(function(){go(1);},4500);var h=scope.querySelector('.gallery')||tr;h.addEventListener('mouseenter',function(){clearInterval(t);});})();</script>`
 const withGalleryDriver = (html: string): string => (/\bgtrack\b/.test(html) ? html + GALLERY_SCRIPT : html)
+// Thumbnail gallery driver for templates that use a `.thumbs` strip + a single main image (e.g. cobalt's
+// `.hbottle`) instead of a `.gtrack` carousel — clicking a thumbnail swaps the main image (QA #6). Skipped
+// when a `.gtrack` is present (that carousel has its own driver above).
+const THUMBS_SCRIPT = `<script>(function(){var s=document.currentScript;var root=s?s.parentElement:document;var scope=root.closest('.pgbld')||root;if(scope.querySelector('.gtrack'))return;var thumbs=[].slice.call(scope.querySelectorAll('.thumbs img'));if(thumbs.length<2)return;var main=scope.querySelector('.hbottle')||scope.querySelector('.gimg')||scope.querySelector('.gallery img')||scope.querySelector('.hero img:not(.thumbs img)');if(!main||main.closest('.thumbs'))return;thumbs.forEach(function(t){t.style.cursor='pointer';t.addEventListener('click',function(){var src=t.getAttribute('src');if(!src)return;main.setAttribute('src',src);thumbs.forEach(function(x){x.classList.remove('on');});t.classList.add('on');});});})();</script>`
+const withThumbsDriver = (html: string): string => (/\bthumbs\b/.test(html) && !/\bgtrack\b/.test(html) ? html + THUMBS_SCRIPT : html)
 
 // Review / testimonial carousels (.gcar with .gprev/.gnext arrows) are a horizontal scroller, not a
 // full-width slider — the page-level script that drove their arrows is dropped when we split into sections,
@@ -972,7 +977,7 @@ export function buildThemeAssets(opts: { pageId: string; kind: PageKind; css: st
     // countdown script is dropped by the split, so without this the published timer is frozen).
     const withCountdown = /\bcd-h\b/.test(html)
     const secSettings = withCountdown ? [...settings, ...COUNTDOWN_SETTINGS] : settings
-    const driven = withCountdownDriver(withMarqueeDriver(withFloatctaDriver(withCarouselDriver(withGalleryDriver(html)))))
+    const driven = withCountdownDriver(withMarqueeDriver(withFloatctaDriver(withCarouselDriver(withThumbsDriver(withGalleryDriver(html))))))
     return { id: key, key: `sections/${key}.liquid`, value: liquidSection(cssKey, p.name, driven, secSettings, blockDefs), blocks: bl?.blocks as any, blockOrder: bl?.blockOrder as any }
   })
 
