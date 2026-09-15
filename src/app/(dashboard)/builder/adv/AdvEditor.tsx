@@ -243,24 +243,31 @@ function rawIsImg(el: HTMLElement): boolean {
 }
 // Derive a meaningful section name from its raw HTML (PagePilot-style: name by heading, else by content type)
 // so the tree never shows a bare "Section 2". Falls back to the stored name only if nothing is detectable.
+// PagePilot's exact section names, keyed by the bespoke templates' section-root class. These WIN over the
+// stored/heading name so the tree reads one-to-one with PagePilot (e.g. the reviews grid → "Reviews Carousel").
+const PP_SECTION_NAME: Record<string, string> = {
+  strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
+  feat: 'Image with Feature Cards', how: 'Image with Text', trust: 'As Seen On with Quotes', cmp: 'Product Differences',
+}
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback
-  // Keep a good stored name as-is (only fix bare "Section N" / empty). A long name is trimmed, not replaced.
+  const box = document.createElement('div'); box.innerHTML = html
+  // 1) Known section type → PagePilot's exact name (matches the live app one-to-one).
+  const root = box.children[0] as HTMLElement | undefined
+  for (const cls of Array.from(root?.classList || [])) if (PP_SECTION_NAME[cls]) return PP_SECTION_NAME[cls]
+  // 2) Keep a good stored name as-is (only fix bare "Section N" / empty). A long name is trimmed, not replaced.
   const stored = (fallback || '').trim()
   const generic = !stored || /^section\s*\d+$/i.test(stored)
   if (!generic) return stored.length > 30 ? stored.slice(0, 30) + '…' : stored
-  const box = document.createElement('div'); box.innerHTML = html
-  // Generic name → prefer a real heading (How It Works, Why Choose Us…), else classify by content.
+  // 3) Generic name → prefer a real heading (How It Works, Why Choose Us…), else classify by content.
   const h = box.querySelector('h1, h2, h3, h4, .hd, .eyebrow, .kicker, .sectitle, .stitle, .secttl') as HTMLElement | null
   const ht = (h?.textContent || '').replace(/\s+/g, ' ').trim()
   if (ht && ht.length <= 40) return ht.length > 30 ? ht.slice(0, 30) + '…' : ht
-  // No heading → classify by what the section holds.
-  if (box.querySelector('.strip')) return 'Rotating Benefits'   // the scrolling benefit-pill bar (PagePilot's name)
-  if (box.querySelector('.pays, .payicon')) return 'Payment'
+  if (box.querySelector('.pays, .payicon')) return 'Payment Icons'
   if (box.querySelector('.hchecks, .checks, .benefit, .ppill, .ppills, .strip .p, [class*="benefit"]') || /✓|✔/.test(box.textContent || '')) return 'Benefits'
-  if (box.querySelector('.stars, [class*="rating"], [class*="review"]') || /★/.test(box.textContent || '')) return 'Reviews'
-  if (box.querySelector('.thumbs, .gtrack, .hbottle, .gallery, .gimg')) return 'Gallery'
-  if (box.querySelector('[class*="stat"], [class*="percent"], [class*="ring"]')) return 'Stats'
+  if (box.querySelector('.stars, [class*="rating"], [class*="review"]') || /★/.test(box.textContent || '')) return 'Reviews Carousel'
+  if (box.querySelector('.thumbs, .gtrack, .hbottle, .gallery, .gimg')) return 'Product Gallery'
+  if (box.querySelector('[class*="stat"], [class*="percent"], [class*="ring"]')) return 'Statistics With Percentages'
   return fallback || 'Section'
 }
 /** Parse a raw slice's HTML into a nested outline. Collapses single-child layout wrappers so the tree shows
