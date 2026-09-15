@@ -141,6 +141,17 @@ function productCardBlock(): Block {
 }
 
 /** A new section of the given type with a full, realistic starter block set (Phase 4 — the section library). */
+/** Build a bespoke-template RAW section from a self-contained HTML slice — same shape pageDocFromTemplate
+ *  produces (section 'raw' → group block → raw element). Used by the "Add Section" library so a merchant can
+ *  drop in a ready-made, PagePilot-style section that keeps its exact design and stays fully editable. */
+export function newRawSection(html: string, name: string): Section {
+  return { id: nodeId('s'), type: 'raw', name, style: { paddingY: '0' }, blocks: [
+    { id: nodeId('b'), type: 'group', style: { width: '100%' }, elements: [
+      { id: nodeId('e'), type: 'raw', content: { html }, style: {} },
+    ] },
+  ] }
+}
+
 export function newSection(type: Section['type']): Section {
   const base = (blocks: Block[], style: Section['style']): Section => section(type, blocks, style)
   // Grid/list sections keep a neutral style (padding only) and let render.ts own their inner layout per

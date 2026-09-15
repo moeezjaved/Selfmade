@@ -17,7 +17,7 @@ import {
   moveNode, moveSectionToIndex, moveBlockToIndex, moveElementToIndex, levelOf, setHidden, removeNode, duplicateNode, insertSection, insertBlock, patchElementContent, patchStyle,
 } from '@/lib/builder/docOps'
 import { writeField, type StyleKey } from '@/lib/builder/styleField'
-import { newSection, newBlock, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
+import { newSection, newBlock, newRawSection, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
 import PropertyPanel from './PropertyPanel'
 
 /* theme tokens (shared with the builder / HqRunable) */
@@ -96,6 +96,28 @@ const RAW_LIBRARY: { id: string; label: string; html: string }[] = [
   { id: 'stat', label: 'Stat', html: '<div style="flex:1 1 160px;max-width:220px;text-align:center;padding:16px"><div style="font-size:40px;font-weight:900;color:#3f4bd6">90%</div><div style="font-size:13px;color:#6a6e93;margin-top:4px">reported better results</div></div>' },
   { id: 'badges', label: 'Badge row', html: '<div class="wrap" style="display:flex;flex-wrap:wrap;justify-content:center;gap:10px;padding:12px 0"><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Vegan</span><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Cruelty-free</span><span style="background:#eef0fe;color:#3f4bd6;font-weight:700;font-size:13px;padding:7px 14px;border-radius:999px">Lab tested</span></div>' },
   { id: 'spacer', label: 'Spacer', html: '<div style="height:40px"></div>' },
+]
+// ── Section LIBRARY ─────────────────────────────────────────────────────────────────────────────────
+// Ready-made, PagePilot-style SECTIONS a merchant can drop into the page (matching PagePilot's Add Section
+// catalog). Each is a self-contained HTML slice (inline styles → renders in any doc + previews) and inserts
+// as a raw section, so it shows in the tree as named, per-piece-editable blocks and publishes as native
+// editable Shopify blocks. Neutral palette (indigo accent) so it blends with any template.
+const SL_ACCENT = '#3f4bd6', SL_INK = '#14120f', SL_SUB = '#6a6e93', SL_LINE = '#e7e3dd', SL_WASH = '#eef0fe'
+const slWrap = (inner: string, bg = 'transparent') => `<section style="padding:44px 20px;background:${bg}"><div style="max-width:1040px;margin:0 auto">${inner}</div></section>`
+const slHead = (t: string, s?: string) => `<div style="text-align:center;margin:0 0 26px"><h2 style="font-size:30px;font-weight:800;color:${SL_INK};margin:0 0 8px">${t}</h2>${s ? `<p style="font-size:15px;color:${SL_SUB};max-width:620px;margin:0 auto;line-height:1.6">${s}</p>` : ''}</div>`
+const SECTION_LIBRARY: { id: string; label: string; html: string }[] = [
+  { id: 'rotating-benefits', label: 'Rotating Benefits', html: slWrap(`<div class="ppills" style="display:flex;flex-wrap:wrap;gap:10px;justify-content:center">${['Boosts hydration', 'Strengthens', 'Adds shine', 'Reduces breakage', 'All-day hold'].map((b) => `<span class="pill" style="background:${SL_WASH};color:${SL_ACCENT};font-weight:700;font-size:14px;padding:10px 18px;border-radius:999px">${b}</span>`).join('')}</div>`) },
+  { id: 'statistics', label: 'Statistics', html: slWrap(slHead('The results speak for themselves') + `<div class="sgrid" style="display:flex;flex-wrap:wrap;gap:20px;justify-content:center">${[['93%', 'saw visible results'], ['4.9★', 'average rating'], ['50k+', 'happy customers'], ['30 days', 'money-back guarantee']].map(([n, t]) => `<div class="stat" style="flex:1 1 180px;max-width:230px;text-align:center;padding:18px"><div style="font-size:42px;font-weight:900;color:${SL_ACCENT}">${n}</div><div style="font-size:14px;color:${SL_SUB};margin-top:6px">${t}</div></div>`).join('')}</div>`, '#faf9ff') },
+  { id: 'feature-cards', label: 'Feature Cards', html: slWrap(slHead('Why customers love it') + `<div class="fgrid" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center">${[['✨', 'Fast results', 'Visible change within the first few weeks of use.'], ['🌿', 'Clean formula', 'No harsh chemicals — gentle enough for daily use.'], ['🛡', 'Guaranteed', 'Love it or your money back, no questions asked.']].map(([i, h, p]) => `<div class="feat" style="flex:1 1 240px;max-width:320px;background:#fff;border:1px solid ${SL_LINE};border-radius:16px;padding:24px 20px;text-align:center;box-shadow:0 2px 12px -6px rgba(20,18,15,.18)"><div style="font-size:32px;margin-bottom:10px">${i}</div><h4 style="font-size:17px;font-weight:800;color:${SL_INK};margin:0 0 6px">${h}</h4><p style="font-size:14px;color:${SL_SUB};line-height:1.6;margin:0">${p}</p></div>`).join('')}</div>`) },
+  { id: 'reviews', label: 'Reviews Carousel', html: slWrap(slHead('What customers say') + `<div class="revs" style="display:flex;flex-wrap:wrap;gap:16px;justify-content:center">${[['Sarah M.', 'Honestly the best I have tried — noticed a difference within days.'], ['James T.', 'Worth every penny. Repurchasing for the third time now.'], ['Aisha K.', 'Gentle, effective, and it actually works. Highly recommend.']].map(([n, q]) => `<div class="rev" style="flex:1 1 260px;max-width:330px;background:#fff;border:1px solid ${SL_LINE};border-radius:16px;padding:22px 20px;box-shadow:0 2px 12px -6px rgba(20,18,15,.18)"><div style="color:#f5a623;letter-spacing:2px;margin-bottom:8px">★★★★★</div><p style="font-size:15px;color:${SL_INK};line-height:1.55;margin:0 0 12px">"${q}"</p><div style="font-size:13px;font-weight:700;color:${SL_SUB}">— ${n}</div></div>`).join('')}</div>`, '#faf9ff') },
+  { id: 'as-seen-on', label: 'As Seen On', html: slWrap(`<div style="text-align:center;font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:${SL_SUB};margin-bottom:16px">As seen on</div><div class="press" style="display:flex;flex-wrap:wrap;gap:26px;justify-content:center;align-items:center">${['Forbes', 'Vogue', 'TechCrunch', 'GQ', 'Allure'].map((l) => `<span class="plogo" style="font-size:20px;font-weight:800;color:#9a9aa8">${l}</span>`).join('')}</div>`) },
+  { id: 'comparison', label: 'Product Differences', html: slWrap(slHead('Why we’re different') + `<div class="vs" style="max-width:640px;margin:0 auto;border:1px solid ${SL_LINE};border-radius:16px;overflow:hidden">${[['Clinically tested formula', true], ['No harsh chemicals', true], ['Money-back guarantee', true], ['Cheap synthetic fillers', false], ['Hidden subscription traps', false]].map(([t, ok]) => `<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid ${SL_LINE}"><span style="font-size:15px;color:${SL_INK}">${t}</span><span style="font-size:18px;color:${ok ? '#1ea672' : '#d64316'};font-weight:800">${ok ? '✓ Us' : '✕ Them'}</span></div>`).join('')}</div>`) },
+  { id: 'guarantee', label: 'Happiness Guarantee', html: slWrap(`<div style="background:#fff;border:1px solid ${SL_LINE};border-radius:20px;padding:34px 26px;text-align:center;box-shadow:0 4px 18px -10px rgba(20,18,15,.2)"><div style="font-size:40px;margin-bottom:10px">🛡</div><h3 style="font-size:24px;font-weight:800;color:${SL_INK};margin:0 0 8px">30-Day Happiness Guarantee</h3><p style="font-size:15px;color:${SL_SUB};max-width:560px;margin:0 auto;line-height:1.6">Try it risk-free. If you don’t love it, we’ll refund every penny — no questions asked.</p></div>`) },
+  { id: 'numbered', label: 'Numbered Benefits', html: slWrap(slHead('How it works') + `<div class="hchecks" style="max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:16px">${[['1', 'Apply', 'Massage a few drops into clean skin or scalp.'], ['2', 'Absorb', 'Let the active ingredients work overnight.'], ['3', 'Reveal', 'Wake up to visibly healthier results.']].map(([n, h, p]) => `<div style="display:flex;gap:16px;align-items:flex-start"><span style="flex:none;width:38px;height:38px;border-radius:999px;background:${SL_ACCENT};color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center">${n}</span><div><h4 style="font-size:17px;font-weight:800;color:${SL_INK};margin:0 0 3px">${h}</h4><p style="font-size:14px;color:${SL_SUB};line-height:1.55;margin:0">${p}</p></div></div>`).join('')}</div>`) },
+  { id: 'image-text', label: 'Image with Text', html: slWrap(`<div style="display:flex;flex-wrap:wrap;gap:36px;align-items:center"><div style="flex:1 1 300px"><img src="https://placehold.co/640x460/eef0fe/3f4bd6?text=Image" alt="" style="width:100%;border-radius:16px"></div><div style="flex:1 1 300px"><h2 style="font-size:28px;font-weight:800;color:${SL_INK};margin:0 0 12px">A headline that sells</h2><p style="font-size:15px;color:${SL_SUB};line-height:1.65;margin:0 0 18px">Two or three lines describing the benefit in the customer’s own words, then a clear reason to buy today.</p><a href="#" style="display:inline-block;background:${SL_ACCENT};color:#fff;padding:14px 28px;border-radius:999px;font-weight:800;text-decoration:none">Shop now</a></div></div>`) },
+  { id: 'cta', label: 'CTA Band', html: slWrap(`<div style="background:${SL_ACCENT};border-radius:20px;padding:44px 26px;text-align:center"><h3 style="color:#fff;font-size:28px;font-weight:800;margin:0 0 8px">Ready to get started?</h3><p style="color:#dfe3ff;font-size:15px;margin:0 0 20px">Join thousands of happy customers today.</p><a href="#" style="display:inline-block;background:#fff;color:${SL_ACCENT};padding:15px 34px;border-radius:999px;font-weight:800;text-decoration:none">Add to cart</a></div>`) },
+  { id: 'trust-icons', label: 'Trust Icons', html: slWrap(`<div class="hchecks" style="display:flex;flex-wrap:wrap;gap:22px;justify-content:center">${[['🚚', 'Free shipping'], ['↩', '30-day returns'], ['🔒', 'Secure checkout'], ['🌿', 'Cruelty-free']].map(([i, t]) => `<div class="ti" style="display:flex;align-items:center;gap:9px;font-size:14px;font-weight:600;color:${SL_INK}"><span style="font-size:20px">${i}</span>${t}</div>`).join('')}</div>`) },
+  { id: 'faq', label: 'FAQ', html: slWrap(slHead('Frequently asked questions') + `<div style="max-width:680px;margin:0 auto;display:flex;flex-direction:column;gap:12px">${[['How long until I see results?', 'Most customers notice a difference within the first two to three weeks of daily use.'], ['Is it safe for sensitive skin?', 'Yes — our formula is dermatologist-tested and free from harsh chemicals.'], ['What’s your return policy?', 'Every order is covered by a 30-day money-back guarantee.']].map(([q, a]) => `<details style="background:#fff;border:1px solid ${SL_LINE};border-radius:12px;padding:14px 18px"><summary style="font-size:15px;font-weight:700;color:${SL_INK};cursor:pointer">${q}</summary><div style="font-size:14px;color:${SL_SUB};line-height:1.6;margin-top:8px">${a}</div></details>`).join('')}</div>`) },
 ]
 /** Resolve the node at `path` inside a raw slice's HTML; returns {box,node} or null on miss. */
 function rawNodeAt(html: string, path: number[]): { box: HTMLElement; node: HTMLElement } | null {
@@ -219,6 +241,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [dirty, setDirty] = useState(false)   // unsaved changes (Save is manual — no autosave)
   const [err, setErr] = useState('')
   const [addMenu, setAddMenu] = useState<null | { kind: 'section' } | { kind: 'block'; sectionId: string }>(null)
+  const [sectionLibOpen, setSectionLibOpen] = useState(false)   // the "Add section" library (PagePilot-style)
   const [drag, setDrag] = useState<NodeRef | null>(null)   // node being dragged in the tree
   const [dropKey, setDropKey] = useState<string | null>(null)   // refKey of the node hovered as a drop target
   const [publishing, setPublishing] = useState<'idle' | 'saving' | 'publishing'>('idle')
@@ -753,7 +776,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               </div>
             )
           })}
-          <AddBtn label="Add section" onClick={() => setAddMenu({ kind: 'section' })} depth={0} primary />
+          <AddBtn label="Add section" onClick={() => setSectionLibOpen(true)} depth={0} primary />
         </aside>
 
         {/* ── center: live canvas ── */}
@@ -849,6 +872,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
       {rawLibOpen && <RawLibraryModal onPick={(html) => { rawInsert(html); setRawLibOpen(false) }} onClose={() => setRawLibOpen(false)} />}
+      {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
     </div>
   )
 }
@@ -871,6 +895,33 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string) => void; 
                 <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
               </div>
               <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// PagePilot-style "Add Section" library — a gallery of ready-made sections with live previews. Picking one
+// inserts it as a named, per-piece-editable raw section that keeps its design and publishes as native blocks.
+function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name: string) => void; onClose: () => void }) {
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(980px,95vw)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: `1px solid ${LINE}`, position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
+          <span style={{ fontFamily: SERIF, fontSize: 20 }}>Add a section</span>
+          <span style={{ fontSize: 12.5, color: SUB }}>Click one to add it to your page — every piece stays editable</span>
+          <div style={{ flex: 1 }} />
+          <button onClick={onClose} style={{ ...iconTopBtn, fontSize: 18 }}>✕</button>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 16, padding: 20 }}>
+          {SECTION_LIBRARY.map((it) => (
+            <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+              <div style={{ height: 168, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <div style={{ width: 900, transform: 'scale(.42)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+              </div>
+              <div style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
             </button>
           ))}
         </div>
