@@ -763,6 +763,8 @@ const LIST_CONTAINERS: Array<[string, string]> = [
   // home template list containers (so its reviews / benefits / transformation / services / FAQ sections
   // become add/remove/reorder blocks too, matching the product page). Item must carry a class (see below).
   ['blurbs', 'Benefit'], ['tlist', 'Step'], ['gcar', 'Review'], ['svc', 'Service'], ['faq', 'Question'],
+  // Peak Energy (cobalt_v1) uniform list containers → editable Shopify blocks in the theme customizer.
+  ['ppills', 'Pill'], ['stats', 'Stat'], ['press', 'Quote'], ['fgrid', 'Feature'],
 ]
 const firstClass = (attrs: string) => (/\bclass=["']([^"']*)["']/.exec(attrs)?.[1] || '').trim().split(/\s+/)[0]
 
