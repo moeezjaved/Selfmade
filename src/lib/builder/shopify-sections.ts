@@ -270,6 +270,18 @@ function editablize(html: string): { html: string; settings: Setting[] } {
     return `<${tag}${attrs}>{{ section.settings.${addText(clean)} }}</${tag}>`
   })
 
+  // PRICE / BADGE span pass — the buy-box price is `<span class="now|was|save|price">` inside a `.price`
+  // div, so it never matched TEXT_TAGS (no span) and the div-leaf pass skips `.price` (it has span
+  // children). Result: the sale price, compare-at price and save badge were uneditable in Shopify (the
+  // merchant couldn't change the price shown on a static / non-dynamic PDP). Lift each price span as
+  // editable text — no markup change, so the design is identical. On a DYNAMIC product the price is
+  // already `{{ product.price }}` liquid, so hasLiquid skips it and nothing double-processes.
+  s = s.replace(/<span\b([^>]*\bclass=["'][^"']*\b(?:now|was|save|price)\b[^"']*["'][^>]*)>([^<]{1,120}?)<\/span>/gi, (m, attrs, text) => {
+    const clean = stripMd(text)
+    if (!clean || hasLiquid(text) || tn >= 44 || !isRealText(clean)) return m
+    return `<span${attrs}>{{ section.settings.${addText(clean)} }}</span>`
+  })
+
   // MARQUEE pass — the scroll bar (.marq-track) holds its promo <span>s TWICE for a seamless -50% loop, so
   // editing them naively would create confusing duplicate fields (QA #5). Make the FIRST copy's spans
   // editable and render that editable set twice — both copies read the SAME settings, so edits stay in sync
