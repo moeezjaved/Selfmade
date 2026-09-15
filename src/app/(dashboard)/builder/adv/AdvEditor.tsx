@@ -77,7 +77,9 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup' | 'appendchild'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup' | 'appendchild' | 'sethref'
+// Inline tags a rich-text piece may contain and still be safely edited as one text block (not a container).
+const RICH_INLINE = new Set(['SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'BR', 'SUP', 'SUB', 'MARK', 'SMALL', 'FONT'])
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
@@ -159,6 +161,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
   else if (op === 'settext' && arg != null) node.textContent = arg    // set a piece's plain text (panel content field)
   else if (op === 'dup') { const c = node.cloneNode(true) as HTMLElement; if (parent) parent.insertBefore(c, node.nextSibling) }
   else if (op === 'appendchild' && arg != null) node.insertAdjacentHTML('beforeend', arg)   // add a child (gallery image)
+  else if (op === 'sethref' && arg != null) { const a = (node.tagName === 'A' ? node : node.querySelector('a')) as HTMLAnchorElement | null; if (a) a.setAttribute('href', arg) }   // button/link destination
   return box.innerHTML
 }
 /** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
@@ -238,6 +241,25 @@ function rawLabelFor(el: HTMLElement): string {
 function rawIsImg(el: HTMLElement): boolean {
   return el.tagName === 'IMG' || (!!el.querySelector('img') && !(el.textContent || '').trim())
 }
+// Derive a meaningful section name from its raw HTML (PagePilot-style: name by heading, else by content type)
+// so the tree never shows a bare "Section 2". Falls back to the stored name only if nothing is detectable.
+function rawSectionName(html: string, fallback: string): string {
+  if (typeof document === 'undefined' || !html) return fallback
+  const box = document.createElement('div'); box.innerHTML = html
+  const generic = !fallback || /^section\s*\d+$/i.test(fallback.trim())
+  // A real heading wins (matches the sections PagePilot already names well: How It Works, Why Choose Us…).
+  const h = box.querySelector('h1, h2, h3, h4, .hd, .eyebrow, .kicker, .sectitle, .stitle') as HTMLElement | null
+  const ht = (h?.textContent || '').replace(/\s+/g, ' ').trim()
+  if (ht && ht.length <= 40) return ht.length > 30 ? ht.slice(0, 30) + '…' : ht
+  if (!generic) return fallback   // stored name is fine (already content-derived) — keep it
+  // No heading + generic stored name → classify by what the section holds.
+  if (box.querySelector('.pays, .payicon')) return 'Payment'
+  if (box.querySelector('.hchecks, .checks, .benefit, .ppill, .ppills, [class*="benefit"]') || /✓|✔/.test(box.textContent || '')) return 'Benefits'
+  if (box.querySelector('.stars, [class*="rating"], [class*="review"]') || /★/.test(box.textContent || '')) return 'Reviews'
+  if (box.querySelector('.thumbs, .gtrack, .hbottle, .gallery, .gimg')) return 'Gallery'
+  if (box.querySelector('[class*="stat"], [class*="percent"], [class*="ring"]')) return 'Stats'
+  return fallback || 'Section'
+}
 /** Parse a raw slice's HTML into a nested outline. Collapses single-child layout wrappers so the tree shows
  *  meaningful pieces, not scaffolding; caps nodes + depth so it stays fast and legible. */
 function buildRawOutline(html: string): RawOutlineNode[] {
@@ -289,8 +311,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [zoom, setZoom] = useState(1)
   // Sub-selection INSIDE a raw (bespoke-template) section: the raw element + the clicked node's child-path.
   const [rawSel, setRawSel] = useState<null | { ref: NodeRef; path: number[]; isImg: boolean }>(null)
+  const [imgUrlOpen, setImgUrlOpen] = useState(false)   // image "Use image URL" inline field (replaces browser prompt)
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
   const [rawBox, setRawBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // selection highlight rect
+  // Close the inline image-URL field whenever the selected piece changes.
+  useEffect(() => { setImgUrlOpen(false) }, [rawSel?.ref.elementId, rawSel?.path.join('.')])
   const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
   const [rawLibOpen, setRawLibOpen] = useState(false)          // the full block LIBRARY (previews) modal
   const [rawInsertTarget, setRawInsertTarget] = useState<null | { path: number[]; mode: 'after' | 'append' }>(null)  // where a picked block lands
@@ -632,7 +657,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const html = (cur?.content as { html?: string } | undefined)?.html
     if (typeof html !== 'string') return
     let a = arg
-    if (op === 'img') { const url = window.prompt('New image URL'); if (!url || !url.trim()) return; a = url.trim() }
+    // Image URL is set from an inline panel field now (no browser prompt) — a bare 'img' op just no-ops.
+    if (op === 'img' && (a == null || !a.trim())) return
     const next = rawHtmlOp(html, path, op, a)
     if (next === html) return
     apply((d) => patchElementContent(d, ref, { html: next }))
@@ -680,6 +706,21 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return n.textContent || ''
   }, [rawNodeEl])
   const rawSetText = useCallback((t: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'settext', t) }, [rawSel, rawApplyAt])
+  // Rich text (PagePilot-style editor): a piece is "text" when it's not an image/gallery/pays row and its
+  // children (if any) are only inline formatting — so its innerHTML can be edited safely with a toolbar.
+  const rawIsText = useCallback((): boolean => {
+    const n = rawNodeEl(); if (!n || rawSel?.isImg) return false
+    if (n.classList?.contains('pays') || n.querySelector('.pays, .payicon, .thumbs, .gtrack, .hbottle, .gimg')) return false
+    const kids = Array.from(n.children) as HTMLElement[]
+    if (kids.length && !kids.every((k) => RICH_INLINE.has(k.tagName))) return false
+    return !!(n.textContent || '').trim()
+  }, [rawNodeEl, rawSel])
+  const rawHtml = useCallback((): string => { const n = rawNodeEl(); return n ? n.innerHTML : '' }, [rawNodeEl])
+  const rawSetHtml = useCallback((h: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'sethtml', h) }, [rawSel, rawApplyAt])
+  // Link/button destination editing (bug: "Shop Now button not working" — make its link editable in-editor).
+  const rawIsLink = useCallback((): boolean => { const n = rawNodeEl(); return !!n && (n.tagName === 'A' || !!n.querySelector('a')) }, [rawNodeEl])
+  const rawHref = useCallback((): string => { const n = rawNodeEl(); if (!n) return ''; const a = (n.tagName === 'A' ? n : n.querySelector('a')) as HTMLAnchorElement | null; return a?.getAttribute('href') || '' }, [rawNodeEl])
+  const rawSetHref = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'sethref', url) }, [rawSel, rawApplyAt])
   // Upload an image file → presigned R2 PUT → returns the public URL (matches PagePilot's "Select files").
   const uploadImage = useCallback(async (file: File): Promise<string | null> => {
     try {
@@ -938,7 +979,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             const rawEl = rawSectionEl(s)
             // PagePilot names the buy-box section "Product Information" (not "Hero"); detect a buy-box slice.
             const isBuyBoxSec = !!rawEl && /\bptitle\b/.test(rawEl.html) && /\b(now|price|buy)\b/.test(rawEl.html)
-            const secLabel = isBuyBoxSec ? 'Product Information' : (s.name || SECTION_LABEL(s.type))
+            const secLabel = isBuyBoxSec ? 'Product Information' : (rawEl ? rawSectionName(rawEl.html, s.name || SECTION_LABEL(s.type)) : (s.name || SECTION_LABEL(s.type)))
             // Flatten a single generic wrapper (the .grid "Row") so its columns (Product Gallery / Product
             // Details) sit directly under the section — matching PagePilot's two-block hero.
             const outlineNodes = rawEl ? flattenOutline(buildRawOutline(rawEl.html)) : []
@@ -1007,9 +1048,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
           {rawSel ? (
             <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg}
+              isText={rawIsText()} html={rawHtml()} onHtml={rawSetHtml} textContext={doc.productRef?.importedProduct?.title || ''}
+              isLink={rawIsLink()} href={rawHref()} onHref={rawSetHref}
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
+              urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
@@ -1076,7 +1120,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
           <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase', pointerEvents: 'auto' }}>Item</span>
-          {rawSel.isImg && <TbBtn title="Replace image" onClick={() => rawOp('img')}>🖼</TbBtn>}
+          {rawSel.isImg && <TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>🖼</TbBtn>}
           <TbBtn title="Move up" onClick={() => rawOp('up')}>↑</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>↓</TbBtn>
           <TbBtn title="Add a piece after this" onClick={() => setRawAddOpen((o) => !o)}>＋</TbBtn>
@@ -1157,9 +1201,10 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
+  const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
   const pickFile = (onUrl: (url: string) => void) => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'
     inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBusy(true); const url = await uploadImage(f); setBusy(false); if (url) onUrl(url) }
@@ -1227,10 +1272,28 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
           <button disabled={busy} onClick={() => pickFile((url) => onSetImg(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Uploading…' : '⬆ Upload image'}</button>
-          <button onClick={() => onOp('img')} style={{ width: '100%', marginTop: 6, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
+          <button onClick={() => onUrlOpen(!urlOpen)} style={{ width: '100%', marginTop: 6, border: `1px solid ${urlOpen ? ORANGE : LINE}`, background: '#fff', color: urlOpen ? ORANGE : SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
+          {urlOpen && (
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <input autoFocus value={urlDraft} onChange={(e) => setUrlDraft(e.target.value)} placeholder="https://…/image.jpg"
+                onKeyDown={(e) => { if (e.key === 'Enter' && urlDraft.trim()) { onSetImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }}
+                style={{ flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+              <button onClick={() => { if (urlDraft.trim()) { onSetImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 8, padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Set</button>
+            </div>
+          )}
         </div>
       )}
-      {text !== '' && (
+      {isLink && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Link</div>
+          <input defaultValue={href} placeholder="https://…  or  /products/handle" onBlur={(e) => { const v = e.target.value.trim(); if (v !== href) onHref(v) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Where this button/link goes when clicked.</div>
+        </div>
+      )}
+      {isText ? (
+        <RichText key={html.length + ':' + name} html={html} onCommit={onHtml} context={textContext} />
+      ) : text !== '' && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Content</div>
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (draft !== text) onText(draft) }} rows={draft.length > 60 ? 4 : 2}
@@ -1268,6 +1331,72 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
   )
 }
 const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
+
+// PagePilot-style rich text editor: a formatting toolbar (size, B/I/U, lists, link, undo/redo, color) over a
+// contentEditable of the selected text piece, plus "✨ Edit with AI". Commits the piece's innerHTML on blur.
+function RichText({ html, onCommit, context }: { html: string; onCommit: (html: string) => void; context: string }) {
+  const ref = useRef<HTMLDivElement | null>(null)
+  const savedRange = useRef<Range | null>(null)
+  const [aiBusy, setAiBusy] = useState(false)
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [linkVal, setLinkVal] = useState('')
+  const setInitial = useCallback((el: HTMLDivElement | null) => { ref.current = el; if (el && el.innerHTML !== html) el.innerHTML = html }, [html])
+  const saveSel = () => { const s = window.getSelection(); if (s && s.rangeCount && ref.current?.contains(s.anchorNode)) savedRange.current = s.getRangeAt(0).cloneRange() }
+  const restoreSel = () => { const r = savedRange.current; const s = window.getSelection(); if (r && s) { s.removeAllRanges(); s.addRange(r) } }
+  const commit = () => { if (ref.current) onCommit(ref.current.innerHTML) }
+  const exec = (cmd: string, val?: string) => { ref.current?.focus(); restoreSel(); document.execCommand(cmd, false, val); saveSel(); commit() }
+  const applyLink = () => { const u = linkVal.trim(); setLinkOpen(false); if (!u) return; ref.current?.focus(); restoreSel(); document.execCommand('createLink', false, u); saveSel(); commit(); setLinkVal('') }
+  const editAI = async () => {
+    const text = ref.current?.textContent || ''
+    if (!text.trim()) return
+    setAiBusy(true)
+    try {
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, context }) })
+      const j = await r.json()
+      if (j.text && ref.current) { ref.current.textContent = j.text; commit() }
+      else window.alert(j.error || 'Could not rewrite.')
+    } catch { window.alert('Could not rewrite — please try again.') }
+    finally { setAiBusy(false) }
+  }
+  const tbBtn: React.CSSProperties = { border: 0, background: 'transparent', color: INK, width: 26, height: 26, borderRadius: 6, cursor: 'pointer', fontSize: 13, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 }
+  const noBlur = (fn: () => void) => (e: React.MouseEvent) => { e.preventDefault(); fn() }
+  return (
+    <div style={{ marginBottom: 14 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Text</div>
+      <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', padding: '4px 5px', borderBottom: `1px solid ${LINE}`, background: INSET }}>
+          <select onMouseDown={saveSel} onChange={(e) => exec('fontSize', e.target.value)} defaultValue="" title="Text size" style={{ border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', fontSize: 12, padding: '2px 4px', marginRight: 3, cursor: 'pointer', color: INK }}>
+            <option value="" disabled>Aa</option>
+            <option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">XL</option>
+          </select>
+          <button title="Bold" style={{ ...tbBtn, fontWeight: 800 }} onMouseDown={noBlur(() => exec('bold'))}>B</button>
+          <button title="Italic" style={{ ...tbBtn, fontStyle: 'italic' }} onMouseDown={noBlur(() => exec('italic'))}>I</button>
+          <button title="Underline" style={{ ...tbBtn, textDecoration: 'underline' }} onMouseDown={noBlur(() => exec('underline'))}>U</button>
+          <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => exec('insertUnorderedList'))}>•</button>
+          <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => exec('insertOrderedList'))}>1.</button>
+          <button title="Link" style={tbBtn} onMouseDown={noBlur(() => { saveSel(); setLinkOpen((o) => !o) })}>🔗</button>
+          <label title="Text color" style={{ ...tbBtn, position: 'relative' }} onMouseDown={saveSel}><span style={{ pointerEvents: 'none' }}>A</span><span style={{ position: 'absolute', bottom: 3, left: 6, right: 6, height: 3, background: ORANGE, borderRadius: 2 }} /><input type="color" onChange={(e) => exec('foreColor', e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
+          <div style={{ flex: 1 }} />
+          <button title="Undo" style={tbBtn} onMouseDown={noBlur(() => exec('undo'))}>↺</button>
+          <button title="Redo" style={tbBtn} onMouseDown={noBlur(() => exec('redo'))}>↻</button>
+        </div>
+        {linkOpen && (
+          <div style={{ display: 'flex', gap: 6, padding: '7px 7px 0' }}>
+            <input autoFocus value={linkVal} onChange={(e) => setLinkVal(e.target.value)} placeholder="https://…" onKeyDown={(e) => { if (e.key === 'Enter') applyLink() }}
+              style={{ flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 9px', fontSize: 12.5, boxSizing: 'border-box' }} />
+            <button onMouseDown={(e) => e.preventDefault()} onClick={applyLink} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 8, padding: '0 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Add</button>
+          </div>
+        )}
+        <div ref={setInitial} contentEditable suppressContentEditableWarning onBlur={commit} onMouseUp={saveSel} onKeyUp={saveSel}
+          style={{ minHeight: 60, padding: '9px 11px', fontSize: 13, lineHeight: 1.5, color: INK, outline: 'none' }} />
+      </div>
+      <div style={{ marginTop: 8 }}>
+        <button disabled={aiBusy} onMouseDown={(e) => e.preventDefault()} onClick={editAI} style={{ width: '100%', border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>{aiBusy ? 'Rewriting…' : '✨ Edit with AI'}</button>
+      </div>
+      <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Format the text here, or double-click it on the canvas.</div>
+    </div>
+  )
+}
 
 /** Border width slider — also sets border-style:solid so the border actually shows (and clears it at 0). */
 function BorderWidthRow({ getVal, onStyle }: { getVal: (p: string) => string; onStyle: (p: string, v: string) => void }) {
