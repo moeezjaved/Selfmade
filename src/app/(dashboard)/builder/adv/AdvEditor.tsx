@@ -18,6 +18,7 @@ import {
 } from '@/lib/builder/docOps'
 import { writeField, type StyleKey } from '@/lib/builder/styleField'
 import { newSection, newBlock, newRawSection, SECTION_LABEL, BLOCK_LABEL, SECTION_BLOCK_PALETTE } from '@/lib/builder/seed'
+import { PAY_PROVIDERS, payIcon } from '@/lib/builder/payicons'
 import PropertyPanel from './PropertyPanel'
 
 /* theme tokens (shared with the builder / HqRunable) */
@@ -740,6 +741,34 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     } catch { window.alert('Could not generate the image — please try again.') }
     finally { setGalleryAIbusy(false) }
   }, [rawSel, rawNodeEl, rawGalleryAdd])
+  // ── Payment Providers (matches PagePilot: real icons + a show/hide toggle list) ───────────────────────
+  const rawIsPays = useCallback((): boolean => {
+    const n = rawNodeEl(); if (!n) return false
+    return n.classList?.contains('pays') || !!n.querySelector('.pays, .payicon') || !!n.closest('.pays')
+  }, [rawNodeEl])
+  const rawPaysActive = useCallback((): string[] => {
+    const n = rawNodeEl(); if (!n) return []
+    const pays = (n.classList?.contains('pays') ? n : (n.closest('.pays') || n.querySelector('.pays'))) as HTMLElement | null
+    if (!pays) return []
+    return Array.from(pays.querySelectorAll('.payicon')).map((e) => e.getAttribute('data-pay') || '').filter(Boolean)
+  }, [rawNodeEl])
+  const togglePayProvider = useCallback((id: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const pays = (node.classList?.contains('pays') ? node : (node.closest('.pays') || node.querySelector('.pays'))) as HTMLElement | null
+      if (!pays) return
+      const existing = pays.querySelector(`.payicon[data-pay="${id}"]`)
+      if (existing) { existing.remove(); return }
+      const order = PAY_PROVIDERS.map((p) => p.id)
+      const tmp = document.createElement('div'); tmp.innerHTML = payIcon(id)
+      const el = tmp.firstElementChild as HTMLElement | null; if (!el) return
+      const idxNew = order.indexOf(id)
+      const after = Array.from(pays.querySelectorAll('.payicon')).find((s) => order.indexOf(s.getAttribute('data-pay') || '') > idxNew)
+      if (after) pays.insertBefore(el, after); else pays.appendChild(el)
+    })
+  }, [rawSel, rawEditHtml])
   // Insert a ready-made piece right AFTER the selected raw piece (a sibling), then keep design intact.
   const rawInsert = useCallback((insertHtml: string) => {
     if (!rawSel || !doc) return
@@ -935,6 +964,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg}
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
+              isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
@@ -1082,7 +1112,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const pickFile = (onUrl: (url: string) => void) => {
@@ -1132,6 +1162,20 @@ function RawElementSettings({ name, text, onText, isImg, gallery, onGalleryAdd, 
             <input type="checkbox" checked={sticky} onChange={(e) => onSticky(e.target.checked)} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
           </label>
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>If enabled, the gallery stays fixed to the top of the screen as the customer scrolls.</div>
+        </div>
+      )}
+      {isPays && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Payment Providers</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {PAY_PROVIDERS.map((p) => (
+              <label key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '5px 2px', fontSize: 12.5, color: INK, cursor: 'pointer' }}>
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 9 }}><span style={{ display: 'inline-flex', width: 38 }} dangerouslySetInnerHTML={{ __html: p.svg }} />{p.label}</span>
+                <input type="checkbox" checked={paysActive.includes(p.id)} onChange={() => onTogglePay(p.id)} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
+              </label>
+            ))}
+          </div>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Toggle which payment icons show in this row.</div>
         </div>
       )}
       {isImg && !gallery && (

@@ -10,6 +10,7 @@
  * accents. Layout is FIXED; the AI only fills `schema` slots. All CSS scoped under `.pgbld`. Responsive.
  */
 import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../types'
+import { paysRowInner } from '../payicons'
 
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
@@ -52,6 +53,8 @@ const css = `
 .pgbld .btn{display:inline-flex;align-items:center;justify-content:center;gap:9px;background:linear-gradient(180deg,#4a56ea,#3a45d0);color:#fff;border:0;border-radius:999px;padding:15px 30px;font-size:15px;font-weight:800;cursor:pointer;text-decoration:none;width:100%;box-shadow:0 12px 24px -12px rgba(63,75,214,.7)}
 .pgbld .pays{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;align-items:center}
 .pgbld .pays span{font-size:10px;font-weight:800;color:#8f93bb;border:1px solid var(--line);border-radius:5px;padding:3px 7px;background:#fff}
+.pgbld .payicon{display:inline-flex;align-items:center;line-height:0}
+.pgbld .payicon svg{display:block;border-radius:4px}
 .pgbld .stars{color:#4a56ea;letter-spacing:1px;font-size:13px}
 .pgbld .secttl{font-size:30px;text-align:center;margin-bottom:8px;font-weight:800}
 .pgbld .sectsub{text-align:center;color:var(--sub);font-size:14px;max-width:620px;margin:0 auto 32px}
@@ -308,7 +311,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="hchecks">${checks}</div>
       <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'Add to Cart')}</a>
-      <div class="pays"><span>VISA</span><span>Mastercard</span><span>AMEX</span><span>PayPal</span><span>Shop</span></div>
+      <div class="pays">${paysRowInner()}</div>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money Back Guarantee')}</span><span>↩ ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="acc">${accItems}</div>
       <div class="hclaim">${escp(c.hero_claim || 'Join thousands of customers who trust our money-back guarantee.')}</div>
@@ -413,7 +416,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <h2>${hl(c.final_head || 'Start your scalp ritual')}</h2>
       <p>${esc(c.final_body || 'Feel the freshness of a truly clean scalp without the stripped, tight feeling. Getting started is risk-free with our thirty-day satisfaction guarantee.')}</p>
       <a class="btn" href="${esc(o.ctaHref || '#')}">${escp(c.final_cta || 'Buy It Now')}</a>
-      <div class="pays"><span>VISA</span><span>Mastercard</span><span>AMEX</span><span>PayPal</span><span>Shop</span></div>
+      <div class="pays">${paysRowInner()}</div>
     </div>
   </div></div></section>
 
