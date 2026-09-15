@@ -76,7 +76,7 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'dup'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup'
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
@@ -147,6 +147,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
   }
   else if (op === 'insert' && arg != null) node.insertAdjacentHTML('afterend', arg)
   else if (op === 'sethtml' && arg != null) node.innerHTML = arg      // replace ONE piece's text/inner markup (inline edit)
+  else if (op === 'settext' && arg != null) node.textContent = arg    // set a piece's plain text (panel content field)
   else if (op === 'dup') { const c = node.cloneNode(true) as HTMLElement; if (parent) parent.insertBefore(c, node.nextSibling) }
   return box.innerHTML
 }
@@ -217,6 +218,10 @@ function rawLabelFor(el: HTMLElement): string {
   if (el.querySelector('img') && !txt) return 'Image'
   if (/^h[1-6]$/.test(tag)) return `Heading: ${snip(20)}`
   if (tag === 'a' || tag === 'button') return `Button: ${snip(16)}`
+  // Unclassed container (a hero column) → infer a PagePilot-style group name from what it holds. The outer
+  // row keeps its own friendly class ('grid'→'Row'), so only real columns reach here.
+  if (el.querySelector('.ptitle, h1') && el.querySelector('.price, .now, .buy, .btn, [class*="cart"], [class*="atc"]')) return 'Product Details'
+  if (rawIsImg(el) || el.querySelector('.thumbs, .gtrack, .gallery, .hbottle')) return 'Product Gallery'
   if (txt && txt.length <= 24) return snip(24)
   return rawFriendly(cls) || 'Group'
 }
@@ -626,6 +631,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const rawStyleVal = useCallback((prop: string): string => {
     const n = rawNodeEl(); return n ? (n.style.getPropertyValue(prop) || '') : ''
   }, [rawNodeEl])
+  // The selected piece's PagePilot-style name (panel heading) + its editable text (panel content field, only
+  // when the piece is a text leaf — a container with child pieces has no single text field).
+  const rawName = useCallback((): string => { const n = rawNodeEl(); return n ? rawLabelFor(n) : 'Item' }, [rawNodeEl])
+  const rawText = useCallback((): string => {
+    const n = rawNodeEl(); if (!n) return ''
+    if (Array.from(n.children).some((c) => (c.textContent || '').trim())) return ''   // container → edit its sub-pieces instead
+    return n.textContent || ''
+  }, [rawNodeEl])
+  const rawSetText = useCallback((t: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'settext', t) }, [rawSel, rawApplyAt])
   // Insert a ready-made piece right AFTER the selected raw piece (a sibling), then keep design intact.
   const rawInsert = useCallback((insertHtml: string) => {
     if (!rawSel || !doc) return
@@ -804,7 +818,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── right: property panel ── raw sub-selection gets the in-place element settings ── */}
         <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
           {rawSel ? (
-            <RawElementSettings key={rawSel.path.join('.')} isImg={rawSel.isImg} getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
+            <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg} getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
           ) : (
@@ -947,7 +961,8 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ isImg, getVal, onStyle, onOp, onClear }: { isImg: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+  const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const pxNum = (p: string) => { const n = parseFloat(getVal(p)); return isFinite(n) ? n : '' }
   const NumRow = ({ label, prop, min = 0, max = 120 }: { label: string; prop: string; min?: number; max?: number }) => {
     const v = pxNum(prop)
@@ -999,14 +1014,25 @@ function RawElementSettings({ isImg, getVal, onStyle, onOp, onClear }: { isImg: 
   return (
     <div>
       <div style={{ marginBottom: 8 }}>
-        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Item</div>
-        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.1 }}>Edit this piece</div>
+        <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>Block</div>
+        <div style={{ fontFamily: SERIF, fontSize: 20, lineHeight: 1.15 }}>{name || 'Edit this piece'}</div>
       </div>
-      <div style={{ fontSize: 11.5, color: SUB, background: INSET, borderRadius: 9, padding: '8px 10px', lineHeight: 1.5, marginBottom: 12 }}>
-        Styling the exact piece you clicked — the template design stays intact. <b>Double-click text on the canvas to edit the words.</b>
-      </div>
+      {isImg && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
+          <button onClick={() => onOp('img')} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>🖼 Replace image</button>
+        </div>
+      )}
+      {text !== '' && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Content</div>
+          <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (draft !== text) onText(draft) }} rows={draft.length > 60 ? 4 : 2}
+            style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 13, lineHeight: 1.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Edit the words here, or double-click the text on the canvas.</div>
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        {isImg && <button onClick={() => onOp('img')} style={miniActionA}>🖼 Replace image</button>}
+        <button onClick={() => onOp('dup')} style={miniActionA}>⧉ Duplicate</button>
         <button onClick={() => onOp('hide')} style={miniActionA}>👁 Hide/show</button>
         <button onClick={() => onOp('delete')} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
       </div>
