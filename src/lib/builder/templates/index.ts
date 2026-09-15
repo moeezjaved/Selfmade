@@ -11,8 +11,9 @@ import { wellnessV1 } from './wellness'
 import { botanicalV1 } from './botanical'
 import { radianceV1 } from './radiance'
 import { cobaltV1 } from './cobalt'
+import { syrupV1 } from './syrup'
 
-export const TEMPLATES: PageTemplate[] = [advertorialV1, listicleV1, productV1, homeV1, wellnessV1, botanicalV1, radianceV1, cobaltV1]
+export const TEMPLATES: PageTemplate[] = [advertorialV1, listicleV1, productV1, homeV1, wellnessV1, botanicalV1, radianceV1, cobaltV1, syrupV1]
 
 // The generic block adapter (pageDocFromContent) renders a DIFFERENT, plainer layout than the bespoke
 // template — so using it made the editor and the Shopify publish look nothing like the template preview.
