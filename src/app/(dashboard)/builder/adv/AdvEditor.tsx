@@ -1343,7 +1343,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       )}
       {isGallery && (
         <div style={{ marginBottom: 14, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>General</div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>General</div>
           <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: INK, cursor: 'pointer' }}>
             Sticky
             <input type="checkbox" checked={sticky} onChange={(e) => onSticky(e.target.checked)} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
@@ -1353,7 +1353,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       )}
       {isPays && (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Payment Providers</div>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Payment Providers</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             {PAY_PROVIDERS.map((p) => (
               <label key={p.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '5px 2px', fontSize: 12.5, color: INK, cursor: 'pointer' }}>
@@ -1404,7 +1404,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <button onClick={() => onOp('delete')} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Text</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Text</div>
         <ColorRow label="Text color" prop="color" getVal={getVal} onStyle={onStyle} />
         <NumRow label="Text size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
         <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
@@ -1414,7 +1414,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Box</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Box</div>
         <ColorRow label="Background" prop="background-color" getVal={getVal} onStyle={onStyle} />
         <NumRow label="Padding" prop="padding" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Margin top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
@@ -1465,19 +1465,19 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
         <button onClick={onDel} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Layout</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Layout</div>
         <SegRow label="Width" prop="__full" options={[['0', 'Contained'], ['1', 'Full']]} getVal={() => (full ? '1' : '0')} onStyle={(_p, v) => onFull(v === '1')} />
         <SegRow label="Content alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Columns" prop="__cols" min={1} max={6} getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />
+        <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />
         <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />
         <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Background</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Background</div>
         <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 10 }}>Spacing</div>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Spacing</div>
         <NumRow label="Padding top" prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Padding bottom" prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Padding sides" prop="padding-inline" max={120} getVal={getVal} onStyle={onStyle} />
@@ -1758,47 +1758,51 @@ function TreeRow(props: {
   )
 }
 // ── Right-panel style rows (MODULE-LEVEL so they keep focus / don't remount on every parent re-render) ──
+// PagePilot layout: label on the LEFT, control on the RIGHT (compact two-column rows).
 type RowBase = { label: string; prop: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void }
-// Number + slider: edits locally while dragging/typing, commits to the canvas on release / blur (so a full
-// re-render never interrupts the interaction — fixes "padding only works once / can't type").
-function NumRow({ label, prop, min = 0, max = 120, getVal, onStyle }: RowBase & { min?: number; max?: number }) {
+const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 30, padding: '5px 0' }
+const LBL: React.CSSProperties = { fontSize: 13, color: '#4a4843', fontWeight: 500, flex: 'none', width: 92 }
+const numBox: React.CSSProperties = { width: 44, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 6px', fontSize: 12.5, boxSizing: 'border-box', textAlign: 'center', color: INK }
+const selBox: React.CSSProperties = { flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box', color: INK }
+// Number + slider: edits locally while dragging/typing, commits on release / blur (so a re-render never
+// interrupts the interaction). Slider knob is dark to match PagePilot; `unit` shows px / % / col.
+function NumRow({ label, prop, min = 0, max = 120, unit = 'px', getVal, onStyle }: RowBase & { min?: number; max?: number; unit?: string }) {
   const initial = () => { const n = parseFloat(getVal(prop)); return isFinite(n) ? String(n) : '' }
   const [val, setVal] = useState(initial)
-  const commit = (v: string) => onStyle(prop, v !== '' ? `${v}px` : '')
+  const commit = (v: string) => onStyle(prop, v !== '' ? `${v}${unit === 'px' ? 'px' : unit === '%' ? '%' : ''}` : '')
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input type="range" min={min} max={max} value={val === '' ? min : val} onChange={(e) => setVal(e.target.value)} onMouseUp={() => commit(val)} onTouchEnd={() => commit(val)} style={{ flex: 1, accentColor: ORANGE }} />
-        <input type="number" value={val} onChange={(e) => setVal(e.target.value)} onBlur={() => commit(val)} onKeyDown={(e) => { if (e.key === 'Enter') commit(val) }} style={{ width: 56, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 8px', fontSize: 12.5, boxSizing: 'border-box' }} />
-      </div>
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <input type="range" min={min} max={max} value={val === '' ? min : val} onChange={(e) => setVal(e.target.value)} onMouseUp={() => commit(val)} onTouchEnd={() => commit(val)} style={{ flex: 1, minWidth: 0, accentColor: INK }} />
+      <input type="number" value={val} onChange={(e) => setVal(e.target.value)} onBlur={() => commit(val)} onKeyDown={(e) => { if (e.key === 'Enter') commit(val) }} style={numBox} />
+      <span style={{ fontSize: 11, color: FAINT, flex: 'none', width: 18 }}>{unit}</span>
     </div>
   )
 }
-// Colour: live-previews locally while the native picker is open (onInput), commits on release (onChange) so
-// the picker doesn't close mid-pick from a re-render.
+// Colour: live-previews locally while the native picker is open (onInput), commits on release (onChange).
 function ColorRow({ label, prop, getVal, onStyle }: RowBase) {
   const [val, setVal] = useState(() => getVal(prop))
   const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(val) ? val : '#000000'
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-        <input type="color" value={hex} onInput={(e) => setVal((e.target as HTMLInputElement).value)} onChange={(e) => { setVal(e.target.value); onStyle(prop, e.target.value) }} style={{ width: 30, height: 30, border: `1px solid ${LINE}`, borderRadius: 8, background: 'none', cursor: 'pointer' }} />
-        <span style={{ flex: 1, fontSize: 12.5, color: val ? INK : FAINT }}>{val || 'inherit'}</span>
-        {val && <button onClick={() => { setVal(''); onStyle(prop, '') }} style={{ border: 0, background: 'transparent', color: ORANGE, fontSize: 11, fontWeight: 700, cursor: 'pointer' }}>clear</button>}
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 8, padding: '4px 8px' }}>
+        <input type="color" value={hex} onInput={(e) => setVal((e.target as HTMLInputElement).value)} onChange={(e) => { setVal(e.target.value); onStyle(prop, e.target.value) }} style={{ width: 22, height: 22, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 6, background: 'none', cursor: 'pointer', padding: 0 }} />
+        <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: val ? INK : FAINT, overflow: 'hidden', textOverflow: 'ellipsis' }}>{val || 'inherit'}</span>
+        {val && <button onClick={() => { setVal(''); onStyle(prop, '') }} style={{ border: 0, background: 'transparent', color: FAINT, fontSize: 14, fontWeight: 700, cursor: 'pointer', flex: 'none', lineHeight: 1 }} title="Clear">×</button>}
       </div>
     </div>
   )
 }
+// Segmented toggle (Page | Full style): label left, pill toggle right — active pill is dark, track is light.
 function SegRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, string][] }) {
   const cur = getVal(prop)
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <div style={{ display: 'inline-flex', border: `1px solid ${LINE}`, borderRadius: 8, overflow: 'hidden', width: '100%' }}>
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', background: '#f1f0ee', borderRadius: 9, padding: 3, gap: 3 }}>
         {options.map(([v, lbl]) => (
-          <button key={v} onClick={() => onStyle(prop, cur === v ? '' : v)} style={{ flex: 1, border: 0, borderLeft: `1px solid ${LINE}`, background: cur === v ? INK : '#fff', color: cur === v ? '#fff' : SUB, padding: '7px 4px', fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
+          <button key={v} onClick={() => onStyle(prop, cur === v ? '' : v)} style={{ flex: 1, border: 0, background: cur === v ? INK : 'transparent', color: cur === v ? '#fff' : SUB, padding: '5px 4px', fontSize: 12, fontWeight: 600, cursor: 'pointer', borderRadius: 6, boxShadow: cur === v ? '0 1px 2px rgba(0,0,0,.15)' : 'none' }}>{lbl}</button>
         ))}
       </div>
     </div>
@@ -1806,9 +1810,9 @@ function SegRow({ label, prop, options, getVal, onStyle }: RowBase & { options: 
 }
 function SelRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, string][] }) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <select value={getVal(prop)} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <select value={getVal(prop)} onChange={(e) => onStyle(prop, e.target.value)} style={selBox}>
         <option value="">Default</option>
         {options.map(([v, lbl]) => <option key={v} value={v}>{lbl}</option>)}
       </select>
@@ -1818,9 +1822,9 @@ function SelRow({ label, prop, options, getVal, onStyle }: RowBase & { options: 
 // A plain labeled <select> driven by value/onChange (for Gallery settings, unlike SelRow which uses CSS props).
 function PlainSel({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
   return (
-    <div style={{ marginBottom: 10 }}>
-      <div style={{ fontSize: 12, color: SUB, fontWeight: 600, marginBottom: 4 }}>{label}</div>
-      <select value={value} onChange={(e) => onChange(e.target.value)} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box' }}>
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <select value={value} onChange={(e) => onChange(e.target.value)} style={selBox}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
     </div>
