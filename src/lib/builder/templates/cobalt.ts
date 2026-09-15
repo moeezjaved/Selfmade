@@ -72,8 +72,13 @@ const css = `
 .pgbld .ppill.solo{display:inline-flex;grid-template-columns:none;align-self:flex-start;box-shadow:none}
 .pgbld .ppill.solo .a{border-radius:999px;padding:6px 15px}
 .pgbld .hbottle,.pgbld .hbottle.ph{aspect-ratio:3/4;border-radius:12px;min-height:0}
+.pgbld .gwrap{position:relative}
+.pgbld .garr{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.94);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;color:var(--ink);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.14);z-index:2;line-height:1;padding:0}
+.pgbld .gwrap .gprev{left:6px}
+.pgbld .gwrap .gnext{right:6px}
 .pgbld .thumbs{display:flex;gap:8px;margin-top:12px}
-.pgbld .thumbs img,.pgbld .thumbs .ph{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line);min-height:0}
+.pgbld .thumbs img,.pgbld .thumbs .ph{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line);min-height:0;cursor:pointer}
+.pgbld .thumbs img.on{border-color:var(--blue);border-width:2px}
 .pgbld .bestseller{display:inline-flex;align-items:center;gap:8px;background:var(--soft2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:800;color:var(--blue);margin-bottom:12px}
 .pgbld .ptitle{font-size:25px;font-weight:800}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
@@ -296,7 +301,7 @@ function render(c: FilledContent, o: RenderOpts): string {
         <div class="sd">${escp(c.hero_subline || 'A Few Drops. Instant Impact.')}</div>
         <div class="mid">
           <div class="ppills">${pills}</div>
-          <div>${img(c.image_hero || P, o.productName, 'hbottle', 'Product')}</div>
+          <div class="gwrap">${img(c.image_hero || P, o.productName, 'hbottle', 'Product')}<button class="garr gprev" aria-label="Previous image">‹</button><button class="garr gnext" aria-label="Next image">›</button></div>
         </div>
       </div>
       <div class="thumbs">${thumbs}</div>

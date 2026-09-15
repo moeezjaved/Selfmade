@@ -244,19 +244,24 @@ function buildRawOutline(html: string): RawOutlineNode[] {
   if (typeof document === 'undefined' || !html) return []
   const box = document.createElement('div'); box.innerHTML = html
   let budget = 800
+  // Decorative gallery arrows (‹ ›) aren't structural blocks — hide them from the outline so the gallery
+  // still reads as one "Product Image" (matches PagePilot). Keep original child indices for the path.
+  const realKids = (el: HTMLElement) => (Array.from(el.children) as HTMLElement[]).map((k, i) => ({ k, i })).filter((x) => !x.k.classList.contains('garr'))
   const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
     if (budget-- <= 0) return null
     let cur: HTMLElement = el, curPath = path
     // descend through wrappers that hold a single element child and add no own text (pure layout)
-    while (cur.children.length === 1 && depth < 12) {
-      const only = cur.children[0] as HTMLElement
+    while (depth < 12) {
+      const rk = realKids(cur)
+      if (rk.length !== 1) break
+      const only = rk[0].k
       const own = (cur.textContent || '').replace(only.textContent || '', '').trim()
       if (own) break
-      cur = only; curPath = [...curPath, 0]
+      cur = only; curPath = [...curPath, rk[0].i]
     }
-    const kids = Array.from(cur.children) as HTMLElement[]
+    const kids = realKids(cur)
     let children: RawOutlineNode[] = []
-    if (kids.length > 1 && depth < 6) children = kids.map((k, i) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
+    if (kids.length > 1 && depth < 6) children = kids.map(({ k, i }) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
     return { path: curPath, label: rawLabelFor(cur), isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
   }
   return (Array.from(box.children) as HTMLElement[]).map((k, i) => walk(k, [i], 0)).filter(Boolean) as RawOutlineNode[]
@@ -435,7 +440,29 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       const scope = (clicked.closest('[data-node-type^="section:"]') as HTMLElement | null) || canvasRef.current
       const main = scope?.querySelector('.hbottle, .gimg, .gtrack img, .gallery img:not(.thumbs img)') as HTMLImageElement | null
       const src = thumb.getAttribute('src')
-      if (main && src && main !== thumb) { main.setAttribute('src', src); e.stopPropagation(); return }
+      if (main && src && main !== thumb) {
+        main.setAttribute('src', src)
+        const ts = Array.from(scope?.querySelectorAll('.thumbs img') || []) as HTMLImageElement[]
+        ts.forEach((t) => t.classList.toggle('on', t === thumb))
+        e.stopPropagation(); return
+      }
+    }
+    // Gallery prev/next arrows (‹ ›): cycle the main image through the thumbnail sources — same as PagePilot
+    // and the published storefront. Works on the canvas even though the published driver script doesn't run here.
+    const arrow = clicked.closest('.gprev, .gnext') as HTMLElement | null
+    if (arrow) {
+      const scope = (clicked.closest('[data-node-type^="section:"]') as HTMLElement | null) || canvasRef.current
+      const main = scope?.querySelector('.hbottle, .gimg, .gallery img:not(.thumbs img)') as HTMLImageElement | null
+      const ts = Array.from(scope?.querySelectorAll('.thumbs img') || []) as HTMLImageElement[]
+      const srcs = ts.map((t) => t.getAttribute('src') || '').filter(Boolean)
+      if (main && srcs.length) {
+        const d = arrow.classList.contains('gnext') ? 1 : -1
+        const k = srcs.indexOf(main.getAttribute('src') || '')
+        const i = k < 0 ? (d > 0 ? 0 : srcs.length - 1) : (k + d + srcs.length) % srcs.length
+        main.setAttribute('src', srcs[i])
+        ts.forEach((t, j) => t.classList.toggle('on', j === i))
+      }
+      e.stopPropagation(); return
     }
     const target = clicked.closest('[data-node-id]') as HTMLElement | null
     if (!target || !doc) { setSel(null); setRawSel(null); return }
