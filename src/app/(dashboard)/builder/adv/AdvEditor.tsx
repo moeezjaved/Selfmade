@@ -1259,14 +1259,15 @@ function TreeRow(props: {
       onClick={onSelect}
       draggable={draggable} onDragStart={props.onDragStart} onDragEnd={props.onDragEnd}
       onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
-      style={{ display: 'flex', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
+      style={{ position: 'relative', display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 4, paddingLeft: 4 + depth * 14, paddingRight: 4, minHeight: 36, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
       {draggable && <span title="Drag to reorder" style={{ cursor: 'grab', color: hover ? SUB : 'transparent', fontSize: 13, flex: 'none', lineHeight: 1, userSelect: 'none' }}>⠿</span>}
       <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 26, height: 26, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? INK : 'transparent', fontSize: 17, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', borderRadius: 6, transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
       <span style={{ flex: 1, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
       {hover && (
-        <span style={{ display: 'flex', gap: 3 }} onClick={(e) => e.stopPropagation()}>
+        <span onClick={(e) => e.stopPropagation()}
+          style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', gap: 1, alignItems: 'center', paddingLeft: 10, background: `linear-gradient(90deg, transparent, ${selected ? WASH : INSET} 12px)`, borderRadius: 8 }}>
           <IconBtn title="Hide" onClick={props.onHide}>{hidden ? '◌' : '👁'}</IconBtn>
           <IconBtn title="Duplicate" onClick={props.onDup}>⧉</IconBtn>
           <IconBtn title="Move up" onClick={props.onUp}>↑</IconBtn>
