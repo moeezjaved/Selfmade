@@ -76,7 +76,7 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml'
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
@@ -124,6 +124,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
     if (val) node.style.setProperty(prop, val); else node.style.removeProperty(prop)
   }
   else if (op === 'insert' && arg != null) node.insertAdjacentHTML('afterend', arg)
+  else if (op === 'sethtml' && arg != null) node.innerHTML = arg      // replace ONE piece's text/inner markup (inline edit)
   return box.innerHTML
 }
 /** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
@@ -336,7 +337,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   /* inline text edit: double-click a text/heading element */
   const onCanvasDouble = useCallback((e: React.MouseEvent) => {
-    const target = (e.target as HTMLElement).closest('[data-node-type^="element:"]') as HTMLElement | null
+    const clicked = e.target as HTMLElement
+    const target = clicked.closest('[data-node-type^="element:"]') as HTMLElement | null
     if (!target || !doc) return
     const type = (target.getAttribute('data-node-type') || '').split(':')[1]
     if (!['text', 'heading', 'price', 'button', 'badge', 'raw'].includes(type)) return
@@ -346,18 +348,47 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (!ref) return
     const cur = findElement(doc, ref)
     if (cur?.content.bind) return // bound to product — not free-text editable here
-    // A `raw` (bespoke-template) section is edited in place: the whole slice is contentEditable and we save
-    // its innerHTML, so any text on the real design can be changed without leaving the template's layout.
     const isRaw = type === 'raw'
-    target.setAttribute('contenteditable', 'true')
-    ;(target as HTMLElement).focus()
-    const finish = () => {
-      target.removeAttribute('contenteditable')
-      if (isRaw) apply((d) => patchElementContent(d, ref!, { html: target.innerHTML }))
-      else apply((d) => patchElementContent(d, ref!, { text: target.textContent || '' }))
-      target.removeEventListener('blur', finish)
+    // A `raw` (bespoke-template) section holds the whole slice's HTML. Editing the ENTIRE slice as one
+    // contentEditable blob is fragile and unlike PagePilot — so make ONLY the piece the user double-clicked
+    // editable (the h1, the price span, that paragraph…) and save just that piece back into the slice by its
+    // child-path. The template's layout/CSS is untouched, so the design stays identical. Falls back to the
+    // whole slice only when the click can't be resolved to a sub-piece.
+    let editEl: HTMLElement = target
+    let subPath: number[] | null = null
+    if (isRaw && clicked !== target) {
+      const item = snapUp(clicked, target)
+      const p = subPathTo(item, target)
+      if (p && p.length) { editEl = item; subPath = p }
     }
-    target.addEventListener('blur', finish)
+    editEl.setAttribute('contenteditable', 'true')
+    editEl.focus()
+    // Place the caret where the user clicked so they can type immediately (PagePilot-style).
+    try {
+      const doc2 = document as Document & { caretRangeFromPoint?: (x: number, y: number) => Range | null }
+      const r = doc2.caretRangeFromPoint?.(e.clientX, e.clientY)
+      if (r) { const sgel = window.getSelection(); sgel?.removeAllRanges(); sgel?.addRange(r) }
+    } catch { /* caret is best-effort */ }
+    const finish = () => {
+      editEl.removeAttribute('contenteditable')
+      const nextInner = editEl.innerHTML
+      const rf = ref!
+      if (isRaw && subPath) {
+        apply((d) => {
+          const el = findElement(d, rf)
+          const h = (el?.content as { html?: string } | undefined)?.html
+          if (typeof h !== 'string') return d
+          const next = rawHtmlOp(h, subPath!, 'sethtml', nextInner)
+          return next === h ? d : patchElementContent(d, rf, { html: next })
+        })
+      } else if (isRaw) {
+        apply((d) => patchElementContent(d, rf, { html: nextInner }))
+      } else {
+        apply((d) => patchElementContent(d, rf, { text: editEl.textContent || '' }))
+      }
+      editEl.removeEventListener('blur', finish)
+    }
+    editEl.addEventListener('blur', finish)
   }, [doc, apply])
 
   /* keyboard: cmd/ctrl+Z undo, Delete removes selection */
