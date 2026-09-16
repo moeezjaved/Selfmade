@@ -263,6 +263,7 @@ function rawIsImg(el: HTMLElement): boolean {
 const PP_SECTION_NAME: Record<string, string> = {
   strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
   feat: 'Image with Feature Cards', how: 'Image with Text', gold: 'Product Comparison',
+  seen: 'As Seen On with Quotes', hguar: 'Happiness Guarantee', recs: 'Recommended Products', satc: 'Sticky Add to Cart',
 }
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback

@@ -211,6 +211,41 @@ const css = `
 .pgbld .final .cta .btn{background:#fff;color:var(--blue);max-width:320px;margin:0 auto}
 .pgbld .final .cta .pays{justify-content:center}
 .pgbld .final .cta .pays span{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24);color:#eef0fe}
+/* review avatar (UGC-style reviewer row) */
+.pgbld .rc .rhead{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.pgbld .rc .rav,.pgbld .rc .rav.ph{width:34px;height:34px;border-radius:50%;object-fit:cover;flex:none;min-height:0;background:var(--soft)}
+.pgbld .rc .rn .vf{color:var(--blue);font-size:11px}
+/* As Seen On logos */
+.pgbld .seen{padding:30px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#fff}
+.pgbld .seen .lbl{text-align:center;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--sub);margin-bottom:16px}
+.pgbld .seen .logos{display:flex;flex-wrap:wrap;gap:30px;justify-content:center;align-items:center}
+.pgbld .seen .logo{font-size:19px;font-weight:800;color:#b7b7c4;font-family:'Fraunces',Georgia,serif}
+/* Happiness Guarantee card */
+.pgbld .hguar{padding:44px 0}
+.pgbld .hguar .card{background:var(--blue);color:#fff;border-radius:20px;padding:38px 26px;text-align:center;max-width:720px;margin:0 auto}
+.pgbld .hguar .hz{display:flex;justify-content:center;margin-bottom:10px}
+.pgbld .hguar h2{font-size:26px;font-weight:900;margin:0 0 8px}
+.pgbld .hguar p{font-size:13.5px;color:#eef0fe;max-width:520px;margin:0 auto 18px;line-height:1.6}
+.pgbld .hguar .btn{background:#fff;color:var(--blue);max-width:300px;margin:0 auto}
+.pgbld .hguar .pays{justify-content:center;margin-top:16px}
+.pgbld .hguar .pays span{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24);color:#eef0fe}
+/* Recommended products */
+.pgbld .recs{padding:46px 0}
+.pgbld .rgridp{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
+.pgbld .rprod{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.pgbld .rprod img,.pgbld .rprod .ph{width:100%;aspect-ratio:1;object-fit:cover;min-height:0}
+.pgbld .rprod .b{padding:12px}
+.pgbld .rprod .t{font-size:13px;font-weight:700;margin-bottom:3px}
+.pgbld .rprod .s{color:#4a56ea;font-size:11px;margin-bottom:8px}
+.pgbld .rprod .row{display:flex;align-items:center;justify-content:space-between}
+.pgbld .rprod .pr{font-size:14px;font-weight:800}
+.pgbld .rprod .add{background:var(--blue);color:#fff;text-decoration:none;font-size:12px;font-weight:800;padding:7px 13px;border-radius:9px}
+/* Sticky add-to-cart bar */
+.pgbld .satc{position:sticky;bottom:0;z-index:30;background:var(--blue);display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 18px;box-shadow:0 -4px 16px -8px rgba(20,18,15,.3)}
+.pgbld .satc .p{display:flex;align-items:center;gap:11px;color:#fff;font-weight:700;font-size:14px;min-width:0}
+.pgbld .satc .p img,.pgbld .satc .p .ph{width:42px;height:42px;border-radius:9px;object-fit:cover;flex:none;min-height:0}
+.pgbld .satc .p span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pgbld .satc .add{background:#fff;color:var(--blue);text-decoration:none;padding:11px 24px;border-radius:10px;font-weight:800;font-size:14px;flex:none}
 
 @media(max-width:900px){
   .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
@@ -270,7 +305,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     { name: 'Sam T.', quote: 'I use it before every wash. Ten minutes and the buildup just rinses away. Love the fresh citrus smell.' },
     { name: 'Bri M.', quote: 'Flakiness calmed down after a week. It’s lightweight and never leaves my hair greasy.' },
     { name: 'Benny K.', quote: 'Finally something that preps my scalp instead of drying it out. My roots feel healthier already.' },
-  ]).slice(0, 4).map((t) => `<div class="rc"><div class="rn">${escp(t.name)}</div><div class="rs">★★★★★</div><p>${esc(t.quote)}</p></div>`).join('')
+  ]).slice(0, 4).map((t: any) => `<div class="rc"><div class="rhead">${(t.image && typeof t.image === 'string') ? `<img class="rav" src="${esc(t.image)}" alt="${esc(t.name)}" loading="lazy">` : `<div class="rav" style="display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--blue)">${escp((t.name || '?').charAt(0))}</div>`}<div><div class="rn">${escp(t.name)} <span class="vf">✔</span></div><div class="rs">★★★★★</div></div></div><p>${esc(t.quote)}</p></div>`).join('')
 
   const press = (arr(c.press_quotes).length ? arr(c.press_quotes) : [
     { title: 'Allure', body: 'The pre-wash step your scalp has been missing.' },
@@ -293,6 +328,16 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   const forms = (arr(c.final_forms).length ? arr(c.final_forms) : ['Cruelty-Free', 'Vegan Formula', 'Sulfate-Free'].map((l) => ({ label: l })))
     .map((f) => `<span>${escp(f.label)}</span>`).join('')
+
+  // As Seen On logos + Recommended products (PagePilot-parity sections; only render when the template shows them).
+  const seenLogos = (arr(c.seen_logos).length ? arr(c.seen_logos).map((x: any) => x.label || x) : ['Forbes', 'Vogue', 'Allure', 'GQ', 'Byrdie'])
+    .map((l: string) => `<span class="logo">${escp(l)}</span>`).join('')
+  const recs = (arr(c.recommended).length ? arr(c.recommended) : [
+    { title: 'Daily Renewal Set', price: c.price || '$34', image: c.image_g2 },
+    { title: 'Overnight Repair Oil', price: c.price || '$29', image: c.image_g3 },
+    { title: 'Gentle Cleanser', price: c.price || '$24', image: c.image_g4 },
+    { title: 'Barrier Cream', price: c.price || '$27', image: c.image_g5 },
+  ]).slice(0, 4).map((r: any) => `<div class="rprod">${img(r.image || P, r.title, '', 'Product')}<div class="b"><div class="t">${escp(r.title)}</div><div class="s">★★★★★</div><div class="row"><span class="pr">${escp(r.price || '')}</span><a class="add" href="${esc(o.ctaHref || '#')}">Add</a></div></div></div>`).join('')
 
   return `<div class="pgbld">
 
@@ -384,6 +429,12 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="press">${press}</div>
   </div></section>
 
+  <!-- 6b · AS SEEN ON -->
+  <section class="seen"><div class="wrap">
+    <div class="lbl">${escp(c.seen_label || 'As seen on')}</div>
+    <div class="logos">${seenLogos}</div>
+  </div></section>
+
   <!-- 7 · STATS -->
   <section class="stats"><div class="wrap">
     <h2 class="secttl">${hl(c.stats_head || 'What Most Reviewers Noticed')}</h2>
@@ -408,6 +459,21 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="ctable"><div class="ctop"><span>Feature</span><span class="ours">Our product</span><span>Others</span></div>${goldRows}</div>
   </div></div></section>
 
+  <!-- 9b · HAPPINESS GUARANTEE -->
+  <section class="hguar"><div class="wrap"><div class="card">
+    <div class="hz">${HEART}</div>
+    <h2>${hl(c.hguar_head || '100% Happiness Guarantee')}</h2>
+    <p>${esc(c.hguar_body || 'Try it risk-free for 30 days. If you don’t love the results, we’ll refund every penny — no questions asked.')}</p>
+    <a class="btn" href="${esc(o.ctaHref || '#')}">${escp(c.hguar_cta || 'Buy It Now')}</a>
+    <div class="pays">${paysRowInner()}</div>
+  </div></div></section>
+
+  <!-- 9c · RECOMMENDED PRODUCTS -->
+  <section class="recs"><div class="wrap">
+    <h2 class="secttl">${hl(c.recs_head || 'Recommended Products')}</h2>
+    <div class="rgridp">${recs}</div>
+  </div></section>
+
   <!-- 10 · FINAL CTA -->
   <section class="final"><div class="wrap"><div class="grid">
     <div class="prod">
@@ -424,6 +490,9 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="pays">${paysRowInner()}</div>
     </div>
   </div></div></section>
+
+  <!-- 11 · STICKY ADD TO CART -->
+  <div class="satc"><div class="p">${img(c.image_hero || P, o.productName, '', '')}<span>${esc(o.productName || 'Product')}</span></div><a class="add" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.satc_cta || 'Add to Cart')}</a></div>
 
   </div>`
 }
