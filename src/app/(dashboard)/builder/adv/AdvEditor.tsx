@@ -1764,6 +1764,17 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
+  const [aiBusy2, setAiBusy2] = useState(false)  // "Edit with AI" on the plain Content field
+  const editContentAI = async () => {
+    const t = draft.trim(); if (!t) return
+    setAiBusy2(true)
+    try {
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, context: textContext }) })
+      const j = await r.json()
+      if (j.text) { setDraft(j.text); onText(j.text) } else window.alert(j.error || 'Could not rewrite.')
+    } catch { window.alert('Could not rewrite — please try again.') }
+    finally { setAiBusy2(false) }
+  }
   // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
   // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
   const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave
@@ -1959,6 +1970,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Content</div>
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (draft !== text) onText(draft) }} rows={draft.length > 60 ? 4 : 2}
             style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 13, lineHeight: 1.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
+          <button disabled={aiBusy2} onClick={editContentAI} style={{ width: '100%', marginTop: 8, border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy2 ? 'default' : 'pointer', opacity: aiBusy2 ? 0.6 : 1 }}>{aiBusy2 ? 'Rewriting…' : '✨ Edit with AI'}</button>
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Edit the words here, or double-click the text on the canvas.</div>
         </div>
       )}
