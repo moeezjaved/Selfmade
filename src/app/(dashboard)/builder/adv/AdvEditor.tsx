@@ -291,7 +291,7 @@ function buildRawOutline(html: string): RawOutlineNode[] {
   let budget = 800
   // Decorative gallery arrows (‹ ›) aren't structural blocks — hide them from the outline so the gallery
   // still reads as one "Product Image" (matches PagePilot). Keep original child indices for the path.
-  const realKids = (el: HTMLElement) => (Array.from(el.children) as HTMLElement[]).map((k, i) => ({ k, i })).filter((x) => !x.k.classList.contains('garr'))
+  const realKids = (el: HTMLElement) => (Array.from(el.children) as HTMLElement[]).map((k, i) => ({ k, i })).filter((x) => !x.k.classList.contains('garr') && x.k.tagName !== 'STYLE')
   const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
     if (budget-- <= 0) return null
     let cur: HTMLElement = el, curPath = path
@@ -458,11 +458,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const canvasHtml = useMemo(() => {
     if (!doc) return ''
     const { html, css } = renderDoc(doc, { mode: 'edit', device, product })
+    // Mobile preview: our raw sections carry mobile overrides in `data-mob` + an `@media` rule that only fires
+    // on a real narrow VIEWPORT (not the shrunk canvas), so inline those values here to preview them live.
+    let body = html
+    if (device === 'mobile' && typeof document !== 'undefined' && html.includes('data-mob')) {
+      const box = document.createElement('div'); box.innerHTML = html
+      box.querySelectorAll('[data-mob]').forEach((el) => { try { const o = JSON.parse(el.getAttribute('data-mob') || '{}'); for (const k in o) (el as HTMLElement).style.setProperty(k, o[k]) } catch { /* noop */ } })
+      body = box.innerHTML
+    }
     return `<style>${css}
 [data-node-id]{outline:1px dashed transparent;outline-offset:-1px;transition:outline-color .1s}
 [data-node-id]:hover{outline-color:rgba(224,47,6,.35);cursor:pointer}
 [data-sel="1"]{outline:2px solid ${ORANGE} !important;outline-offset:-2px}
-</style>${html}`
+</style>${body}`
   }, [doc, device, product])
 
   /* mark the selected node in the rendered DOM + attach click selection */
@@ -991,6 +999,33 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const c = parseInt(n, 10)
     sectionInnerStyle(sectionId, 'grid-template-columns', c > 0 ? `repeat(${c}, minmax(0, 1fr))` : '')
   }
+  // ── Per-device (mobile) section styles ───────────────────────────────────────────────────────────────
+  // Mobile overrides live as JSON on the section root (data-mob) + a real `@media` rule (data-sid) that ships
+  // to the storefront; the editor previews them by inlining the values when the canvas is in mobile mode.
+  const readMob = (root: HTMLElement): Record<string, string> => { try { return JSON.parse(root.getAttribute('data-mob') || '{}') } catch { return {} } }
+  const writeMob = (root: HTMLElement, obj: Record<string, string>) => {
+    let sid = root.getAttribute('data-sid'); if (!sid) { sid = 'sf' + Math.random().toString(36).slice(2, 8); root.setAttribute('data-sid', sid) }
+    const keys = Object.keys(obj)
+    if (keys.length) root.setAttribute('data-mob', JSON.stringify(obj)); else root.removeAttribute('data-mob')
+    let st = (Array.from(root.children).find((c) => c.tagName === 'STYLE' && (c as HTMLElement).classList.contains('sf-mob'))) as HTMLStyleElement | undefined
+    if (keys.length) {
+      const css = `@media (max-width:768px){[data-sid="${sid}"]{${keys.map((k) => `${k}:${obj[k]} !important`).join(';')}}}`
+      if (!st) { st = document.createElement('style'); st.className = 'sf-mob'; root.insertBefore(st, root.firstChild) }
+      st.textContent = css
+    } else if (st) { st.remove() }
+  }
+  const sectionMobileVal = (sectionId: string, prop: string): string => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return ''
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const root = box.children[0] as HTMLElement | undefined; return root ? (readMob(root)[prop] || '') : ''
+  }
+  const sectionMobileStyle = (sectionId: string, prop: string, value: string) => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const root = box.children[0] as HTMLElement | undefined; if (!root) return
+    const obj = readMob(root); if (value) obj[prop] = value; else delete obj[prop]; writeMob(root, obj)
+    apply((d) => patchElementContent(d, re.ref, { html: box.innerHTML }))
+  }
   // Section background IMAGE (set image + cover/center in one write; clear all three together).
   const sectionBgImageUrl = (sectionId: string): string => {
     const v = sectionStyleVal(sectionId, 'background-image'); const m = v.match(/url\(["']?([^"')]+)["']?\)/); return m ? m[1] : ''
@@ -1166,9 +1201,10 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
           ) : (sel.sectionId && !sel.blockId && !sel.elementId && secRaw(sel.sectionId)) ? (
-            <RawSectionSettings key={sel.sectionId}
+            <RawSectionSettings key={sel.sectionId + ':' + device}
               name={(() => { const s = doc.sections.find((x) => x.id === sel.sectionId); const re = s ? rawSectionEl(s) : null; return re ? (/\bptitle\b/.test(re.html) && /\b(now|price|buy)\b/.test(re.html) ? 'Product Information' : rawSectionName(re.html, s?.name || '')) : (s?.name || 'Section') })()}
-              getVal={(p) => sectionStyleVal(sel.sectionId, p)} onStyle={(p, v) => sectionStyle(sel.sectionId, p, v)}
+              getVal={(p) => device === 'mobile' ? (sectionMobileVal(sel.sectionId, p) || sectionStyleVal(sel.sectionId, p)) : sectionStyleVal(sel.sectionId, p)}
+              onStyle={(p, v) => device === 'mobile' ? sectionMobileStyle(sel.sectionId, p, v) : sectionStyle(sel.sectionId, p, v)}
               full={sectionFullWidth(sel.sectionId)} onFull={(v) => setSectionFullWidth(sel.sectionId, v)}
               gridVal={(p) => sectionInnerVal(sel.sectionId, p)} onGrid={(p, v) => sectionInnerStyle(sel.sectionId, p, v)}
               cols={sectionColumns(sel.sectionId)} onCols={(n) => setSectionColumns(sel.sectionId, n)}
@@ -1526,9 +1562,12 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
   const [roundedCustom, setRoundedCustom] = useState(() => !!parseFloat(getVal('border-radius')))
   const [bgBusy, setBgBusy] = useState(false)
   const pickBg = () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'; inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBgBusy(true); const u = await uploadImage(f); setBgBusy(false); if (u) onBgImage(u) }; inp.click() }
+  const mob = device === 'mobile'
+  const L = (s: string) => (mob ? `Mobile ${s}` : s)   // per-device props read/write mobile values in mobile mode
   return (
     <div>
       <PanelHeader kind="Section" name={name} device={device} onDevice={onDevice} />
+      {mob && <div style={{ display: 'flex', gap: 7, alignItems: 'center', background: WASH, border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', marginBottom: 12, fontSize: 11.5, color: SUB, lineHeight: 1.4 }}><span style={{ flex: 'none' }}>📱</span>Editing mobile — background, padding &amp; alignment here apply on phones only.</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={onDup} style={miniActionA}>⧉ Duplicate</button>
         <button onClick={onHide} style={miniActionA}>👁 Hide/show</button>
@@ -1537,15 +1576,15 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Layout</div>
         <SegRow label="Width" prop="__full" options={[['0', 'Contained'], ['1', 'Full']]} getVal={() => (full ? '1' : '0')} onStyle={(_p, v) => onFull(v === '1')} />
-        <SegRow label="Content alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />
-        <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />
+        <SegRow label={L('Content alignment')} prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+        {!mob && <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />}
+        {!mob && <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />}
         <SegRow label="Rounded corners source" prop="__rcs" options={[['custom', 'Custom'], ['dynamic', 'Dynamic']]} getVal={() => (roundedCustom ? 'custom' : 'dynamic')} onStyle={(_p, v) => { const c = v === 'custom'; setRoundedCustom(c); if (!c) onStyle('border-radius', '') }} />
-        {roundedCustom && <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
+        {roundedCustom && <NumRow label={L('Rounded corners')} prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Background</div>
-        <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <ColorRow label={L('Background color')} prop="background-color" getVal={getVal} onStyle={onStyle} />
         <div style={{ ...ROW, alignItems: 'flex-start' }}>
           <span style={{ ...LBL, marginTop: 6 }}>Background image</span>
           <div style={{ flex: 1, minWidth: 0 }}>
@@ -1557,9 +1596,9 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Spacing</div>
-        <NumRow label="Padding top" prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Padding bottom" prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Padding sides" prop="padding-inline" max={120} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Padding top')} prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Padding bottom')} prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Padding sides')} prop="padding-inline" max={120} getVal={getVal} onStyle={onStyle} />
       </div>
     </div>
   )
