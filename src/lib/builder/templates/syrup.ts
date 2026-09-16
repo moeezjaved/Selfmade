@@ -82,7 +82,7 @@ const css = `
 .pgbld .thumbs img,.pgbld .thumbs .ph{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line);min-height:0;cursor:pointer}
 .pgbld .thumbs img.on{border-color:var(--blue);border-width:2px}
 /* clean hero gallery (real product images) + relocated benefit-creative section */
-.pgbld .pgal .hbottle,.pgbld .pgal .hbottle.ph{aspect-ratio:3/4;width:100%}
+.pgbld .pgal .hbottle,.pgbld .pgal .hbottle.ph{aspect-ratio:4/5;width:100%;object-fit:contain;background:var(--soft)}
 .pgbld .pcre{padding:6px 0 26px}
 .pgbld .pcre-img .pcrei,.pgbld .pcre-img .ph{aspect-ratio:3/4;border-radius:12px;min-height:0;width:100%;object-fit:cover}
 .pgbld .bestseller{display:inline-flex;align-items:center;gap:9px;background:var(--soft2);border:1px solid var(--line);border-radius:10px;padding:7px 12px;margin-bottom:12px}
@@ -90,7 +90,7 @@ const css = `
 .pgbld .bestseller .bst{display:flex;flex-direction:column;line-height:1.25}
 .pgbld .bestseller .bst b{font-size:11.5px;font-weight:800;color:var(--ink);letter-spacing:.02em}
 .pgbld .bestseller .bst span{font-size:10.5px;font-weight:600;color:var(--sub)}
-.pgbld .ptitle{font-size:25px;font-weight:800}
+.pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:600;line-height:1.08;letter-spacing:-.01em}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}

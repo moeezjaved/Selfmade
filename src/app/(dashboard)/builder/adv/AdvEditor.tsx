@@ -378,6 +378,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [showMenu, setShowMenu] = useState(false)
   const [topMenu, setTopMenu] = useState(false)   // the top-bar "Menu" dropdown (holds undo/redo + settings)
   const [rawAIbusy, setRawAIbusy] = useState(false)   // "Edit with AI" on the canvas toolbar
+  const [preview, setPreview] = useState(false)   // fullscreen preview — hides both panels (PagePilot's expand)
   const [histDepth, setHistDepth] = useState(0)
   const [redoDepth, setRedoDepth] = useState(0)
   const [tb, setTb] = useState<null | { top: number; left: number; below: boolean }>(null)
@@ -1366,7 +1367,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: '#fff', border: `1px solid #f2e3da`, borderRadius: 10, padding: 2 }}>
           <button title="Select tool" onClick={() => { setSel(null); setRawSel(null) }} style={{ ...iconTopBtn, border: 0, background: 'transparent', color: INK }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3l7 17 2.2-6.8L20 11z"/></svg></button>
           <DeviceToggle value={device} onChange={(d) => setDevice(d)} />
-          <button title="Fullscreen" onClick={() => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.() } catch { /* ignore */ } }} style={{ ...iconTopBtn, border: 0, background: 'transparent', color: SUB }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
+          <button title={preview ? 'Exit fullscreen' : 'Fullscreen preview'} onClick={() => setPreview((p) => !p)} style={{ ...iconTopBtn, border: 0, background: preview ? WASH : 'transparent', color: preview ? ORANGE : SUB }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">{preview ? <path d="M8 3v3a2 2 0 0 1-2 2H3M16 3v3a2 2 0 0 0 2 2h3M8 21v-3a2 2 0 0 0-2-2H3M16 21v-3a2 2 0 0 1 2-2h3" /> : <path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3" />}</svg></button>
         </div>
         <ZoomControl zoom={zoom} setZoom={setZoom} onFit={fitZoom} />
         <div style={{ flex: 1 }} />
@@ -1394,7 +1395,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
         {/* ── left: section/block tree ── */}
-        <aside style={{ width: 264, borderRight: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 10 }}>
+        <aside style={{ width: 264, borderRight: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 10, display: preview ? 'none' : undefined }}>
           <Row label="PAGE" faint />
           {doc.sections.map((s) => {
             const sRef: NodeRef = { sectionId: s.id }
@@ -1468,7 +1469,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         </main>
 
         {/* ── right: property panel ── raw sub-selection gets the in-place element settings ── */}
-        <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16 }}>
+        <aside style={{ width: 300, borderLeft: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 16, display: preview ? 'none' : undefined }}>
           {rawSel ? (
             <RawElementSettings key={rawSel.path.join('.')} name={rawName()} text={rawText()} onText={rawSetText} isImg={rawSel.isImg}
               isText={rawIsText()} html={rawHtml()} onHtml={rawSetHtml} textContext={doc.productRef?.importedProduct?.title || ''}

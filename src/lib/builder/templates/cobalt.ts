@@ -71,7 +71,8 @@ const css = `
 .pgbld .ppill .b{background:#fff;color:var(--ink);padding:6px 11px;border:1px solid var(--line);border-left:0}
 .pgbld .ppill.solo{display:inline-flex;grid-template-columns:none;align-self:flex-start;box-shadow:none}
 .pgbld .ppill.solo .a{border-radius:999px;padding:6px 15px}
-.pgbld .hbottle,.pgbld .hbottle.ph{aspect-ratio:3/4;border-radius:12px;min-height:0}
+.pgbld .hbottle,.pgbld .hbottle.ph{aspect-ratio:3/4;border-radius:12px;min-height:0;object-fit:contain;background:var(--soft)}
+.pgbld .pgal .hbottle,.pgbld .pgal .hbottle.ph{width:100%;aspect-ratio:4/5}
 .pgbld .gwrap{position:relative}
 .pgbld .garr{position:absolute;top:50%;transform:translateY(-50%);width:32px;height:32px;border-radius:50%;background:rgba(255,255,255,.94);border:1px solid var(--line);display:grid;place-items:center;font-size:18px;color:var(--ink);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.14);z-index:2;line-height:1;padding:0}
 .pgbld .gwrap .gprev{left:6px}
@@ -84,7 +85,7 @@ const css = `
 .pgbld .bestseller .bst{display:flex;flex-direction:column;line-height:1.25}
 .pgbld .bestseller .bst b{font-size:11.5px;font-weight:800;color:var(--ink);letter-spacing:.02em}
 .pgbld .bestseller .bst span{font-size:10.5px;font-weight:600;color:var(--sub)}
-.pgbld .ptitle{font-size:25px;font-weight:800}
+.pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:600;line-height:1.08;letter-spacing:-.01em}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
