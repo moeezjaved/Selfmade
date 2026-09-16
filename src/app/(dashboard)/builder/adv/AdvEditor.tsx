@@ -1462,11 +1462,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               </div>
             ))}
           </div>
-          <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 12, padding: '18px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, textAlign: 'center' }}>
-            <div style={{ fontSize: 20, marginBottom: 4 }}>🖼</div>
-            {busy ? 'Uploading…' : 'Drag & Drop or click to select images'}
-            <div style={{ fontSize: 11, color: FAINT, fontWeight: 500, marginTop: 2 }}>JPG, PNG, GIF, WEBP up to 120MB</div>
-          </button>
+          <DropZone label="Drag & Drop or click to select images" busy={busy} onPick={() => pickFile((url) => onGalleryAdd(url))} />
           <button disabled={busy} onClick={() => pickFile((url) => onGalleryAdd(url))} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 10, padding: '10px 12px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }}>⬆ Select files</button>
           <button disabled={aiBusy} onClick={onCreateAI} style={{ width: '100%', marginTop: 8, border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '11px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>{aiBusy ? 'Creating…' : '✨ Create with AI'}</button>
           <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Add images to the gallery. The first image will be used as the main image.</div>
@@ -1499,8 +1495,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       {isImg && !gallery && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
-          <button disabled={busy} onClick={() => pickFile((url) => onSetImg(url))} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 12px', fontSize: 13, fontWeight: 700, cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1 }}>{busy ? 'Uploading…' : '⬆ Upload image'}</button>
-          <button onClick={() => onUrlOpen(!urlOpen)} style={{ width: '100%', marginTop: 6, border: `1px solid ${urlOpen ? ORANGE : LINE}`, background: '#fff', color: urlOpen ? ORANGE : SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
+          <DropZone label="Drag & Drop or click to select image" busy={busy} onPick={() => pickFile((url) => onSetImg(url))} />
+          <button onClick={() => onUrlOpen(!urlOpen)} style={{ width: '100%', marginTop: 8, border: `1px solid ${urlOpen ? ORANGE : LINE}`, background: '#fff', color: urlOpen ? ORANGE : SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
           {urlOpen && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <input autoFocus value={urlDraft} onChange={(e) => setUrlDraft(e.target.value)} placeholder="https://…/image.jpg"
@@ -1559,6 +1555,18 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   )
 }
 const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontWeight: 600, fontSize: 12.5, cursor: 'pointer' }
+// PagePilot's framed-picture icon for the drag-&-drop dropzones (replaces the 🖼 emoji).
+const PIC_ICON = <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke={FAINT} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="4" width="18" height="16" rx="3" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M21 15.5l-4.5-4.5L5 20" /></svg>
+// A PagePilot-style dashed drop-zone box (icon + prompt + size hint). `onPick` fires the file chooser.
+function DropZone({ label, busy, onPick }: { label: string; busy: boolean; onPick: () => void }) {
+  return (
+    <button disabled={busy} onClick={onPick} style={{ width: '100%', border: `1.5px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 12, padding: '20px 12px', cursor: busy ? 'default' : 'pointer', opacity: busy ? 0.6 : 1, textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+      {PIC_ICON}
+      <span style={{ fontSize: 13, fontWeight: 700 }}>{busy ? 'Uploading…' : label}</span>
+      <span style={{ fontSize: 11, color: FAINT, fontWeight: 500 }}>JPG, PNG, GIF, WEBP up to 120MB</span>
+    </button>
+  )
+}
 
 // Shared panel header (PagePilot parity): the KIND label ("Section"/"Block"), the name, a ✏️ affordance, and a
 // desktop/mobile toggle — the same header PagePilot shows above every block's settings.
@@ -1619,13 +1627,15 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Background</div>
         <ColorRow label={L('Background color')} prop="background-color" getVal={getVal} onStyle={onStyle} />
-        <div style={{ ...ROW, alignItems: 'flex-start' }}>
-          <span style={{ ...LBL, marginTop: 6 }}>Background image</span>
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {bgImage
-              ? (<div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}` }}><img src={bgImage} alt="" style={{ width: '100%', height: 84, objectFit: 'cover', display: 'block' }} /><button onClick={() => onBgImage('')} title="Remove" style={{ position: 'absolute', top: 5, right: 5, border: 0, background: 'rgba(20,18,15,.7)', color: '#fff', borderRadius: 999, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>)
-              : (<button disabled={bgBusy} onClick={pickBg} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 10px', fontSize: 12.5, fontWeight: 700, cursor: bgBusy ? 'default' : 'pointer', opacity: bgBusy ? 0.6 : 1, textAlign: 'center' }}>{bgBusy ? 'Uploading…' : '⬆ Drag & Drop or select image'}</button>)}
-          </div>
+        <div style={{ marginTop: 6 }}>
+          <div style={{ fontSize: 13, color: '#4a4843', fontWeight: 500, marginBottom: 7 }}>Background image</div>
+          {bgImage
+            ? (<div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}` }}><img src={bgImage} alt="" style={{ width: '100%', height: 110, objectFit: 'cover', display: 'block' }} /><button onClick={() => onBgImage('')} title="Remove" style={{ position: 'absolute', top: 6, right: 6, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 999, width: 24, height: 24, cursor: 'pointer', lineHeight: 1, fontSize: 14 }}>×</button></div>)
+            : (<DropZone label="Drag & Drop or click to select image" busy={bgBusy} onPick={pickBg} />)}
+          {bgImage && (<div style={{ marginTop: 8 }}>
+            <SegRow label="Position" prop="background-position" options={[['top', 'Top'], ['center', 'Center'], ['bottom', 'Bottom']]} getVal={getVal} onStyle={onStyle} />
+            <SegRow label="Size" prop="background-size" options={[['cover', 'Cover'], ['contain', 'Contain']]} getVal={getVal} onStyle={onStyle} />
+          </div>)}
         </div>
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
