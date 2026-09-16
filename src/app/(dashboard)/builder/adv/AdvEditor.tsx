@@ -79,7 +79,7 @@ function subPathTo(clicked: HTMLElement, rawRoot: HTMLElement): number[] | null 
   return n === rawRoot ? path : null
 }
 
-type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup' | 'appendchild' | 'sethref'
+type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 'sethtml' | 'settext' | 'dup' | 'appendchild' | 'sethref' | 'setname'
 // Inline tags a rich-text piece may contain and still be safely edited as one text block (not a container).
 const RICH_INLINE = new Set(['SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'BR', 'SUP', 'SUB', 'MARK', 'SMALL', 'FONT'])
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
@@ -169,6 +169,7 @@ function rawHtmlOp(html: string, path: number[], op: RawOp, arg?: string): strin
   else if (op === 'dup') { const c = node.cloneNode(true) as HTMLElement; if (parent) parent.insertBefore(c, node.nextSibling) }
   else if (op === 'appendchild' && arg != null) node.insertAdjacentHTML('beforeend', arg)   // add a child (gallery image)
   else if (op === 'sethref' && arg != null) { const a = (node.tagName === 'A' ? node : node.querySelector('a')) as HTMLAnchorElement | null; if (a) a.setAttribute('href', arg) }   // button/link destination
+  else if (op === 'setname') { if (arg && arg.trim()) node.setAttribute('data-name', arg.trim()); else node.removeAttribute('data-name') }   // custom tree name (rename)
   return box.innerHTML
 }
 /** Move the node at `from` to just before/after the node at `to` (same slice). Returns new HTML. */
@@ -218,6 +219,7 @@ function rawFriendly(cls: string): string {
   return cls.length <= 14 ? cls.charAt(0).toUpperCase() + cls.slice(1) : ''
 }
 function rawLabelFor(el: HTMLElement): string {
+  const custom = el.getAttribute('data-name'); if (custom) return custom   // user rename wins
   const tag = el.tagName.toLowerCase()
   const cls = friendlyClassOf(el)
   // A known class wins for BOTH leaves and containers → clean PagePilot-style names everywhere we know them.
@@ -265,6 +267,7 @@ const PP_SECTION_NAME: Record<string, string> = {
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback
   const box = document.createElement('div'); box.innerHTML = html
+  const custom = (box.children[0] as HTMLElement | undefined)?.getAttribute('data-name'); if (custom) return custom   // user rename wins
   // 1) Known section type → PagePilot's exact name (matches the live app one-to-one). The section's own class
   // (.strip / .revs / .stats …) sits on a <section> INSIDE the .pgbld wrapper, so search the whole slice.
   for (const cls of Object.keys(PP_SECTION_NAME)) if (box.querySelector('section.' + cls + ', .' + cls)) return PP_SECTION_NAME[cls]
@@ -752,6 +755,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const rawIsLink = useCallback((): boolean => { const n = rawNodeEl(); return !!n && (n.tagName === 'A' || !!n.querySelector('a')) }, [rawNodeEl])
   const rawHref = useCallback((): string => { const n = rawNodeEl(); if (!n) return ''; const a = (n.tagName === 'A' ? n : n.querySelector('a')) as HTMLAnchorElement | null; return a?.getAttribute('href') || '' }, [rawNodeEl])
   const rawSetHref = useCallback((url: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'sethref', url) }, [rawSel, rawApplyAt])
+  const rawRename = useCallback((name: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'setname', name) }, [rawSel, rawApplyAt])
   // Upload an image file → presigned R2 PUT → returns the public URL (matches PagePilot's "Select files").
   const uploadImage = useCallback(async (file: File): Promise<string | null> => {
     try {
@@ -964,6 +968,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // ── Section-level settings (bug D): style the raw section's OUTER wrapper (path [0]) so the user can set the
   // whole section's background, padding, width and alignment — matching PagePilot's section panel. ──────────
   const secRaw = (sectionId: string) => { const s = doc?.sections.find((x) => x.id === sectionId); return s ? rawSectionEl(s) : null }
+  const sectionRename = (sectionId: string, name: string) => { const re = secRaw(sectionId); if (re) rawApplyAt(re.ref, [0], 'setname', name) }
   const sectionStyleVal = (sectionId: string, prop: string): string => {
     const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return ''
     const box = document.createElement('div'); box.innerHTML = re.html
@@ -1196,7 +1201,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
-              urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice}
+              urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
@@ -1209,7 +1214,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               gridVal={(p) => sectionInnerVal(sel.sectionId, p)} onGrid={(p, v) => sectionInnerStyle(sel.sectionId, p, v)}
               cols={sectionColumns(sel.sectionId)} onCols={(n) => setSectionColumns(sel.sectionId, n)}
               bgImage={sectionBgImageUrl(sel.sectionId)} onBgImage={(u) => sectionSetBgImage(sel.sectionId, u)} uploadImage={uploadImage}
-              device={device} onDevice={setDevice}
+              device={device} onDevice={setDevice} onRename={(nm) => sectionRename(sel.sectionId, nm)}
               onHide={() => apply((d) => setHidden(d, sel))} onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })} onDel={() => apply((d) => removeNode(d, sel), null)} />
           ) : (
             <PropertyPanel doc={doc} sel={sel} device={device} onStyle={onStyle} onHidden={onHidden} onContent={onContent} />
@@ -1403,7 +1408,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, device, onDevice, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; device: Device; onDevice: (d: Device) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1417,7 +1422,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   // padding input wouldn't accept typing (it lost focus after the first keystroke).
   return (
     <div>
-      <PanelHeader kind="Block" name={name || 'Edit this piece'} device={device} onDevice={onDevice} />
+      <PanelHeader kind="Block" name={name || 'Edit this piece'} device={device} onDevice={onDevice} onRename={onRename} />
       {gallery && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
@@ -1533,15 +1538,20 @@ const miniActionA: React.CSSProperties = { border: `1px solid ${LINE}`, backgrou
 
 // Shared panel header (PagePilot parity): the KIND label ("Section"/"Block"), the name, a ✏️ affordance, and a
 // desktop/mobile toggle — the same header PagePilot shows above every block's settings.
-function PanelHeader({ kind, name, device, onDevice }: { kind: string; name: string; device?: Device; onDevice?: (d: Device) => void }) {
+function PanelHeader({ kind, name, device, onDevice, onRename }: { kind: string; name: string; device?: Device; onDevice?: (d: Device) => void; onRename?: (name: string) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(name)
+  const save = () => { setEditing(false); if (onRename && draft.trim() && draft.trim() !== name) onRename(draft.trim()) }
   return (
     <div style={{ marginBottom: 12 }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE }}>{kind}</div>
-          <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || kind}</div>
+          {editing
+            ? <input autoFocus defaultValue={name} onChange={(e) => setDraft(e.target.value)} onBlur={save} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }} style={{ width: '100%', fontFamily: SERIF, fontSize: 16, fontWeight: 700, border: `1px solid ${ORANGE}`, borderRadius: 8, padding: '3px 8px', color: INK, boxSizing: 'border-box', outline: 'none' }} />
+            : <div style={{ fontFamily: SERIF, fontSize: 16, fontWeight: 700, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name || kind}</div>}
         </div>
-        <span title="Edit" style={{ color: FAINT, flex: 'none', marginTop: 2, cursor: 'default' }}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg></span>
+        {onRename && <button title="Rename" onClick={() => { setDraft(name); setEditing((e) => !e) }} style={{ border: 0, background: editing ? WASH : 'transparent', color: editing ? ORANGE : FAINT, flex: 'none', marginTop: 2, cursor: 'pointer', padding: 3, borderRadius: 6, lineHeight: 0 }}><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></svg></button>}
       </div>
       {device && onDevice && (
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
@@ -1557,7 +1567,7 @@ function PanelHeader({ kind, name, device, onDevice }: { kind: string; name: str
 
 // Section-level settings panel (bug D): PagePilot-style — the whole section's Layout (width, columns, gap,
 // rounded), Background, and Spacing. Styles the raw section's outer wrapper + its content grid.
-function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGrid, cols, onCols, bgImage, onBgImage, uploadImage, device, onDevice, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; gridVal: (p: string) => string; onGrid: (p: string, v: string) => void; cols: string; onCols: (n: string) => void; bgImage: string; onBgImage: (u: string) => void; uploadImage: (f: File) => Promise<string | null>; device: Device; onDevice: (d: Device) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
+function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGrid, cols, onCols, bgImage, onBgImage, uploadImage, device, onDevice, onRename, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; gridVal: (p: string) => string; onGrid: (p: string, v: string) => void; cols: string; onCols: (n: string) => void; bgImage: string; onBgImage: (u: string) => void; uploadImage: (f: File) => Promise<string | null>; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
   // "Dynamic" rounded-corners = inherit the template default (no override); "Custom" = the slider below.
   const [roundedCustom, setRoundedCustom] = useState(() => !!parseFloat(getVal('border-radius')))
   const [bgBusy, setBgBusy] = useState(false)
@@ -1566,7 +1576,7 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
   const L = (s: string) => (mob ? `Mobile ${s}` : s)   // per-device props read/write mobile values in mobile mode
   return (
     <div>
-      <PanelHeader kind="Section" name={name} device={device} onDevice={onDevice} />
+      <PanelHeader kind="Section" name={name} device={device} onDevice={onDevice} onRename={onRename} />
       {mob && <div style={{ display: 'flex', gap: 7, alignItems: 'center', background: WASH, border: `1px solid ${LINE}`, borderRadius: 9, padding: '8px 10px', marginBottom: 12, fontSize: 11.5, color: SUB, lineHeight: 1.4 }}><span style={{ flex: 'none' }}>📱</span>Editing mobile — background, padding &amp; alignment here apply on phones only.</div>}
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
         <button onClick={onDup} style={miniActionA}>⧉ Duplicate</button>
