@@ -2032,7 +2032,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Layout</SecHead>
         <SegRow label="Width" prop="__w" options={[['fill', 'Fill'], ['fit', 'Fit']]} getVal={() => { const v = getVal('width'); return v === 'auto' || v === 'fit-content' ? 'fit' : 'fill' }} onStyle={(_p, v) => onStyle('width', v === 'fit' ? 'auto' : '100%')} />
-        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+        <IconSegRow label="Alignment" prop="text-align" getVal={getVal} onStyle={onStyle} options={[['left', alignIcon(<path d="M3 6h18M3 12h11M3 18h15" />)], ['center', alignIcon(<path d="M3 6h18M6 12h12M4 18h16" />)], ['right', alignIcon(<path d="M3 6h18M10 12h11M6 18h15" />)]]} />
       </div>
       )}
       {!isMedia && (
@@ -2043,9 +2043,11 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
         <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Padding" prop="padding" max={80} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Margin top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Margin bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '10px 0 2px' }}>Padding</div>
+        <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
       </div>
       )}
       {(showTextStyle || !isMedia) && (
@@ -2600,6 +2602,21 @@ function FontField({ label, prop, getVal, onStyle }: RowBase) {
     </div>
   )
 }
+// Icon segmented toggle (PagePilot's alignment: left / center / right icon buttons).
+function IconSegRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, React.ReactNode][] }) {
+  const cur = getVal(prop)
+  return (
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', background: '#f1f0ee', borderRadius: 9, padding: 3, gap: 3 }}>
+        {options.map(([v, icon]) => (
+          <button key={v} title={v} onClick={() => onStyle(prop, cur === v ? '' : v)} style={{ flex: 1, border: 0, background: cur === v ? '#fff' : 'transparent', color: cur === v ? INK : SUB, padding: '5px 4px', cursor: 'pointer', borderRadius: 6, boxShadow: cur === v ? '0 1px 2px rgba(0,0,0,.12)' : 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>{icon}</button>
+        ))}
+      </div>
+    </div>
+  )
+}
+const alignIcon = (d: React.ReactNode) => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"><>{d}</></svg>
 // Segmented toggle (Page | Full style): label left, pill toggle right — active pill is dark, track is light.
 function SegRow({ label, prop, options, getVal, onStyle }: RowBase & { options: [string, string][] }) {
   const cur = getVal(prop)
