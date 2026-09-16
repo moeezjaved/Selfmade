@@ -170,7 +170,9 @@ const css = `
 .pgbld .stats{padding:52px 0}
 .pgbld .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .pgbld .stats .sc{background:linear-gradient(160deg,#6a5cf0,#4433c4);color:#fff;border-radius:18px;padding:26px 18px;text-align:center}
-.pgbld .stats .ring{width:104px;height:104px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px}
+@property --p{syntax:'<number>';inherits:false;initial-value:0}
+.pgbld .stats .ring{width:104px;height:104px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;background:conic-gradient(#fff calc(var(--p,0)*1%),rgba(255,255,255,.22) 0);animation:sffillp var(--dur,1.6s) ease forwards}
+@keyframes sffillp{from{--p:0}to{--p:var(--pt,0)}}
 .pgbld .stats .rc{width:82px;height:82px;border-radius:50%;background:#5245d6;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:900;color:#fff}
 .pgbld .stats .sc p{font-size:14px;opacity:.95;color:inherit;margin:0;line-height:1.4}
 
@@ -315,7 +317,7 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   const stats = (arr(c.stats).length ? arr(c.stats) : [
     { label: '97%', body: 'Said their scalp felt cleaner and lighter.' }, { label: '94%', body: 'Noticed less oil between washes.' }, { label: '96%', body: 'Loved the fresh, natural citrus scent.' }, { label: '91%', body: 'Saw smoother, healthier-looking roots.' },
-  ]).slice(0, 4).map((s) => { const pct = pctOf(s.label); return `<div class="sc"><div class="ring" style="background:conic-gradient(#fff ${pct}%, rgba(255,255,255,.22) 0)"><div class="rc">${pct}%</div></div><p>${bd(s.body)}</p></div>` }).join('')
+  ]).slice(0, 4).map((s) => { const pct = pctOf(s.label); return `<div class="sc"><div class="ring" style="--pt:${pct};--dur:1.6s"><div class="rc">${pct}%</div></div><p>${bd(s.body)}</p></div>` }).join('')
 
   const feats = (arr(c.feature_cards).length ? arr(c.feature_cards) : [
     { title: 'Purifying Ritual', body: 'Loosen buildup and excess oil in minutes for a scalp that feels truly clean before you wash.' },

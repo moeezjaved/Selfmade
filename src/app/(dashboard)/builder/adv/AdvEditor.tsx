@@ -802,6 +802,31 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const next = box.innerHTML
     if (next !== html) apply((d) => patchElementContent(d, ref, { html: next }))
   }, [doc, apply])
+  // ── Percentage Circle (stat ring) — PagePilot's Animation/size panel for the .ring conic circles ─────────
+  const ringNodeEl = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    return (n.classList?.contains('ring') ? n : (n.querySelector('.ring') || n.closest('.ring'))) as HTMLElement | null
+  }, [rawNodeEl])
+  const rawIsRing = useCallback((): boolean => !!ringNodeEl(), [ringNodeEl])
+  const ringVal = useCallback((prop: string): string => { const r = ringNodeEl(); return r ? r.style.getPropertyValue(prop) : '' }, [ringNodeEl])
+  const ringPct = useCallback((): string => { const r = ringNodeEl(); if (!r) return ''; return r.style.getPropertyValue('--pt') || ((r.textContent || '').match(/\d+/)?.[0] || '') }, [ringNodeEl])
+  const ringSize = useCallback((): string => { const r = ringNodeEl(); return r ? (parseFloat(getComputedStyle(r).width) ? String(Math.round(parseFloat(r.style.width || getComputedStyle(r).width))) : '') : '' }, [ringNodeEl])
+  const editRing = useCallback((mutate: (ring: HTMLElement) => void) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const ring = (node.classList?.contains('ring') ? node : (node.querySelector('.ring') || node.closest('.ring'))) as HTMLElement | null
+      if (ring) mutate(ring)
+    })
+  }, [rawSel, rawEditHtml])
+  const setRingPct = useCallback((v: string) => { const n = (v || '').replace(/[^\d.]/g, '') || '0'; editRing((r) => { r.style.setProperty('--pt', n); const rc = r.querySelector('.rc'); if (rc) rc.textContent = `${n}%` }) }, [editRing])
+  const setRingStyle = useCallback((prop: string, v: string) => editRing((r) => { if (v) r.style.setProperty(prop, v); else r.style.removeProperty(prop) }), [editRing])
+  const setRingSize = useCallback((v: string) => editRing((r) => { if (v) { r.style.width = `${v}px`; r.style.height = `${v}px` } else { r.style.removeProperty('width'); r.style.removeProperty('height') } }), [editRing])
+  // ── Logo (As Seen On / press logos) — upload a logo IMAGE in place of the text name (like PagePilot) ─────
+  const rawIsLogo = useCallback((): boolean => { const n = rawNodeEl(); return !!n && (n.classList?.contains('logo') || n.classList?.contains('plogo')) }, [rawNodeEl])
+  const rawLogoImg = useCallback((): string => { const n = rawNodeEl(); const im = n?.querySelector('img'); return im?.getAttribute('src') || '' }, [rawNodeEl])
+  const setLogoImage = useCallback((url: string) => { if (!rawSel) return; rawEditHtml(rawSel.ref, (box) => { let node: HTMLElement = box; for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k } if (node) node.innerHTML = url ? `<img src="${url}" alt="logo" style="height:30px;max-width:130px;object-fit:contain;display:block">` : (node.getAttribute('data-name') || 'Logo') }) }, [rawSel, rawEditHtml])
   // Gallery manager: list every <img> inside the selected gallery node with its child-path from the raw root,
   // so add / remove / replace work whether you select "Product Gallery" or the thumbnail strip (PagePilot).
   const rawGallery = useCallback((): { src: string; path: number[] }[] | null => {
@@ -1225,6 +1250,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
+              isRing={rawIsRing()} ringPct={ringPct()} ringSize={ringSize()} ringDur={(ringVal('--dur') || '').replace('s', '')}
+              onRingPct={setRingPct} onRingSize={setRingSize} onRingDur={(v) => setRingStyle('--dur', v ? `${v}s` : '')}
+              isLogo={rawIsLogo()} logoImg={rawLogoImg()} onLogoImage={setLogoImage}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
@@ -1432,7 +1460,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1490,6 +1518,23 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
             ))}
           </div>
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Toggle which payment icons show in this row.</div>
+        </div>
+      )}
+      {isRing && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Animation</div>
+          <NumRow label="Percentage" prop="__pct" min={0} max={100} unit="%" getVal={() => ringPct} onStyle={(_p, v) => onRingPct(v)} />
+          <NumRow label="Size" prop="__size" min={60} max={200} getVal={() => ringSize} onStyle={(_p, v) => onRingSize(v)} />
+          <NumRow label="Duration" prop="__dur" min={0} max={6} unit="s" getVal={() => ringDur} onStyle={(_p, v) => onRingDur(v)} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>The ring fills from 0 to the percentage over the duration.</div>
+        </div>
+      )}
+      {isLogo && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Logo</div>
+          {logoImg && <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7', padding: 12, marginBottom: 8, display: 'flex', justifyContent: 'center' }}><img src={logoImg} alt="" style={{ height: 34, maxWidth: '100%', objectFit: 'contain' }} /><button onClick={() => onLogoImage('')} title="Remove" style={{ position: 'absolute', top: 5, right: 5, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 999, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>}
+          <DropZone label={logoImg ? 'Replace logo image' : 'Drag & Drop or click to upload a logo'} busy={busy} onPick={() => pickFile((url) => onLogoImage(url))} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Upload a logo image, or edit the text below to use a name instead.</div>
         </div>
       )}
       {isImg && !gallery && (
