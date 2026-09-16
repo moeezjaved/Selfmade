@@ -1595,6 +1595,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           </>)}
           {rawSel.isImg && <><TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>{TB_ICON.img}</TbBtn><TbDiv /></>}
           <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>{TB_ICON.eye}</TbBtn>
+          <TbBtn title="Duplicate" onClick={() => rawOp('dup')}>{TB_ICON.dup}</TbBtn>
           <TbDiv />
           <TbBtn title="Move up" onClick={() => rawOp('up')}>{TB_ICON.up}</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>{TB_ICON.down}</TbBtn>
@@ -2013,33 +2014,29 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Edit the words here, or double-click the text on the canvas.</div>
         </div>
       )}
-      <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 14 }}>
-        <button onClick={() => onOp('dup')} style={miniActionA}>⧉ Duplicate</button>
-        <button onClick={() => onOp('hide')} style={miniActionA}>👁 Hide/show</button>
-        <button onClick={() => onOp('delete')} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
-      </div>
       {showTextStyle && (
-      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-        <div style={panelSecHead}>Typography</div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14 }}>
+        <SecHead device={device} onDevice={onDevice}>Typography</SecHead>
         <ColorRow label="Branding color" prop="color" getVal={getVal} onStyle={onStyle} />
         <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["'Fraunces',Georgia,serif", 'Serif (Fraunces)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
         <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={getVal} onStyle={onStyle} />
         <SegRow label="Letter spacing" prop="__ls" options={[['tight', 'Tight'], ['normal', 'Normal'], ['loose', 'Loose']]} getVal={() => { const v = getVal('letter-spacing'); return v && v.startsWith('-') ? 'tight' : (v && v !== 'normal' && v !== '' && parseFloat(v) > 0 ? 'loose' : 'normal') }} onStyle={(_p, v) => onStyle('letter-spacing', v === 'tight' ? '-0.02em' : v === 'loose' ? '0.06em' : 'normal')} />
         <SelRow label="Case" prop="text-transform" options={[['none', 'Default'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']]} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Line height" prop="line-height" min={12} max={64} getVal={getVal} onStyle={onStyle} />
+        <SegRow label="Line height" prop="__lh" options={[['auto', 'Auto'], ['custom', 'Custom']]} getVal={() => { const v = getVal('line-height'); return v && v !== 'normal' && v !== '' ? 'custom' : 'auto' }} onStyle={(_p, v) => onStyle('line-height', v === 'custom' ? '1.4' : 'normal')} />
+        {getVal('line-height') && getVal('line-height') !== 'normal' && <NumRow label=" " prop="line-height" min={10} max={40} unit="" getVal={(p) => { const v = getVal(p); return v ? String(Math.round(parseFloat(v) * 10)) : '' }} onStyle={(_p, v) => onStyle('line-height', v ? String(parseInt(v) / 10) : 'normal')} />}
       </div>
       )}
       {showTextStyle && (
-      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={panelSecHead}>Layout</div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+        <SecHead device={device} onDevice={onDevice}>Layout</SecHead>
         <SegRow label="Width" prop="__w" options={[['fill', 'Fill'], ['fit', 'Fit']]} getVal={() => { const v = getVal('width'); return v === 'auto' || v === 'fit-content' ? 'fit' : 'fill' }} onStyle={(_p, v) => onStyle('width', v === 'fit' ? 'auto' : '100%')} />
         <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
       </div>
       )}
       {!isMedia && (
-      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={panelSecHead}>Appearance</div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+        <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
         <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
         <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
         <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
@@ -2051,8 +2048,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       </div>
       )}
       {(showTextStyle || !isMedia) && (
-      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={panelSecHead}>Custom</div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+        <SecHead>Custom</SecHead>
         <div style={{ fontSize: 12, fontWeight: 600, color: SUB, marginBottom: 6 }}>Class</div>
         <input defaultValue={getVal('__class')} key={getVal('__class')} placeholder="my-class another-class" onBlur={(e) => onStyle('__class', e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
           style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
@@ -2205,21 +2202,20 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
     <div style={{ marginBottom: 14 }}>
       <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Text</div>
       <div style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', padding: '4px 5px', borderBottom: `1px solid ${LINE}`, background: INSET }}>
-          <select onMouseDown={saveSel} onChange={(e) => execRestore('fontSize', e.target.value)} defaultValue="" title="Text size" style={{ border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', fontSize: 12, padding: '2px 4px', marginRight: 3, cursor: 'pointer', color: INK }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'nowrap', padding: '4px 4px', borderBottom: `1px solid ${LINE}`, background: INSET }}>
+          <select onMouseDown={saveSel} onChange={(e) => execRestore('fontSize', e.target.value)} defaultValue="" title="Text size" style={{ border: `1px solid ${LINE}`, borderRadius: 6, background: '#fff', fontSize: 11.5, padding: '2px 3px', marginRight: 2, cursor: 'pointer', color: INK, flex: 'none' }}>
             <option value="" disabled>Aa</option>
             <option value="2">Small</option><option value="3">Normal</option><option value="5">Large</option><option value="6">XL</option>
           </select>
           <button title="Bold" style={{ ...tbBtn, fontWeight: 800 }} onMouseDown={noBlur(() => exec('bold'))}>B</button>
-          <button title="Italic" style={{ ...tbBtn, fontStyle: 'italic' }} onMouseDown={noBlur(() => exec('italic'))}>I</button>
+          <button title="Italic" style={{ ...tbBtn, fontStyle: 'italic', fontFamily: 'Georgia,serif' }} onMouseDown={noBlur(() => exec('italic'))}>I</button>
           <button title="Underline" style={{ ...tbBtn, textDecoration: 'underline' }} onMouseDown={noBlur(() => exec('underline'))}>U</button>
-          <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => execList('insertUnorderedList'))}>•</button>
-          <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => execList('insertOrderedList'))}>1.</button>
-          <button title="Link" style={tbBtn} onMouseDown={noBlur(() => { saveSel(); setLinkOpen((o) => !o) })}>🔗</button>
-          <label title="Text color" style={{ ...tbBtn, position: 'relative' }} onMouseDown={saveSel}><span style={{ pointerEvents: 'none' }}>A</span><span style={{ position: 'absolute', bottom: 3, left: 6, right: 6, height: 3, background: ORANGE, borderRadius: 2 }} /><input type="color" onChange={(e) => execRestore('foreColor', e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
+          <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => execList('insertUnorderedList'))}>{riSvg(<><path d="M8 6h13M8 12h13M8 18h13" /><path d="M3.6 6h.01M3.6 12h.01M3.6 18h.01" /></>)}</button>
+          <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => execList('insertOrderedList'))}>{riSvg(<><path d="M10 6h11M10 12h11M10 18h11" /><path d="M4 5.5 5.2 5v4M4 15h2l-2 3h2.2" /></>)}</button>
+          <button title="Link" style={tbBtn} onMouseDown={noBlur(() => { saveSel(); setLinkOpen((o) => !o) })}>{riSvg(<><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1" /><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1" /></>)}</button>
           <div style={{ flex: 1 }} />
-          <button title="Undo" style={tbBtn} onMouseDown={noBlur(() => exec('undo'))}>↺</button>
-          <button title="Redo" style={tbBtn} onMouseDown={noBlur(() => exec('redo'))}>↻</button>
+          <button title="Undo" style={tbBtn} onMouseDown={noBlur(() => exec('undo'))}>{riSvg(<><path d="M3 7v6h6" /><path d="M3.5 13a9 9 0 1 0 2.5-7L3 9" /></>)}</button>
+          <button title="Redo" style={tbBtn} onMouseDown={noBlur(() => exec('redo'))}>{riSvg(<><path d="M21 7v6h-6" /><path d="M20.5 13a9 9 0 1 1-2.5-7L21 9" /></>)}</button>
         </div>
         {linkOpen && (
           <div style={{ display: 'flex', gap: 6, padding: '7px 7px 0' }}>
@@ -2314,6 +2310,8 @@ function Modal({ title, hint, children, onClose }: { title: string; hint?: strin
 
 // PagePilot-style canvas toolbar: a clean white pill with muted outline icons + dividers (not a bold bar).
 const tbSvg = (d: React.ReactNode) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+// Rich-text toolbar icon (single line, matches PagePilot's editor row).
+const riSvg = (d: React.ReactNode) => <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
 const TB_ICON: Record<string, React.ReactNode> = {
   eye: tbSvg(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>),
   dup: tbSvg(<><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" /></>),
@@ -2338,7 +2336,22 @@ const TB_BAR: React.CSSProperties = { background: '#fff', border: '1px solid #e7
 const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
 const iconTopBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, width: 30, height: 30, fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
 const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }
-const panelSecHead: React.CSSProperties = { fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }
+const panelSecHead: React.CSSProperties = { fontSize: 14, fontWeight: 600, marginBottom: 12, marginTop: 2, color: INK }
+// PagePilot-style section header: label + a small desktop/mobile device toggle on the right.
+function SecHead({ children, device, onDevice }: { children: React.ReactNode; device?: Device; onDevice?: (d: Device) => void }) {
+  const ico = (active: boolean, d: React.ReactNode) => ({ border: 0, background: active ? '#fff' : 'transparent', borderRadius: 6, width: 26, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: active ? INK : SUB, boxShadow: active ? '0 1px 2px rgba(0,0,0,.12)' : 'none', padding: 0 } as React.CSSProperties)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 2 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{children}</div>
+      {device && onDevice && (
+        <div style={{ display: 'inline-flex', gap: 2, background: '#f1f0ee', borderRadius: 8, padding: 2 }}>
+          <button title="Desktop" onClick={() => onDevice('base')} style={ico(device !== 'mobile', null)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 20h8M12 17v3" /></svg></button>
+          <button title="Mobile" onClick={() => onDevice('mobile')} style={ico(device === 'mobile', null)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></svg></button>
+        </div>
+      )}
+    </div>
+  )
+}
 
 function Center({ children }: { children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: SUB, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14 }}>{children}</div>
