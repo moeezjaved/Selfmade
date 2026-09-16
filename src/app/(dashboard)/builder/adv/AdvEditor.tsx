@@ -362,6 +362,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [imgUrlOpen, setImgUrlOpen] = useState(false)   // image "Use image URL" inline field (replaces browser prompt)
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
   const [rawBox, setRawBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // selection highlight rect
+  const [hoverBox, setHoverBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // hover highlight rect (PagePilot-style)
+  const hoverRaf = useRef(0)
+  // Highlight the specific piece under the cursor inside a raw section (PagePilot highlights the exact block).
+  const onCanvasHover = useCallback((e: React.MouseEvent) => {
+    if (hoverRaf.current) return
+    const t = e.target as HTMLElement
+    hoverRaf.current = requestAnimationFrame(() => {
+      hoverRaf.current = 0
+      const target = t.closest('[data-node-type="element:raw"]') as HTMLElement | null
+      if (!target) { setHoverBox(null); return }
+      const item = snapUp(t, target)
+      if (!item || item === target || item.classList?.contains('garr')) { setHoverBox(null); return }
+      const r = item.getBoundingClientRect()
+      setHoverBox({ top: r.top, left: r.left, width: r.width, height: r.height })
+    })
+  }, [])
   // Close the inline image-URL field whenever the selected piece changes.
   useEffect(() => { setImgUrlOpen(false) }, [rawSel?.ref.elementId, rawSel?.path.join('.')])
   const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
@@ -541,9 +557,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       const srcs = ts.map((t) => t.getAttribute('src') || '').filter(Boolean)
       if (main && srcs.length) {
         const d = arrow.classList.contains('gnext') ? 1 : -1
-        const k = srcs.indexOf(main.getAttribute('src') || '')
-        const i = k < 0 ? (d > 0 ? 0 : srcs.length - 1) : (k + d + srcs.length) % srcs.length
-        main.setAttribute('src', srcs[i])
+        // Track the index on the element — indexOf(src) breaks when gallery images repeat (it always finds the
+        // first duplicate, so the ring never advances past it).
+        const cur = parseInt(main.getAttribute('data-gi') || '', 10)
+        const base = Number.isFinite(cur) ? cur : Math.max(0, srcs.indexOf(main.getAttribute('src') || ''))
+        const i = (base + d + srcs.length) % srcs.length
+        main.setAttribute('src', srcs[i]); main.setAttribute('data-gi', String(i))
         ts.forEach((t, j) => t.classList.toggle('on', j === i))
       }
       e.stopPropagation(); return
@@ -884,9 +903,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return col
   }
   const rawGallerySticky = useCallback((): boolean => {
-    const n = rawNodeEl(); if (!n) return false
-    return !!Array.from(n.querySelectorAll<HTMLElement>('*')).concat(n).find((e) => e.style && e.style.position === 'sticky')
-  }, [rawNodeEl])
+    if (!rawSel || !doc) return false
+    const cur = findElement(doc, rawSel.ref); const html = (cur?.content as { html?: string } | undefined)?.html
+    if (typeof html !== 'string' || typeof document === 'undefined') return false
+    const box = document.createElement('div'); box.innerHTML = html
+    const col = galleryColOf(box); return !!(col && col.style.position === 'sticky')   // read the same node setGallerySticky writes
+  }, [rawSel, doc])
   const setGallerySticky = useCallback((on: boolean) => {
     if (!rawSel) return
     rawEditHtml(rawSel.ref, (box) => {
@@ -1254,7 +1276,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── center: live canvas ── */}
         <main ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
           <div style={{ zoom, width: canvasWidth, background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
-            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} onDragStart={onCanvasDragStart} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
+            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} onMouseMove={onCanvasHover} onMouseLeave={() => setHoverBox(null)} onDragStart={onCanvasDragStart} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
           </div>
         </main>
 
@@ -1346,6 +1368,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {/* selection highlight box over the exact block that's selected (PagePilot-style) */}
       {rawBox && rawSel && (
         <div style={{ position: 'fixed', top: rawBox.top - 2, left: rawBox.left - 2, width: rawBox.width + 4, height: rawBox.height + 4, border: `2px solid ${ORANGE}`, borderRadius: 6, zIndex: 29, pointerEvents: 'none', boxShadow: `0 0 0 3px ${WASH}` }} />
+      )}
+      {hoverBox && (!rawBox || hoverBox.top !== rawBox.top || hoverBox.left !== rawBox.left) && (
+        <div style={{ position: 'fixed', top: hoverBox.top - 1, left: hoverBox.left - 1, width: hoverBox.width + 2, height: hoverBox.height + 2, border: `1.5px dashed ${ORANGE}`, borderRadius: 5, zIndex: 28, pointerEvents: 'none' }} />
       )}
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
@@ -1483,6 +1508,10 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
+  // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
+  // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
+  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc
+  const showTextStyle = !isMedia && (isText || text !== '' || isLink)   // typography only where there's real text
   const pickFile = (onUrl: (url: string) => void) => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'
     inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBusy(true); const url = await uploadImage(f); setBusy(false); if (url) onUrl(url) }
@@ -1625,6 +1654,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <button onClick={() => onOp('hide')} style={miniActionA}>👁 Hide/show</button>
         <button onClick={() => onOp('delete')} style={{ ...miniActionA, color: ORANGE }}>🗑 Delete</button>
       </div>
+      {showTextStyle && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Text</div>
         <ColorRow label="Text color" prop="color" getVal={getVal} onStyle={onStyle} />
@@ -1635,6 +1665,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <NumRow label="Line height" prop="line-height" min={12} max={64} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} getVal={getVal} onStyle={onStyle} />
       </div>
+      )}
+      {!isMedia && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Box</div>
         <ColorRow label="Background" prop="background-color" getVal={getVal} onStyle={onStyle} />
@@ -1645,6 +1677,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
       </div>
+      )}
       <button onClick={onClear} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
     </div>
   )
