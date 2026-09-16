@@ -818,6 +818,17 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const cur = findElement(doc, rawSel.ref)
     const html = (cur?.content as { html?: string } | undefined)?.html
     if (typeof html !== 'string') return
+    // Per-element responsive visibility ("Show on") — toggle a hide-on-device utility class.
+    if ((prop === '__hidemob' || prop === '__hidedesk') && typeof document !== 'undefined') {
+      const cls = prop === '__hidemob' ? 'sf-hide-mob' : 'sf-hide-desk'
+      const box = document.createElement('div'); box.innerHTML = html
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      node.classList.toggle(cls, value === '1')
+      const ref3 = rawSel.ref
+      apply((d) => patchElementContent(d, ref3, { html: box.innerHTML }))
+      return
+    }
     // Custom CSS classes (PagePilot's "Custom → Class"): tracked in data-cc so re-edits swap cleanly and never
     // clobber the element's own functional classes.
     if (prop === '__class' && typeof document !== 'undefined') {
@@ -840,6 +851,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const rawStyleVal = useCallback((prop: string): string => {
     const n = rawNodeEl(); if (!n) return ''
     if (prop === '__class') return n.getAttribute('data-cc') || ''
+    if (prop === '__hidemob') return n.classList.contains('sf-hide-mob') ? '1' : ''
+    if (prop === '__hidedesk') return n.classList.contains('sf-hide-desk') ? '1' : ''
     return n.style.getPropertyValue(prop) || ''
   }, [rawNodeEl])
   // The selected piece's PagePilot-style name (panel heading) + its editable text (panel content field, only
@@ -2035,6 +2048,21 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <IconSegRow label="Alignment" prop="text-align" getVal={getVal} onStyle={onStyle} options={[['left', alignIcon(<path d="M3 6h18M3 12h11M3 18h15" />)], ['center', alignIcon(<path d="M3 6h18M6 12h12M4 18h16" />)], ['right', alignIcon(<path d="M3 6h18M10 12h11M6 18h15" />)]]} />
       </div>
       )}
+      {(showTextStyle || !isMedia) && (
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+        <SecHead>Visibility</SecHead>
+        <div style={ROW}>
+          <span style={LBL}>Show on</span>
+          <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 6 }}>
+            {([['__hidedesk', 'Desktop', alignIcon(<><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 20h8M12 17v3" /></>)], ['__hidemob', 'Mobile', alignIcon(<><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></>)]] as [string, string, React.ReactNode][]).map(([p, lbl, icon]) => {
+              const on = getVal(p) !== '1'
+              return <button key={p} onClick={() => onStyle(p, on ? '1' : '')} style={{ flex: 1, border: `1px solid ${on ? ORANGE : LINE}`, background: on ? WASH : '#fff', color: on ? INK : SUB, borderRadius: 9, padding: '7px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>{icon}{lbl}</button>
+            })}
+          </div>
+        </div>
+        <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Turn a device off to hide this element there.</div>
+      </div>
+      )}
       {!isMedia && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
@@ -2042,7 +2070,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
         <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+        <SegRow label="Rounded corners source" prop="__rcsrc" options={[['custom', 'Custom'], ['dynamic', 'Dynamic']]} getVal={() => getVal('border-radius') ? 'custom' : 'dynamic'} onStyle={(_p, v) => onStyle('border-radius', v === 'custom' ? (getVal('border-radius') || '8px') : '')} />
+        {getVal('border-radius') !== '' && <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
         <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '10px 0 2px' }}>Padding</div>
         <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />

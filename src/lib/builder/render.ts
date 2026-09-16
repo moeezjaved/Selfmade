@@ -140,6 +140,9 @@ function baseCss(tokens: DesignTokens): string {
 .sf-stars{letter-spacing:2px;color:#f5a623}
 .sf-price-was{text-decoration:line-through;opacity:.55;margin-left:8px}
 .sf-price-save{margin-left:8px;font-weight:700}
+/* per-element responsive visibility ("Show on" — desktop / mobile) */
+@media(max-width:768px){.sf-hide-mob{display:none!important}}
+@media(min-width:769px){.sf-hide-desk{display:none!important}}
 
 /* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
 /* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */
