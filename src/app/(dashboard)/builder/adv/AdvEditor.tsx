@@ -1277,27 +1277,75 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string) => void; 
   )
 }
 
-// PagePilot-style "Add Section" library — a gallery of ready-made sections with live previews. Picking one
-// inserts it as a named, per-piece-editable raw section that keeps its design and publishes as native blocks.
+// Which category each library section belongs to (PagePilot groups its Add-Section library this way).
+const SECTION_CAT: Record<string, string> = {
+  reviews: 'Social Proof & Trust', 'reviews-photos': 'Social Proof & Trust', 'as-seen-on': 'Social Proof & Trust', 'trust-icons': 'Social Proof & Trust', 'trusted-by': 'Social Proof & Trust',
+  'rotating-benefits': 'Benefits & Features', statistics: 'Benefits & Features', 'feature-cards': 'Benefits & Features', comparison: 'Benefits & Features', numbered: 'Benefits & Features',
+  'image-text': 'Image & Content', 'how-it-works': 'Image & Content', 'text-rotating': 'Image & Content',
+  cta: 'Conversion / CTA', recommended: 'Conversion / CTA', 'sticky-atc': 'Conversion / CTA',
+  faq: 'FAQ', guarantee: 'Guarantee',
+}
+const SECTION_CAT_ORDER = ['Social Proof & Trust', 'Benefits & Features', 'Image & Content', 'Conversion / CTA', 'FAQ', 'Guarantee']
+// A minimal blank section for "Create from Scratch".
+const BLANK_SECTION = `<section style="padding:44px 20px;background:transparent"><div style="max-width:1040px;margin:0 auto;text-align:center"><h2 style="font-size:28px;font-weight:800;color:#1b1a17;margin:0 0 10px">Your section heading</h2><p style="font-size:15px;color:#6a6e93;max-width:560px;margin:0 auto;line-height:1.6">Add your text, then drop in blocks — every piece stays editable.</p></div></section>`
+
+// PagePilot-style "Add Section" library: a searchable, category-filtered gallery of ready-made sections with
+// live previews. Picking one inserts it as a named, per-piece-editable raw section that publishes natively.
 function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name: string) => void; onClose: () => void }) {
+  const [cat, setCat] = useState('All')
+  const [q, setQ] = useState('')
+  const catOf = (id: string) => SECTION_CAT[id] || 'Layout'
+  const counts: Record<string, number> = { All: SECTION_LIBRARY.length }
+  for (const c of SECTION_CAT_ORDER) counts[c] = SECTION_LIBRARY.filter((it) => catOf(it.id) === c).length
+  const query = q.trim().toLowerCase()
+  const shown = SECTION_LIBRARY.filter((it) => (cat === 'All' || catOf(it.id) === cat) && (!query || it.label.toLowerCase().includes(query)))
+  const navItem = (label: string, count?: number) => (
+    <button key={label} onClick={() => setCat(label)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, width: '100%', textAlign: 'left', border: 0, background: cat === label ? INSET : 'transparent', color: cat === label ? INK : SUB, borderRadius: 9, padding: '8px 11px', fontSize: 13, fontWeight: cat === label ? 700 : 500, cursor: 'pointer' }}>
+      <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
+      {count != null && <span style={{ fontSize: 11.5, color: FAINT, flex: 'none' }}>{count}</span>}
+    </button>
+  )
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(980px,95vw)', maxHeight: '88vh', overflow: 'auto', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: `1px solid ${LINE}`, position: 'sticky', top: 0, background: '#fff', zIndex: 1 }}>
-          <span style={{ fontFamily: SERIF, fontSize: 20 }}>Add a section</span>
-          <span style={{ fontSize: 12.5, color: SUB }}>Click one to add it to your page — every piece stays editable</span>
-          <div style={{ flex: 1 }} />
-          <button onClick={onClose} style={{ ...iconTopBtn, fontSize: 18 }}>✕</button>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(1080px,96vw)', height: 'min(760px,90vh)', display: 'flex', flexDirection: 'column', overflow: 'hidden', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
+        {/* header + search */}
+        <div style={{ padding: '18px 22px 14px', borderBottom: `1px solid ${LINE}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ fontFamily: SERIF, fontSize: 20, fontWeight: 700 }}>Add Section</span>
+            <div style={{ flex: 1 }} />
+            <button onClick={onClose} style={{ ...iconTopBtn, fontSize: 18 }}>✕</button>
+          </div>
+          <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px' }}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={FAINT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
+            <input autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" style={{ flex: 1, border: 0, outline: 'none', fontSize: 13.5, color: INK, background: 'transparent' }} />
+          </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(290px,1fr))', gap: 16, padding: 20 }}>
-          {SECTION_LIBRARY.map((it) => (
-            <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
-              <div style={{ height: 168, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <div style={{ width: 900, transform: 'scale(.42)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
-              </div>
-              <div style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
+        {/* body: left categories + right grid */}
+        <div style={{ flex: 1, minHeight: 0, display: 'flex' }}>
+          <div style={{ width: 210, flex: 'none', borderRight: `1px solid ${LINE}`, padding: 12, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            {navItem('Saved', 0)}
+            {navItem('All', counts.All)}
+            {SECTION_CAT_ORDER.map((c) => navItem(c, counts[c]))}
+            <div style={{ flex: 1 }} />
+            <button onClick={() => { onPick(BLANK_SECTION, 'Section'); onClose() }} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, border: `1px dashed ${LINE}`, background: INSET, borderRadius: 12, padding: '16px 10px', cursor: 'pointer', color: INK, marginTop: 8 }}>
+              <span style={{ fontSize: 22, color: ORANGE, lineHeight: 1 }}>＋</span>
+              <span style={{ fontSize: 12.5, fontWeight: 700 }}>Create from Scratch</span>
             </button>
-          ))}
+          </div>
+          <div style={{ flex: 1, minWidth: 0, overflowY: 'auto', padding: 18 }}>
+            {cat !== 'All' && <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>{cat}</div>}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+              {shown.map((it) => (
+                <button key={it.id} onClick={() => { onPick(it.html, it.label); onClose() }} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+                  <div style={{ padding: '10px 12px 6px', fontSize: 13, fontWeight: 700, color: INK }}>{it.label}</div>
+                  <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ width: 900, transform: 'scale(.34)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                  </div>
+                </button>
+              ))}
+              {shown.length === 0 && <div style={{ gridColumn: '1 / -1', color: FAINT, fontSize: 13, padding: '30px 0', textAlign: 'center' }}>No sections match “{q}”.</div>}
+            </div>
+          </div>
         </div>
       </div>
     </div>
