@@ -378,6 +378,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [showMenu, setShowMenu] = useState(false)
   const [topMenu, setTopMenu] = useState(false)   // the top-bar "Menu" dropdown (holds undo/redo + settings)
   const [rawAIbusy, setRawAIbusy] = useState(false)   // "Edit with AI" on the canvas toolbar
+  const [aiOpen, setAiOpen] = useState(false)         // the "Edit with AI" popup (mode + instructions)
+  const [aiMode, setAiMode] = useState<'rewrite' | 'shorter' | 'longer'>('rewrite')
+  const [aiInstr, setAiInstr] = useState('')
   const [preview, setPreview] = useState(false)   // fullscreen preview — hides both panels (PagePilot's expand)
   const [histDepth, setHistDepth] = useState(0)
   const [redoDepth, setRedoDepth] = useState(0)
@@ -753,7 +756,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [measureRawTb])
   // Drop the raw sub-selection when the main selection moves off the raw element (tree click, etc.).
   useEffect(() => { if (rawSel && (!sel || sel.elementId !== rawSel.ref.elementId)) setRawSel(null) }, [sel, rawSel])
-  useEffect(() => { if (!rawSel) setRawAddOpen(false) }, [rawSel])
+  useEffect(() => { if (!rawSel) setRawAddOpen(false); setAiOpen(false) }, [rawSel])
   // Make the selected raw piece draggable so it can be dragged to reorder among its siblings.
   useEffect(() => { const n = rawNodeEl(); if (n) { n.setAttribute('draggable', 'true'); return () => n.removeAttribute('draggable') } }, [rawNodeEl, canvasHtml])
   // Apply a raw op to ANY piece by (ref, path) — the core used by both the canvas toolbar (via rawSel) and
@@ -848,15 +851,17 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return n.textContent || ''
   }, [rawNodeEl])
   const rawSetText = useCallback((t: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'settext', t) }, [rawSel, rawApplyAt])
-  // "Edit with AI" straight from the canvas toolbar — rewrites the selected text piece in the brand voice.
-  const rawEditAI = useCallback(async () => {
+  // "Edit with AI" — the popup (Rewrite / Shorter / Longer + optional instructions) rewrites the selected text.
+  const runRawAI = useCallback(async (mode: 'rewrite' | 'shorter' | 'longer', instr: string) => {
     if (!rawSel) return
     const t = rawText(); if (!t.trim()) return
+    const base = mode === 'shorter' ? 'Make it shorter and more concise, keeping the meaning.' : mode === 'longer' ? 'Make it a little longer and more detailed.' : 'Rewrite it to be tighter and more persuasive.'
+    const instruction = instr.trim() ? `${base} ${instr.trim()}` : base
     setRawAIbusy(true)
     try {
-      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, context: doc?.productRef?.importedProduct?.title || '' }) })
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, instruction, context: doc?.productRef?.importedProduct?.title || '' }) })
       const j = await r.json()
-      if (j.text) rawSetText(j.text); else window.alert(j.error || 'Could not rewrite.')
+      if (j.text) { rawSetText(j.text); setAiOpen(false); setAiInstr('') } else window.alert(j.error || 'Could not rewrite.')
     } catch { window.alert('Could not rewrite — please try again.') }
     finally { setRawAIbusy(false) }
   }, [rawSel, rawText, rawSetText, doc])
@@ -1585,7 +1590,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, ...TB_BAR, zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
           {!rawSel.isImg && rawText().trim() !== '' && (<>
-            <button title="Edit with AI" onClick={rawEditAI} disabled={rawAIbusy} style={{ border: 0, background: rawAIbusy ? '#f3ebfb' : 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#a23ba0', cursor: rawAIbusy ? 'default' : 'pointer', height: 28, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 7, padding: '0 10px', fontSize: 12.5, fontWeight: 800, pointerEvents: 'auto', whiteSpace: 'nowrap' }}>✨ {rawAIbusy ? 'Editing…' : 'Edit with AI'}</button>
+            <button title="Edit with AI" onClick={() => setAiOpen((o) => !o)} style={{ border: 0, background: aiOpen ? '#f3ebfb' : 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#a23ba0', cursor: 'pointer', height: 28, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 7, padding: '0 10px', fontSize: 12.5, fontWeight: 800, pointerEvents: 'auto', whiteSpace: 'nowrap' }}>✨ Edit with AI</button>
             <TbDiv />
           </>)}
           {rawSel.isImg && <><TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>{TB_ICON.img}</TbBtn><TbDiv /></>}
@@ -1604,6 +1609,24 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                 <button key={it.id} onClick={() => { rawInsert(stampName(it.html, it.label)); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
               ))}
               <button onClick={() => { setRawAddOpen(false); setRawLibOpen(true) }} style={{ textAlign: 'left', border: 0, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 8, background: 'transparent', color: ORANGE, fontSize: 13, fontWeight: 700, padding: '8px', cursor: 'pointer' }}>Browse library →</button>
+            </div>
+          )}
+          {aiOpen && (
+            <div style={{ position: 'absolute', top: '100%', left: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 16px 40px -12px rgba(20,18,15,.35)', padding: 16, width: 320, zIndex: 33, pointerEvents: 'auto', cursor: 'default' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 15, fontWeight: 800, color: INK, marginBottom: 12 }}><span style={{ color: '#a23ba0' }}>✨</span> Edit with AI</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Mode</div>
+              <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                {([['rewrite', 'Rewrite'], ['shorter', 'Shorter'], ['longer', 'Longer']] as const).map(([m, lbl]) => (
+                  <button key={m} onClick={() => setAiMode(m)} style={{ flex: 1, border: `1px solid ${aiMode === m ? ORANGE : LINE}`, background: aiMode === m ? WASH : '#fff', color: INK, borderRadius: 9, padding: '8px 6px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 5 }}>{lbl}{m === 'rewrite' && aiMode === 'rewrite' ? <span style={{ fontSize: 9.5, fontWeight: 800, color: '#2f8f4e', background: '#e7f6ec', borderRadius: 999, padding: '1px 6px' }}>Selected</span> : null}</button>
+                ))}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Instructions <span style={{ color: FAINT, fontWeight: 500 }}>(Optional)</span></div>
+              <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} placeholder="Type your prompt here…" rows={3}
+                style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12 }} />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                <button onClick={() => { setAiOpen(false); setAiInstr('') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 9, padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+                <button disabled={rawAIbusy} onClick={() => runRawAI(aiMode, aiInstr)} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 9, padding: '8px 18px', fontSize: 12.5, fontWeight: 700, cursor: rawAIbusy ? 'default' : 'pointer', opacity: rawAIbusy ? 0.65 : 1 }}>{rawAIbusy ? 'Sending…' : 'Send'}</button>
+              </div>
             </div>
           )}
         </div>
