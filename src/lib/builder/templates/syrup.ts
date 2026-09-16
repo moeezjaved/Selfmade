@@ -81,6 +81,10 @@ const css = `
 .pgbld .thumbs{display:flex;gap:8px;margin-top:12px}
 .pgbld .thumbs img,.pgbld .thumbs .ph{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line);min-height:0;cursor:pointer}
 .pgbld .thumbs img.on{border-color:var(--blue);border-width:2px}
+/* clean hero gallery (real product images) + relocated benefit-creative section */
+.pgbld .pgal .hbottle,.pgbld .pgal .hbottle.ph{aspect-ratio:3/4;width:100%}
+.pgbld .pcre{padding:6px 0 26px}
+.pgbld .pcre-img .pcrei,.pgbld .pcre-img .ph{aspect-ratio:3/4;border-radius:12px;min-height:0;width:100%;object-fit:cover}
 .pgbld .bestseller{display:inline-flex;align-items:center;gap:8px;background:var(--soft2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:800;color:var(--blue);margin-bottom:12px}
 .pgbld .ptitle{font-size:25px;font-weight:800}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
@@ -256,7 +260,7 @@ const css = `
 .pgbld .satc .add{background:#fff;color:var(--blue);text-decoration:none;padding:11px 24px;border-radius:10px;font-weight:800;font-size:14px;flex:none}
 
 @media(max-width:900px){
-  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
+  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid,.pgbld .pcre .mid{grid-template-columns:1fr}
   .pgbld .rgrid,.pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
   .pgbld .press{grid-template-columns:1fr}
@@ -354,15 +358,8 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 1 · HERO -->
   <section class="hero"><div class="wrap"><div class="grid">
-    <div>
-      <div class="hcre">
-        <div class="hd">${hl(c.hero_headline || 'Your Scalp is Buried Under **Buildup**. Purify it & Unlock Healthier Roots.')}</div>
-        <div class="sd">${escp(c.hero_subline || 'A Simple Pre-Wash. Visible Results.')}</div>
-        <div class="mid">
-          <div class="ppills">${pills}</div>
-          <div class="gwrap">${img(c.image_hero || P, o.productName, 'hbottle', 'Product')}<button class="garr gprev" aria-label="Previous image">‹</button><button class="garr gnext" aria-label="Next image">›</button></div>
-        </div>
-      </div>
+    <div class="pgal">
+      <div class="gwrap">${img(c.image_hero || c.image_main || P, o.productName, 'hbottle', 'Product')}<button class="garr gprev" aria-label="Previous image">‹</button><button class="garr gnext" aria-label="Next image">›</button></div>
       <div class="thumbs">${thumbs}</div>
     </div>
     <div>
@@ -381,6 +378,19 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="warn">⚠ <span><b>Low Stock Notice.</b> ${bd(c.warn_line || 'This pre-wash treatment sold out fast this year. We encourage you to take advantage of the limited sale while it lasts. It’s only available here and not sold in stores.')}</span></div>
     </div>
   </div></div></section>
+
+  <!-- 1b · BENEFIT CREATIVE (Image with Numbered Benefits) — the "Awaken Your Radiance" pills beside the bottle.
+       Lives as its OWN section now (PagePilot keeps the hero gallery clean = real product images only). -->
+  <section class="pcre"><div class="wrap">
+    <div class="hcre">
+      <div class="hd">${hl(c.hero_headline || 'Your Scalp is Buried Under **Buildup**. Purify it & Unlock Healthier Roots.')}</div>
+      <div class="sd">${escp(c.hero_subline || 'A Simple Pre-Wash. Visible Results.')}</div>
+      <div class="mid">
+        <div class="ppills">${pills}</div>
+        <div class="pcre-img">${img(c.image_hero || P, o.productName, 'pcrei', 'Product')}</div>
+      </div>
+    </div>
+  </div></section>
 
   <!-- 2 · PILL STRIP -->
   <section class="strip"><div class="wrap"><div class="row">${strip}</div></div></section>

@@ -10,6 +10,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
+import { Mark } from '@/components/brand/Mark'
 import { renderDoc, type RenderProduct } from '@/lib/builder/render'
 import type { PageDoc, Section, Block, Element, Device } from '@/lib/builder/schema'
 import {
@@ -261,6 +262,9 @@ function rawLabelFor(el: HTMLElement): string {
     if (tag === 'a' || tag === 'button') return 'Button'
     return 'Text'
   }
+  // A gallery container (main image + thumbnail strip / slider) wins BEFORE the generic image check — a clean
+  // product gallery is image-only, so it must read as "Product Gallery", not a bare "Image".
+  if (el.querySelector('.thumbs, .gtrack, .gallery, .hbottle')) return 'Product Gallery'
   if (el.querySelector('img') && !txt) return el.querySelector('svg') && !el.querySelector('img') ? 'Icon' : 'Image'
   if (isIcon) return 'Icon'
   if (/^h[1-6]$/.test(tag)) return 'Heading'
@@ -268,7 +272,7 @@ function rawLabelFor(el: HTMLElement): string {
   // Unclassed container (a hero column) → infer a PagePilot-style group name from what it holds. The outer
   // row keeps its own friendly class ('grid'→'Row'), so only real columns reach here.
   if (el.querySelector('.ptitle, h1') && el.querySelector('.price, .now, .buy, .btn, [class*="cart"], [class*="atc"]')) return 'Product Details'
-  if (rawIsImg(el) || el.querySelector('.thumbs, .gtrack, .gallery, .hbottle')) return 'Product Gallery'
+  if (rawIsImg(el)) return 'Product Gallery'
   // Generic container → PagePilot's "Group (Horizontal/Vertical)" (direction inferred from inline style/class).
   const st = (el.getAttribute('style') || '')
   if (/flex-direction\s*:\s*column/.test(st) || /(^|\s)(ppills|col|vstack|vertical)(\s|$)/.test(el.className)) return 'Group (Vertical)'
@@ -282,6 +286,7 @@ function rawIsImg(el: HTMLElement): boolean {
 // PagePilot's exact section names, keyed by the bespoke templates' section-root class. These WIN over the
 // stored/heading name so the tree reads one-to-one with PagePilot (e.g. the reviews grid → "Reviews Carousel").
 const PP_SECTION_NAME: Record<string, string> = {
+  pcre: 'Image with Numbered Benefits',
   strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
   feat: 'Image with Feature Cards', how: 'Image with Text', gold: 'Product Comparison',
   seen: 'As Seen On with Quotes', hguar: 'Happiness Guarantee', recs: 'Recommended Products', satc: 'Sticky Add to Cart',
@@ -308,6 +313,16 @@ function rawSectionName(html: string, fallback: string): string {
   if (box.querySelector('[class*="stat"], [class*="percent"], [class*="ring"]')) return 'Statistics With Percentages'
   return fallback || 'Section'
 }
+/** Stamp a friendly tree name onto an inserted block's root element (as data-name, which rawLabelFor honours
+ *  first) so a library block lands in the tree under the name you picked — "Heading + subtext", not "Row".
+ *  Matches PagePilot, where an added block keeps the library name. */
+function stampName(html: string, label: string): string {
+  if (typeof document === 'undefined' || !label) return html
+  const box = document.createElement('div'); box.innerHTML = html
+  const first = box.firstElementChild as HTMLElement | null
+  if (first && !first.getAttribute('data-name')) { first.setAttribute('data-name', label); return box.innerHTML }
+  return html
+}
 /** Parse a raw slice's HTML into a nested outline. Collapses single-child layout wrappers so the tree shows
  *  meaningful pieces, not scaffolding; caps nodes + depth so it stays fast and legible. */
 function buildRawOutline(html: string): RawOutlineNode[] {
@@ -325,13 +340,21 @@ function buildRawOutline(html: string): RawOutlineNode[] {
       const rk = realKids(cur)
       if (rk.length !== 1) break
       const only = rk[0].k
-      const own = (cur.textContent || '').replace(only.textContent || '', '').trim()
+      // "own text" ignores decorative arrow buttons (‹ ›) so the gallery's .gwrap collapses to its image —
+      // reads as one "Product Image", not a nested "Product Gallery" with its own duplicate Images panel.
+      let ownRaw = cur.textContent || ''
+      for (const c of Array.from(cur.children) as HTMLElement[]) if (c.classList?.contains('garr')) ownRaw = ownRaw.replace(c.textContent || '', '')
+      const own = ownRaw.replace(only.textContent || '', '').trim()
       if (own) break
       cur = only; curPath = [...curPath, rk[0].i]
     }
     const kids = realKids(cur)
     let children: RawOutlineNode[] = []
-    if (kids.length > 1 && depth < 6) children = kids.map(({ k, i }) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
+    // Some pieces are ONE self-contained block with a dedicated panel (Payment Icons has its own provider
+    // toggles + alignment). Don't expand them into per-icon Group/Text rows — that just duplicates the same
+    // settings on every descendant. Treat them as a single leaf, matching PagePilot's one "Payment Icons" block.
+    const atomic = cur.classList?.contains('pays') || cur.classList?.contains('payicon')
+    if (!atomic && kids.length > 1 && depth < 6) children = kids.map(({ k, i }) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
     return { path: curPath, label: rawLabelFor(cur), isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
   }
   return (Array.from(box.children) as HTMLElement[]).map((k, i) => walk(k, [i], 0)).filter(Boolean) as RawOutlineNode[]
@@ -533,6 +556,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   const onCanvasClick = useCallback((e: React.MouseEvent) => {
     const clicked = e.target as HTMLElement
+    // In the editor a click SELECTS a piece — it must never follow a link or submit a form (e.g. the Add-to-Cart
+    // <a> would otherwise navigate away from the editor).
+    if (clicked.closest('a,button')) e.preventDefault()
     // Gallery: clicking a thumbnail swaps the MAIN image (preview interaction, like PagePilot and the
     // published storefront). Replacing/editing gallery images is still available from the tree.
     const thumb = clicked.closest('.thumbs img, img.gthumb, .gthumb img') as HTMLImageElement | null
@@ -759,6 +785,26 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       node.scrollIntoView({ block: 'center', behavior: 'smooth' })
     })
   }, [])
+  // When a raw piece is selected (from the canvas OR the tree), open EVERY ancestor node in the left tree so the
+  // selected row is actually rendered — only then can it show its highlight and scroll into view. Fixes "select a
+  // block in the center preview → it isn't highlighted in the left panel" (the row was inside a collapsed group).
+  const revealRawInTree = useCallback((ref: NodeRef, path: number[]) => {
+    const s = doc?.sections.find((x) => x.id === ref.sectionId); if (!s || s.blocks.length !== 1) return
+    const el0 = s.blocks[0].elements[0]
+    const html = el0 && el0.type === 'raw' ? (el0.content as { html?: string } | undefined)?.html : undefined
+    if (typeof html !== 'string') return
+    let nodes = buildRawOutline(html)
+    // mirror flattenOutline: drop leading generic wrappers so node paths line up with the rendered tree
+    let guard = 0
+    while (nodes.length === 1 && nodes[0].children.length > 1 && /^(Row|Group|Section|Group \((Horizontal|Vertical)\))$/.test(nodes[0].label) && guard++ < 4) nodes = nodes[0].children
+    const isPrefix = (a: number[]) => a.length <= path.length && a.every((v, i) => v === path[i])
+    const keys: string[] = []
+    const walk = (arr: RawOutlineNode[]) => { for (const n of arr) if (isPrefix(n.path)) { if (n.children.length) keys.push(`${ref.elementId}#${n.path.join('.')}`); walk(n.children) } }
+    walk(nodes)
+    setExpanded((x) => { const nx = new Set(x); nx.add(ref.sectionId); if (ref.blockId) nx.add(ref.blockId); keys.forEach((k) => nx.add(k)); return nx })
+    queueMicrotask(() => { if (typeof document !== 'undefined') document.querySelector(`[data-rawkey="${ref.elementId}#${path.join('.')}"]`)?.scrollIntoView({ block: 'nearest' }) })
+  }, [doc])
+  useEffect(() => { if (rawSel) revealRawInTree(rawSel.ref, rawSel.path) }, [rawSel, revealRawInTree])
   // Set one inline CSS property on the selected raw piece (colour, size, padding, …) — edits the real
   // template design in place so the look is preserved and every piece is individually styleable.
   const rawStyle = useCallback((prop: string, value: string) => {
@@ -822,6 +868,100 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const next = box.innerHTML
     if (next !== html) apply((d) => patchElementContent(d, ref, { html: next }))
   }, [doc, apply])
+  // ── Add to Cart button (matches PagePilot: Label + Icon; the product is ALWAYS dynamic, so no editable link) ──
+  const cartBtnEl = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    const el = (n.matches?.('a,button') ? n : (n.closest('a,button') || n.querySelector('a,button'))) as HTMLElement | null
+    if (!el) return null
+    const t = el.textContent || ''
+    const cart = t.includes('🛒') || /add to cart|add to bag/i.test(t) || el.classList.contains('buy') || el.classList.contains('atc')
+    return cart ? el : null
+  }, [rawNodeEl])
+  const rawIsCart = useCallback((): boolean => !!cartBtnEl(), [cartBtnEl])
+  const cartParseEl = (btn: HTMLElement): { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number } => {
+    const ds = btn.dataset
+    if (ds.lbl != null) return { icon: ds.ico || '🛒', label: ds.lbl || '', show: ds.icoShow !== '0', pos: (ds.icoPos === 'right' ? 'right' : 'left'), size: ds.icoSize ? parseInt(ds.icoSize) : 0 }
+    const raw = (btn.textContent || '').trim()
+    let i = 0; while (i < raw.length && !/[A-Za-z0-9]/.test(raw[i]) && raw[i] !== ' ') i++
+    const rawIcon = raw.slice(0, i).trim(); const label = raw.slice(i).trim()
+    const icon = rawIcon === '🛒' ? 'cart' : (rawIcon || 'cart')   // default the legacy emoji cart to the SVG cart
+    return { icon, label: label || raw, show: !!rawIcon, pos: 'left', size: 0 }
+  }
+  const cartCfg = useCallback(() => { const b = cartBtnEl(); return b ? cartParseEl(b) : { icon: '🛒', label: '', show: true, pos: 'left' as const, size: 0 } }, [cartBtnEl])
+  const setCart = useCallback((patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const btn = (node.matches?.('a,button') ? node : (node.closest('a,button') || node.querySelector('a,button'))) as HTMLElement | null
+      if (!btn) return
+      const cfg = { ...cartParseEl(btn), ...patch }
+      const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      const ico = cfg.show && cfg.icon
+        ? (LINE_ICONS[cfg.icon]
+          ? `<span class="atcico" style="display:inline-flex;align-items:center">${svgIcon(LINE_ICONS[cfg.icon], cfg.size || 18)}</span>`
+          : `<span class="atcico" style="${cfg.size ? `font-size:${cfg.size}px;` : ''}">${esc(cfg.icon)}</span>`)
+        : ''
+      const lbl = `<span class="atclbl">${esc(cfg.label)}</span>`
+      btn.innerHTML = cfg.pos === 'right' ? `${lbl}${ico ? ' ' + ico : ''}` : `${ico ? ico + ' ' : ''}${lbl}`
+      btn.setAttribute('data-ico', cfg.icon); btn.setAttribute('data-ico-show', cfg.show ? '1' : '0'); btn.setAttribute('data-ico-pos', cfg.pos); btn.setAttribute('data-lbl', cfg.label)
+      if (cfg.size) btn.setAttribute('data-ico-size', String(cfg.size)); else btn.removeAttribute('data-ico-size')
+    })
+  }, [rawSel, rawEditHtml])
+  // ── Save Badge (matches PagePilot: dynamic saving computed from Price & Compare price; Percentage or Value) ──
+  const saveEl = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    return (n.classList?.contains('save') ? n : (n.querySelector('.save') || n.closest('.save'))) as HTMLElement | null
+  }, [rawNodeEl])
+  const rawIsSave = useCallback((): boolean => !!saveEl(), [saveEl])
+  const saveCfg = useCallback(() => { const el = saveEl(); return { mode: (el?.dataset.saveMode === 'value' ? 'value' : 'percent') as 'percent' | 'value', show: el ? el.dataset.saveShow !== '0' : true } }, [saveEl])
+  const parseMoney = (s: string): { num: number; prefix: string } => {
+    const num = parseFloat((s || '').replace(/[^\d.]/g, '')) || 0
+    const m = (s || '').match(/^[^\d]*/); const raw = (m ? m[0] : '').trim()
+    // a word prefix ("PKR", "Rs") gets a space ("PKR 600"); a symbol ("$", "€", "₹") does not ("$8")
+    return { num, prefix: raw ? (/[A-Za-z]$/.test(raw) ? raw + ' ' : raw) : '' }
+  }
+  const setSaveBadge = useCallback((patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const el = (node.classList?.contains('save') ? node : (node.querySelector('.save') || node.closest('.save'))) as HTMLElement | null
+      if (!el) return
+      const mode = patch.mode ?? (el.dataset.saveMode === 'value' ? 'value' : 'percent')
+      const show = patch.show ?? (el.dataset.saveShow !== '0')
+      // read Compare (.was) & Sale (.now) from the same price row so the badge is dynamic, not typed
+      const row = (el.closest('.price') || el.parentElement || box) as HTMLElement
+      const was = parseMoney((row.querySelector('.was')?.textContent) || '')
+      const now = parseMoney((row.querySelector('.now')?.textContent) || '')
+      let txt = el.textContent || 'SAVE'
+      if (was.num > 0 && now.num > 0 && was.num > now.num) {
+        txt = mode === 'value' ? `SAVE ${now.prefix}${Math.round(was.num - now.num).toLocaleString()}` : `SAVE ${Math.round((1 - now.num / was.num) * 100)}%`
+      }
+      el.textContent = txt
+      el.setAttribute('data-save-mode', mode); el.setAttribute('data-save-show', show ? '1' : '0')
+      el.style.display = show ? '' : 'none'
+    })
+  }, [rawSel, rawEditHtml])
+  // ── List-item icon (matches PagePilot: pick / remove the icon on a benefit or ingredient row) ────────────
+  const iconHolderEl = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    if (/^(t|ic|chip|slchip)$/.test(n.className)) return n
+    return (n.querySelector('.t, .slchip, .chip, .ic') || (n.closest('.c, .hchecks .c, .slchip') ? n.closest('.c, .slchip')?.querySelector('.t, .slchip, .chip, .ic') : null)) as HTMLElement | null
+  }, [rawNodeEl])
+  const rawIsIconItem = useCallback((): boolean => !!iconHolderEl(), [iconHolderEl])
+  const itemIcon = useCallback((): string => { const h = iconHolderEl(); if (!h || h.style.display === 'none') return ''; return h.dataset.ico || '' }, [iconHolderEl])
+  const setItemIcon = useCallback((icon: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const h = (/^(t|ic|chip|slchip)$/.test(node.className) ? node : (node.querySelector('.t, .slchip, .chip, .ic') || node.closest('.c, .slchip')?.querySelector('.t, .slchip, .chip, .ic'))) as HTMLElement | null
+      if (!h) return
+      if (!icon) { h.style.display = 'none'; h.removeAttribute('data-ico') }
+      else { h.style.display = ''; h.setAttribute('data-ico', icon); h.innerHTML = LINE_ICONS[icon] ? svgIcon(LINE_ICONS[icon], 16) : icon }
+    })
+  }, [rawSel, rawEditHtml])
   // ── Percentage Circle (stat ring) — PagePilot's Animation/size panel for the .ring conic circles ─────────
   const ringNodeEl = useCallback((): HTMLElement | null => {
     const n = rawNodeEl(); if (!n) return null
@@ -863,6 +1003,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const vpickSetList = useCallback((list: boolean) => editVpick((v) => v.classList.toggle('list', list)), [editVpick])
   const vpickAdd = useCallback(() => editVpick((v) => { const o = v.querySelector('.vopts'); if (o) o.insertAdjacentHTML('beforeend', '<button class="vopt" type="button">New option</button>') }), [editVpick])
   const vpickRemove = useCallback((i: number) => editVpick((v) => { const o = v.querySelectorAll('.vopt')[i] as HTMLElement | undefined; o?.remove() }), [editVpick])
+  // Variant Picker option text styling (matches PagePilot: size / weight / spacing / case / colour + gap)
+  const vpickStyleVal = useCallback((prop: string): string => { const v = vpickEl(); const o = v?.querySelector('.vopt') as HTMLElement | null; return o?.style.getPropertyValue(prop) || '' }, [vpickEl])
+  const setVpickTextStyle = useCallback((prop: string, val: string) => { editVpick((v) => v.querySelectorAll('.vopt').forEach((o) => { if (val) (o as HTMLElement).style.setProperty(prop, val); else (o as HTMLElement).style.removeProperty(prop) })) }, [editVpick])
+  const vpickGapVal = useCallback((): string => { const v = vpickEl(); const o = v?.querySelector('.vopts') as HTMLElement | null; return o?.style.gap || '' }, [vpickEl])
+  const setVpickGap = useCallback((val: string) => { editVpick((v) => { const o = v.querySelector('.vopts') as HTMLElement | null; if (o) { if (val) o.style.gap = val; else o.style.removeProperty('gap') } }) }, [editVpick])
   // Gallery manager: list every <img> inside the selected gallery node with its child-path from the raw root,
   // so add / remove / replace work whether you select "Product Gallery" or the thumbnail strip (PagePilot).
   const rawGallery = useCallback((): { src: string; path: number[] }[] | null => {
@@ -891,6 +1036,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // A raw piece is a "gallery" when it (or the slice under it) has a .thumbs strip or a known main image.
   const rawIsGallery = useCallback((): boolean => {
     const n = rawNodeEl(); if (!n) return false
+    // The bare thumbnail strip is NOT the gallery manager — the Images panel belongs on the ONE gallery
+    // container (it already lists the thumbs), so selecting "Thumbnails" alone doesn't duplicate the panel.
+    if (n.classList?.contains('thumbs')) return false
     return !!(n.querySelector('.thumbs, .hbottle, .gimg, .gtrack') || (Array.from(n.children).filter((c) => c.tagName === 'IMG' || c.querySelector('img')).length >= 2))
   }, [rawNodeEl])
   // The gallery COLUMN (direct child of the .grid that holds the main image) — the element we make sticky.
@@ -936,8 +1084,16 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // ── Payment Providers (matches PagePilot: real icons + a show/hide toggle list) ───────────────────────
   const rawIsPays = useCallback((): boolean => {
     const n = rawNodeEl(); if (!n) return false
-    return n.classList?.contains('pays') || !!n.querySelector('.pays, .payicon') || !!n.closest('.pays')
+    // Only the Payment Icons block itself gets the provider panel — not a container that merely holds it
+    // (that container has its own things), so the settings live in ONE place. (.payicon = a single icon inside.)
+    return !!(n.classList?.contains('pays') || n.classList?.contains('payicon') || n.closest('.pays'))
   }, [rawNodeEl])
+  // Payment Icons row alignment (matches PagePilot: Left / Center / Right / Space between — real flex, not text)
+  const paysRow = useCallback((): HTMLElement | null => { const n = rawNodeEl(); if (!n) return null; return (n.classList?.contains('pays') ? n : (n.closest('.pays') || n.querySelector('.pays'))) as HTMLElement | null }, [rawNodeEl])
+  const paysAlignVal = useCallback((): string => { const p = paysRow(); const j = p?.style.justifyContent || ''; return j === 'flex-start' ? 'left' : j === 'center' ? 'center' : j === 'flex-end' ? 'right' : j === 'space-between' ? 'between' : (j || '') }, [paysRow])
+  const paysGapVal = useCallback((): string => (paysRow()?.style.gap || '').replace('px', ''), [paysRow])
+  const setPaysStyle = useCallback((prop: string, val: string) => { if (!rawSel) return; rawEditHtml(rawSel.ref, (box) => { let node: HTMLElement = box; for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k } const p = (node.classList?.contains('pays') ? node : (node.closest('.pays') || node.querySelector('.pays'))) as HTMLElement | null; if (!p) return; if (val) p.style.setProperty(prop, val); else p.style.removeProperty(prop) }) }, [rawSel, rawEditHtml])
+  const setPaysAlign = useCallback((v: string) => { const map: Record<string, string> = { left: 'flex-start', center: 'center', right: 'flex-end', between: 'space-between' }; setPaysStyle('justify-content', map[v] || '') }, [setPaysStyle])
   const rawPaysActive = useCallback((): string[] => {
     const n = rawNodeEl(); if (!n) return []
     const pays = (n.classList?.contains('pays') ? n : (n.closest('.pays') || n.querySelector('.pays'))) as HTMLElement | null
@@ -1161,7 +1317,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       const isOpen = expanded.has(key)
       const selected = !!rawSel && rawSel.ref.elementId === ref.elementId && rawSel.path.join('.') === n.path.join('.')
       return (
-        <div key={key}>
+        <div key={key} data-rawkey={key}>
           <TreeRow
             depth={depth} open={isOpen} hasChildren={n.children.length > 0}
             onToggle={() => setExpanded((x) => toggle(x, key))}
@@ -1182,11 +1338,14 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f2ee', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
-      {/* top bar */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 16px', borderBottom: `1px solid ${LINE}`, background: '#fff' }}>
-        <Link href="/builder" style={{ color: SUB, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>← Builder</Link>
-        <span style={{ fontFamily: SERIF, fontSize: 15, fontWeight: 700 }}>Page editor</span>
-        <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, background: WASH, borderRadius: 999, padding: '3px 9px' }}>Advanced · beta</span>
+      {/* top bar — Selfmade mark + a soft orange tint (PagePilot uses a blue tint; ours is orange) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid #f2e3da`, background: 'linear-gradient(180deg,#fff6f1,#fff)' }}>
+        <Link href="/builder" title="Back to Builder" style={{ color: SUB, textDecoration: 'none', fontSize: 18, fontWeight: 600, display: 'inline-flex', alignItems: 'center', width: 30, height: 30, justifyContent: 'center', borderRadius: 8, border: `1px solid #f2e3da`, background: '#fff' }}>←</Link>
+        <Link href="/" title="Selfmade" style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}>
+          <Mark size={26} />
+          <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>Selfmade</span>
+        </Link>
+        <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, background: WASH, borderRadius: 999, padding: '3px 9px' }}>Advanced</span>
         <button onClick={() => setShowProduct(true)} style={{ ...btn, padding: '6px 12px' }}>Edit product</button>
         <div style={{ flex: 1 }} />
         <div style={{ display: 'inline-flex', gap: 2 }}>
@@ -1289,11 +1448,16 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
+              paysAlign={paysAlignVal()} paysGap={paysGapVal()} onPaysAlign={setPaysAlign} onPaysGap={(v) => setPaysStyle('gap', v ? `${v}px` : '')}
               isRing={rawIsRing()} ringPct={ringPct()} ringSize={ringSize()} ringDur={(ringVal('--dur') || '').replace('s', '')}
               onRingPct={setRingPct} onRingSize={setRingSize} onRingDur={(v) => setRingStyle('--dur', v ? `${v}s` : '')}
               isLogo={rawIsLogo()} logoImg={rawLogoImg()} onLogoImage={setLogoImage}
               isAcc={rawIsAcc()} accRows={accRows()} onAccAdd={accAddRow} onAccRemove={accRemoveRow}
               isVpick={rawIsVpick()} vpickList={vpickIsList()} vpickOpts={vpickOpts()} onVpickStyle={vpickSetList} onVpickAdd={vpickAdd} onVpickRemove={vpickRemove}
+              vpickStyleVal={vpickStyleVal} onVpickTextStyle={setVpickTextStyle} vpickGap={vpickGapVal()} onVpickGap={setVpickGap}
+              isCart={rawIsCart()} cart={cartCfg()} onCart={setCart}
+              isSave={rawIsSave()} saveMode={saveCfg().mode} saveShow={saveCfg().show} onSaveBadge={setSaveBadge}
+              isIconItem={rawIsIconItem()} itemIcon={itemIcon()} onItemIcon={setItemIcon}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
@@ -1354,13 +1518,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
 
       {tb && sel && !rawSel && (
-        <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', gap: 1, background: INK, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 30, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
-          <TbBtn title="Hide" onClick={() => apply((d) => setHidden(d, sel))}>👁</TbBtn>
-          <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>⧉</TbBtn>
-          <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>↑</TbBtn>
-          <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>↓</TbBtn>
-          {!sel.elementId && <TbBtn title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>＋</TbBtn>}
-          <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>🗑</TbBtn>
+        <div style={{ position: 'fixed', top: tb.top, left: tb.left, transform: tb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, ...TB_BAR, zIndex: 30 }} onClick={(e) => e.stopPropagation()}>
+          <TbBtn title="Hide / show" onClick={() => apply((d) => setHidden(d, sel))}>{TB_ICON.eye}</TbBtn>
+          <TbBtn title="Duplicate" onClick={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })}>{TB_ICON.dup}</TbBtn>
+          <TbDiv />
+          <TbBtn title="Move up" onClick={() => apply((d) => moveNode(d, sel, -1))}>{TB_ICON.up}</TbBtn>
+          <TbBtn title="Move down" onClick={() => apply((d) => moveNode(d, sel, 1))}>{TB_ICON.down}</TbBtn>
+          {!sel.elementId && <><TbDiv /><TbText title="Add block" onClick={() => setAddMenu({ kind: 'block', sectionId: sel.sectionId })}>Add block</TbText></>}
+          <TbDiv />
+          <TbBtn title="Delete" onClick={() => apply((d) => removeNode(d, sel), null)} danger>{TB_ICON.trash}</TbBtn>
         </div>
       )}
 
@@ -1373,19 +1539,21 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <div style={{ position: 'fixed', top: hoverBox.top - 1, left: hoverBox.left - 1, width: hoverBox.width + 2, height: hoverBox.height + 2, border: `1.5px dashed ${ORANGE}`, borderRadius: 5, zIndex: 28, pointerEvents: 'none' }} />
       )}
       {rawTb && rawSel && (
-        <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, background: ORANGE, borderRadius: 8, padding: '3px 4px', boxShadow: '0 4px 14px rgba(20,18,15,.3)', zIndex: 31, pointerEvents: 'none' }} onClick={(e) => e.stopPropagation()}>
-          <span style={{ color: '#fff', fontSize: 10, fontWeight: 800, letterSpacing: '.04em', padding: '0 6px', textTransform: 'uppercase', pointerEvents: 'auto' }}>Item</span>
-          {rawSel.isImg && <TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>🖼</TbBtn>}
-          <TbBtn title="Move up" onClick={() => rawOp('up')}>↑</TbBtn>
-          <TbBtn title="Move down" onClick={() => rawOp('down')}>↓</TbBtn>
-          <TbBtn title="Add a piece after this" onClick={() => setRawAddOpen((o) => !o)}>＋</TbBtn>
-          <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>👁</TbBtn>
-          <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>🗑</TbBtn>
+        <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, ...TB_BAR, zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
+          {rawSel.isImg && <><TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>{TB_ICON.img}</TbBtn><TbDiv /></>}
+          <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>{TB_ICON.eye}</TbBtn>
+          <TbDiv />
+          <TbBtn title="Move up" onClick={() => rawOp('up')}>{TB_ICON.up}</TbBtn>
+          <TbBtn title="Move down" onClick={() => rawOp('down')}>{TB_ICON.down}</TbBtn>
+          <TbDiv />
+          <TbText title="Add a piece after this" onClick={() => setRawAddOpen((o) => !o)}>Add block</TbText>
+          <TbDiv />
+          <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>{TB_ICON.trash}</TbBtn>
           {rawAddOpen && (
             <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 4, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 8px 24px -8px rgba(20,18,15,.35)', padding: 6, display: 'flex', flexDirection: 'column', minWidth: 130, zIndex: 32, pointerEvents: 'auto' }}>
               <div style={{ fontSize: 10, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.06em', padding: '2px 8px 4px' }}>Add a piece</div>
               {RAW_INSERTS.map((it) => (
-                <button key={it.id} onClick={() => { rawInsert(it.html); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
+                <button key={it.id} onClick={() => { rawInsert(stampName(it.html, it.label)); setRawAddOpen(false) }} style={{ textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '7px 8px', borderRadius: 7, cursor: 'pointer' }}>{it.label}</button>
               ))}
               <button onClick={() => { setRawAddOpen(false); setRawLibOpen(true) }} style={{ textAlign: 'left', border: 0, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 8, background: 'transparent', color: ORANGE, fontSize: 13, fontWeight: 700, padding: '8px', cursor: 'pointer' }}>Browse library →</button>
             </div>
@@ -1395,14 +1563,14 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
-      {rawLibOpen && <RawLibraryModal onPick={(html) => { rawInsertAt(html); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { rawInsertAt(stampName(html, label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
     </div>
   )
 }
 
 /* ── Block library: a gallery of ready-made pieces (rendered previews) to drop into a template section. ── */
-function RawLibraryModal({ onPick, onClose }: { onPick: (html: string) => void; onClose: () => void }) {
+function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: string) => void; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(860px,94vw)', maxHeight: '86vh', overflow: 'auto', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
@@ -1414,7 +1582,7 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string) => void; 
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14, padding: 20 }}>
           {RAW_LIBRARY.map((it) => (
-            <button key={it.id} onClick={() => onPick(it.html)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+            <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
               <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
                 <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
               </div>
@@ -1504,14 +1672,76 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+// ── Premium single-weight line-icon library (Lucide-style) — searchable, matches PagePilot's icon collection.
+// Values are the INNER svg markup; svgIcon() wraps them so the same set feeds both the picker and the page.
+const LINE_ICONS: Record<string, string> = {
+  cart: '<circle cx="8" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2.5 3h2l2.5 12.4a2 2 0 0 0 2 1.6h8.8a2 2 0 0 0 2-1.6L21.5 7H6"/>',
+  bag: '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+  basket: '<path d="M5 11 8 4M19 11l-3-7M2 11h20l-1.4 8a2 2 0 0 1-2 1.7H5.4a2 2 0 0 1-2-1.7z"/><path d="M9 15v2M15 15v2"/>',
+  heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/>',
+  star: '<path d="m12 2 3.1 6.3 6.9 1-5 4.9 1.2 6.8L12 17.8 5.8 21l1.2-6.8-5-4.9 6.9-1z"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  check: '<path d="M20 6 9 17l-5-5"/>',
+  verified: '<path d="M22 11.1V12a10 10 0 1 1-5.9-9.1"/><path d="m9 11 3 3L22 4"/>',
+  truck: '<path d="M14 18V6a1 1 0 0 0-1-1H2a1 1 0 0 0-1 1v11a1 1 0 0 0 1 1h1"/><path d="M14 9h4l3 3v5a1 1 0 0 1-1 1h-1"/><circle cx="7" cy="18" r="2"/><circle cx="17" cy="18" r="2"/>',
+  leaf: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.5 19 2c1 2 2 4.2 2 8a10 10 0 0 1-15 8.6"/><path d="M2 21c0-3 1.8-5.6 4.6-7"/>',
+  droplet: '<path d="M12 2.7 6.3 9.4a7.5 7.5 0 1 0 11.4 0z"/>',
+  sparkles: '<path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M5 3v4M3 5h4M19 17v4M17 19h4"/>',
+  gift: '<rect x="3" y="8" width="18" height="4" rx="1"/><path d="M12 8v13M5 12v7a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-7"/><path d="M7.5 8a2.5 2.5 0 0 1 0-5C11 3 12 8 12 8s1-5 4.5-5a2.5 2.5 0 0 1 0 5"/>',
+  tag: '<path d="M12.6 2.6a2 2 0 0 0-1.4-.6H4a2 2 0 0 0-2 2v7.2a2 2 0 0 0 .6 1.4l8.2 8.2a2 2 0 0 0 2.8 0l6.8-6.8a2 2 0 0 0 0-2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  flame: '<path d="M12 2c1 3 4 4.5 4 8a4 4 0 0 1-8 0c0-1 .3-1.8 1-3-2 1-4 3-4 6a7 7 0 0 0 14 0c0-5-4-7-7-11z"/>',
+  lock: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
+  bolt: '<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',
+  award: '<circle cx="12" cy="9" r="6"/><path d="M8.2 13.9 7 22l5-3 5 3-1.2-8.1"/>',
+  smile: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+  package: '<path d="m21 8-9 4-9-4 9-4z"/><path d="M3 8v8l9 4 9-4V8"/><path d="M12 12v8"/>',
+  moon: '<path d="M21 12.8A9 9 0 1 1 11.2 3 7 7 0 0 0 21 12.8z"/>',
+  sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+  thumbsup: '<path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z"/><path d="M7 11l4-8a2 2 0 0 1 3 1.8V9h5a2 2 0 0 1 2 2.4l-1.4 6A2 2 0 0 1 17.6 19H7"/>',
+  percent: '<path d="M19 5 5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  crown: '<path d="M2 18h20l-1.6-9-4.4 4-4-6-4 6-4.4-4z"/>',
+  flower: '<circle cx="12" cy="12" r="3"/><path d="M12 9c0-3 1-5 0-7-1 2 0 4 0 7M12 15c0 3-1 5 0 7 1-2 0-4 0-7M9 12c-3 0-5 1-7 0 2 1 4 0 7 0M15 12c3 0 5-1 7 0-2 1-4 0-7 0"/>',
+  coffee: '<path d="M17 8h1a3 3 0 0 1 0 6h-1"/><path d="M3 8h14v6a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4z"/><path d="M6 2v2M10 2v2M14 2v2"/>',
+  bell: '<path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M10.3 21a2 2 0 0 0 3.4 0"/>',
+  bulb: '<path d="M9 18h6M10 22h4M12 2a7 7 0 0 0-4 12.7c.6.5 1 1.3 1 2.1V17h6v-.2c0-.8.4-1.6 1-2.1A7 7 0 0 0 12 2z"/>',
+  rocket: '<path d="M5 13c-1.5 1.3-2 5-2 5s3.7-.5 5-2M12 15l-3-3a11 11 0 0 1 7-8 11 11 0 0 1 2 2 11 11 0 0 1-8 7z"/><circle cx="14" cy="10" r="1.2"/>',
+  wallet: '<path d="M3 7a2 2 0 0 1 2-2h13v4"/><path d="M3 7v10a2 2 0 0 0 2 2h14a1 1 0 0 0 1-1v-3"/><path d="M21 11h-5a2 2 0 0 0 0 4h5z"/>',
+  refresh: '<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>',
+  feather: '<path d="M20 4a6 6 0 0 0-8.5 0L4 11.5V20h8.5z"/><path d="M16 8 2 22M17.5 12.5H9"/>',
+  gem: '<path d="M6 3h12l4 6-10 12L2 9z"/><path d="M2 9h20M12 3 8 9l4 12 4-12z"/>',
+  sprout: '<path d="M7 20h10M12 20V10"/><path d="M12 10C12 6 9 4 4 4c0 4 3 6 8 6zM12 10c0-3 2-5 6-5 0 3-2 5-6 5z"/>',
+  target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
+}
+const svgIcon = (inner: string, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`
+function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick: (name: string) => void; allowNone?: boolean }) {
+  const [q, setQ] = useState('')
+  const names = Object.keys(LINE_ICONS).filter((n) => !q || n.includes(q.toLowerCase()))
+  const cell = (sel: boolean): React.CSSProperties => ({ height: 34, border: `1px solid ${sel ? ORANGE : LINE}`, background: sel ? WASH : '#fff', color: INK, borderRadius: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 })
+  return (
+    <div>
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search icons…" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 10px', fontSize: 12.5, color: INK, boxSizing: 'border-box', marginBottom: 8 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, maxHeight: 176, overflowY: 'auto' }}>
+        {allowNone && <button title="None" onClick={() => onPick('')} style={{ ...cell(value === ''), fontSize: 10, color: SUB }}>None</button>}
+        {names.map((n) => <button key={n} title={n} onClick={() => onPick(n)} style={cell(value === n)} dangerouslySetInnerHTML={{ __html: svgIcon(LINE_ICONS[n], 18) }} />)}
+      </div>
+    </div>
+  )
+}
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
   // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
   // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
-  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc
+  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave
   const showTextStyle = !isMedia && (isText || text !== '' || isLink)   // typography only where there's real text
+  // The multi-image "Images N/15" manager belongs ONLY on the real Product Gallery. A block that merely CONTAINS
+  // an image (a review avatar, a single lifestyle photo) gets a plain single-image replace instead — so the
+  // Featured Review's image is edited on the Featured Review, never duplicated onto Product Details. (Bug: the
+  // gallery manager was showing on every image-bearing block.)
+  const singleImg = !isGallery && (isImg || (gallery != null && gallery.length > 0))
+  const replaceImg = (url: string) => { if (isImg) onSetImg(url); else if (gallery && gallery.length) onGalleryReplace(gallery[0].path, url) }
   const pickFile = (onUrl: (url: string) => void) => {
     const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'
     inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBusy(true); const url = await uploadImage(f); setBusy(false); if (url) onUrl(url) }
@@ -1523,7 +1753,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   return (
     <div>
       <PanelHeader kind="Block" name={name || 'Edit this piece'} device={device} onDevice={onDevice} onRename={onRename} />
-      {gallery && (
+      {isGallery && gallery && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginBottom: 8 }}>
             <div style={{ fontSize: 12.5, fontWeight: 800 }}>Images</div>
@@ -1565,7 +1795,10 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               </label>
             ))}
           </div>
-          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Toggle which payment icons show in this row.</div>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4, marginBottom: 12 }}>Toggle which payment icons show in this row.</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: INK }}>Icons</div>
+          <SegRow label="Alignment" prop="__paysalign" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right'], ['between', 'Space']]} getVal={() => paysAlign} onStyle={(_p, v) => onPaysAlign(v)} />
+          <NumRow label="Gap" prop="__paysgap" min={0} max={30} unit="px" getVal={() => paysGap} onStyle={(_p, v) => onPaysGap(v)} />
         </div>
       )}
       {isRing && (
@@ -1613,25 +1846,73 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
             ))}
           </div>
           <button onClick={onVpickAdd} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>＋ Add option</button>
-          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Double-click an option on the canvas to rename it.</div>
+          <div style={{ fontSize: 11, color: FAINT, margin: '6px 0 12px' }}>Double-click an option on the canvas to rename it.</div>
+          <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: INK }}>Options</div>
+          <NumRow label="Gap" prop="__vgap" min={0} max={40} unit="px" getVal={() => (vpickGap || '').replace('px', '')} onStyle={(_p, v) => onVpickGap(v ? `${v}px` : '')} />
+          <ColorRow label="Branding text color" prop="color" getVal={vpickStyleVal} onStyle={onVpickTextStyle} />
+          <NumRow label="Size" prop="font-size" min={10} max={24} unit="px" getVal={vpickStyleVal} onStyle={onVpickTextStyle} />
+          <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold']]} getVal={vpickStyleVal} onStyle={onVpickTextStyle} />
+          <NumRow label="Letter spacing" prop="letter-spacing" min={-1} max={6} unit="px" getVal={vpickStyleVal} onStyle={onVpickTextStyle} />
+          <SegRow label="Case" prop="text-transform" options={[['none', 'Normal'], ['uppercase', 'Upper'], ['lowercase', 'Lower']]} getVal={vpickStyleVal} onStyle={onVpickTextStyle} />
         </div>
       )}
-      {isImg && !gallery && (
+      {singleImg && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
-          <DropZone label="Drag & Drop or click to select image" busy={busy} onPick={() => pickFile((url) => onSetImg(url))} />
+          <DropZone label="Drag & Drop or click to select image" busy={busy} onPick={() => pickFile((url) => replaceImg(url))} />
           <button onClick={() => onUrlOpen(!urlOpen)} style={{ width: '100%', marginTop: 8, border: `1px solid ${urlOpen ? ORANGE : LINE}`, background: '#fff', color: urlOpen ? ORANGE : SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
           {urlOpen && (
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
               <input autoFocus value={urlDraft} onChange={(e) => setUrlDraft(e.target.value)} placeholder="https://…/image.jpg"
-                onKeyDown={(e) => { if (e.key === 'Enter' && urlDraft.trim()) { onSetImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }}
+                onKeyDown={(e) => { if (e.key === 'Enter' && urlDraft.trim()) { replaceImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }}
                 style={{ flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '8px 10px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
-              <button onClick={() => { if (urlDraft.trim()) { onSetImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 8, padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Set</button>
+              <button onClick={() => { if (urlDraft.trim()) { replaceImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 8, padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Set</button>
             </div>
           )}
         </div>
       )}
-      {isLink && (
+      {isCart && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Add to Cart</div>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6, color: INK }}>Button label</div>
+          <input defaultValue={cart.label} key={cart.label} placeholder="Add to Cart" onBlur={(e) => { const v = e.target.value; if (v !== cart.label) onCart({ label: v }) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+            style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box', marginBottom: 10 }} />
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: INK, cursor: 'pointer', marginBottom: 8 }}>
+            Show icon
+            <input type="checkbox" checked={cart.show} onChange={(e) => onCart({ show: e.target.checked })} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
+          </label>
+          {cart.show && (<>
+            <div style={{ fontSize: 12, fontWeight: 700, margin: '2px 0 6px', color: INK }}>Icon</div>
+            <IconPicker value={cart.icon} onPick={(v) => onCart({ icon: v })} allowNone={false} />
+            <div style={{ height: 8 }} />
+            <SegRow label="Icon position" prop="__icopos" options={[['left', 'Left'], ['right', 'Right']]} getVal={() => cart.pos} onStyle={(_p, v) => onCart({ pos: v as 'left' | 'right' })} />
+            <NumRow label="Icon size" prop="__icosize" min={10} max={40} unit="px" getVal={() => (cart.size ? String(cart.size) : '')} onStyle={(_p, v) => onCart({ size: parseInt(v) || 0 })} />
+          </>)}
+          <div style={{ fontSize: 12.5, fontWeight: 700, margin: '14px 0 8px', color: INK, borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>Colors</div>
+          <ColorRow label="Background color" prop="background" getVal={getVal} onStyle={onStyle} />
+          <ColorRow label="Text color" prop="color" getVal={getVal} onStyle={onStyle} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>The product is added dynamically — there’s no link to set.</div>
+        </div>
+      )}
+      {isSave && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Save Badge</div>
+          <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: INK, cursor: 'pointer', marginBottom: 8 }}>
+            Show badge
+            <input type="checkbox" checked={saveShow} onChange={(e) => onSaveBadge({ show: e.target.checked })} style={{ accentColor: ORANGE, width: 34, height: 18 }} />
+          </label>
+          <SegRow label="Type" prop="__savetype" options={[['percent', 'Percentage'], ['value', 'Value']]} getVal={() => saveMode} onStyle={(_p, v) => onSaveBadge({ mode: v as 'percent' | 'value' })} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Computed automatically from Price & Compare price — updates when you change them.</div>
+        </div>
+      )}
+      {isIconItem && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, marginTop: 2, color: INK }}>Icon</div>
+          <IconPicker value={itemIcon} onPick={onItemIcon} />
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Pick an icon for this row, or None to remove it.</div>
+        </div>
+      )}
+      {isLink && !isCart && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Link</div>
           <input defaultValue={href} placeholder="https://…  or  /products/handle" onBlur={(e) => { const v = e.target.value.trim(); if (v !== href) onHref(v) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
@@ -1639,7 +1920,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Where this button/link goes when clicked.</div>
         </div>
       )}
-      {isText ? (
+      {isCart || isSave ? null : isText ? (
         <RichText key={html.length + ':' + name} html={html} onCommit={onHtml} context={textContext} />
       ) : text !== '' && (
         <div style={{ marginBottom: 14 }}>
@@ -1791,6 +2072,18 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
   // Toolbar buttons preventDefault on mousedown, so the editor keeps focus + the live selection — run the
   // command directly (calling focus() here would collapse the selection first, which is why it "did nothing").
   const exec = (cmd: string, val?: string) => { document.execCommand(cmd, false, val); saveSel(); commit() }
+  // List toggles need a live selection INSIDE the editor or execCommand can wipe/detach the whole block. If the
+  // cursor isn't in the editor, select all its content first; and never let a toggle empty the block.
+  const execList = (cmd: string) => {
+    const el = ref.current; if (!el) return
+    const before = el.innerHTML
+    const s = window.getSelection()
+    const inside = !!(s && s.rangeCount && el.contains(s.anchorNode))
+    if (!inside) { el.focus(); const r = document.createRange(); r.selectNodeContents(el); s?.removeAllRanges(); s?.addRange(r) }
+    document.execCommand(cmd)
+    if (!(el.textContent || '').trim()) el.innerHTML = before   // guard: a list toggle must never delete the content
+    saveSel(); commit()
+  }
   // Focus-stealing controls (size <select>, color <input>, link field) — refocus + restore the saved range first.
   const execRestore = (cmd: string, val?: string) => { ref.current?.focus(); restoreSel(); document.execCommand(cmd, false, val); saveSel(); commit() }
   const applyLink = () => { const u = linkVal.trim(); setLinkOpen(false); if (!u) return; execRestore('createLink', u); setLinkVal('') }
@@ -1820,8 +2113,8 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
           <button title="Bold" style={{ ...tbBtn, fontWeight: 800 }} onMouseDown={noBlur(() => exec('bold'))}>B</button>
           <button title="Italic" style={{ ...tbBtn, fontStyle: 'italic' }} onMouseDown={noBlur(() => exec('italic'))}>I</button>
           <button title="Underline" style={{ ...tbBtn, textDecoration: 'underline' }} onMouseDown={noBlur(() => exec('underline'))}>U</button>
-          <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => exec('insertUnorderedList'))}>•</button>
-          <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => exec('insertOrderedList'))}>1.</button>
+          <button title="Bulleted list" style={tbBtn} onMouseDown={noBlur(() => execList('insertUnorderedList'))}>•</button>
+          <button title="Numbered list" style={tbBtn} onMouseDown={noBlur(() => execList('insertOrderedList'))}>1.</button>
           <button title="Link" style={tbBtn} onMouseDown={noBlur(() => { saveSel(); setLinkOpen((o) => !o) })}>🔗</button>
           <label title="Text color" style={{ ...tbBtn, position: 'relative' }} onMouseDown={saveSel}><span style={{ pointerEvents: 'none' }}>A</span><span style={{ position: 'absolute', bottom: 3, left: 6, right: 6, height: 3, background: ORANGE, borderRadius: 2 }} /><input type="color" onChange={(e) => execRestore('foreColor', e.target.value)} style={{ position: 'absolute', inset: 0, opacity: 0, cursor: 'pointer' }} /></label>
           <div style={{ flex: 1 }} />
@@ -1919,9 +2212,27 @@ function Modal({ title, hint, children, onClose }: { title: string; hint?: strin
   )
 }
 
-function TbBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
-  return <button title={title} onClick={onClick} style={{ border: 0, background: 'transparent', color: danger ? '#ff9b8a' : '#fff', cursor: 'pointer', fontSize: 16, lineHeight: 1, width: 30, height: 30, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, pointerEvents: 'auto' }}>{children}</button>
+// PagePilot-style canvas toolbar: a clean white pill with muted outline icons + dividers (not a bold bar).
+const tbSvg = (d: React.ReactNode) => <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round">{d}</svg>
+const TB_ICON: Record<string, React.ReactNode> = {
+  eye: tbSvg(<><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z" /><circle cx="12" cy="12" r="3" /></>),
+  dup: tbSvg(<><rect x="9" y="9" width="11" height="11" rx="2.5" /><path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" /></>),
+  up: tbSvg(<path d="M6 15l6-6 6 6" />),
+  down: tbSvg(<path d="M6 9l6 6 6-6" />),
+  plus: tbSvg(<path d="M12 5v14M5 12h14" />),
+  trash: tbSvg(<><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></>),
+  img: tbSvg(<><rect x="3" y="4" width="18" height="16" rx="2.5" /><circle cx="8.5" cy="9.5" r="1.6" /><path d="M21 15l-5-5L5 20" /></>),
 }
+function TbBtn({ children, title, onClick, danger }: { children: React.ReactNode; title: string; onClick: () => void; danger?: boolean }) {
+  const [h, setH] = useState(false)
+  return <button title={title} onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{ border: 0, background: h ? (danger ? '#fdece9' : '#f1f0f7') : 'transparent', color: danger ? '#e0402f' : '#565b78', cursor: 'pointer', fontSize: 15, lineHeight: 0, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 7, pointerEvents: 'auto', transition: 'background .1s' }}>{children}</button>
+}
+const TbDiv = () => <span style={{ width: 1, height: 18, background: '#e7e5f0', margin: '0 2px', flex: 'none' }} />
+function TbText({ title, onClick, children }: { title: string; onClick: () => void; children: React.ReactNode }) {
+  const [h, setH] = useState(false)
+  return <button title={title} onClick={onClick} onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} style={{ border: 0, background: h ? '#f1f0f7' : 'transparent', color: '#565b78', cursor: 'pointer', height: 28, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 7, padding: '0 9px 0 7px', fontSize: 13, fontWeight: 600, pointerEvents: 'auto', whiteSpace: 'nowrap', transition: 'background .1s' }}>{TB_ICON.plus}{children}</button>
+}
+const TB_BAR: React.CSSProperties = { background: '#fff', border: '1px solid #e7e5f0', borderRadius: 10, padding: 4, boxShadow: '0 6px 22px -6px rgba(20,18,15,.22)', pointerEvents: 'auto' }
 
 /* ── small pieces ── */
 const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
