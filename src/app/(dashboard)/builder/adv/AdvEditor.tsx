@@ -1490,7 +1490,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
-            <div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section, block, or element on the canvas or in the tree to edit it.</div>
+            <div><div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 6 }}>Customize your template</div><div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section or block in the sidebar to start.</div></div>
           ) : (sel.sectionId && !sel.blockId && !sel.elementId && secRaw(sel.sectionId)) ? (
             <RawSectionSettings key={sel.sectionId + ':' + device}
               name={(() => { const s = doc.sections.find((x) => x.id === sel.sectionId); const re = s ? rawSectionEl(s) : null; return re ? (/\bptitle\b/.test(re.html) && /\b(now|price|buy)\b/.test(re.html) ? 'Product Information' : rawSectionName(re.html, s?.name || '')) : (s?.name || 'Section') })()}
