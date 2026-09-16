@@ -86,11 +86,11 @@ const css = `
 .pgbld .pcre{padding:6px 0 26px}
 .pgbld .pcre-img .pcrei,.pgbld .pcre-img .ph{aspect-ratio:3/4;border-radius:12px;min-height:0;width:100%;object-fit:cover}
 .pgbld .bestseller{display:inline-flex;align-items:center;gap:9px;background:var(--soft2);border:1px solid var(--line);border-radius:10px;padding:7px 12px;margin-bottom:12px}
-.pgbld .bestseller .num{background:var(--blue);color:#fff;font-size:12px;font-weight:900;border-radius:6px;padding:3px 7px;flex:none}
+.pgbld .bestseller .num{background:var(--blue);color:#fff;font-size:14px;font-weight:700;border-radius:6px;padding:3px 8px;flex:none}
 .pgbld .bestseller .bst{display:flex;flex-direction:column;line-height:1.25}
-.pgbld .bestseller .bst b{font-size:11.5px;font-weight:800;color:var(--ink);letter-spacing:.02em}
-.pgbld .bestseller .bst span{font-size:10.5px;font-weight:600;color:var(--sub)}
-.pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:36px;font-weight:600;line-height:1.08;letter-spacing:-.01em}
+.pgbld .bestseller .bst b{font-size:12px;font-weight:600;color:var(--ink);letter-spacing:.02em}
+.pgbld .bestseller .bst span{font-size:11px;font-weight:400;color:var(--sub)}
+.pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:600;line-height:1.12;letter-spacing:-.01em}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
