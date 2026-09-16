@@ -219,6 +219,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   ti: 'Check', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
   hrev: 'Featured Review', warn: 'Stock Notice', hclaim: 'Guarantee', qty: 'Quantity', newline: 'Tagline',
   brow: 'Benefit Row', rc: 'Featured Review', rgrid: 'Featured Reviews Carousel', hcheck: 'Benefit Check',
+  vpick: 'Variant Picker', vopt: 'Option', ring: 'Percentage Circle', sc: 'Percentage Circle', logo: 'Logo',
   // gallery / creative
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
@@ -827,6 +828,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const rawIsLogo = useCallback((): boolean => { const n = rawNodeEl(); return !!n && (n.classList?.contains('logo') || n.classList?.contains('plogo')) }, [rawNodeEl])
   const rawLogoImg = useCallback((): string => { const n = rawNodeEl(); const im = n?.querySelector('img'); return im?.getAttribute('src') || '' }, [rawNodeEl])
   const setLogoImage = useCallback((url: string) => { if (!rawSel) return; rawEditHtml(rawSel.ref, (box) => { let node: HTMLElement = box; for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k } if (node) node.innerHTML = url ? `<img src="${url}" alt="logo" style="height:30px;max-width:130px;object-fit:contain;display:block">` : (node.getAttribute('data-name') || 'Logo') }) }, [rawSel, rawEditHtml])
+  // ── Accordion (the .acc info block of <details> rows) — PagePilot lets you add/remove rows ────────────────
+  const accEl = useCallback((): HTMLElement | null => { const n = rawNodeEl(); if (!n) return null; return (n.classList?.contains('acc') ? n : (n.querySelector('.acc') || n.closest('.acc'))) as HTMLElement | null }, [rawNodeEl])
+  const rawIsAcc = useCallback((): boolean => !!accEl(), [accEl])
+  const accRows = useCallback((): string[] => { const a = accEl(); return a ? Array.from(a.querySelectorAll(':scope > details')).map((d) => (d.querySelector('summary')?.textContent || 'Section')) : [] }, [accEl])
+  const editAcc = useCallback((mutate: (acc: HTMLElement) => void) => { if (!rawSel) return; rawEditHtml(rawSel.ref, (box) => { let node: HTMLElement = box; for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k } const a = (node.classList?.contains('acc') ? node : (node.querySelector('.acc') || node.closest('.acc'))) as HTMLElement | null; if (a) mutate(a) }) }, [rawSel, rawEditHtml])
+  const accAddRow = useCallback(() => editAcc((a) => a.insertAdjacentHTML('beforeend', '<details><summary>New section</summary><div class="body">Add details here.</div></details>')), [editAcc])
+  const accRemoveRow = useCallback((i: number) => editAcc((a) => { const d = a.querySelectorAll(':scope > details')[i] as HTMLElement | undefined; d?.remove() }), [editAcc])
+  // ── Variant Picker (the .vpick "Make a Choice" options) — Style (Buttons/Dropdown) + add/remove options ──
+  const vpickEl = useCallback((): HTMLElement | null => { const n = rawNodeEl(); if (!n) return null; return (n.classList?.contains('vpick') ? n : (n.querySelector('.vpick') || n.closest('.vpick'))) as HTMLElement | null }, [rawNodeEl])
+  const rawIsVpick = useCallback((): boolean => !!vpickEl(), [vpickEl])
+  const vpickIsList = useCallback((): boolean => !!vpickEl()?.classList.contains('list'), [vpickEl])
+  const vpickOpts = useCallback((): string[] => { const v = vpickEl(); return v ? Array.from(v.querySelectorAll('.vopt')).map((o) => o.textContent || 'Option') : [] }, [vpickEl])
+  const editVpick = useCallback((mutate: (v: HTMLElement) => void) => { if (!rawSel) return; rawEditHtml(rawSel.ref, (box) => { let node: HTMLElement = box; for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k } const v = (node.classList?.contains('vpick') ? node : (node.querySelector('.vpick') || node.closest('.vpick'))) as HTMLElement | null; if (v) mutate(v) }) }, [rawSel, rawEditHtml])
+  const vpickSetList = useCallback((list: boolean) => editVpick((v) => v.classList.toggle('list', list)), [editVpick])
+  const vpickAdd = useCallback(() => editVpick((v) => { const o = v.querySelector('.vopts'); if (o) o.insertAdjacentHTML('beforeend', '<button class="vopt" type="button">New option</button>') }), [editVpick])
+  const vpickRemove = useCallback((i: number) => editVpick((v) => { const o = v.querySelectorAll('.vopt')[i] as HTMLElement | undefined; o?.remove() }), [editVpick])
   // Gallery manager: list every <img> inside the selected gallery node with its child-path from the raw root,
   // so add / remove / replace work whether you select "Product Gallery" or the thumbnail strip (PagePilot).
   const rawGallery = useCallback((): { src: string; path: number[] }[] | null => {
@@ -1253,6 +1270,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               isRing={rawIsRing()} ringPct={ringPct()} ringSize={ringSize()} ringDur={(ringVal('--dur') || '').replace('s', '')}
               onRingPct={setRingPct} onRingSize={setRingSize} onRingDur={(v) => setRingStyle('--dur', v ? `${v}s` : '')}
               isLogo={rawIsLogo()} logoImg={rawLogoImg()} onLogoImage={setLogoImage}
+              isAcc={rawIsAcc()} accRows={accRows()} onAccAdd={accAddRow} onAccRemove={accRemoveRow}
+              isVpick={rawIsVpick()} vpickList={vpickIsList()} vpickOpts={vpickOpts()} onVpickStyle={vpickSetList} onVpickAdd={vpickAdd} onVpickRemove={vpickRemove}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
@@ -1460,7 +1479,7 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
 
 /* ── Settings for a single piece clicked inside a template (raw) section. Edits inline CSS on that exact
  * node so the template design is preserved and every piece is individually styleable (PagePilot-style). ── */
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1535,6 +1554,37 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           {logoImg && <div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7', padding: 12, marginBottom: 8, display: 'flex', justifyContent: 'center' }}><img src={logoImg} alt="" style={{ height: 34, maxWidth: '100%', objectFit: 'contain' }} /><button onClick={() => onLogoImage('')} title="Remove" style={{ position: 'absolute', top: 5, right: 5, border: 0, background: 'rgba(20,18,15,.72)', color: '#fff', borderRadius: 999, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>}
           <DropZone label={logoImg ? 'Replace logo image' : 'Drag & Drop or click to upload a logo'} busy={busy} onPick={() => pickFile((url) => onLogoImage(url))} />
           <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Upload a logo image, or edit the text below to use a name instead.</div>
+        </div>
+      )}
+      {isAcc && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Accordion rows</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 8 }}>
+            {accRows.map((r, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 10px' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r}</span>
+                <button onClick={() => onAccRemove(i)} title="Remove row" style={{ border: 0, background: 'transparent', color: FAINT, cursor: 'pointer', fontSize: 15, lineHeight: 1, flex: 'none' }}>×</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={onAccAdd} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>＋ Add row</button>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Double-click a row’s title or text on the canvas to edit it.</div>
+        </div>
+      )}
+      {isVpick && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Variant Picker</div>
+          <SegRow label="Style" prop="__vstyle" options={[['buttons', 'Buttons'], ['dropdown', 'Dropdown']]} getVal={() => (vpickList ? 'dropdown' : 'buttons')} onStyle={(_p, v) => onVpickStyle(v === 'dropdown')} />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, margin: '8px 0' }}>
+            {vpickOpts.map((o, i) => (
+              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 10px' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{o}</span>
+                <button onClick={() => onVpickRemove(i)} title="Remove option" style={{ border: 0, background: 'transparent', color: FAINT, cursor: 'pointer', fontSize: 15, lineHeight: 1, flex: 'none' }}>×</button>
+              </div>
+            ))}
+          </div>
+          <button onClick={onVpickAdd} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>＋ Add option</button>
+          <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Double-click an option on the canvas to rename it.</div>
         </div>
       )}
       {isImg && !gallery && (

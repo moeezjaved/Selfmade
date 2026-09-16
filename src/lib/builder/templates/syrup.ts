@@ -87,6 +87,12 @@ const css = `
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
 .pgbld .hchecks .c .t{width:20px;height:20px;border-radius:50%;background:var(--soft2);display:flex;align-items:center;justify-content:center;flex:none}
+.pgbld .vpick{margin-bottom:14px}
+.pgbld .vpick .vlabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
+.pgbld .vpick .vopts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.pgbld .vpick.list .vopts{grid-template-columns:1fr}
+.pgbld .vpick .vopt{border:1.5px solid var(--line);background:#fff;color:var(--ink);border-radius:10px;padding:11px 12px;font-size:12.5px;font-weight:700;cursor:pointer;text-align:left}
+.pgbld .vpick .vopt.on{border-color:var(--blue);background:var(--soft)}
 .pgbld .price{display:flex;align-items:baseline;gap:10px;margin:4px 0 14px}
 .pgbld .price .was{font-size:15px;color:#a6aac9;text-decoration:line-through}
 .pgbld .price .now{font-size:24px;font-weight:900;color:var(--blue)}
@@ -280,6 +286,9 @@ function render(c: FilledContent, o: RenderOpts): string {
   const accItems = (arr(c.info_sections).length ? arr(c.info_sections) : [{ label: 'Description', body: 'A lightweight pre-wash oil that loosens buildup and excess oil before you shampoo.' }, { label: 'How to use', body: 'Massage into a dry scalp, leave on for 10–15 minutes, then wash as usual.' }, { label: 'Shipping & Returns', body: 'Fast, tracked delivery and a money-back guarantee.' }])
     .map((s, i) => `<details${i === 0 ? ' open' : ''}><summary>${escp(s.label)}</summary><div class="body">${esc(s.body)}</div></details>`).join('')
 
+  const variants = (arr(c.variants).length ? arr(c.variants) : [{ label: 'Buy 1' }, { label: 'Buy 2 · Save 10%' }, { label: 'Buy 3 · Save 20%' }, { label: 'Subscribe · Save 25%' }])
+    .slice(0, 4).map((v: any, i: number) => `<button class="vopt${(v.sel || i === 0) ? ' on' : ''}" type="button">${escp(v.label)}</button>`).join('')
+
   const strip = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Purifies The Scalp', 'Simple Pre-Wash Ritual', 'Cruelty-Free & Vegan', 'Lightweight, Non-Greasy', 'No Harsh Sulfates'].map((l) => ({ label: l })))
     .map((p) => `<span class="p">${escp(p.label)}</span>`).join('')
 
@@ -362,6 +371,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="rlabel"><span class="stars">★★★★★</span> ${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</div>
       <div class="hchecks">${checks}</div>
       <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
+      <div class="vpick"><div class="vlabel">${escp(c.variant_label || 'Make a Choice')}</div><div class="vopts">${variants}</div></div>
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'Add to Cart')}</a>
       <div class="pays">${paysRowInner()}</div>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money Back Guarantee')}</span><span>↩ ${escp(c.returns_line || '30 Day Returns')}</span></div>
