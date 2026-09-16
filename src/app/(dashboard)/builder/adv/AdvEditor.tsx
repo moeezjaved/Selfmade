@@ -28,6 +28,26 @@ const LINE = 'rgba(20,18,15,.10)', ORANGE = '#e02f06', WASH = '#fdeee9', INSET =
 // chrome uses a system sans stack to match; `SERIF` keeps its name only to avoid churn across usages.
 const SERIF = "'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif"
 
+// Unwrap the template's mobile `@media (max-width: N)` blocks (N ≥ ~500) so their rules apply directly in the
+// editor's shrunk mobile canvas — a real @media keys off the wide viewport and never fires there. Applied
+// in-place (after the base rules) so the mobile overrides still win; smaller breakpoints are left intact.
+function activateMobileCss(css: string): string {
+  let out = '', i = 0
+  while (i < css.length) {
+    if (css.startsWith('@media', i)) {
+      const brace = css.indexOf('{', i)
+      if (brace === -1) { out += css.slice(i); break }
+      const cond = css.slice(i, brace)
+      let depth = 1, j = brace + 1
+      while (j < css.length && depth > 0) { const ch = css[j]; if (ch === '{') depth++; else if (ch === '}') depth--; j++ }
+      const inner = css.slice(brace + 1, j - 1)
+      const m = cond.match(/max-width:\s*(\d+)/)
+      out += (m && parseInt(m[1], 10) >= 500) ? inner : css.slice(i, j)   // unwrap wide breakpoints; keep the rest
+      i = j
+    } else { out += css[i]; i++ }
+  }
+  return out
+}
 const sameRef = (a: NodeRef | null, b: NodeRef | null) =>
   !!a && !!b && a.sectionId === b.sectionId && a.blockId === b.blockId && a.elementId === b.elementId
 const refKey = (r: NodeRef) => `${r.sectionId}/${r.blockId || ''}/${r.elementId || ''}`
@@ -461,9 +481,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const product = useMemo(() => (doc ? editorProduct(doc) : {}), [doc])
   const canvasHtml = useMemo(() => {
     if (!doc) return ''
-    const { html, css } = renderDoc(doc, { mode: 'edit', device, product })
-    // Mobile preview: our raw sections carry mobile overrides in `data-mob` + an `@media` rule that only fires
-    // on a real narrow VIEWPORT (not the shrunk canvas), so inline those values here to preview them live.
+    const rendered = renderDoc(doc, { mode: 'edit', device, product })
+    const html = rendered.html
+    // Mobile preview: @media rules key off the browser VIEWPORT (still wide), not the shrunk canvas — so the
+    // template's mobile breakpoints never fire. Activate them here so the mobile preview reflows correctly.
+    const css = device === 'mobile' ? activateMobileCss(rendered.css) : rendered.css
+    // Also inline any per-section `data-mob` overrides (their @media rule wouldn't fire in the wide viewport).
     let body = html
     if (device === 'mobile' && typeof document !== 'undefined' && html.includes('data-mob')) {
       const box = document.createElement('div'); box.innerHTML = html
