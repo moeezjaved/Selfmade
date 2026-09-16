@@ -376,6 +376,8 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [pubResult, setPubResult] = useState<null | { url?: string; previewUrl?: string; error?: string }>(null)
   const [showProduct, setShowProduct] = useState(false)
   const [showMenu, setShowMenu] = useState(false)
+  const [topMenu, setTopMenu] = useState(false)   // the top-bar "Menu" dropdown (holds undo/redo + settings)
+  const [rawAIbusy, setRawAIbusy] = useState(false)   // "Edit with AI" on the canvas toolbar
   const [histDepth, setHistDepth] = useState(0)
   const [redoDepth, setRedoDepth] = useState(0)
   const [tb, setTb] = useState<null | { top: number; left: number; below: boolean }>(null)
@@ -830,6 +832,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     return n.textContent || ''
   }, [rawNodeEl])
   const rawSetText = useCallback((t: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'settext', t) }, [rawSel, rawApplyAt])
+  // "Edit with AI" straight from the canvas toolbar — rewrites the selected text piece in the brand voice.
+  const rawEditAI = useCallback(async () => {
+    if (!rawSel) return
+    const t = rawText(); if (!t.trim()) return
+    setRawAIbusy(true)
+    try {
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, context: doc?.productRef?.importedProduct?.title || '' }) })
+      const j = await r.json()
+      if (j.text) rawSetText(j.text); else window.alert(j.error || 'Could not rewrite.')
+    } catch { window.alert('Could not rewrite — please try again.') }
+    finally { setRawAIbusy(false) }
+  }, [rawSel, rawText, rawSetText, doc])
   // Rich text (PagePilot-style editor): a piece is "text" when it's not an image/gallery/pays row and its
   // children (if any) are only inline formatting — so its innerHTML can be edited safely with a toolbar.
   const rawIsText = useCallback((): boolean => {
@@ -1346,14 +1360,16 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <span style={{ fontSize: 18, fontWeight: 800, letterSpacing: '-.02em', color: INK }}>Selfmade</span>
         </Link>
         <span style={{ fontSize: 10.5, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: ORANGE, background: WASH, borderRadius: 999, padding: '3px 9px' }}>Advanced</span>
-        <button onClick={() => setShowProduct(true)} style={{ ...btn, padding: '6px 12px' }}>Edit product</button>
         <div style={{ flex: 1 }} />
-        <div style={{ display: 'inline-flex', gap: 2 }}>
-          <button title="Undo (⌘Z)" onClick={undo} disabled={!histDepth} style={{ ...iconTopBtn, opacity: histDepth ? 1 : 0.35, cursor: histDepth ? 'pointer' : 'default' }}>↶</button>
-          <button title="Redo (⇧⌘Z)" onClick={redo} disabled={!redoDepth} style={{ ...iconTopBtn, opacity: redoDepth ? 1 : 0.35, cursor: redoDepth ? 'pointer' : 'default' }}>↷</button>
+        {/* center tool group — Edit product + inspector / device / fullscreen (matches PagePilot) */}
+        <button onClick={() => setShowProduct(true)} style={{ ...btn, padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: 6 }}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"><path d="M20.6 3.4a2 2 0 0 0-2.8 0l-1 1 2.8 2.8 1-1a2 2 0 0 0 0-2.8z"/><path d="M16.6 5.4 4 18v2.8h2.8L19.4 8.2z"/></svg>Edit product</button>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: '#fff', border: `1px solid #f2e3da`, borderRadius: 10, padding: 2 }}>
+          <button title="Select tool" onClick={() => { setSel(null); setRawSel(null) }} style={{ ...iconTopBtn, border: 0, background: 'transparent', color: INK }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M4 3l7 17 2.2-6.8L20 11z"/></svg></button>
+          <DeviceToggle value={device} onChange={(d) => setDevice(d)} />
+          <button title="Fullscreen" onClick={() => { try { if (document.fullscreenElement) document.exitFullscreen(); else document.documentElement.requestFullscreen?.() } catch { /* ignore */ } }} style={{ ...iconTopBtn, border: 0, background: 'transparent', color: SUB }}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/></svg></button>
         </div>
-        <DeviceToggle value={device} onChange={(d) => setDevice(d)} />
         <ZoomControl zoom={zoom} setZoom={setZoom} onFit={fitZoom} />
+        <div style={{ flex: 1 }} />
         <SaveBadge status={status} />
         <button onClick={saveNow} disabled={!dirty || status === 'saving'} title="Save (⌘S)" style={{ border: `1px solid ${dirty ? ORANGE : LINE}`, background: dirty ? WASH : '#fff', color: dirty ? ORANGE : SUB, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: dirty && status !== 'saving' ? 'pointer' : 'default' }}>
           {status === 'saving' ? 'Saving…' : dirty ? 'Save' : 'Saved'}
@@ -1361,7 +1377,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         <button onClick={publish} disabled={publishing !== 'idle'} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 999, padding: '7px 18px', fontSize: 13, fontWeight: 700, cursor: publishing === 'idle' ? 'pointer' : 'default', opacity: publishing === 'idle' ? 1 : 0.7 }}>
           {publishing === 'saving' ? 'Saving…' : publishing === 'publishing' ? 'Publishing…' : 'Publish →'}
         </button>
-        <button title="Page settings" onClick={() => setShowMenu(true)} style={{ ...iconTopBtn, fontSize: 18 }}>⋯</button>
+        <div style={{ position: 'relative' }}>
+          <button title="Menu" onClick={() => setTopMenu((o) => !o)} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 10, padding: '7px 13px', fontSize: 13, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 7 }}><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg>Menu</button>
+          {topMenu && (<>
+            <div onClick={() => setTopMenu(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+            <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 12px 30px -8px rgba(20,18,15,.28)', padding: 6, minWidth: 190, zIndex: 41 }}>
+              <button onClick={() => { undo(); setTopMenu(false) }} disabled={!histDepth} style={{ ...menuItem, opacity: histDepth ? 1 : 0.4 }}>↶ Undo</button>
+              <button onClick={() => { redo(); setTopMenu(false) }} disabled={!redoDepth} style={{ ...menuItem, opacity: redoDepth ? 1 : 0.4 }}>↷ Redo</button>
+              <div style={{ height: 1, background: LINE, margin: '4px 6px' }} />
+              <button onClick={() => { setShowProduct(true); setTopMenu(false) }} style={menuItem}>✎ Edit product</button>
+              <button onClick={() => { setShowMenu(true); setTopMenu(false) }} style={menuItem}>⚙ Page settings</button>
+            </div>
+          </>)}
+        </div>
       </div>
 
       <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
@@ -1540,6 +1568,10 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, ...TB_BAR, zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
+          {!rawSel.isImg && rawText().trim() !== '' && (<>
+            <button title="Edit with AI" onClick={rawEditAI} disabled={rawAIbusy} style={{ border: 0, background: rawAIbusy ? '#f3ebfb' : 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#a23ba0', cursor: rawAIbusy ? 'default' : 'pointer', height: 28, display: 'inline-flex', alignItems: 'center', gap: 5, borderRadius: 7, padding: '0 10px', fontSize: 12.5, fontWeight: 800, pointerEvents: 'auto', whiteSpace: 'nowrap' }}>✨ {rawAIbusy ? 'Editing…' : 'Edit with AI'}</button>
+            <TbDiv />
+          </>)}
           {rawSel.isImg && <><TbBtn title="Replace image" onClick={() => setImgUrlOpen(true)}>{TB_ICON.img}</TbBtn><TbDiv /></>}
           <TbBtn title="Hide / show" onClick={() => rawOp('hide')}>{TB_ICON.eye}</TbBtn>
           <TbDiv />
@@ -2237,6 +2269,7 @@ const TB_BAR: React.CSSProperties = { background: '#fff', border: '1px solid #e7
 /* ── small pieces ── */
 const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
 const iconTopBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, width: 30, height: 30, fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
+const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }
 
 function Center({ children }: { children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: SUB, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14 }}>{children}</div>
@@ -2342,7 +2375,7 @@ function TreeRow(props: {
       </span>
       <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? SUB : 'transparent', fontSize: 15, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
       <span style={{ color: selected ? ORANGE : SUB, display: 'inline-flex', flex: 'none' }}>{treeIconFor(label, hasChildren)}</span>
-      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+      <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 800 : 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
       {(hover || menu) && (

@@ -316,7 +316,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="rlabel"><span class="stars">★★★★★</span> ${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</div>
       <div class="hchecks">${checks}</div>
       <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
-      <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'ADD TO CART')}</a>
+      <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(String(c.cta_label || 'Add to Cart').toUpperCase())}</a>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money-Back Guarantee')}</span><span>📦 ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="pays">${paysRowInner()}</div>
       <div class="acc">${accItems}</div>
