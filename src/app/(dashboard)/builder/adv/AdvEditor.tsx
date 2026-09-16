@@ -1862,14 +1862,23 @@ function TreeRow(props: {
       onClick={onSelect}
       draggable={draggable} onDragStart={props.onDragStart} onDragEnd={props.onDragEnd}
       onDragOver={draggable ? props.onDragOver : undefined} onDrop={draggable ? props.onDrop : undefined}
-      style={{ position: 'relative', zIndex: menu ? 20 : undefined, display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 6, paddingLeft: 6 + depth * 14, paddingRight: 4, minHeight: 34, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, borderTop: props.dropHint ? `2px solid ${ORANGE}` : '2px solid transparent' }}>
+      style={{ position: 'relative', zIndex: menu ? 20 : undefined, display: 'flex', flexWrap: 'nowrap', alignItems: 'center', gap: 6, paddingLeft: 2 + depth * 14, paddingRight: 4, minHeight: 34, borderRadius: 8, background: selected ? WASH : hover ? INSET : 'transparent', cursor: 'pointer', opacity: props.dragging ? 0.4 : hidden ? 0.5 : 1, boxShadow: props.dropHint ? `inset 0 2px 0 ${ORANGE}` : 'none' }}>
+      {/* drag grip — appears on hover (the whole row is draggable); signals reordering like PagePilot */}
+      <span title="Drag to reorder" style={{ width: 12, flex: 'none', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: FAINT, cursor: draggable ? 'grab' : 'default', opacity: hover && draggable ? 1 : 0, transition: 'opacity .1s' }}>
+        <svg viewBox="0 0 10 16" width="8" height="13" fill="currentColor"><circle cx="2.5" cy="3" r="1.3"/><circle cx="7.5" cy="3" r="1.3"/><circle cx="2.5" cy="8" r="1.3"/><circle cx="7.5" cy="8" r="1.3"/><circle cx="2.5" cy="13" r="1.3"/><circle cx="7.5" cy="13" r="1.3"/></svg>
+      </span>
       <span onClick={(e) => { e.stopPropagation(); (hasChildren ? onToggle : onSelect)?.() }} style={{ width: 16, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', color: hasChildren ? SUB : 'transparent', fontSize: 15, fontWeight: 700, cursor: hasChildren ? 'pointer' : 'default', flex: 'none', transition: 'transform .12s', transform: hasChildren && open ? 'rotate(90deg)' : 'none' }}>{hasChildren ? '›' : ''}</span>
       <span style={{ color: selected ? ORANGE : SUB, display: 'inline-flex', flex: 'none' }}>{treeIconFor(label, hasChildren)}</span>
       <span style={{ flex: 1, minWidth: 0, fontSize: 13, color: selected ? ORANGE : INK, fontWeight: selected ? 700 : 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
         {label}{count != null && count > 0 ? <span style={{ color: FAINT, fontWeight: 500 }}> · {count}</span> : null}
       </span>
       {(hover || menu) && (
-        <span onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', paddingLeft: 12, background: `linear-gradient(90deg, transparent, ${selected ? WASH : INSET} 14px)`, borderRadius: 8 }}>
+        <span onClick={(e) => e.stopPropagation()} style={{ position: 'absolute', right: 4, top: '50%', transform: 'translateY(-50%)', display: 'flex', alignItems: 'center', gap: 1, paddingLeft: 14, background: `linear-gradient(90deg, transparent, ${selected ? WASH : INSET} 16px)`, borderRadius: 8 }}>
+          <button title={hidden ? 'Show' : 'Hide'} onClick={act(props.onHide)} style={{ border: 0, background: 'transparent', color: SUB, cursor: 'pointer', width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, padding: 0 }}>
+            {hidden
+              ? <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M17.9 17.9A10.4 10.4 0 0 1 12 20C5 20 1 12 1 12a19 19 0 0 1 5.1-5.9M9.9 4.2A10.4 10.4 0 0 1 12 4c7 0 11 8 11 8a19 19 0 0 1-2.2 3.2M1 1l22 22M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+              : <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>}
+          </button>
           <button title="Options" onClick={(e) => { e.stopPropagation(); setMenu((m) => !m) }} style={{ border: 0, background: 'transparent', color: SUB, cursor: 'pointer', fontSize: 18, lineHeight: 1, width: 24, height: 24, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6 }}>⋯</button>
           {menu && (
             <div style={{ position: 'absolute', top: '100%', right: 0, marginTop: 2, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 10, boxShadow: '0 10px 28px -10px rgba(20,18,15,.4)', padding: 5, display: 'flex', flexDirection: 'column', minWidth: 150, zIndex: 40 }}>
