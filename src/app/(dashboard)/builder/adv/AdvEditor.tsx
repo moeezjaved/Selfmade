@@ -1373,6 +1373,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
   return (
     <div style={{ position: 'fixed', inset: 0, zIndex: 55, display: 'flex', flexDirection: 'column', height: '100vh', background: '#f4f2ee', fontFamily: 'Inter, system-ui, sans-serif', color: INK }}>
+      <style>{`.sfp-range{-webkit-appearance:none;appearance:none;height:4px;border-radius:999px;background:#e5e3ee;outline:none}.sfp-range::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:14px;height:14px;border-radius:50%;background:${INK};cursor:pointer;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}.sfp-range::-moz-range-thumb{width:14px;height:14px;border-radius:50%;background:${INK};cursor:pointer;border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.25)}.sfp-range::-moz-range-track{height:4px;border-radius:999px;background:#e5e3ee}`}</style>
       {/* top bar — Selfmade mark + a soft orange tint (PagePilot uses a blue tint; ours is orange) */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 16px', borderBottom: `1px solid #f2e3da`, background: 'linear-gradient(180deg,#fff6f1,#fff)' }}>
         <Link href="/builder" title="Back to Builder" style={{ color: SUB, textDecoration: 'none', fontSize: 18, fontWeight: 600, display: 'inline-flex', alignItems: 'center', width: 30, height: 30, justifyContent: 'center', borderRadius: 8, border: `1px solid #f2e3da`, background: '#fff' }}>←</Link>
@@ -2017,8 +2018,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       {showTextStyle && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Typography</SecHead>
-        <ColorRow label="Branding color" prop="color" getVal={getVal} onStyle={onStyle} />
-        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["'Fraunces',Georgia,serif", 'Serif (Fraunces)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} getVal={getVal} onStyle={onStyle} />
+        <ColorField label="Branding color" prop="color" getVal={getVal} onStyle={onStyle} />
+        <FontField label="Font" prop="font-family" getVal={getVal} onStyle={onStyle} />
         <NumRow label="Size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
         <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={getVal} onStyle={onStyle} />
         <SegRow label="Letter spacing" prop="__ls" options={[['tight', 'Tight'], ['normal', 'Normal'], ['loose', 'Loose']]} getVal={() => { const v = getVal('letter-spacing'); return v && v.startsWith('-') ? 'tight' : (v && v !== 'normal' && v !== '' && parseFloat(v) > 0 ? 'loose' : 'normal') }} onStyle={(_p, v) => onStyle('letter-spacing', v === 'tight' ? '-0.02em' : v === 'loose' ? '0.06em' : 'normal')} />
@@ -2037,9 +2038,9 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       {!isMedia && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
-        <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <ColorField label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
         <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
-        <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+        <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
         <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Padding" prop="padding" max={80} getVal={getVal} onStyle={onStyle} />
@@ -2498,7 +2499,7 @@ function NumRow({ label, prop, min = 0, max = 120, unit = 'px', getVal, onStyle 
   return (
     <div style={ROW}>
       <span style={LBL}>{label}</span>
-      <input type="range" min={min} max={max} value={val === '' ? min : val} onChange={(e) => setVal(e.target.value)} onMouseUp={() => commit(val)} onTouchEnd={() => commit(val)} style={{ flex: 1, minWidth: 0, accentColor: INK }} />
+      <input className="sfp-range" type="range" min={min} max={max} value={val === '' ? min : val} onChange={(e) => setVal(e.target.value)} onMouseUp={() => commit(val)} onTouchEnd={() => commit(val)} style={{ flex: 1, minWidth: 0, accentColor: INK }} />
       <input type="number" value={val} onChange={(e) => setVal(e.target.value)} onBlur={() => commit(val)} onKeyDown={(e) => { if (e.key === 'Enter') commit(val) }} style={numBox} />
       <span style={{ fontSize: 11, color: FAINT, flex: 'none', width: 18 }}>{unit}</span>
     </div>
@@ -2515,6 +2516,86 @@ function ColorRow({ label, prop, getVal, onStyle }: RowBase) {
         <input type="color" value={hex} onInput={(e) => setVal((e.target as HTMLInputElement).value)} onChange={(e) => { setVal(e.target.value); onStyle(prop, e.target.value) }} style={{ width: 22, height: 22, flex: 'none', border: `1px solid ${LINE}`, borderRadius: 6, background: 'none', cursor: 'pointer', padding: 0 }} />
         <span style={{ flex: 1, minWidth: 0, fontSize: 12.5, color: val ? INK : FAINT, overflow: 'hidden', textOverflow: 'ellipsis' }}>{val || 'inherit'}</span>
         {val && <button onClick={() => { setVal(''); onStyle(prop, '') }} style={{ border: 0, background: 'transparent', color: FAINT, fontSize: 14, fontWeight: 700, cursor: 'pointer', flex: 'none', lineHeight: 1 }} title="Clear">×</button>}
+      </div>
+    </div>
+  )
+}
+// ── PagePilot-style Template Colors / Fonts, mapped to the template's own tokens (--blue, --ink, Fraunces…) ──
+const TEMPLATE_COLORS: [string, string][] = [
+  ['Primary', 'var(--blue)'], ['Primary Dark', 'var(--dark)'], ['Headings', 'var(--ink)'], ['Subheadings', 'var(--sub)'],
+  ['Soft', 'var(--soft)'], ['Border', 'var(--line)'], ['Warning', 'var(--warn)'], ['White', '#ffffff'],
+]
+const TEMPLATE_FONTS: [string, string][] = [
+  ['Headings', "'Fraunces',Georgia,serif"], ['Body', 'Inter,system-ui,sans-serif'], ['Serif', "Georgia,'Times New Roman',serif"], ['Mono', "'Courier New',monospace"],
+]
+const resolveColor = (v: string): string => {
+  if (!v) return ''
+  if (v.startsWith('var(') && typeof document !== 'undefined') { try { const nm = v.slice(4, -1).trim(); const root = document.querySelector('.pgbld') || document.body; return getComputedStyle(root).getPropertyValue(nm).trim() || '#ccc' } catch { return '#ccc' } }
+  return v
+}
+const popMask: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 44 }
+const popCard: React.CSSProperties = { position: 'absolute', top: '100%', right: 0, marginTop: 6, width: 238, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 14px 36px -10px rgba(20,18,15,.3)', padding: 8, zIndex: 45 }
+function ColorField({ label, prop, getVal, onStyle }: RowBase) {
+  const [open, setOpen] = useState(false)
+  const [tab, setTab] = useState<'custom' | 'template'>('template')
+  const cur = getVal(prop)
+  const name = TEMPLATE_COLORS.find(([, v]) => v === cur)?.[0] || (cur ? 'Custom' : 'Default')
+  const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(cur) ? cur : '#000000'
+  return (
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        <button onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 9px', background: '#fff', cursor: 'pointer' }}>
+          <span style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${LINE}`, background: resolveColor(cur) || 'transparent', flex: 'none' }} />
+          <span style={{ flex: 1, textAlign: 'left', fontSize: 12.5, color: INK, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{name}</span>
+        </button>
+        {open && (<>
+          <div onClick={() => setOpen(false)} style={popMask} />
+          <div style={popCard}>
+            <div style={{ display: 'flex', gap: 2, background: '#f1f0ee', borderRadius: 8, padding: 3, marginBottom: 8 }}>
+              {(['custom', 'template'] as const).map((t) => <button key={t} onClick={() => setTab(t)} style={{ flex: 1, border: 0, background: tab === t ? '#fff' : 'transparent', borderRadius: 6, padding: '5px', fontSize: 11.5, fontWeight: 700, color: INK, cursor: 'pointer', boxShadow: tab === t ? '0 1px 2px rgba(0,0,0,.12)' : 'none' }}>{t === 'custom' ? 'Custom' : 'Template Colors'}</button>)}
+            </div>
+            {tab === 'template' ? (
+              <div style={{ maxHeight: 220, overflowY: 'auto' }}>
+                {TEMPLATE_COLORS.map(([nm, v]) => (
+                  <button key={v} onClick={() => { onStyle(prop, v); setOpen(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, border: 0, background: cur === v ? WASH : 'transparent', borderRadius: 8, padding: '7px 8px', cursor: 'pointer' }}>
+                    <span style={{ width: 18, height: 18, borderRadius: '50%', border: `1px solid ${LINE}`, background: resolveColor(v), flex: 'none' }} />
+                    <span style={{ fontSize: 12.5, color: INK, fontWeight: 500 }}>{nm}</span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <div style={{ padding: 2 }}>
+                <input type="color" value={hex} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', height: 40, border: `1px solid ${LINE}`, borderRadius: 8, cursor: 'pointer', background: 'none' }} />
+                <input defaultValue={cur} key={cur} placeholder="#000000 or var(--blue)" onBlur={(e) => onStyle(prop, e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+                {cur && <button onClick={() => { onStyle(prop, ''); setOpen(false) }} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, padding: '7px', fontSize: 12, color: SUB, cursor: 'pointer' }}>Clear</button>}
+              </div>
+            )}
+          </div>
+        </>)}
+      </div>
+    </div>
+  )
+}
+function FontField({ label, prop, getVal, onStyle }: RowBase) {
+  const [open, setOpen] = useState(false)
+  const cur = getVal(prop)
+  const name = TEMPLATE_FONTS.find(([, v]) => v === cur)?.[0] || (cur ? 'Custom' : 'Default')
+  return (
+    <div style={ROW}>
+      <span style={LBL}>{label}</span>
+      <div style={{ position: 'relative', flex: 1, minWidth: 0 }}>
+        <button onClick={() => setOpen((o) => !o)} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', background: '#fff', cursor: 'pointer', fontSize: 12.5, color: INK }}><span style={{ fontFamily: cur || 'inherit' }}>{name}</span><span style={{ color: FAINT }}>▾</span></button>
+        {open && (<>
+          <div onClick={() => setOpen(false)} style={popMask} />
+          <div style={popCard}>
+            <div style={{ fontSize: 10, fontWeight: 800, color: FAINT, textTransform: 'uppercase', letterSpacing: '.06em', padding: '4px 8px 6px' }}>Template Fonts</div>
+            {TEMPLATE_FONTS.map(([nm, v]) => (
+              <button key={v} onClick={() => { onStyle(prop, v); setOpen(false) }} style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', border: 0, background: cur === v ? WASH : 'transparent', borderRadius: 8, padding: '8px 9px', cursor: 'pointer' }}><span style={{ fontFamily: v, fontSize: 14, color: INK }}>{nm}</span>{cur === v && <span style={{ color: ORANGE }}>✓</span>}</button>
+            ))}
+            <button onClick={() => { onStyle(prop, ''); setOpen(false) }} style={{ width: '100%', textAlign: 'left', border: 0, borderTop: `1px solid ${LINE}`, marginTop: 4, paddingTop: 8, background: 'transparent', color: SUB, fontSize: 12.5, padding: '8px', cursor: 'pointer' }}>Default</button>
+          </div>
+        </>)}
       </div>
     </div>
   )
