@@ -991,6 +991,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const c = parseInt(n, 10)
     sectionInnerStyle(sectionId, 'grid-template-columns', c > 0 ? `repeat(${c}, minmax(0, 1fr))` : '')
   }
+  // Section background IMAGE (set image + cover/center in one write; clear all three together).
+  const sectionBgImageUrl = (sectionId: string): string => {
+    const v = sectionStyleVal(sectionId, 'background-image'); const m = v.match(/url\(["']?([^"')]+)["']?\)/); return m ? m[1] : ''
+  }
+  const sectionSetBgImage = (sectionId: string, url: string) => {
+    const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return
+    const box = document.createElement('div'); box.innerHTML = re.html
+    const root = box.children[0] as HTMLElement | undefined; if (!root) return
+    if (url) { root.style.backgroundImage = `url("${url}")`; root.style.backgroundSize = 'cover'; root.style.backgroundPosition = 'center' }
+    else { root.style.removeProperty('background-image'); root.style.removeProperty('background-size'); root.style.removeProperty('background-position') }
+    apply((d) => patchElementContent(d, re.ref, { html: box.innerHTML }))
+  }
   // Full-width vs contained: toggle the inner .wrap max-width (contained = the template default, full = edge to edge).
   const sectionFullWidth = (sectionId: string): boolean => {
     const re = secRaw(sectionId); if (!re || typeof document === 'undefined') return false
@@ -1160,6 +1172,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               full={sectionFullWidth(sel.sectionId)} onFull={(v) => setSectionFullWidth(sel.sectionId, v)}
               gridVal={(p) => sectionInnerVal(sel.sectionId, p)} onGrid={(p, v) => sectionInnerStyle(sel.sectionId, p, v)}
               cols={sectionColumns(sel.sectionId)} onCols={(n) => setSectionColumns(sel.sectionId, n)}
+              bgImage={sectionBgImageUrl(sel.sectionId)} onBgImage={(u) => sectionSetBgImage(sel.sectionId, u)} uploadImage={uploadImage}
               device={device} onDevice={setDevice}
               onHide={() => apply((d) => setHidden(d, sel))} onDup={() => apply((d) => { const { doc: nd, newRef } = duplicateNode(d, sel); queueMicrotask(() => setSel(newRef)); return nd })} onDel={() => apply((d) => removeNode(d, sel), null)} />
           ) : (
@@ -1508,7 +1521,11 @@ function PanelHeader({ kind, name, device, onDevice }: { kind: string; name: str
 
 // Section-level settings panel (bug D): PagePilot-style — the whole section's Layout (width, columns, gap,
 // rounded), Background, and Spacing. Styles the raw section's outer wrapper + its content grid.
-function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGrid, cols, onCols, device, onDevice, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; gridVal: (p: string) => string; onGrid: (p: string, v: string) => void; cols: string; onCols: (n: string) => void; device: Device; onDevice: (d: Device) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
+function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGrid, cols, onCols, bgImage, onBgImage, uploadImage, device, onDevice, onHide, onDup, onDel }: { name: string; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; full: boolean; onFull: (v: boolean) => void; gridVal: (p: string) => string; onGrid: (p: string, v: string) => void; cols: string; onCols: (n: string) => void; bgImage: string; onBgImage: (u: string) => void; uploadImage: (f: File) => Promise<string | null>; device: Device; onDevice: (d: Device) => void; onHide: () => void; onDup: () => void; onDel: () => void }) {
+  // "Dynamic" rounded-corners = inherit the template default (no override); "Custom" = the slider below.
+  const [roundedCustom, setRoundedCustom] = useState(() => !!parseFloat(getVal('border-radius')))
+  const [bgBusy, setBgBusy] = useState(false)
+  const pickBg = () => { const inp = document.createElement('input'); inp.type = 'file'; inp.accept = 'image/jpeg,image/png,image/webp,image/gif'; inp.onchange = async () => { const f = inp.files?.[0]; if (!f) return; setBgBusy(true); const u = await uploadImage(f); setBgBusy(false); if (u) onBgImage(u) }; inp.click() }
   return (
     <div>
       <PanelHeader kind="Section" name={name} device={device} onDevice={onDevice} />
@@ -1523,11 +1540,20 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
         <SegRow label="Content alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />
         <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />
-        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+        <SegRow label="Rounded corners source" prop="__rcs" options={[['custom', 'Custom'], ['dynamic', 'Dynamic']]} getVal={() => (roundedCustom ? 'custom' : 'dynamic')} onStyle={(_p, v) => { const c = v === 'custom'; setRoundedCustom(c); if (!c) onStyle('border-radius', '') }} />
+        {roundedCustom && <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Background</div>
         <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <div style={{ ...ROW, alignItems: 'flex-start' }}>
+          <span style={{ ...LBL, marginTop: 6 }}>Background image</span>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            {bgImage
+              ? (<div style={{ position: 'relative', borderRadius: 10, overflow: 'hidden', border: `1px solid ${LINE}` }}><img src={bgImage} alt="" style={{ width: '100%', height: 84, objectFit: 'cover', display: 'block' }} /><button onClick={() => onBgImage('')} title="Remove" style={{ position: 'absolute', top: 5, right: 5, border: 0, background: 'rgba(20,18,15,.7)', color: '#fff', borderRadius: 999, width: 22, height: 22, cursor: 'pointer', lineHeight: 1 }}>×</button></div>)
+              : (<button disabled={bgBusy} onClick={pickBg} style={{ width: '100%', border: `1px dashed ${LINE}`, background: INSET, color: INK, borderRadius: 10, padding: '14px 10px', fontSize: 12.5, fontWeight: 700, cursor: bgBusy ? 'default' : 'pointer', opacity: bgBusy ? 0.6 : 1, textAlign: 'center' }}>{bgBusy ? 'Uploading…' : '⬆ Drag & Drop or select image'}</button>)}
+          </div>
+        </div>
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Spacing</div>
