@@ -1819,13 +1819,18 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
   const [aiBusy2, setAiBusy2] = useState(false)  // "Edit with AI" on the plain Content field
+  const [aiOpen2, setAiOpen2] = useState(false)  // the Content-field AI popup (mode + instructions)
+  const [aiMode2, setAiMode2] = useState<'rewrite' | 'shorter' | 'longer'>('rewrite')
+  const [aiInstr2, setAiInstr2] = useState('')
   const editContentAI = async () => {
     const t = draft.trim(); if (!t) return
     setAiBusy2(true)
+    const base = aiMode2 === 'shorter' ? 'Rewrite this to be noticeably shorter and punchier, keeping the meaning.' : aiMode2 === 'longer' ? 'Rewrite this to be a little longer and more persuasive, keeping the meaning.' : 'Rewrite this to be clearer and more compelling, keeping the meaning.'
+    const instruction = aiInstr2.trim() ? `${base} Also: ${aiInstr2.trim()}` : base
     try {
-      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, context: textContext }) })
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text: t, instruction, context: textContext }) })
       const j = await r.json()
-      if (j.text) { setDraft(j.text); onText(j.text) } else window.alert(j.error || 'Could not rewrite.')
+      if (j.text) { setDraft(j.text); onText(j.text); setAiOpen2(false); setAiInstr2('') } else window.alert(j.error || 'Could not rewrite.')
     } catch { window.alert('Could not rewrite — please try again.') }
     finally { setAiBusy2(false) }
   }
@@ -2024,7 +2029,28 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Content</div>
           <textarea value={draft} onChange={(e) => setDraft(e.target.value)} onBlur={() => { if (draft !== text) onText(draft) }} rows={draft.length > 60 ? 4 : 2}
             style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 13, lineHeight: 1.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit' }} />
-          <button disabled={aiBusy2} onClick={editContentAI} style={{ width: '100%', marginTop: 8, border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy2 ? 'default' : 'pointer', opacity: aiBusy2 ? 0.6 : 1 }}>{aiBusy2 ? 'Rewriting…' : '✨ Edit with AI'}</button>
+          <div style={{ position: 'relative', marginTop: 8 }}>
+            <button disabled={aiBusy2} onClick={() => setAiOpen2((o) => !o)} style={{ width: '100%', border: 0, background: aiOpen2 ? '#f3ebfb' : 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>✨ Edit with AI</button>
+            {aiOpen2 && (<>
+              <div onClick={() => setAiOpen2(false)} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+              <div style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 16px 40px -12px rgba(20,18,15,.35)', padding: 16, zIndex: 41 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 15, fontWeight: 800, color: INK, marginBottom: 12 }}><span style={{ color: '#a23ba0' }}>✨</span> Edit with AI</div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Mode</div>
+                <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+                  {([['rewrite', 'Rewrite'], ['shorter', 'Shorter'], ['longer', 'Longer']] as const).map(([m, lbl]) => (
+                    <button key={m} onClick={() => setAiMode2(m)} style={{ flex: 1, border: `1px solid ${aiMode2 === m ? ORANGE : LINE}`, background: aiMode2 === m ? WASH : '#fff', color: INK, borderRadius: 9, padding: '8px 6px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
+                  ))}
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Instructions <span style={{ color: FAINT, fontWeight: 500 }}>(Optional)</span></div>
+                <textarea value={aiInstr2} onChange={(e) => setAiInstr2(e.target.value)} placeholder="Type your prompt here…" rows={3}
+                  style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12 }} />
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                  <button onClick={() => { setAiOpen2(false); setAiInstr2('') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 9, padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+                  <button disabled={aiBusy2} onClick={editContentAI} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 9, padding: '8px 18px', fontSize: 12.5, fontWeight: 700, cursor: aiBusy2 ? 'default' : 'pointer', opacity: aiBusy2 ? 0.65 : 1 }}>{aiBusy2 ? 'Sending…' : 'Send'}</button>
+                </div>
+              </div>
+            </>)}
+          </div>
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Edit the words here, or double-click the text on the canvas.</div>
         </div>
       )}
@@ -2074,9 +2100,9 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         {getVal('border-radius') !== '' && <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
         <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '10px 0 2px' }}>Padding</div>
         <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
       </div>
       )}
       {(showTextStyle || !isMedia) && (
@@ -2192,6 +2218,9 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
   const ref = useRef<HTMLDivElement | null>(null)
   const savedRange = useRef<Range | null>(null)
   const [aiBusy, setAiBusy] = useState(false)
+  const [aiOpen, setAiOpen] = useState(false)   // Edit-with-AI popup (mode + instructions)
+  const [aiMode, setAiMode] = useState<'rewrite' | 'shorter' | 'longer'>('rewrite')
+  const [aiInstr, setAiInstr] = useState('')
   const [linkOpen, setLinkOpen] = useState(false)
   const [linkVal, setLinkVal] = useState('')
   const setInitial = useCallback((el: HTMLDivElement | null) => { ref.current = el; if (el && el.innerHTML !== html) el.innerHTML = html }, [html])
@@ -2220,10 +2249,12 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
     const text = ref.current?.textContent || ''
     if (!text.trim()) return
     setAiBusy(true)
+    const base = aiMode === 'shorter' ? 'Rewrite this to be noticeably shorter and punchier, keeping the meaning.' : aiMode === 'longer' ? 'Rewrite this to be a little longer and more persuasive, keeping the meaning.' : 'Rewrite this to be clearer and more compelling, keeping the meaning.'
+    const instruction = aiInstr.trim() ? `${base} Also: ${aiInstr.trim()}` : base
     try {
-      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, context }) })
+      const r = await fetch('/api/builder/rewrite', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ text, instruction, context }) })
       const j = await r.json()
-      if (j.text && ref.current) { ref.current.textContent = j.text; commit() }
+      if (j.text && ref.current) { ref.current.textContent = j.text; commit(); setAiOpen(false); setAiInstr('') }
       else window.alert(j.error || 'Could not rewrite.')
     } catch { window.alert('Could not rewrite — please try again.') }
     finally { setAiBusy(false) }
@@ -2259,8 +2290,27 @@ function RichText({ html, onCommit, context }: { html: string; onCommit: (html: 
         <div ref={setInitial} contentEditable suppressContentEditableWarning onBlur={commit} onMouseUp={saveSel} onKeyUp={saveSel}
           style={{ minHeight: 60, padding: '9px 11px', fontSize: 13, lineHeight: 1.5, color: INK, outline: 'none' }} />
       </div>
-      <div style={{ marginTop: 8 }}>
-        <button disabled={aiBusy} onMouseDown={(e) => e.preventDefault()} onClick={editAI} style={{ width: '100%', border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>{aiBusy ? 'Rewriting…' : '✨ Edit with AI'}</button>
+      <div style={{ marginTop: 8, position: 'relative' }}>
+        <button disabled={aiBusy} onMouseDown={(e) => e.preventDefault()} onClick={() => setAiOpen((o) => !o)} style={{ width: '100%', border: 0, background: aiOpen ? '#f3ebfb' : 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '9px 12px', fontSize: 13, fontWeight: 800, cursor: 'pointer' }}>✨ Edit with AI</button>
+        {aiOpen && (<>
+          <div onMouseDown={(e) => { e.preventDefault(); setAiOpen(false) }} style={{ position: 'fixed', inset: 0, zIndex: 40 }} />
+          <div onMouseDown={(e) => e.preventDefault()} style={{ position: 'absolute', top: '100%', left: 0, right: 0, marginTop: 6, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14, boxShadow: '0 16px 40px -12px rgba(20,18,15,.35)', padding: 16, zIndex: 41 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, fontSize: 15, fontWeight: 800, color: INK, marginBottom: 12 }}><span style={{ color: '#a23ba0' }}>✨</span> Edit with AI</div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Mode</div>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 14 }}>
+              {([['rewrite', 'Rewrite'], ['shorter', 'Shorter'], ['longer', 'Longer']] as const).map(([m, lbl]) => (
+                <button key={m} onClick={() => setAiMode(m)} style={{ flex: 1, border: `1px solid ${aiMode === m ? ORANGE : LINE}`, background: aiMode === m ? WASH : '#fff', color: INK, borderRadius: 9, padding: '8px 6px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>{lbl}</button>
+              ))}
+            </div>
+            <div style={{ fontSize: 12, fontWeight: 700, color: INK, marginBottom: 7 }}>Instructions <span style={{ color: FAINT, fontWeight: 500 }}>(Optional)</span></div>
+            <textarea value={aiInstr} onChange={(e) => setAiInstr(e.target.value)} placeholder="Type your prompt here…" rows={3}
+              style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12 }} />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+              <button onClick={() => { setAiOpen(false); setAiInstr('') }} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 9, padding: '8px 16px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Cancel</button>
+              <button disabled={aiBusy} onClick={editAI} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 9, padding: '8px 18px', fontSize: 12.5, fontWeight: 700, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.65 : 1 }}>{aiBusy ? 'Sending…' : 'Send'}</button>
+            </div>
+          </div>
+        </>)}
       </div>
       <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Format the text here, or double-click it on the canvas.</div>
     </div>
@@ -2610,7 +2660,7 @@ const popMask: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 44 }
 const popCard: React.CSSProperties = { position: 'absolute', top: '100%', right: 0, marginTop: 6, width: 238, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 14px 36px -10px rgba(20,18,15,.3)', padding: 8, zIndex: 45 }
 function ColorField({ label, prop, getVal, onStyle }: RowBase) {
   const [open, setOpen] = useState(false)
-  const [tab, setTab] = useState<'custom' | 'template'>('template')
+  const [tab, setTab] = useState<'custom' | 'template'>('custom')
   const cur = getVal(prop)
   const name = TEMPLATE_COLORS.find(([, v]) => v === cur)?.[0] || (cur ? 'Custom' : 'Default')
   const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(cur) ? cur : '#000000'
