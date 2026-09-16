@@ -65,7 +65,7 @@ const css = `
 .pgbld .hcre{background:linear-gradient(180deg,var(--soft),#fff);border:1px solid var(--line);border-radius:20px;padding:22px}
 .pgbld .hcre .hd{font-size:20px;font-weight:900;line-height:1.18;margin-bottom:4px}
 .pgbld .hcre .hd .hl{color:var(--blue)}
-.pgbld .hcre .sd{font-size:12.5px;color:var(--sub);font-weight:600;margin-bottom:14px}
+.pgbld .hcre .sd{font-size:14px;color:var(--sub);font-weight:500;margin-bottom:14px}
 .pgbld .hcre .mid{display:grid;grid-template-columns:1fr .9fr;gap:12px;align-items:center}
 .pgbld .ppills{display:flex;flex-direction:column;gap:8px}
 .pgbld .ppill{display:grid;grid-template-columns:auto 1fr;border-radius:999px;overflow:hidden;font-size:10.5px;font-weight:800;box-shadow:0 3px 8px -5px rgba(63,75,214,.5)}
@@ -91,9 +91,9 @@ const css = `
 .pgbld .bestseller .bst b{font-size:12px;font-weight:600;color:var(--ink);letter-spacing:.02em}
 .pgbld .bestseller .bst span{font-size:11px;font-weight:400;color:var(--sub)}
 .pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:600;line-height:1.12;letter-spacing:-.01em}
-.pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
+.pgbld .rlabel{font-size:14px;color:var(--sub);margin:7px 0 12px}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
-.pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
+.pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500}
 .pgbld .hchecks .c .t{width:22px;height:22px;border-radius:50%;background:var(--soft2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
 .pgbld .vpick{margin-bottom:14px}
 .pgbld .vpick .vlabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
@@ -105,14 +105,14 @@ const css = `
 .pgbld .price .was{font-size:15px;color:#a6aac9;text-decoration:line-through}
 .pgbld .price .now{font-size:24px;font-weight:900;color:var(--blue)}
 .pgbld .price .save{font-size:11px;font-weight:800;color:#fff;background:var(--blue);border-radius:5px;padding:3px 8px}
-.pgbld .grow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin:12px 0;font-size:12px;color:#6a6e93;font-weight:600}
+.pgbld .grow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin:12px 0;font-size:13px;color:#6a6e93;font-weight:600}
 .pgbld .grow span{display:inline-flex;align-items:center;gap:6px}
 .pgbld .acc{margin-top:14px;border-top:1px solid var(--line)}
 .pgbld .acc details{border-bottom:1px solid var(--line)}
-.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 2px;font-weight:700;font-size:13.5px}
+.pgbld .acc summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:10px;padding:12px 2px;font-weight:600;font-size:14px}
 .pgbld .acc summary::-webkit-details-marker{display:none}
 .pgbld .acc summary::after{content:'⌄';margin-left:auto;color:var(--sub);font-size:17px}
-.pgbld .acc .body{padding:0 2px 12px;font-size:13px;color:var(--sub)}
+.pgbld .acc .body{padding:0 2px 12px;font-size:14px;color:var(--sub);line-height:1.55}
 .pgbld .hclaim{font-size:12px;color:var(--sub);text-align:center;margin-top:12px}
 .pgbld .hrev{display:flex;gap:12px;background:var(--soft);border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-top:12px}
 .pgbld .hrev .av,.pgbld .hrev .av.ph{width:40px;height:40px;border-radius:50%;flex:none;min-height:0}
