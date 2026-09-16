@@ -129,7 +129,7 @@ function renderSection(s: Section, tokens: DesignTokens, o: Required<Pick<Render
 /** Base CSS shared by every rendered page (the design-token vars come from the theme). */
 function baseCss(tokens: DesignTokens): string {
   const vars = Object.entries(tokens).map(([k, v]) => `--sf-${k.toLowerCase()}:${v}`).join(';')
-  return `
+  return `@import url('https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Lato:wght@300;400;700;900&family=Playfair+Display:wght@400;600;700&family=Poppins:wght@400;500;600;700&family=Montserrat:wght@400;500;600;700;800&display=swap');
 :root{${vars}}
 .sf-page{font-family:Inter,system-ui,sans-serif;color:var(--sf-ink,#1b1a17);line-height:1.5}
 .sf-section{width:100%}

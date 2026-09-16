@@ -2557,12 +2557,54 @@ const TEMPLATE_COLORS: [string, string][] = [
   ['Soft', 'var(--soft)'], ['Border', 'var(--line)'], ['Warning', 'var(--warn)'], ['White', '#ffffff'],
 ]
 const TEMPLATE_FONTS: [string, string][] = [
-  ['Headings', "'Fraunces',Georgia,serif"], ['Body', 'Inter,system-ui,sans-serif'], ['Serif', "Georgia,'Times New Roman',serif"], ['Mono', "'Courier New',monospace"],
+  ['Fraunces', "'Fraunces',Georgia,serif"], ['EB Garamond', "'EB Garamond',Georgia,serif"], ['Lato', "'Lato',system-ui,sans-serif"],
+  ['Inter', 'Inter,system-ui,sans-serif'], ['Playfair Display', "'Playfair Display',Georgia,serif"], ['Poppins', "'Poppins',system-ui,sans-serif"],
+  ['Montserrat', "'Montserrat',system-ui,sans-serif"], ['Serif', "Georgia,'Times New Roman',serif"], ['Mono', "'Courier New',monospace"],
 ]
 const resolveColor = (v: string): string => {
   if (!v) return ''
   if (v.startsWith('var(') && typeof document !== 'undefined') { try { const nm = v.slice(4, -1).trim(); const root = document.querySelector('.pgbld') || document.body; return getComputedStyle(root).getPropertyValue(nm).trim() || '#ccc' } catch { return '#ccc' } }
   return v
+}
+// ── Inline HSV colour picker (gradient square + hue bar + hex), matching PagePilot's "Custom" colour tab ──
+const hsvToHex = (h: number, s: number, v: number): string => {
+  const c = v * s, x = c * (1 - Math.abs(((h / 60) % 2) - 1)), m = v - c
+  let r = 0, g = 0, b = 0
+  if (h < 60) { r = c; g = x } else if (h < 120) { r = x; g = c } else if (h < 180) { g = c; b = x } else if (h < 240) { g = x; b = c } else if (h < 300) { r = x; b = c } else { r = c; b = x }
+  const to = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, '0')
+  return '#' + to(r) + to(g) + to(b)
+}
+const hexToHsv = (hex: string): { h: number; s: number; v: number } => {
+  let h = (hex || '').replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) h = '363636'
+  const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
+  let hue = 0; if (d) { if (max === r) hue = ((g - b) / d) % 6; else if (max === g) hue = (b - r) / d + 2; else hue = (r - g) / d + 4; hue *= 60; if (hue < 0) hue += 360 }
+  return { h: hue, s: max ? d / max : 0, v: max }
+}
+function ColorPicker({ value, onChange, onRemove }: { value: string; onChange: (hex: string) => void; onRemove: () => void }) {
+  const [hsv, setHsv] = useState(() => hexToHsv(value))
+  const [hex, setHex] = useState(() => (hsvToHex(hexToHsv(value).h, hexToHsv(value).s, hexToHsv(value).v)).slice(1))
+  const sqRef = useRef<HTMLDivElement | null>(null); const hueRef = useRef<HTMLDivElement | null>(null)
+  const apply = (n: { h: number; s: number; v: number }) => { setHsv(n); const hx = hsvToHex(n.h, n.s, n.v); setHex(hx.slice(1)); onChange(hx) }
+  const drag = (handler: (e: { clientX: number; clientY: number }) => void) => (e: React.MouseEvent) => { e.preventDefault(); handler(e); const mv = (ev: MouseEvent) => handler(ev); const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up) }; document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up) }
+  const onSq = (e: { clientX: number; clientY: number }) => { const el = sqRef.current; if (!el) return; const r = el.getBoundingClientRect(); const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)); apply({ ...hsv, s: x, v: 1 - y }) }
+  const onHue = (e: { clientX: number; clientY: number }) => { const el = hueRef.current; if (!el) return; const r = el.getBoundingClientRect(); const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); apply({ ...hsv, h: x * 360 }) }
+  return (
+    <div style={{ padding: 2 }}>
+      <div ref={sqRef} onMouseDown={drag(onSq)} style={{ position: 'relative', height: 128, borderRadius: 8, cursor: 'crosshair', background: `linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(${hsv.h},100%,50%))` }}>
+        <div style={{ position: 'absolute', left: `${hsv.s * 100}%`, top: `${(1 - hsv.v) * 100}%`, transform: 'translate(-50%,-50%)', width: 13, height: 13, borderRadius: '50%', border: '2px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,.35)', pointerEvents: 'none' }} />
+      </div>
+      <div ref={hueRef} onMouseDown={drag(onHue)} style={{ position: 'relative', height: 12, borderRadius: 999, marginTop: 12, cursor: 'pointer', background: 'linear-gradient(to right, red, #ff0, #0f0, #0ff, #00f, #f0f, red)' }}>
+        <div style={{ position: 'absolute', left: `${(hsv.h / 360) * 100}%`, top: '50%', transform: 'translate(-50%,-50%)', width: 15, height: 15, borderRadius: '50%', background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,.3)', pointerEvents: 'none' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 9px' }}>
+        <span style={{ color: FAINT, fontSize: 13 }}>#</span>
+        <input value={hex} onChange={(e) => { const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6); setHex(v); if (v.length === 6 || v.length === 3) { const full = v.length === 3 ? v.split('').map((c) => c + c).join('') : v; setHsv(hexToHsv('#' + full)); onChange('#' + full) } }} style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontSize: 13, color: INK, letterSpacing: '.04em' }} />
+      </div>
+      <button onClick={onRemove} style={{ width: '100%', marginTop: 12, border: 0, background: '#e0402f', color: '#fff', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>🗑 Remove color</button>
+    </div>
+  )
 }
 const popMask: React.CSSProperties = { position: 'fixed', inset: 0, zIndex: 44 }
 const popCard: React.CSSProperties = { position: 'absolute', top: '100%', right: 0, marginTop: 6, width: 238, background: '#fff', border: `1px solid ${LINE}`, borderRadius: 12, boxShadow: '0 14px 36px -10px rgba(20,18,15,.3)', padding: 8, zIndex: 45 }
@@ -2596,11 +2638,7 @@ function ColorField({ label, prop, getVal, onStyle }: RowBase) {
                 ))}
               </div>
             ) : (
-              <div style={{ padding: 2 }}>
-                <input type="color" value={hex} onChange={(e) => onStyle(prop, e.target.value)} style={{ width: '100%', height: 40, border: `1px solid ${LINE}`, borderRadius: 8, cursor: 'pointer', background: 'none' }} />
-                <input defaultValue={cur} key={cur} placeholder="#000000 or var(--blue)" onBlur={(e) => onStyle(prop, e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
-                {cur && <button onClick={() => { onStyle(prop, ''); setOpen(false) }} style={{ width: '100%', marginTop: 8, border: `1px solid ${LINE}`, background: '#fff', borderRadius: 8, padding: '7px', fontSize: 12, color: SUB, cursor: 'pointer' }}>Clear</button>}
-              </div>
+              <ColorPicker value={hex} onChange={(v) => onStyle(prop, v)} onRemove={() => { onStyle(prop, ''); setOpen(false) }} />
             )}
           </div>
         </>)}
