@@ -10,7 +10,7 @@
  * accents. Layout is FIXED; the AI only fills `schema` slots. All CSS scoped under `.pgbld`. Responsive.
  */
 import type { PageTemplate, FilledContent, RenderOpts, SlotValue } from '../types'
-import { paysRowInner } from '../payicons'
+import { paysRowInner, benefitCheckIcon } from '../payicons'
 
 const esc = (s: any) => String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string))
 const escp = (s: any) => esc(String(s ?? '').replace(/\*\*/g, '').replace(/^\s*[-•*]\s*/, '').trim())
@@ -85,12 +85,16 @@ const css = `
 .pgbld .pgal .hbottle,.pgbld .pgal .hbottle.ph{aspect-ratio:3/4;width:100%}
 .pgbld .pcre{padding:6px 0 26px}
 .pgbld .pcre-img .pcrei,.pgbld .pcre-img .ph{aspect-ratio:3/4;border-radius:12px;min-height:0;width:100%;object-fit:cover}
-.pgbld .bestseller{display:inline-flex;align-items:center;gap:8px;background:var(--soft2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:11px;font-weight:800;color:var(--blue);margin-bottom:12px}
+.pgbld .bestseller{display:inline-flex;align-items:center;gap:9px;background:var(--soft2);border:1px solid var(--line);border-radius:10px;padding:7px 12px;margin-bottom:12px}
+.pgbld .bestseller .num{background:var(--blue);color:#fff;font-size:12px;font-weight:900;border-radius:6px;padding:3px 7px;flex:none}
+.pgbld .bestseller .bst{display:flex;flex-direction:column;line-height:1.25}
+.pgbld .bestseller .bst b{font-size:11.5px;font-weight:800;color:var(--ink);letter-spacing:.02em}
+.pgbld .bestseller .bst span{font-size:10.5px;font-weight:600;color:var(--sub)}
 .pgbld .ptitle{font-size:25px;font-weight:800}
 .pgbld .rlabel{font-size:12.5px;color:var(--sub);margin:7px 0 12px}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600}
-.pgbld .hchecks .c .t{width:20px;height:20px;border-radius:50%;background:var(--soft2);display:flex;align-items:center;justify-content:center;flex:none}
+.pgbld .hchecks .c .t{width:22px;height:22px;border-radius:50%;background:var(--soft2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
 .pgbld .vpick{margin-bottom:14px}
 .pgbld .vpick .vlabel{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--sub);margin-bottom:8px}
 .pgbld .vpick .vopts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -101,7 +105,7 @@ const css = `
 .pgbld .price .was{font-size:15px;color:#a6aac9;text-decoration:line-through}
 .pgbld .price .now{font-size:24px;font-weight:900;color:var(--blue)}
 .pgbld .price .save{font-size:11px;font-weight:800;color:#fff;background:var(--blue);border-radius:5px;padding:3px 8px}
-.pgbld .grow{display:flex;gap:16px;flex-wrap:wrap;margin-top:12px;font-size:12px;color:#6a6e93;font-weight:600}
+.pgbld .grow{display:flex;gap:22px;flex-wrap:wrap;justify-content:center;margin:12px 0;font-size:12px;color:#6a6e93;font-weight:600}
 .pgbld .grow span{display:inline-flex;align-items:center;gap:6px}
 .pgbld .acc{margin-top:14px;border-top:1px solid var(--line)}
 .pgbld .acc details{border-bottom:1px solid var(--line)}
@@ -285,7 +289,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   }).join('')
 
   const checks = (arr(c.hero_benefits).length ? arr(c.hero_benefits) : ['Lifts excess oil', 'Smooths wash routines', 'Nourishes scalp', 'Natural ingredients'].map((l) => ({ label: l })))
-    .slice(0, 4).map((f) => `<div class="c"><span class="t">${TICK}</span>${escp(f.label)}</div>`).join('')
+    .slice(0, 4).map((f, i) => `<div class="c"><span class="t">${benefitCheckIcon(i)}</span>${escp(f.label)}</div>`).join('')
   const thumbs = [c.image_main, c.image_g2, c.image_g3, c.image_g4, c.image_g5].map((u) => img(u || P, o.productName, '', 'Img')).join('')
   const accItems = (arr(c.info_sections).length ? arr(c.info_sections) : [{ label: 'Description', body: 'A lightweight pre-wash oil that loosens buildup and excess oil before you shampoo.' }, { label: 'How to use', body: 'Massage into a dry scalp, leave on for 10–15 minutes, then wash as usual.' }, { label: 'Shipping & Returns', body: 'Fast, tracked delivery and a money-back guarantee.' }])
     .map((s, i) => `<details${i === 0 ? ' open' : ''}><summary>${escp(s.label)}</summary><div class="body">${esc(s.body)}</div></details>`).join('')
@@ -363,15 +367,15 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="thumbs">${thumbs}</div>
     </div>
     <div>
-      <div class="bestseller">★ ${escp(c.bestseller_label || 'BESTSELLER OF 2026')}</div>
+      <div class="bestseller"><span class="num">#1</span><span class="bst"><b>${escp(c.bestseller_label || 'BESTSELLER OF 2026')}</b><span>${escp(c.bestseller_sub || 'Trusted by thousands')}</span></span></div>
       <h1 class="ptitle">${esc(c.headline || o.productName)}</h1>
       <div class="rlabel"><span class="stars">★★★★★</span> ${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</div>
       <div class="hchecks">${checks}</div>
       <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
       <div class="vpick"><div class="vlabel">${escp(c.variant_label || 'Make a Choice')}</div><div class="vopts">${variants}</div></div>
-      <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'Add to Cart')}</a>
+      <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(c.cta_label || 'ADD TO CART')}</a>
+      <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money-Back Guarantee')}</span><span>📦 ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="pays">${paysRowInner()}</div>
-      <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money Back Guarantee')}</span><span>↩ ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="acc">${accItems}</div>
       <div class="hclaim">${escp(c.hero_claim || 'Join thousands of customers who trust our money-back guarantee.')}</div>
       <div class="hrev"><div class="av">${img(c.image_reviewer, 'Reviewer', 'avim', '')}</div><div><div class="q">${esc(c.hero_review || 'My scalp feels genuinely clean and my hair looks fuller by the second wash. No greasy residue at all, just fresh, healthy-feeling roots.')}</div><div class="who">${escp(c.hero_review_name || 'Verified Buyer')}</div></div></div>

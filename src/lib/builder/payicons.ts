@@ -27,5 +27,14 @@ export const payIcon = (id: string): string => {
   return p ? `<span class="payicon" data-pay="${id}" title="${p.label}">${p.svg}</span>` : ''
 }
 /** Default provider set baked into a fresh template's buy-box. */
-export const DEFAULT_PAYS = ['visa', 'mastercard', 'amex', 'paypal', 'shop']
+export const DEFAULT_PAYS = ['amex', 'applepay', 'visa', 'mastercard', 'paypal', 'googlepay', 'shop']
+
+// Varied benefit-check icons — a different single-colour symbol per row (matches PagePilot's buy-box checks).
+const BENEFIT_ICONS = [
+  '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2"/><path d="M9 9h.01M15 9h.01"/>',
+  '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>',
+  '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/>',
+  '<path d="m12 3 1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/>',
+]
+export const benefitCheckIcon = (i: number): string => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">${BENEFIT_ICONS[i % BENEFIT_ICONS.length]}</svg>`
 export const paysRowInner = (ids: string[] = DEFAULT_PAYS): string => ids.map(payIcon).join('')
