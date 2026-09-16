@@ -815,6 +815,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     const cur = findElement(doc, rawSel.ref)
     const html = (cur?.content as { html?: string } | undefined)?.html
     if (typeof html !== 'string') return
+    // Custom CSS classes (PagePilot's "Custom → Class"): tracked in data-cc so re-edits swap cleanly and never
+    // clobber the element's own functional classes.
+    if (prop === '__class' && typeof document !== 'undefined') {
+      const box = document.createElement('div'); box.innerHTML = html
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      ;(node.getAttribute('data-cc') || '').split(/\s+/).filter(Boolean).forEach((c) => node.classList.remove(c))
+      const add = value.split(/\s+/).filter(Boolean); add.forEach((c) => node.classList.add(c))
+      if (add.length) node.setAttribute('data-cc', add.join(' ')); else node.removeAttribute('data-cc')
+      const ref2 = rawSel.ref
+      apply((d) => patchElementContent(d, ref2, { html: box.innerHTML }))
+      return
+    }
     const next = rawHtmlOp(html, rawSel.path, 'style', `${prop}::${value}`)
     if (next === html) return
     const ref = rawSel.ref
@@ -822,7 +835,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   }, [rawSel, doc, apply])
   // Current inline value of a CSS prop on the selected raw piece (for the settings panel inputs).
   const rawStyleVal = useCallback((prop: string): string => {
-    const n = rawNodeEl(); return n ? (n.style.getPropertyValue(prop) || '') : ''
+    const n = rawNodeEl(); if (!n) return ''
+    if (prop === '__class') return n.getAttribute('data-cc') || ''
+    return n.style.getPropertyValue(prop) || ''
   }, [rawNodeEl])
   // The selected piece's PagePilot-style name (panel heading) + its editable text (panel content field, only
   // when the piece is a text leaf — a container with child pieces has no single text field).
@@ -1982,26 +1997,43 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       </div>
       {showTextStyle && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Text</div>
-        <ColorRow label="Text color" prop="color" getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Text size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
-        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+        <div style={panelSecHead}>Typography</div>
+        <ColorRow label="Branding color" prop="color" getVal={getVal} onStyle={onStyle} />
+        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["'Fraunces',Georgia,serif", 'Serif (Fraunces)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Size" prop="font-size" min={10} max={72} getVal={getVal} onStyle={onStyle} />
         <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={getVal} onStyle={onStyle} />
-        <SelRow label="Font" prop="font-family" options={[["Inter,system-ui,sans-serif", 'Sans (Inter)'], ["Georgia,'Times New Roman',serif", 'Serif'], ["'Courier New',monospace", 'Mono']]} getVal={getVal} onStyle={onStyle} />
+        <SegRow label="Letter spacing" prop="__ls" options={[['tight', 'Tight'], ['normal', 'Normal'], ['loose', 'Loose']]} getVal={() => { const v = getVal('letter-spacing'); return v && v.startsWith('-') ? 'tight' : (v && v !== 'normal' && v !== '' && parseFloat(v) > 0 ? 'loose' : 'normal') }} onStyle={(_p, v) => onStyle('letter-spacing', v === 'tight' ? '-0.02em' : v === 'loose' ? '0.06em' : 'normal')} />
+        <SelRow label="Case" prop="text-transform" options={[['none', 'Default'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']]} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Line height" prop="line-height" min={12} max={64} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Letter spacing" prop="letter-spacing" min={-2} max={12} getVal={getVal} onStyle={onStyle} />
+      </div>
+      )}
+      {showTextStyle && (
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={panelSecHead}>Layout</div>
+        <SegRow label="Width" prop="__w" options={[['fill', 'Fill'], ['fit', 'Fit']]} getVal={() => { const v = getVal('width'); return v === 'auto' || v === 'fit-content' ? 'fit' : 'fill' }} onStyle={(_p, v) => onStyle('width', v === 'fit' ? 'auto' : '100%')} />
+        <SegRow label="Alignment" prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
       </div>
       )}
       {!isMedia && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Box</div>
-        <ColorRow label="Background" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <div style={panelSecHead}>Appearance</div>
+        <ColorRow label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+        <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
+        <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+        <BorderWidthRow getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Padding" prop="padding" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Margin top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Margin bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
-        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
-        <ColorRow label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
-        <BorderWidthRow getVal={getVal} onStyle={onStyle} />
+      </div>
+      )}
+      {(showTextStyle || !isMedia) && (
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={panelSecHead}>Custom</div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: SUB, marginBottom: 6 }}>Class</div>
+        <input defaultValue={getVal('__class')} key={getVal('__class')} placeholder="my-class another-class" onBlur={(e) => onStyle('__class', e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+        <div style={{ fontSize: 11, color: FAINT, marginTop: 5 }}>Add custom CSS classes, separated by spaces.</div>
       </div>
       )}
       <button onClick={onClear} style={{ marginTop: 14, border: `1px solid ${LINE}`, background: '#fff', color: SUB, borderRadius: 999, padding: '7px 14px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>Done</button>
@@ -2283,6 +2315,7 @@ const TB_BAR: React.CSSProperties = { background: '#fff', border: '1px solid #e7
 const btn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' }
 const iconTopBtn: React.CSSProperties = { border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 8, width: 30, height: 30, fontSize: 14, lineHeight: 1, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }
 const menuItem: React.CSSProperties = { display: 'block', width: '100%', textAlign: 'left', border: 0, background: 'transparent', color: INK, fontSize: 13, fontWeight: 600, padding: '8px 10px', borderRadius: 8, cursor: 'pointer' }
+const panelSecHead: React.CSSProperties = { fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }
 
 function Center({ children }: { children: React.ReactNode }) {
   return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100vh', color: SUB, fontFamily: 'Inter, system-ui, sans-serif', fontSize: 14 }}>{children}</div>
