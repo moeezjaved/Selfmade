@@ -502,7 +502,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="hgbox">
       ${img(c.image_hguar || c.image_trust1 || P, o.productName, 'hgimg', 'Image')}
       <div class="hgel">
-        <span class="ic hgico">${HEART}</span>
+        <span class="pico hgico">${HEART}</span>
         <h2>${hl(c.hguar_head || 'Our Happiness **Guarantee**')}</h2>
         <p>${esc(c.hguar_body || 'Try it risk-free for 30 days. If you do not feel the difference, we will refund you in full — no questions asked.')}</p>
         <a class="hgbtn" href="${esc(o.ctaHref || '#')}">${escp(c.hguar_cta || 'Buy It Now')}</a>

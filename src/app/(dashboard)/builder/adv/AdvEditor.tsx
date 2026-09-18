@@ -222,7 +222,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   // buy-box / hero
   ptitle: 'Product Title', bestseller: 'Best Seller Badge', rlabel: 'Reviews Number', rpill: 'Eyebrow Badge',
   price: 'Price', now: 'Sale Price', was: 'Compare Price', save: 'Save Badge', hchecks: 'Ingredients List',
-  ti: 'Check', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
+  ti: 'Check', ic: 'Icon', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
   hrev: 'Featured Review', warn: 'Low Stock Notice', hclaim: '90-Day Money Back Guarantee', qty: 'Quantity', newline: 'Tagline', sfdiv: 'Divider',
   brow: 'Benefit Row', rc: 'Featured Review', rgrid: 'Featured Reviews Carousel', hcheck: 'Benefit Check',
   vpick: 'Variant Picker', vopt: 'Option', ring: 'Percentage Circle', sc: 'Item Group', logo: 'Logo',
