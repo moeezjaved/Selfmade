@@ -87,6 +87,7 @@ const css = `
 .pgbld .bestseller .bst span{font-size:11px;font-weight:400;color:var(--sub)}
 .pgbld .ptitle{font-family:'Fraunces',Georgia,serif;font-size:32px;font-weight:600;line-height:1.12;letter-spacing:-.01em}
 .pgbld .rlabel{font-size:14px;color:var(--sub);margin:7px 0 12px}
+.pgbld .sfdiv{height:1px;width:100%;background:var(--line);border:0;margin:16px 0}
 .pgbld .hchecks{display:grid;grid-template-columns:1fr 1fr;gap:8px 16px;margin-bottom:16px}
 .pgbld .hchecks .c{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:500}
 .pgbld .hchecks .c .t{width:22px;height:22px;border-radius:50%;background:var(--soft2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
@@ -314,12 +315,13 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div>
       <div class="bestseller"><span class="num">#1</span><span class="bst"><b>${escp(c.bestseller_label || 'BESTSELLER OF 2026')}</b><span>${escp(c.bestseller_sub || 'Trusted by thousands')}</span></span></div>
       <h1 class="ptitle">${esc(c.headline || o.productName)}</h1>
-      <div class="rlabel"><span class="stars">★★★★★</span> ${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</div>
+      <div class="rlabel"><span class="stars">★★★★★</span> <span class="rtext">${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</span></div>
       <div class="hchecks">${checks}</div>
       <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(String(c.cta_label || 'Add to Cart').toUpperCase())}</a>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money-Back Guarantee')}</span><span>📦 ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="pays">${paysRowInner()}</div>
+      <div class="sfdiv"></div>
       <div class="acc">${accItems}</div>
       <div class="hclaim">${escp(c.hero_claim || 'Join thousands of customers who trust our money-back guarantee.')}</div>
       <div class="hrev"><div class="av">${img(c.image_reviewer, 'Reviewer', 'avim', '')}</div><div><div class="q">${esc(c.hero_review || 'Actually feels like clean fuel. No racing heart or crash later, just a steady sense of being ‘on’ while I work through my day.')}</div><div class="who">${escp(c.hero_review_name || 'Verified Buyer')}</div></div></div>

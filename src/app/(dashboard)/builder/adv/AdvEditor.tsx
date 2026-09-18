@@ -218,7 +218,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   ptitle: 'Product Title', bestseller: 'Best Seller Badge', rlabel: 'Reviews Number', rpill: 'Eyebrow Badge',
   price: 'Price', now: 'Sale Price', was: 'Compare Price', save: 'Save Badge', hchecks: 'Benefit Checks',
   ti: 'Check', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
-  hrev: 'Featured Review', warn: 'Stock Notice', hclaim: 'Guarantee', qty: 'Quantity', newline: 'Tagline',
+  hrev: 'Featured Review', warn: 'Stock Notice', hclaim: 'Guarantee', qty: 'Quantity', newline: 'Tagline', sfdiv: 'Divider',
   brow: 'Benefit Row', rc: 'Featured Review', rgrid: 'Featured Reviews Carousel', hcheck: 'Benefit Check',
   vpick: 'Variant Picker', vopt: 'Option', ring: 'Percentage Circle', sc: 'Percentage Circle', logo: 'Logo',
   // gallery / creative
@@ -1021,6 +1021,32 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       if (val) el.style.setProperty(prop, val); else el.style.removeProperty(prop)
     })
   }, [rawSel, rawEditHtml])
+  // ── Divider (matches PagePilot's Divider block: colour / thickness / width / margin) ─────────────────────
+  const rawIsDivider = useCallback((): boolean => { const n = rawNodeEl(); return !!n && n.classList?.contains('sfdiv') }, [rawNodeEl])
+  // ── Reviews rating (matches PagePilot's Reviews Number: the star icons + the label text) ─────────────────
+  const reviewsWrap = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    return (n.querySelector('.stars') ? n : n.closest('.rlabel, .rate, .sectsub')) as HTMLElement | null
+  }, [rawNodeEl])
+  const rawIsReviews = useCallback((): boolean => { const w = reviewsWrap(); return !!(w && w.querySelector('.stars')) }, [reviewsWrap])
+  const reviewsVal = useCallback((part: string, prop: string): string => {
+    const w = reviewsWrap(); const el = w?.querySelector('.' + part) as HTMLElement | null; if (!el) return ''
+    if (prop === '__count') return String((el.textContent || '').replace(/[^★]/g, '').length || 5)
+    if (prop === '__text') return el.textContent || ''
+    return el.style.getPropertyValue(prop) || ''
+  }, [reviewsWrap])
+  const setReviews = useCallback((part: string, prop: string, val: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const w = (node.querySelector('.stars') ? node : node.closest('.rlabel, .rate, .sectsub')) as HTMLElement | null; if (!w) return
+      const el = w.querySelector('.' + part) as HTMLElement | null; if (!el) return
+      if (prop === '__count') { const n = Math.max(1, Math.min(5, parseInt(val) || 5)); el.textContent = '★'.repeat(n); return }
+      if (prop === '__text') { el.textContent = val; return }
+      if (val) el.style.setProperty(prop, val); else el.style.removeProperty(prop)
+    })
+  }, [rawSel, rawEditHtml])
   // ── List-item icon (matches PagePilot: pick / remove the icon on a benefit or ingredient row) ────────────
   const iconHolderEl = useCallback((): HTMLElement | null => {
     const n = rawNodeEl(); if (!n) return null
@@ -1551,6 +1577,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               isCart={rawIsCart()} cart={cartCfg()} onCart={setCart}
               isSave={rawIsSave()} saveMode={saveCfg().mode} saveShow={saveCfg().show} onSaveBadge={setSaveBadge}
               isPrice={rawIsPrice()} priceVal={pricePartVal} onPrice={setPricePart}
+              isDivider={rawIsDivider()} isReviews={rawIsReviews()} reviewsVal={reviewsVal} onReviews={setReviews}
               isIconItem={rawIsIconItem()} itemIcon={itemIcon()} onItemIcon={setItemIcon}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               hasChildren={rawHasBlockChildren()}
@@ -1846,7 +1873,7 @@ function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick
     </div>
   )
 }
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isDivider, isReviews, reviewsVal, onReviews, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isDivider: boolean; isReviews: boolean; reviewsVal: (part: string, prop: string) => string; onReviews: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1868,7 +1895,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   }
   // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
   // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
-  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave || isPrice
+  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave || isPrice || isDivider || isReviews
   // A container/group (block-level children, no special role) gets PagePilot's dedicated Group panel instead of
   // the generic Typography/Appearance rows.
   const isGroup = hasChildren && !isMedia && !isText && !isLink && text === ''
@@ -2106,6 +2133,53 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           </div>
         )
       })()}
+      {isDivider && (
+        <div>
+          <div style={{ paddingTop: 2 }}>
+            <SecHead device={device} onDevice={onDevice}>Divider</SecHead>
+            <ColorField label="Color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Thickness" prop="height" min={1} max={20} getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Width" prop="width" min={10} max={100} unit="%" getVal={getVal} onStyle={onStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Margin</div>
+            <NumRow label="Top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <SecHead>Visibility</SecHead>
+            <ShowOnRow getVal={getVal} onStyle={onStyle} />
+          </div>
+        </div>
+      )}
+      {isReviews && (() => {
+        const starGet = (p: string) => reviewsVal('stars', p), starSet = (p: string, v: string) => onReviews('stars', p, v)
+        const sec: React.CSSProperties = { borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }
+        return (
+          <div>
+            <div style={{ paddingTop: 2 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Text</div>
+              <input defaultValue={reviewsVal('rtext', '__text')} key={reviewsVal('rtext', '__text')} onBlur={(e) => onReviews('rtext', '__text', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 13, color: INK, boxSizing: 'border-box' }} />
+            </div>
+            <div style={sec}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Icons</div>
+              <NumRow label="Count" prop="__count" min={1} max={5} unit="" getVal={() => starGet('__count')} onStyle={(_p, v) => starSet('__count', v)} />
+              <NumRow label="Size" prop="font-size" min={10} max={32} getVal={starGet} onStyle={starSet} />
+              <ColorField label="Color" prop="color" getVal={starGet} onStyle={starSet} />
+            </div>
+            <div style={sec}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+              <NumRow label="Top" prop="padding-top" max={40} getVal={getVal} onStyle={onStyle} />
+              <NumRow label="Bottom" prop="padding-bottom" max={40} getVal={getVal} onStyle={onStyle} />
+            </div>
+            <div style={sec}>
+              <SecHead>Visibility</SecHead>
+              <ShowOnRow getVal={getVal} onStyle={onStyle} />
+            </div>
+          </div>
+        )
+      })()}
       {isIconItem && !isGroup && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, marginTop: 2, color: INK }}>Icon</div>
@@ -2121,7 +2195,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Where this button/link goes when clicked.</div>
         </div>
       )}
-      {isCart || isSave ? null : isText ? (
+      {isCart || isSave || isPrice || isReviews || isDivider ? null : isText ? (
         <RichText key={html.length + ':' + name} html={html} onCommit={onHtml} context={textContext} />
       ) : text !== '' && (
         <div style={{ marginBottom: 14 }}>
