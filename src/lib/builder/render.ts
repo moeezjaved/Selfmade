@@ -145,6 +145,14 @@ function baseCss(tokens: DesignTokens): string {
 @media(min-width:769px){.sf-hide-desk{display:none!important}}
 /* payment-icon size (editor "Icons → Size" sets --payw on the .pays row) */
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
+/* gallery thumbnail + arrow controls (editor sets CSS vars on the .thumbs / .gwrap elements; the targeted
+   !important only takes effect once a var is present, so it overrides the template's baked thumb size). */
+.pgbld .thumbs[style*="--thw"] img,.pgbld .thumbs[style*="--thw"] .ph{width:var(--thw)!important;height:var(--thw)!important}
+.pgbld .thumbs[style*="--thop"] img:not(.on){opacity:var(--thop)!important}
+.pgbld .thumbs[style*="--abw"] img.on{border-width:var(--abw)!important}
+.pgbld .thumbs[style*="--abc"] img.on{border-color:var(--abc)!important}
+.pgbld .gwrap[style*="--goff"] .gprev{left:var(--goff)!important}
+.pgbld .gwrap[style*="--goff"] .gnext{right:var(--goff)!important}
 
 /* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
 /* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */

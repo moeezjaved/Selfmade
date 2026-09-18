@@ -1145,6 +1145,29 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (n.classList?.contains('thumbs')) return false
     return !!(n.querySelector('.thumbs, .hbottle, .gimg, .gtrack') || (Array.from(n.children).filter((c) => c.tagName === 'IMG' || c.querySelector('img')).length >= 2))
   }, [rawNodeEl])
+  // Gallery sub-part styling (PagePilot's Main image / Thumbnails / Nav Arrows / Pagination sections). `part`:
+  // 'container' (the .pgal — carries CSS vars for thumbs/arrows), 'main' (.hbottle), 'thumbs' (.thumbs strip),
+  // 'arrow' (both .garr buttons). Special props: '__show' toggles display, '__dots' toggles pagination dots.
+  const GAL_SEL: Record<string, string> = { main: '.hbottle, .gimg', thumbs: '.thumbs', arrow: '.garr', gwrap: '.gwrap' }
+  const galleryScope = useCallback((): HTMLElement | null => rawNodeEl(), [rawNodeEl])
+  const galleryVal = useCallback((part: string, prop: string): string => {
+    const scope = galleryScope(); if (!scope) return ''
+    const el = (scope.matches?.(GAL_SEL[part]) ? scope : scope.querySelector(GAL_SEL[part])) as HTMLElement | null; if (!el) return ''
+    if (prop === '__show') return el.style.display === 'none' ? '' : '1'
+    return el.style.getPropertyValue(prop) || ''
+  }, [galleryScope])
+  const setGalleryPart = useCallback((part: string, prop: string, val: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const targets = (node.matches?.(GAL_SEL[part]) ? [node] : Array.from(node.querySelectorAll(GAL_SEL[part]))) as HTMLElement[]
+      targets.forEach((e) => {
+        if (prop === '__show') { e.style.display = val === '1' ? '' : 'none'; return }
+        if (val) e.style.setProperty(prop, val); else e.style.removeProperty(prop)
+      })
+    })
+  }, [rawSel, rawEditHtml])
   // The gallery COLUMN (direct child of the .grid that holds the main image) — the element we make sticky.
   const galleryColOf = (box: HTMLElement): HTMLElement | null => {
     const main = box.querySelector(galleryMainSel) as HTMLElement | null; if (!main) return null
@@ -1566,6 +1589,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               isLink={rawIsLink()} href={rawHref()} onHref={rawSetHref}
               gallery={rawGallery()} onGalleryAdd={rawGalleryAdd} onGalleryRemove={rawGalleryRemove} onGalleryReplace={rawGalleryReplace} onSetImg={rawSetImg} uploadImage={uploadImage}
               isGallery={rawIsGallery()} sticky={rawGallerySticky()} onSticky={setGallerySticky} onCreateAI={galleryCreateAI} aiBusy={galleryAIbusy}
+              galleryVal={galleryVal} onGalleryPart={setGalleryPart}
               isPays={rawIsPays()} paysActive={rawPaysActive()} onTogglePay={togglePayProvider}
               paysAlign={paysAlignVal()} paysGap={paysGapVal()} onPaysAlign={setPaysAlign} onPaysGap={(v) => setPaysStyle('gap', v ? `${v}px` : '')}
               isRing={rawIsRing()} ringPct={ringPct()} ringSize={ringSize()} ringDur={(ringVal('--dur') || '').replace('s', '')}
@@ -1873,7 +1897,7 @@ function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick
     </div>
   )
 }
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isDivider, isReviews, reviewsVal, onReviews, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isDivider: boolean; isReviews: boolean; reviewsVal: (part: string, prop: string) => string; onReviews: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, galleryVal, onGalleryPart, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isDivider, isReviews, reviewsVal, onReviews, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isDivider: boolean; isReviews: boolean; reviewsVal: (part: string, prop: string) => string; onReviews: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; galleryVal: (part: string, prop: string) => string; onGalleryPart: (part: string, prop: string, val: string) => void; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1948,6 +1972,41 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>If enabled, the gallery stays fixed to the top of the screen as the customer scrolls.</div>
         </div>
       )}
+      {isGallery && (() => {
+        const mainGet = (p: string) => galleryVal('main', p), mainSet = (p: string, v: string) => onGalleryPart('main', p, v)
+        const thGet = (p: string) => galleryVal('thumbs', p), thSet = (p: string, v: string) => onGalleryPart('thumbs', p, v)
+        const arrGet = (p: string) => galleryVal('arrow', p), arrSet = (p: string, v: string) => onGalleryPart('arrow', p, v)
+        const sec: React.CSSProperties = { borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }
+        const dirVertical = thGet('flex-direction') === 'column'
+        return (
+          <div>
+            <div style={sec}>
+              <SecHead device={device} onDevice={onDevice}>Main image</SecHead>
+              <SelRow label="Object fit" prop="object-fit" options={[['contain', 'Contain'], ['cover', 'Cover'], ['fill', 'Fill']]} getVal={mainGet} onStyle={mainSet} />
+              <NumRow label="Rounded corners" prop="border-radius" max={40} getVal={mainGet} onStyle={mainSet} />
+            </div>
+            <div style={sec}>
+              <SecHead>Thumbnails</SecHead>
+              <ToggleRow label="Show thumbnails" on={galleryVal('thumbs', '__show') !== ''} onChange={(v) => onGalleryPart('thumbs', '__show', v ? '1' : '')} />
+              <SegRow label="Direction" prop="__thdir" options={[['row', 'Horizontal'], ['column', 'Vertical']]} getVal={() => dirVertical ? 'column' : 'row'} onStyle={(_p, v) => thSet('flex-direction', v === 'column' ? 'column' : '')} />
+              <NumRow label="Size" prop="--thw" min={36} max={96} getVal={thGet} onStyle={thSet} />
+              <NumRow label="Gap" prop="gap" min={0} max={24} getVal={thGet} onStyle={thSet} />
+              <NumRow label="Inactive opacity" prop="--thop" min={20} max={100} unit="" getVal={() => { const v = thGet('--thop'); return v ? String(Math.round(parseFloat(v) * 100)) : '' }} onStyle={(_p, v) => thSet('--thop', v ? String(parseInt(v) / 100) : '')} />
+              <NumRow label="Active border" prop="--abw" min={0} max={5} getVal={thGet} onStyle={thSet} />
+              <ColorField label="Active color" prop="--abc" getVal={thGet} onStyle={thSet} />
+            </div>
+            <div style={sec}>
+              <SecHead>Navigation arrows</SecHead>
+              <ToggleRow label="Show navigation" on={galleryVal('arrow', '__show') !== ''} onChange={(v) => onGalleryPart('arrow', '__show', v ? '1' : '')} />
+              <ColorField label="Background" prop="background-color" getVal={arrGet} onStyle={arrSet} />
+              <ColorField label="Color" prop="color" getVal={arrGet} onStyle={arrSet} />
+              <NumRow label="Icon size" prop="font-size" min={12} max={32} getVal={arrGet} onStyle={arrSet} />
+              <NumRow label="Offset" prop="--goff" min={0} max={30} getVal={(p) => galleryVal('gwrap', p)} onStyle={(p, v) => onGalleryPart('gwrap', p, v)} />
+              <NumRow label="Rounded corners" prop="border-radius" max={50} getVal={arrGet} onStyle={arrSet} />
+            </div>
+          </div>
+        )
+      })()}
       {isPays && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Payment Providers</div>
