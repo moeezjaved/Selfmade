@@ -224,6 +224,19 @@ const css = `
 .pgbld .fc h4{font-size:16px;font-weight:800;color:var(--blue);margin-bottom:4px}
 .pgbld .fc p{font-size:12.5px;color:var(--sub);margin:0;line-height:1.45}
 
+/* 9b · HAPPINESS GUARANTEE */
+.pgbld .hguar{padding:16px 0 52px}
+.pgbld .hguar .hgbox{background:var(--blue);border-radius:22px;overflow:hidden;display:grid;grid-template-columns:1fr 1fr;align-items:stretch;color:#fff}
+.pgbld .hguar .hgimg,.pgbld .hguar .hgimg.ph{width:100%;height:100%;min-height:300px;object-fit:cover;background:var(--dark);border-radius:0;min-width:0}
+.pgbld .hguar .hgel{padding:44px 38px;display:flex;flex-direction:column;align-items:center;text-align:center;gap:14px}
+.pgbld .hguar .hgico{display:inline-flex;color:#fff}
+.pgbld .hguar .hgico svg{width:34px;height:34px}
+.pgbld .hguar .hgel h2{font-size:26px;font-weight:800;color:#fff}
+.pgbld .hguar .hgel h2 .hl{color:#cdd3ff}
+.pgbld .hguar .hgel p{font-size:14px;color:#dfe2fb;line-height:1.6;margin:0;max-width:420px}
+.pgbld .hguar .hgbtn{display:inline-block;background:#fff;color:var(--blue);font-weight:800;font-size:14px;padding:13px 28px;border-radius:12px;text-decoration:none}
+.pgbld .hguar .pays{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:4px}
+
 /* 9 · GOLD STANDARD (comparison table) */
 .pgbld .gold{padding:52px 0;background:var(--soft)}
 .pgbld .gold .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
@@ -256,7 +269,8 @@ const css = `
 .pgbld .final .cta .pays span{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24);color:#d5d8f7}
 
 @media(max-width:900px){
-  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .numbf .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
+  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .numbf .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid,.pgbld .hguar .hgbox{grid-template-columns:1fr}
+  .pgbld .hguar .hgimg,.pgbld .hguar .hgimg.ph{min-height:220px}
   .pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
 }
@@ -483,6 +497,20 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="ctable"><div class="ctop"><span>Feature</span><span class="ours">Our product</span><span>Others</span></div>${goldRows}</div>
   </div></div></section>
 
+  <!-- 9b · HAPPINESS GUARANTEE -->
+  <section class="hguar"><div class="wrap">
+    <div class="hgbox">
+      ${img(c.image_hguar || c.image_trust1 || P, o.productName, 'hgimg', 'Image')}
+      <div class="hgel">
+        <span class="ic hgico">${HEART}</span>
+        <h2>${hl(c.hguar_head || 'Our Happiness **Guarantee**')}</h2>
+        <p>${esc(c.hguar_body || 'Try it risk-free for 30 days. If you do not feel the difference, we will refund you in full — no questions asked.')}</p>
+        <a class="hgbtn" href="${esc(o.ctaHref || '#')}">${escp(c.hguar_cta || 'Buy It Now')}</a>
+        <div class="pays">${paysRowInner()}</div>
+      </div>
+    </div>
+  </div></section>
+
   <!-- 10 · FINAL CTA -->
   <section class="final"><div class="wrap"><div class="grid">
     <div class="prod">
@@ -577,6 +605,10 @@ export const cobaltV1: PageTemplate = {
     { key: 'feat_head', type: 'text', label: 'Feature-cards heading' },
     { key: 'feat_sub', type: 'text', label: 'Feature-cards subhead' },
     { key: 'feature_cards', type: 'reasons', label: 'Feature cards (3)', count: 3, hint: 'title + body; each has its own image slot.' },
+    { key: 'hguar_head', type: 'text', label: 'Happiness-guarantee heading', hint: 'Accent 1-2 words with ** ** (e.g. "Our Happiness **Guarantee**").' },
+    { key: 'hguar_body', type: 'text', label: 'Happiness-guarantee text' },
+    { key: 'hguar_cta', type: 'text', label: 'Happiness-guarantee button' },
+    { key: 'image_hguar', type: 'image', role: 'lifestyle', label: 'Happiness-guarantee image' },
     { key: 'gold_head', type: 'text', label: 'Gold-standard heading' },
     { key: 'gold_body', type: 'richtext', role: 'body', label: 'Gold-standard paragraph' },
     { key: 'gold_cta', type: 'text', label: 'Gold-standard button' },
