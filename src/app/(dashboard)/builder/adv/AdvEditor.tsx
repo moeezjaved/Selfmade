@@ -3160,10 +3160,11 @@ function ZoomControl({ zoom, setZoom, onFit }: { zoom: number; setZoom: (z: numb
 function TreeInsert({ onClick }: { onClick: () => void }) {
   const [h, setH] = useState(false)
   return (
-    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
-      style={{ position: 'relative', height: 10, margin: '0 2px', cursor: 'pointer' }} title="Add a section here">
+    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)}
+      onClick={(e) => { e.stopPropagation(); onClick() }} onMouseDown={(e) => e.stopPropagation()}
+      style={{ position: 'relative', zIndex: 6, height: 12, margin: '-3px 2px', cursor: 'pointer' }} title="Add a section here">
       {h && (
-        <div style={{ position: 'absolute', left: 6, right: 6, top: '50%', transform: 'translateY(-50%)', height: 2, background: ORANGE, borderRadius: 2 }}>
+        <div style={{ position: 'absolute', left: 6, right: 6, top: '50%', transform: 'translateY(-50%)', height: 2, background: ORANGE, borderRadius: 2, pointerEvents: 'none' }}>
           <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: ORANGE, color: '#fff', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</span>
         </div>
       )}
