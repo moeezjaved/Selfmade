@@ -2106,7 +2106,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           </div>
         )
       })()}
-      {isIconItem && (
+      {isIconItem && !isGroup && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, marginTop: 2, color: INK }}>Icon</div>
           <IconPicker value={itemIcon} onPick={onItemIcon} />
