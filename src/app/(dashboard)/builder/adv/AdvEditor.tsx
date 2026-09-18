@@ -443,6 +443,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Captured insert location for the inline "+" line — set on "+" click, read synchronously by rawInsertAt
   // (avoids relying on setRawSel/setRawInsertTarget landing before the modal's onPick fires).
   const pendingInsert = useRef<null | { ref: NodeRef; path: number[]; mode: 'after' | 'append' | 'before' }>(null)
+  // Exact section index for a tree "+" insert (the hover line BETWEEN tree rows); overrides the "after current
+  // section" placement in the Add Block → Gallery onPick when set.
+  const pendingSectionIndex = useRef<number | null>(null)
   // Highlight the specific piece under the cursor inside a raw section (PagePilot highlights the exact block).
   const onCanvasHover = useCallback((e: React.MouseEvent) => {
     if (hoverRaf.current) return
@@ -1675,7 +1678,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── left: section/block tree ── */}
         <aside style={{ width: 264, borderRight: `1px solid ${LINE}`, background: '#fff', overflowY: 'auto', padding: 10, display: preview ? 'none' : undefined }}>
           <Row label="PAGE" faint />
-          {doc.sections.map((s) => {
+          {doc.sections.map((s, si) => {
             const sRef: NodeRef = { sectionId: s.id }
             const open = expanded.has(s.id)
             const rawEl = rawSectionEl(s)
@@ -1687,6 +1690,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
             const outlineNodes = rawEl ? flattenOutline(buildRawOutline(rawEl.html)) : []
             return (
               <div key={s.id}>
+                <TreeInsert onClick={() => { pendingSectionIndex.current = si; pendingInsert.current = null; setRawInsertTarget(null); setRawLibOpen(true) }} />
                 <TreeRow
                   depth={0} open={open} hasChildren={s.blocks.length > 0}
                   onToggle={() => setExpanded((x) => toggle(x, s.id))}
@@ -1736,6 +1740,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               </div>
             )
           })}
+          <TreeInsert onClick={() => { pendingSectionIndex.current = doc.sections.length; pendingInsert.current = null; setRawInsertTarget(null); setRawLibOpen(true) }} />
           <AddBtn label="Add section" onClick={() => setSectionLibOpen(true)} depth={0} primary />
         </aside>
 
@@ -1913,17 +1918,18 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           // Gallery picks drop in as their OWN section (like PagePilot) — a top-level, fully-editable node,
           // placed right after the section the "+" was on. Basic Elements still insert as an inline piece.
           const curSecId = pendingInsert.current?.ref.sectionId || rawSel?.ref.sectionId || sel?.sectionId
+          const treeIdx = pendingSectionIndex.current
           apply((d) => {
-            const idx = curSecId ? d.sections.findIndex((s) => s.id === curSecId) : -1
-            const { doc: nd, newRef } = insertSection(d, newRawSection(html, label), idx >= 0 ? idx + 1 : undefined)
+            const at = treeIdx != null ? treeIdx : (curSecId ? d.sections.findIndex((s) => s.id === curSecId) + 1 : undefined)
+            const { doc: nd, newRef } = insertSection(d, newRawSection(html, label), at != null && at >= 0 ? at : undefined)
             queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) })
             return nd
           })
         } else {
           const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label))
         }
-        setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null
-      }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null }} />}
+        setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null; pendingSectionIndex.current = null
+      }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null; pendingSectionIndex.current = null }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
       {imgAI && <ImageAIModal productName={doc.productRef?.importedProduct?.title || ''} busy={galleryAIbusy} onCreate={(p) => runImageAI(p)} onClose={() => setImgAI(null)} />}
     </div>
@@ -3146,6 +3152,21 @@ function ZoomControl({ zoom, setZoom, onFit }: { zoom: number; setZoom: (z: numb
       <button title="Zoom out" onClick={() => step(-0.1)} style={{ border: 0, background: '#fff', color: INK, padding: '6px 10px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>−</button>
       <button title="Fit to width" onClick={onFit} style={{ border: 0, borderLeft: `1px solid ${LINE}`, borderRight: `1px solid ${LINE}`, background: '#fff', color: SUB, padding: '6px 8px', cursor: 'pointer', fontSize: 12, fontWeight: 700, minWidth: 46 }}>{Math.round(zoom * 100)}%</button>
       <button title="Zoom in" onClick={() => step(0.1)} style={{ border: 0, background: '#fff', color: INK, padding: '6px 10px', cursor: 'pointer', fontSize: 15, lineHeight: 1 }}>+</button>
+    </div>
+  )
+}
+// PagePilot-style hover "+" line BETWEEN tree rows: a thin strip that reveals an orange rule + "+" on hover,
+// clicking it opens Add Block to drop a new section at exactly this gap.
+function TreeInsert({ onClick }: { onClick: () => void }) {
+  const [h, setH] = useState(false)
+  return (
+    <div onMouseEnter={() => setH(true)} onMouseLeave={() => setH(false)} onClick={onClick}
+      style={{ position: 'relative', height: 10, margin: '0 2px', cursor: 'pointer' }} title="Add a section here">
+      {h && (
+        <div style={{ position: 'absolute', left: 6, right: 6, top: '50%', transform: 'translateY(-50%)', height: 2, background: ORANGE, borderRadius: 2 }}>
+          <span style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 16, height: 16, borderRadius: '50%', background: ORANGE, color: '#fff', fontSize: 13, lineHeight: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</span>
+        </div>
+      )}
     </div>
   )
 }
