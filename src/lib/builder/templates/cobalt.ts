@@ -134,7 +134,8 @@ const css = `
 .pgbld .how{padding:52px 0}
 .pgbld .how .grid{display:grid;grid-template-columns:1fr 1.05fr;gap:40px;align-items:center}
 .pgbld .how h2{font-size:26px;font-weight:800;margin-bottom:16px}
-.pgbld .how p{font-size:13.5px;color:var(--sub);margin-bottom:16px;line-height:1.6}
+.pgbld .how p{font-size:14px;color:var(--sub);margin-bottom:16px;line-height:1.6}
+.pgbld .how .rgroup .howimg,.pgbld .how .rgroup .howimg.ph{width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:18px;background:var(--soft2);min-height:0}
 .pgbld .sci{background:var(--dark);border-radius:22px;padding:26px;color:#eceefb;text-align:center}
 .pgbld .sci h3{font-size:18px;font-weight:800;margin-bottom:4px}
 .pgbld .sci .ss{font-size:11.5px;color:#b7bcea;margin-bottom:16px}
@@ -258,12 +259,6 @@ function render(c: FilledContent, o: RenderOpts): string {
   // duplicate set (aria-hidden, skipped in the tree) makes the marquee loop seamlessly
   const stripDup = stripPills.map((h) => h.replace('<div class="benfc"', '<div class="benfc" aria-hidden="true"')).join('')
 
-  const sci = (arr(c.sci_points).length ? arr(c.sci_points) : [
-    { title: 'Pharmaceutical-Grade Methylene Blue', body: 'The one true form, sourced at the highest standard.' },
-    { title: 'Distilled Water', body: 'Ultra-clean and contaminant-free.' },
-    { title: 'Vitamin C', body: 'Elevated absorption for lasting potency.' },
-  ]).slice(0, 3).map((s: any, i: number) => `<div class="ic"><div class="d">${ICONS[i % ICONS.length]}</div><div class="t"><b>${escp(s.title || s.label)}</b><span>${escp(s.body)}</span></div></div>`).join('')
-
   const vGood = (arr(c.vs_ours).length ? arr(c.vs_ours) : ['USP-Grade Purity', 'Accurate Microdosing', 'Rapid Brain & Energy Boost', 'Clean Taste, No Bitterness', 'Leakproof, Stable Formula'].map((l) => ({ label: l })))
     .map((r) => `<div class="r">${CHKline}${escp(r.label)}</div>`).join('')
   const vBad = (arr(c.vs_others).length ? arr(c.vs_others) : ['Unverified Purity', 'Inconsistent Dosing', 'Slower Absorption', 'Harsh Chemical Taste', 'Leaky, Unstable Packaging'].map((l) => ({ label: l })))
@@ -354,21 +349,13 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 4 · HOW IT WORKS -->
   <section class="how"><div class="wrap"><div class="grid">
-    <div>
+    <div class="lgroup">
       <h2>${hl(c.how_head || 'How Does This Liquid Energy Work?')}</h2>
       <p>${bd(c.how_body1 || 'It acts directly on your mitochondria, the tiny engines that power every cell. It helps them convert fuel into energy more efficiently than caffeine can.')}</p>
       <p>${bd(c.how_body2 || 'Instead of a temporary spike, you feel steady focus and sustained stamina. Daily use helps protect brain cells and lifts your mood naturally.')}</p>
       <a class="btn" style="width:auto" href="${esc(o.ctaHref || '#')}">${escp(c.how_cta || 'Buy It Now')}</a>
     </div>
-    <div class="sci">
-      <h3>${escp(c.sci_head || 'Pure By Design — Backed By Science')}</h3>
-      <div class="ss">${escp(c.sci_sub || 'Only 3 carefully chosen ingredients. Free from GMOs, animal products, and unnecessary additives.')}</div>
-      <div class="body">
-        <div>${sci}</div>
-        <div>${img(c.image_sci || P, o.productName, 'im', 'Product')}</div>
-        <div class="brand"><b>${escp(c.sci_brand || o.productName)}</b>${escp(c.sci_brand_sub || 'Quality You Can Trust.')}</div>
-      </div>
-    </div>
+    <div class="rgroup">${img(c.image_sci || c.image_g2 || P, o.productName, 'howimg', 'Product')}</div>
   </div></div></section>
 
   <!-- 5 · VERSUS + BENEFITS -->

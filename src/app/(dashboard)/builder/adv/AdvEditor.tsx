@@ -230,7 +230,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
   // sections / lists
-  striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
+  striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
   fgrid: 'Feature Cards', rev: 'Review', revs: 'Reviews', press: 'Press', plogo: 'Logo', vs: 'Comparison',
   gold: 'Comparison', avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',
