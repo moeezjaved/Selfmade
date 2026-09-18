@@ -171,7 +171,9 @@ const css = `
 .pgbld .vcol h5{font-size:12px;font-weight:800;text-align:center;margin-bottom:10px}
 .pgbld .vcol .r{display:flex;align-items:flex-start;gap:7px;font-size:11px;font-weight:600;margin-bottom:9px;color:var(--ink)}
 .pgbld .vcol.o .r{color:var(--sub)}
-.pgbld .vcol .r svg{flex:none;margin-top:1px}
+.pgbld .vcol .r .ic{flex:none;margin-top:1px;display:inline-flex}
+.pgbld .vcol .r .ic svg{display:block}
+.pgbld .vcol .r .rt{flex:1}
 .pgbld .vmid,.pgbld .vmid.ph{width:86px;aspect-ratio:3/5;border-radius:10px;min-height:0}
 .pgbld .ben h2 .hl{color:var(--blue)}
 .pgbld .brow{display:flex;gap:13px;margin-bottom:15px;align-items:flex-start}
@@ -282,9 +284,9 @@ function render(c: FilledContent, o: RenderOpts): string {
   ]).slice(0, 5).map((b: any, i: number) => `<div class="brow"><span class="pico">${benefitCheckIcon(i)}</span><div class="btg"><div class="btitle">${escp(b.title || b.label)}</div><div class="bdesc">${escp(b.body || '')}</div></div></div>`).join('')
 
   const vGood = (arr(c.vs_ours).length ? arr(c.vs_ours) : ['USP-Grade Purity', 'Accurate Microdosing', 'Rapid Brain & Energy Boost', 'Clean Taste, No Bitterness', 'Leakproof, Stable Formula'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r">${CHKline}${escp(r.label)}</div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${CHKline}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
   const vBad = (arr(c.vs_others).length ? arr(c.vs_others) : ['Unverified Purity', 'Inconsistent Dosing', 'Slower Absorption', 'Harsh Chemical Taste', 'Leaky, Unstable Packaging'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r">${XMARKr}${escp(r.label)}</div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${XMARKr}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
 
   const bens = (arr(c.benefits).length ? arr(c.benefits) : [
     { title: 'Sustained Cellular Energy', body: 'Fuel your mitochondria for steady stamina that lasts all day without the caffeine crash.' },

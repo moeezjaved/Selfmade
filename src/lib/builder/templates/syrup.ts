@@ -166,7 +166,9 @@ const css = `
 .pgbld .vcol h5{font-size:12px;font-weight:800;text-align:center;margin-bottom:10px}
 .pgbld .vcol .r{display:flex;align-items:flex-start;gap:7px;font-size:11px;font-weight:600;margin-bottom:9px;color:var(--ink)}
 .pgbld .vcol.o .r{color:var(--sub)}
-.pgbld .vcol .r svg{flex:none;margin-top:1px}
+.pgbld .vcol .r .ic{flex:none;margin-top:1px;display:inline-flex}
+.pgbld .vcol .r .ic svg{display:block}
+.pgbld .vcol .r .rt{flex:1}
 .pgbld .vmid,.pgbld .vmid.ph{width:86px;aspect-ratio:3/5;border-radius:10px;min-height:0}
 .pgbld .ben h2 .hl{color:var(--blue)}
 .pgbld .brow{display:flex;gap:13px;margin-bottom:15px;align-items:flex-start}
@@ -325,9 +327,9 @@ function render(c: FilledContent, o: RenderOpts): string {
   ]).slice(0, 3).map((s: any, i: number) => `<div class="ic"><div class="d">${ICONS[i % ICONS.length]}</div><div class="t"><b>${escp(s.title || s.label)}</b><span>${escp(s.body)}</span></div></div>`).join('')
 
   const vGood = (arr(c.vs_ours).length ? arr(c.vs_ours) : ['Clarifies Without Stripping', 'Balances Oil Naturally', 'Lightweight, Fast-Absorbing', 'Fresh Citrus Scent', 'Cruelty-Free & Vegan'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r">${CHKline}${escp(r.label)}</div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${CHKline}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
   const vBad = (arr(c.vs_others).length ? arr(c.vs_others) : ['Strips Natural Oils', 'Leaves Residue Behind', 'Heavy, Greasy Feel', 'Synthetic Fragrance', 'Harsh Sulfates'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r">${XMARKr}${escp(r.label)}</div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${XMARKr}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
 
   const bens = (arr(c.benefits).length ? arr(c.benefits) : [
     { title: 'Purified, Balanced Scalp', body: 'Dissolve buildup and excess oil so your scalp feels fresh and genuinely clean before every wash.' },
