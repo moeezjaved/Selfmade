@@ -265,7 +265,7 @@ function sectionRawHtml(s: Section): string {
 // editing; at publish time we rebuild that region into Swiper markup and inject the library + init once. */
 const SWIPER_CSS_URL = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css'
 const SWIPER_JS_URL = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js'
-const swiperInitScript = `<script>(function(){function go(){if(!window.Swiper){return setTimeout(go,120)}document.querySelectorAll('.pgsw').forEach(function(g){if(g.dataset.sw)return;g.dataset.sw='1';var t=g.querySelector('.pgsw-thumbs');var th=t?new window.Swiper(t,{slidesPerView:'auto',spaceBetween:8,watchSlidesProgress:true,freeMode:true}):null;var o={spaceBetween:12,pagination:{el:g.querySelector('.swiper-pagination'),clickable:true},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')}};if(th)o.thumbs={swiper:th};new window.Swiper(g.querySelector('.pgsw-main'),o)})}go()})();</script>`
+const swiperInitScript = `<script>(function(){function go(){if(!window.Swiper){return setTimeout(go,120)}document.querySelectorAll('.pgsw').forEach(function(g){if(g.dataset.sw)return;g.dataset.sw='1';if(g.classList.contains('pgsw-rev')){new window.Swiper(g.querySelector('.pgsw-rmain'),{slidesPerView:1.15,spaceBetween:16,breakpoints:{640:{slidesPerView:2.2},1024:{slidesPerView:3.4}},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')},pagination:{el:g.querySelector('.swiper-pagination'),clickable:true}});return}var t=g.querySelector('.pgsw-thumbs');var th=t?new window.Swiper(t,{slidesPerView:'auto',spaceBetween:8,watchSlidesProgress:true,freeMode:true}):null;var o={spaceBetween:12,pagination:{el:g.querySelector('.swiper-pagination'),clickable:true},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')}};if(th)o.thumbs={swiper:th};new window.Swiper(g.querySelector('.pgsw-main'),o)})}go()})();</script>`
 /** Rebuild the first `.gwrap`(+`.thumbs`) gallery in a body string into Swiper markup. Defensive: if the
  * expected structure isn't found, returns the body unchanged (no breakage). */
 function swiperizeGallery(body: string): string {
@@ -289,9 +289,47 @@ function swiperizeGallery(body: string): string {
   if (thumbM) out = out.replace(thumbM[0], '')
   return out
 }
-/** Wrap a published body with the Swiper library + init, only when it actually contains a swiperized gallery. */
+/** Return the index just past the `</div>` that balances the `<div` starting at `start`. -1 if unbalanced. */
+function endOfBalancedDiv(s: string, start: number): number {
+  const re = /<\/?div\b[^>]*>/g
+  re.lastIndex = start
+  let depth = 0
+  let m: RegExpExecArray | null
+  while ((m = re.exec(s))) {
+    if (m[0][1] === '/') { depth--; if (depth === 0) return re.lastIndex }
+    else if (!m[0].endsWith('/>')) depth++
+  }
+  return -1
+}
+/** Rebuild the `.rcar` review carousel into Swiper markup on publish (each `.frev` card → a slide). The editor
+ * keeps the static horizontal-scroll `.rcar` markup. Defensive: returns the body unchanged if not found. */
+function swiperizeReviews(body: string): string {
+  const marker = '<div class="rcar">'
+  const open = body.indexOf(marker)
+  if (open < 0) return body
+  const end = endOfBalancedDiv(body, open)
+  if (end < 0) return body
+  const inner = body.slice(open + marker.length, end - '</div>'.length)
+  const cards: string[] = []
+  let k = 0
+  while (k < inner.length) {
+    const s = inner.indexOf('<div class="frev">', k)
+    if (s < 0) break
+    const e = endOfBalancedDiv(inner, s)
+    if (e < 0) break
+    cards.push(inner.slice(s, e))
+    k = e
+  }
+  if (!cards.length) return body
+  const slides = cards.map((c) => `<div class="swiper-slide">${c}</div>`).join('')
+  const prev = '<button class="rarr rprev pgsw-prev" aria-label="Previous review">‹</button>'
+  const next = '<button class="rarr rnext pgsw-next" aria-label="Next review">›</button>'
+  const sw = `<div class="pgsw pgsw-rev"><div class="swiper pgsw-rmain"><div class="swiper-wrapper">${slides}</div>${prev}${next}<div class="swiper-pagination"></div></div></div>`
+  return body.slice(0, open) + sw + body.slice(end)
+}
+/** Wrap a published body with the Swiper library + init, only when it actually contains a swiperized carousel. */
 function withSwiperAssets(body: string): string {
-  if (!body.includes('class="pgsw"')) return body
+  if (!body.includes('class="pgsw')) return body
   return `<link rel="stylesheet" href="${SWIPER_CSS_URL}"><script src="${SWIPER_JS_URL}"></script>${body}${swiperInitScript}`
 }
 // Layout CSS for the swiperized gallery (appended to the published css, since publish uses doc.rawCss not baseCss).
@@ -309,7 +347,24 @@ const GALLERY_SW_CSS = `
 .pgbld .pgsw-main .gprev{left:8px}.pgbld .pgsw-main .gnext{right:8px}
 .pgbld .pgsw-main .swiper-button-disabled{opacity:.35;cursor:default}
 `
-const withSwiperCss = (css: string, body: string): string => body.includes('class="pgsw"') ? `${css}\n${GALLERY_SW_CSS}` : css
+// Layout CSS for the swiperized reviews carousel (appended on publish, since publish uses doc.rawCss not baseCss).
+const REVIEWS_SW_CSS = `
+.pgbld .pgsw-rev{position:relative;padding:0 4px}
+.pgbld .pgsw-rev .swiper-slide{height:auto;display:flex}
+.pgbld .pgsw-rev .swiper-slide>.frev{flex:1 1 auto;max-width:none}
+.pgbld .pgsw-rev .rarr{position:absolute;top:44%;transform:translateY(-50%);z-index:3;width:34px;height:34px;border-radius:50%;background:#fff;border:1px solid var(--line,#e1e4f6);display:grid;place-items:center;font-size:18px;line-height:1;color:var(--ink,#191b3a);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.12);padding:0}
+.pgbld .pgsw-rev .rprev{left:-6px}.pgbld .pgsw-rev .rnext{right:-6px}
+.pgbld .pgsw-rev .swiper-button-disabled{opacity:.35;cursor:default}
+.pgbld .pgsw-rev .swiper-pagination{position:static;margin-top:12px}
+.pgbld .pgsw-rev .swiper-pagination-bullet-active{background:var(--blue,#3f4bd6)}
+`
+const withSwiperCss = (css: string, body: string): string => {
+  if (!body.includes('class="pgsw')) return css
+  let out = css
+  if (body.includes('class="pgsw"') || body.includes('pgsw-main')) out += `\n${GALLERY_SW_CSS}`
+  if (body.includes('pgsw-rev')) out += `\n${REVIEWS_SW_CSS}`
+  return out
+}
 
 /** Render the doc for Shopify publish: body + css where each <section> becomes an editable native theme
  * section. The wrapper is renamed to `pgbld` so shopify-sections.splitPageIntoSections() splits per section
@@ -328,10 +383,10 @@ export function renderDocForPublish(doc: PageDoc, product?: RenderProduct): { bo
   const allRaw = visible.length > 0 && visible.every((s) => s.type === 'raw' && !!sectionRawHtml(s))
   if (doc.rawCss && allRaw) {
     const inner = visible.map((s) => pgbldInner(sectionRawHtml(s)).trim()).filter(Boolean).join('\n')
-    const body = withSwiperAssets(swiperizeGallery(`<div class="pgbld">${inner}</div>`))
+    const body = withSwiperAssets(swiperizeReviews(swiperizeGallery(`<div class="pgbld">${inner}</div>`)))
     return { body, css: withSwiperCss(doc.rawCss, body) }
   }
   const { html, css } = renderDoc(doc, { mode: 'publish', device: 'base', product })
-  const body = withSwiperAssets(swiperizeGallery(html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')))
+  const body = withSwiperAssets(swiperizeReviews(swiperizeGallery(html.replace('<div class="sf-page">', '<div class="pgbld sf-page">'))))
   return { body, css: withSwiperCss(css, body) }
 }

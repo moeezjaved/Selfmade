@@ -23,6 +23,7 @@ const CHKline = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" str
 const XMARK = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#b9bcd6" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
 const XMARKr = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#e2557a" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
 const HEART = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/></svg>'
+const VERIFIED = '<svg viewBox="0 0 24 24" width="15" height="15" fill="#3f4bd6" stroke="none"><path d="M12 1.5l2.6 1.9 3.2-.2 1 3 2.7 1.8-1.2 3 .0 .0 1.2 3-2.7 1.8-1 3-3.2-.2L12 22.5l-2.6-1.9-3.2.2-1-3L2.5 16l1.2-3-1.2-3 2.7-1.8 1-3 3.2.2z"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 const S = (p: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`
 const ICONS = [
   S('<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/>'),                                                            // bolt
@@ -183,11 +184,19 @@ const css = `
 
 /* 6 · REVIEWS */
 .pgbld .revs{padding:48px 0;background:var(--soft)}
-.pgbld .rgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}
-.pgbld .rc{background:#fff;border:1px solid var(--line);border-radius:14px;padding:15px}
-.pgbld .rc .rn{font-weight:800;font-size:12.5px;margin-bottom:2px}
-.pgbld .rc .rs{color:#4a56ea;font-size:11px;letter-spacing:1px;margin-bottom:7px}
-.pgbld .rc p{font-size:12px;color:var(--sub);margin:0;line-height:1.5}
+.pgbld .rvtitle{text-align:center;margin-bottom:26px}
+.pgbld .ratedby{display:inline-flex;align-items:center;gap:8px;background:#fff;border:1px solid var(--line);border-radius:999px;padding:7px 14px;margin-bottom:14px;font-size:12.5px;font-weight:700;color:var(--ink)}
+.pgbld .ratedby .stars{font-size:13px}
+.pgbld .rcar{display:flex;gap:16px;overflow-x:auto;padding:4px 2px 8px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.pgbld .rcar::-webkit-scrollbar{height:6px}.pgbld .rcar::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.pgbld .frev{flex:0 0 300px;max-width:300px;scroll-snap-align:start;background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;display:flex;flex-direction:column;gap:11px}
+.pgbld .frev .frimg,.pgbld .frev .frimg.ph{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:12px;background:var(--soft2);min-height:0}
+.pgbld .frwho{display:flex;align-items:center;gap:7px}
+.pgbld .frwho .ic{display:inline-flex;flex:none}
+.pgbld .frwho .ic svg{display:block}
+.pgbld .frname{font-weight:800;font-size:13.5px;color:var(--ink)}
+.pgbld .frstars{color:#4a56ea;font-size:13px;letter-spacing:1px}
+.pgbld .frq{font-size:13px;color:var(--sub);margin:0;line-height:1.55}
 .pgbld .press{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
 .pgbld .press .pq b{font-family:'Fraunces',Georgia,serif;font-size:16px;display:block;margin-bottom:5px}
 .pgbld .press .pq p{font-size:11.5px;color:var(--sub);margin:0;font-style:italic}
@@ -239,13 +248,14 @@ const css = `
 
 @media(max-width:900px){
   .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .numbf .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
-  .pgbld .rgrid,.pgbld .sgrid{grid-template-columns:1fr 1fr}
+  .pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
   .pgbld .press{grid-template-columns:1fr}
 }
 @media(max-width:520px){
   .pgbld .hcre .mid{grid-template-columns:1fr}
-  .pgbld .rgrid,.pgbld .sgrid{grid-template-columns:1fr}
+  .pgbld .sgrid{grid-template-columns:1fr}
+  .pgbld .frev{flex-basis:82%;max-width:82%}
   .pgbld .hchecks{grid-template-columns:1fr}
   .pgbld .wrap{padding:0 16px}
 }
@@ -296,12 +306,15 @@ function render(c: FilledContent, o: RenderOpts): string {
     { title: 'Triple Tested Purity', body: 'Trust in pharmaceutical-grade quality with every batch tested in protective cobalt glass.' },
   ]).slice(0, 5).map((b: any, i: number) => `<div class="brow"><div class="n">${i + 1}</div><div class="t"><b>${escp(b.title || b.label)}</b><p>${esc(b.body)}</p></div></div>`).join('')
 
+  // Reviews Carousel — Featured Review cards (image + verified reviewer + stars + quote), swiperized on publish.
   const revs = (arr(c.testimonials).length ? arr(c.testimonials) : [
     { name: 'Justin P.', quote: 'I was skeptical, but this smooths out my whole day. Less stress, more getting things done. Way different than coffee.' },
     { name: 'Sam T.', quote: 'I feel lighter, more positive, and just generally driven without feeling wired. Simple addition to my water.' },
     { name: 'Bri M.', quote: 'Helps me stay sharp during long meetings. I like that it supports my cells instead of just spiking me.' },
     { name: 'Benny K.', quote: 'Love skipping the third cup of coffee now. This gives me that grounded alertness I’ve been searching for.' },
-  ]).slice(0, 4).map((t) => `<div class="rc"><div class="rn">${escp(t.name)}</div><div class="rs">★★★★★</div><p>${esc(t.quote)}</p></div>`).join('')
+    { name: 'Dana R.', quote: 'A calm, steady lift with none of the afternoon crash. It has quietly become part of my morning.' },
+    { name: 'Theo L.', quote: 'Clean and simple. I feel focused for hours and my mood is noticeably better through the week.' },
+  ]).slice(0, 6).map((t: any) => `<div class="frev">${img(t.image || P, escp(t.name), 'frimg', 'Image')}<div class="frwho"><span class="ic">${VERIFIED}</span><span class="frname">${escp(t.name)}</span></div><div class="frstars">★★★★★</div><p class="frq">${esc(t.quote)}</p></div>`).join('')
 
   const press = (arr(c.press_quotes).length ? arr(c.press_quotes) : [
     { title: 'New Scientist', body: 'The ultimate upgrade for clean mental clarity and focus.' },
@@ -412,9 +425,12 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 6 · REVIEWS -->
   <section class="revs"><div class="wrap">
-    <h2 class="secttl">${hl(c.reviews_head || 'What People Are Saying Now')}</h2>
-    <div class="sectsub"><span class="stars">★★★★★</span> ${escp(c.reviews_sub || `Rated ${o.rating?.stars || '4.9'} based on 7,000+ reviews`)}</div>
-    <div class="rgrid">${revs}</div>
+    <div class="rvtitle">
+      <div class="ratedby"><span class="stars">★★★★★</span> <span class="rbtxt">${escp(c.reviews_sub || `Rated ${o.rating?.stars || '4.9'} based on 7,000+ reviews`)}</span></div>
+      <h2 class="secttl">${hl(c.reviews_head || 'What Real People Are Saying')}</h2>
+      <div class="sectsub">${escp(c.reviews_intro || 'Join our growing community of people who made this part of their daily routine.')}</div>
+    </div>
+    <div class="rcar">${revs}</div>
     <div class="press">${press}</div>
   </div></section>
 
@@ -527,7 +543,8 @@ export const cobaltV1: PageTemplate = {
     { key: 'benefits', type: 'reasons', label: 'Numbered benefits (5)', count: 5, hint: 'title + body.' },
     { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
     { key: 'reviews_sub', type: 'text', label: 'Reviews rating line' },
-    { key: 'testimonials', type: 'testimonials', label: 'Reviews (4)', count: 4, hint: 'name + quote.' },
+    { key: 'reviews_intro', type: 'text', label: 'Reviews subtitle' },
+    { key: 'testimonials', type: 'testimonials', label: 'Reviews (6)', count: 6, hint: 'name + quote.' },
     { key: 'press_quotes', type: 'reasons', label: 'Press quotes (3)', count: 3, hint: 'title = publication; body = the quote.' },
     { key: 'stats_head', type: 'text', label: 'Stats heading' },
     { key: 'stats_sub', type: 'text', label: 'Stats subhead' },

@@ -232,6 +232,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   // sections / lists
   striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
   fgrid: 'Feature Cards', rev: 'Review', revs: 'Reviews', press: 'Press', plogo: 'Logo',
+  rvtitle: 'Title Group', ratedby: 'Rated by', rcar: 'Carousel', frev: 'Featured Review', frwho: 'Reviewer', frstars: 'Stars', frq: 'Text', frname: 'Text',
   vcard: 'Comparison Table', vcol: 'Comparison Column', r: 'Comparison Row', rt: 'Text', ben: 'Benefits',
   avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',
@@ -253,6 +254,7 @@ function rawLabelFor(el: HTMLElement): string {
   // A known class wins for BOTH leaves and containers → clean PagePilot-style names everywhere we know them.
   if (RAW_FRIENDLY[cls]) return RAW_FRIENDLY[cls]
   if (tag === 'img') return 'Image'
+  if (el.classList?.contains('ph')) return 'Image'   // an unset image placeholder is still an "Image" leaf (editable)
   if (tag === 'hr') return 'Divider'
   if (tag === 'table') return 'Table'
   if (tag === 'ul' || tag === 'ol') return 'List'
