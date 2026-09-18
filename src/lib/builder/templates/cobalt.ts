@@ -349,7 +349,7 @@ function render(c: FilledContent, o: RenderOpts): string {
     { title: 'Sustained Vitality', body: 'Experience clean cellular energy that keeps you alert and steady from morning until evening.' },
     { title: 'Sharp Cognition', body: 'Clear away mental fog to find a natural flow state that helps you stay productive.' },
     { title: 'Trusted Purity', body: 'Every drop is triple-lab tested, ensuring long-term safety for daily use without doubt.' },
-  ]).slice(0, 3).map((f: any) => `<div class="fc">${img(f.image, o.productName, 'im', 'Feature')}<h4>${escp(f.title)}</h4><p>${esc(f.body)}</p></div>`).join('')
+  ]).slice(0, 3).map((f: any) => `<div class="fc" style="display:flex;flex-direction:column">${img(f.image, o.productName, 'im', 'Image')}<h4>${escp(f.title)}</h4><p>${esc(f.body)}</p></div>`).join('')
 
   const goldRows = (arr(c.gold_rows).length ? arr(c.gold_rows) : ['USP Purity', 'Zero Jitters', 'Consistent Focus', 'No Crash', 'Lab Tested', 'Cellular Fuel'].map((l) => ({ label: l })))
     .map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="m">${CHK}</div><div class="m">${XMARK}</div></div>`).join('')
@@ -466,8 +466,10 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 8 · FEATURE CARDS -->
   <section class="feat"><div class="wrap">
-    <h2 class="secttl">${hl(c.feat_head || 'Pure mitochondria support for daily mental clarity')}</h2>
-    <div class="sectsub">${esc(c.feat_sub || 'Fuel your cells directly to activate natural focus and steady stamina without the usual caffeine crash.')}</div>
+    <div class="fhead" style="display:flex;flex-direction:column;align-items:center">
+      <h2 class="secttl">${hl(c.feat_head || 'Pure mitochondria support for daily mental clarity')}</h2>
+      <div class="sectsub">${esc(c.feat_sub || 'Fuel your cells directly to activate natural focus and steady stamina without the usual caffeine crash.')}</div>
+    </div>
     <div class="fgrid">${feats}</div>
   </div></section>
 
