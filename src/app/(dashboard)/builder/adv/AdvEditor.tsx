@@ -8,7 +8,9 @@
  * publishes — the hard correctness bar in the spec. The property panel is intentionally minimal here
  * (hidden toggle + inline text); the full control system is Phase 3.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createElement, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { icons as LUCIDE_ICONS } from 'lucide-react'
 import Link from 'next/link'
 import { Mark } from '@/components/brand/Mark'
 import { renderDoc, type RenderProduct } from '@/lib/builder/render'
@@ -1075,7 +1077,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // template icon that has no data-ico name yet).
   const iconCurrentSvg = useCallback((): string => { const h = iconHolderEl(); return h && h.style.display !== 'none' ? h.innerHTML : '' }, [iconHolderEl])
   const iconSizeVal = useCallback((): string => { const h = iconHolderEl(); const s = h?.dataset.ics || h?.querySelector('svg')?.getAttribute('width'); return s ? String(parseInt(s)) : '' }, [iconHolderEl])
-  const iconHolderStyleVal = useCallback((prop: string): string => { const h = iconHolderEl(); return h?.style.getPropertyValue(prop) || '' }, [iconHolderEl])
+  const iconHolderStyleVal = useCallback((prop: string): string => { const h = iconHolderEl(); if (!h) return ''; if (prop === '__hidemob') return h.classList.contains('sf-hide-mob') ? '1' : ''; if (prop === '__hidedesk') return h.classList.contains('sf-hide-desk') ? '1' : ''; if (prop === '__bgsize') return h.style.width ? String(parseInt(h.style.width)) : ''; return h.style.getPropertyValue(prop) || '' }, [iconHolderEl])
   const withIconHolder = useCallback((fn: (h: HTMLElement) => void) => {
     if (!rawSel) return
     rawEditHtml(rawSel.ref, (box) => {
@@ -1088,13 +1090,21 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const setItemIcon = useCallback((icon: string) => withIconHolder((h) => {
     const size = parseInt(h.dataset.ics || '') || 18
     if (!icon) { h.style.display = 'none'; h.removeAttribute('data-ico') }
-    else { h.style.display = ''; h.setAttribute('data-ico', icon); h.innerHTML = LINE_ICONS[icon] ? svgIcon(LINE_ICONS[icon], size) : icon }
+    else { h.style.display = ''; h.setAttribute('data-ico', icon); h.innerHTML = resolveIconSvg(icon, size) || icon }
   }), [withIconHolder])
   const setIconSize = useCallback((px: string) => withIconHolder((h) => {
     if (px) h.setAttribute('data-ics', px); else h.removeAttribute('data-ics')
     const svg = h.querySelector('svg'); if (svg && px) { svg.setAttribute('width', px); svg.setAttribute('height', px) }
   }), [withIconHolder])
-  const setIconHolderStyle = useCallback((prop: string, val: string) => withIconHolder((h) => { if (val) h.style.setProperty(prop, val); else h.style.removeProperty(prop) }), [withIconHolder])
+  const setIconHolderStyle = useCallback((prop: string, val: string) => withIconHolder((h) => {
+    if (prop === '__hidemob' || prop === '__hidedesk') { h.classList.toggle(prop === '__hidemob' ? 'sf-hide-mob' : 'sf-hide-desk', val === '1'); return }
+    if (val) h.style.setProperty(prop, val); else h.style.removeProperty(prop)
+  }), [withIconHolder])
+  // Background size = the size of the shape behind the icon (holder becomes a centred box of that size).
+  const setIconBgSize = useCallback((px: string) => withIconHolder((h) => {
+    if (px) { h.style.width = `${px}px`; h.style.height = `${px}px`; h.style.display = 'inline-flex'; h.style.alignItems = 'center'; h.style.justifyContent = 'center' }
+    else { h.style.removeProperty('width'); h.style.removeProperty('height') }
+  }), [withIconHolder])
   // ── Percentage Circle (stat ring) — PagePilot's Animation/size panel for the .ring conic circles ─────────
   const ringNodeEl = useCallback((): HTMLElement | null => {
     const n = rawNodeEl(); if (!n) return null
@@ -1640,7 +1650,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               isPrice={rawIsPrice()} priceVal={pricePartVal} onPrice={setPricePart}
               isDivider={rawIsDivider()} isReviews={rawIsReviews()} reviewsVal={reviewsVal} onReviews={setReviews}
               isIconItem={rawIsIconItem()} itemIcon={itemIcon()} onItemIcon={setItemIcon}
-              iconSize={iconSizeVal()} onIconSize={setIconSize} iconStyleVal={iconHolderStyleVal} onIconStyle={setIconHolderStyle} iconCurrentSvg={iconCurrentSvg()}
+              iconSize={iconSizeVal()} onIconSize={setIconSize} iconStyleVal={iconHolderStyleVal} onIconStyle={setIconHolderStyle} iconCurrentSvg={iconCurrentSvg()} onIconBgSize={setIconBgSize}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               hasChildren={rawHasBlockChildren()}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
@@ -1921,17 +1931,32 @@ const LINE_ICONS: Record<string, string> = {
   target: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>',
 }
 const svgIcon = (inner: string, size = 18) => `<svg viewBox="0 0 24 24" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`
+// Resolve an icon NAME to an inline SVG string — our own hand-drawn LINE_ICONS first, else the full lucide
+// library (1,400+ icons, the same family PagePilot uses). The result is baked into the page HTML so it renders
+// identically on the canvas and on the published storefront (no runtime dependency needed there).
+const ALL_ICON_NAMES: string[] = [...Object.keys(LINE_ICONS), ...Object.keys(LUCIDE_ICONS)]
+function resolveIconSvg(name: string, size = 18): string {
+  if (!name) return ''
+  if (LINE_ICONS[name]) return svgIcon(LINE_ICONS[name], size)
+  const C = (LUCIDE_ICONS as Record<string, React.ComponentType<Record<string, unknown>>>)[name]
+  if (!C) return ''
+  try { return renderToStaticMarkup(createElement(C, { width: size, height: size, stroke: 'currentColor', fill: 'none', strokeWidth: 1.8 })) } catch { return '' }
+}
 function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick: (name: string) => void; allowNone?: boolean }) {
   const [q, setQ] = useState('')
-  const names = Object.keys(LINE_ICONS).filter((n) => !q || n.includes(q.toLowerCase()))
+  const ql = q.trim().toLowerCase()
+  const names = (ql ? ALL_ICON_NAMES.filter((n) => n.toLowerCase().includes(ql)) : ALL_ICON_NAMES).slice(0, 300)
   const cell = (sel: boolean): React.CSSProperties => ({ height: 34, border: `1px solid ${sel ? ORANGE : LINE}`, background: sel ? WASH : '#fff', color: INK, borderRadius: 8, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', padding: 0 })
   return (
     <div>
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search icons…" style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 10px', fontSize: 12.5, color: INK, boxSizing: 'border-box', marginBottom: 8 }} />
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, maxHeight: 176, overflowY: 'auto' }}>
-        {allowNone && <button title="None" onClick={() => onPick('')} style={{ ...cell(value === ''), fontSize: 10, color: SUB }}>None</button>}
-        {names.map((n) => <button key={n} title={n} onClick={() => onPick(n)} style={cell(value === n)} dangerouslySetInnerHTML={{ __html: svgIcon(LINE_ICONS[n], 18) }} />)}
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder={`Search ${ALL_ICON_NAMES.length} icons…`} style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 9, padding: '7px 10px', fontSize: 12.5, color: INK, boxSizing: 'border-box', marginBottom: 8 }} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6,1fr)', gap: 6, maxHeight: 208, overflowY: 'auto' }}>
+        {allowNone && !ql && <button title="None" onClick={() => onPick('')} style={{ ...cell(value === ''), fontSize: 10, color: SUB }}>None</button>}
+        {names.map((n) => LINE_ICONS[n]
+          ? <button key={n} title={n} onClick={() => onPick(n)} style={cell(value === n)} dangerouslySetInnerHTML={{ __html: svgIcon(LINE_ICONS[n], 18) }} />
+          : <button key={n} title={n} onClick={() => onPick(n)} style={cell(value === n)}>{createElement((LUCIDE_ICONS as Record<string, React.ComponentType<Record<string, unknown>>>)[n], { size: 18, strokeWidth: 1.8 })}</button>)}
       </div>
+      {!ql && <div style={{ fontSize: 11, color: FAINT, marginTop: 6 }}>Showing 300 — search to find any of {ALL_ICON_NAMES.length} icons.</div>}
     </div>
   )
 }
@@ -1959,7 +1984,7 @@ function IconField({ value, currentSvg, onPick }: { value: string; currentSvg: s
     </div>
   )
 }
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, galleryVal, onGalleryPart, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, vpickMode, onVpickMode, vpickSelVal, onVpickSel, vpickSwatchColors, onVpickSwatchColor, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isDivider, isReviews, reviewsVal, onReviews, isIconItem, itemIcon, onItemIcon, iconSize, onIconSize, iconStyleVal, onIconStyle, iconCurrentSvg, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; vpickMode: 'buttons' | 'dropdowns' | 'swatches'; onVpickMode: (m: string) => void; vpickSelVal: (prop: string) => string; onVpickSel: (prop: string, v: string) => void; vpickSwatchColors: string[]; onVpickSwatchColor: (i: number, color: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isDivider: boolean; isReviews: boolean; reviewsVal: (part: string, prop: string) => string; onReviews: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; iconSize: string; onIconSize: (px: string) => void; iconStyleVal: (p: string) => string; onIconStyle: (p: string, v: string) => void; iconCurrentSvg: string; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; galleryVal: (part: string, prop: string) => string; onGalleryPart: (part: string, prop: string, val: string) => void; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, galleryVal, onGalleryPart, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, vpickMode, onVpickMode, vpickSelVal, onVpickSel, vpickSwatchColors, onVpickSwatchColor, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isDivider, isReviews, reviewsVal, onReviews, isIconItem, itemIcon, onItemIcon, iconSize, onIconSize, iconStyleVal, onIconStyle, iconCurrentSvg, onIconBgSize, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; vpickMode: 'buttons' | 'dropdowns' | 'swatches'; onVpickMode: (m: string) => void; vpickSelVal: (prop: string) => string; onVpickSel: (prop: string, v: string) => void; vpickSwatchColors: string[]; onVpickSwatchColor: (i: number, color: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isDivider: boolean; isReviews: boolean; reviewsVal: (part: string, prop: string) => string; onReviews: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; iconSize: string; onIconSize: (px: string) => void; iconStyleVal: (p: string) => string; onIconStyle: (p: string, v: string) => void; iconCurrentSvg: string; onIconBgSize: (px: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; galleryVal: (part: string, prop: string) => string; onGalleryPart: (part: string, prop: string, val: string) => void; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -2324,14 +2349,25 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <ColorField label="Branding color" prop="color" getVal={iconStyleVal} onStyle={onIconStyle} />
           <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
             <SecHead device={device} onDevice={onDevice}>Background</SecHead>
+            <NumRow label="Background size" prop="__bgsize" min={0} max={96} getVal={() => iconStyleVal('__bgsize')} onStyle={(_p, v) => onIconBgSize(v)} />
             <ColorField label="Background color" prop="background-color" getVal={iconStyleVal} onStyle={onIconStyle} />
-            <NumRow label="Padding" prop="padding" min={0} max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
             <NumRow label="Rounded corners" prop="border-radius" max={50} getVal={iconStyleVal} onStyle={onIconStyle} />
           </div>
           <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
             <SecHead>Borders</SecHead>
             <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={iconStyleVal} onStyle={onIconStyle} />
             <ColorField label="Border color" prop="border-color" getVal={iconStyleVal} onStyle={onIconStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <SecHead>Visibility</SecHead>
+            <ShowOnRow getVal={iconStyleVal} onStyle={onIconStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+            <NumRow label="Top" prop="padding-top" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
+            <NumRow label="Bottom" prop="padding-bottom" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
+            <NumRow label="Left" prop="padding-left" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
+            <NumRow label="Right" prop="padding-right" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
           </div>
         </div>
       )}
