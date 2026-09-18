@@ -233,6 +233,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   striptrack: 'Rotating Content', seentrack: 'Rotating Content', qitem: 'Item', qlogo: 'Logo', qquote: 'Quote', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Percentages Group', card: 'Card',
   fhead: 'Headings Group', hgel: 'Elements', rev: 'Review', press: 'Press', plogo: 'Logo',
   rvtitle: 'Title Group', ratedby: 'Rated by', rcar: 'Carousel', frev: 'Featured Review', frwho: 'Reviewer', frstars: 'Stars', frq: 'Text', frname: 'Text',
+  reccar: 'Carousel', reccard: 'Product Card', rectitle: 'Product Title', recprice: 'Price',
   vcard: 'Comparison Table', vcol: 'Comparison Column', r: 'Comparison Row', rt: 'Text', ben: 'Benefits',
   avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',

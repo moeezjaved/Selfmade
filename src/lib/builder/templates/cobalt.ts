@@ -237,6 +237,17 @@ const css = `
 .pgbld .hguar .hgbtn{display:inline-block;background:#fff;color:var(--blue);font-weight:800;font-size:14px;padding:13px 28px;border-radius:12px;text-decoration:none}
 .pgbld .hguar .pays{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:4px}
 
+/* 9c · RECOMMENDED PRODUCTS (carousel) */
+.pgbld .recs{padding:16px 0 52px}
+.pgbld .reccar{display:flex;gap:16px;overflow-x:auto;padding:8px 2px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch}
+.pgbld .reccar::-webkit-scrollbar{height:6px}.pgbld .reccar::-webkit-scrollbar-thumb{background:var(--line);border-radius:99px}
+.pgbld .reccard{flex:0 0 220px;max-width:220px;scroll-snap-align:start;display:flex;flex-direction:column}
+.pgbld .reccard .recimg,.pgbld .reccard .recimg.ph{width:100%;aspect-ratio:1/1;object-fit:cover;border-radius:14px;background:var(--soft2);margin-bottom:10px;min-height:0}
+.pgbld .rectitle{font-size:14px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.pgbld .recprice{font-size:13px;color:var(--ink);font-weight:700;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.pgbld .recprice .rwas{color:var(--sub);font-weight:500;text-decoration:line-through}
+.pgbld .recprice .roff{background:var(--blue);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px}
+
 /* 9 · GOLD STANDARD (comparison table) */
 .pgbld .gold{padding:52px 0;background:var(--soft)}
 .pgbld .gold .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
@@ -278,6 +289,7 @@ const css = `
   .pgbld .hcre .mid{grid-template-columns:1fr}
   .pgbld .sgrid{grid-template-columns:1fr}
   .pgbld .frev{flex-basis:82%;max-width:82%}
+  .pgbld .reccard{flex-basis:62%;max-width:62%}
   .pgbld .hchecks{grid-template-columns:1fr}
   .pgbld .wrap{padding:0 16px}
 }
@@ -364,6 +376,16 @@ function render(c: FilledContent, o: RenderOpts): string {
     { title: 'Sharp Cognition', body: 'Clear away mental fog to find a natural flow state that helps you stay productive.' },
     { title: 'Trusted Purity', body: 'Every drop is triple-lab tested, ensuring long-term safety for daily use without doubt.' },
   ]).slice(0, 3).map((f: any) => `<div class="fc" style="display:flex;flex-direction:column">${img(f.image, o.productName, 'im', 'Image')}<h4>${escp(f.title)}</h4><p>${esc(f.body)}</p></div>`).join('')
+
+  // Recommended Products — a carousel of Product Cards (Image + Product Title + Price); swiperized on publish.
+  const recProducts = (arr(c.rec_products).length ? arr(c.rec_products) : [
+    { title: 'Complete Starter Kit', price: '$29.99', was: '$39.99', off: '25% OFF' },
+    { title: 'Travel Companion Pack', price: '$19.99', was: '$24.99', off: '20% OFF' },
+    { title: 'Refill 3-Pack', price: '$34.99', was: '$44.99', off: '22% OFF' },
+    { title: 'Deluxe Gift Box', price: '$49.99', was: '$64.99', off: '23% OFF' },
+    { title: 'Everyday Essentials', price: '$24.99', was: '$29.99', off: '17% OFF' },
+    { title: 'Premium Bundle', price: '$59.99', was: '$79.99', off: '25% OFF' },
+  ]).slice(0, 8).map((p: any) => `<div class="reccard">${img(p.image, o.productName, 'recimg', 'Image')}<div class="rectitle">${escp(p.title || p.label)}</div><div class="recprice"><span class="rn">${escp(p.price || '$19.99')}</span> <s class="rwas">${escp(p.was || '$24.99')}</s> <span class="roff">${escp(p.off || '20% OFF')}</span></div></div>`).join('')
 
   const goldRows = (arr(c.gold_rows).length ? arr(c.gold_rows) : ['USP Purity', 'Zero Jitters', 'Consistent Focus', 'No Crash', 'Lab Tested', 'Cellular Fuel'].map((l) => ({ label: l })))
     .map((r) => `<div class="cr"><div>${escp(r.label)}</div><div class="m">${CHK}</div><div class="m">${XMARK}</div></div>`).join('')
@@ -511,6 +533,12 @@ function render(c: FilledContent, o: RenderOpts): string {
     </div>
   </div></section>
 
+  <!-- 9c · RECOMMENDED PRODUCTS -->
+  <section class="recs"><div class="wrap">
+    <h2 class="secttl">${hl(c.recs_head || 'You May Also **Like**')}</h2>
+    <div class="reccar">${recProducts}</div>
+  </div></section>
+
   <!-- 10 · FINAL CTA -->
   <section class="final"><div class="wrap"><div class="grid">
     <div class="prod">
@@ -609,6 +637,7 @@ export const cobaltV1: PageTemplate = {
     { key: 'hguar_body', type: 'text', label: 'Happiness-guarantee text' },
     { key: 'hguar_cta', type: 'text', label: 'Happiness-guarantee button' },
     { key: 'image_hguar', type: 'image', role: 'lifestyle', label: 'Happiness-guarantee image' },
+    { key: 'recs_head', type: 'text', label: 'Recommended-products heading', hint: 'Accent 1-2 words with ** ** (e.g. "You May Also **Like**").' },
     { key: 'gold_head', type: 'text', label: 'Gold-standard heading' },
     { key: 'gold_body', type: 'richtext', role: 'body', label: 'Gold-standard paragraph' },
     { key: 'gold_cta', type: 'text', label: 'Gold-standard button' },

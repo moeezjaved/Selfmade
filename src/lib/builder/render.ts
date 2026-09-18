@@ -303,17 +303,18 @@ function endOfBalancedDiv(s: string, start: number): number {
 }
 /** Rebuild the `.rcar` review carousel into Swiper markup on publish (each `.frev` card → a slide). The editor
  * keeps the static horizontal-scroll `.rcar` markup. Defensive: returns the body unchanged if not found. */
-function swiperizeReviews(body: string): string {
-  const marker = '<div class="rcar">'
+function swiperizeCarousel(body: string, containerCls: string, cardCls: string): string {
+  const marker = `<div class="${containerCls}">`
   const open = body.indexOf(marker)
   if (open < 0) return body
   const end = endOfBalancedDiv(body, open)
   if (end < 0) return body
   const inner = body.slice(open + marker.length, end - '</div>'.length)
   const cards: string[] = []
+  const cardOpen = `<div class="${cardCls}">`
   let k = 0
   while (k < inner.length) {
-    const s = inner.indexOf('<div class="frev">', k)
+    const s = inner.indexOf(cardOpen, k)
     if (s < 0) break
     const e = endOfBalancedDiv(inner, s)
     if (e < 0) break
@@ -322,10 +323,16 @@ function swiperizeReviews(body: string): string {
   }
   if (!cards.length) return body
   const slides = cards.map((c) => `<div class="swiper-slide">${c}</div>`).join('')
-  const prev = '<button class="rarr rprev pgsw-prev" aria-label="Previous review">‹</button>'
-  const next = '<button class="rarr rnext pgsw-next" aria-label="Next review">›</button>'
+  const prev = '<button class="rarr rprev pgsw-prev" aria-label="Previous">‹</button>'
+  const next = '<button class="rarr rnext pgsw-next" aria-label="Next">›</button>'
   const sw = `<div class="pgsw pgsw-rev"><div class="swiper pgsw-rmain"><div class="swiper-wrapper">${slides}</div>${prev}${next}<div class="swiper-pagination"></div></div></div>`
   return body.slice(0, open) + sw + body.slice(end)
+}
+/** Turn the review + recommended-product carousels into Swiper markup on publish (editor keeps static scroll). */
+function swiperizeReviews(body: string): string {
+  let out = swiperizeCarousel(body, 'rcar', 'frev')
+  out = swiperizeCarousel(out, 'reccar', 'reccard')
+  return out
 }
 /** Wrap a published body with the Swiper library + init, only when it actually contains a swiperized carousel. */
 function withSwiperAssets(body: string): string {
