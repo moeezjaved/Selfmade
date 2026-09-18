@@ -208,9 +208,13 @@ const css = `
 
 /* 7 · STATS */
 .pgbld .stats{padding:52px 0}
+.pgbld .stats .shead{text-align:center}
 .pgbld .sgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
 .pgbld .sc{background:var(--blue);border-radius:16px;padding:22px 18px;text-align:center;color:#fff}
-.pgbld .sc .bd{width:64px;height:64px;border-radius:50%;border:2px solid rgba(255,255,255,.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:17px;margin:0 auto 12px}
+@property --p{syntax:'<number>';inherits:false;initial-value:0}
+.pgbld .stats .ring{width:92px;height:92px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 14px;background:conic-gradient(#fff calc(var(--p,0)*1%),rgba(255,255,255,.26) 0);animation:sffillp var(--dur,1.6s) ease forwards}
+@keyframes sffillp{from{--p:0}to{--p:var(--pt,0)}}
+.pgbld .stats .rc{width:72px;height:72px;border-radius:50%;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;color:#fff}
 .pgbld .sc p{font-size:12px;color:#dfe2fb;margin:0;line-height:1.4}
 
 /* 8 · FEATURE CARDS */
@@ -333,9 +337,13 @@ function render(c: FilledContent, o: RenderOpts): string {
   // aria-hidden duplicate set → seamless marquee loop (skipped in the editor tree, like Rotating Benefits)
   const seenDup = seenSrc.map((p) => seenItem(p).replace('<div class="qitem"', '<div class="qitem" aria-hidden="true"')).join('')
 
+  // Statistics With Percentages — Item Group (Percentage Circle [proportional ring] + Text) per stat.
   const stats = (arr(c.stats).length ? arr(c.stats) : [
     { label: '97%', body: 'Felt reliable clarity in every drop.' }, { label: '96%', body: 'Gained brain fuel for a sharper edge.' }, { label: '98%', body: 'Maintained steady focus without any crashes.' }, { label: '89%', body: 'Found a lighter, more motivated mood.' },
-  ]).slice(0, 4).map((s) => `<div class="sc"><div class="bd">${escp(s.label)}</div><p>${bd(s.body)}</p></div>`).join('')
+  ]).slice(0, 4).map((s: any) => {
+    const pct = Math.max(0, Math.min(100, parseInt(String(s.label).replace(/[^0-9]/g, ''), 10) || 90))
+    return `<div class="sc"><div class="ring" style="--pt:${pct};--dur:1.6s"><div class="rc">${pct}%</div></div><p>${bd(s.body)}</p></div>`
+  }).join('')
 
   const feats = (arr(c.feature_cards).length ? arr(c.feature_cards) : [
     { title: 'Sustained Vitality', body: 'Experience clean cellular energy that keeps you alert and steady from morning until evening.' },
@@ -449,8 +457,10 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 7 · STATS -->
   <section class="stats"><div class="wrap">
-    <h2 class="secttl">${hl(c.stats_head || 'What Most High Performers Noticed')}</h2>
-    <div class="sectsub">${esc(c.stats_sub || 'A collection of real experiences from people who chose mitochondrial support over their morning cup of coffee.')}</div>
+    <div class="shead" style="display:flex;flex-direction:column;align-items:center">
+      <h2 class="secttl">${hl(c.stats_head || 'What Most High Performers Noticed')}</h2>
+      <div class="sectsub">${esc(c.stats_sub || 'A collection of real experiences from people who chose mitochondrial support over their morning cup of coffee.')}</div>
+    </div>
     <div class="sgrid">${stats}</div>
   </div></section>
 

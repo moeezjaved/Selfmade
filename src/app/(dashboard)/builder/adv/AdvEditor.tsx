@@ -225,12 +225,12 @@ const RAW_FRIENDLY: Record<string, string> = {
   ti: 'Check', pays: 'Payment Icons', grow: 'Brand Trust', acc: 'Accordion', pdetails: 'Details', pdesc: 'Description',
   hrev: 'Featured Review', warn: 'Low Stock Notice', hclaim: '90-Day Money Back Guarantee', qty: 'Quantity', newline: 'Tagline', sfdiv: 'Divider',
   brow: 'Benefit Row', rc: 'Featured Review', rgrid: 'Featured Reviews Carousel', hcheck: 'Benefit Check',
-  vpick: 'Variant Picker', vopt: 'Option', ring: 'Percentage Circle', sc: 'Percentage Circle', logo: 'Logo',
+  vpick: 'Variant Picker', vopt: 'Option', ring: 'Percentage Circle', sc: 'Item Group', logo: 'Logo',
   // gallery / creative
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
   // sections / lists
-  striptrack: 'Rotating Content', seentrack: 'Rotating Content', qitem: 'Item', qlogo: 'Logo', qquote: 'Quote', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card',
+  striptrack: 'Rotating Content', seentrack: 'Rotating Content', qitem: 'Item', qlogo: 'Logo', qquote: 'Quote', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Percentages Group', card: 'Card',
   fgrid: 'Feature Cards', rev: 'Review', press: 'Press', plogo: 'Logo',
   rvtitle: 'Title Group', ratedby: 'Rated by', rcar: 'Carousel', frev: 'Featured Review', frwho: 'Reviewer', frstars: 'Stars', frq: 'Text', frname: 'Text',
   vcard: 'Comparison Table', vcol: 'Comparison Column', r: 'Comparison Row', rt: 'Text', ben: 'Benefits',
