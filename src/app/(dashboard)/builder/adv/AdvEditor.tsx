@@ -1853,11 +1853,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
       {/* PagePilot-style inline insertion line: a blue rule + a "+" that opens Add Block at this exact spot. */}
       {insertLine && (
-        <div style={{ position: 'fixed', top: insertLine.top - 1, left: insertLine.left, width: insertLine.width, height: 2, background: '#3f6bff', zIndex: 30, pointerEvents: 'none' }}>
+        <div style={{ position: 'fixed', top: insertLine.top - 1, left: insertLine.left, width: insertLine.width, height: 2, background: ORANGE, zIndex: 30, pointerEvents: 'none' }}>
           <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
             onClick={(e) => { e.stopPropagation(); pendingInsert.current = { ref: insertLine.ref, path: insertLine.path, mode: insertLine.mode }; setRawSel({ ref: insertLine.ref, path: insertLine.path, isImg: false }); setRawInsertTarget({ path: insertLine.path, mode: insertLine.mode }); setRawLibOpen(true); setInsertLine(null) }}
             title="Add a block here"
-            style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', background: '#3f6bff', color: '#fff', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(20,18,15,.3)', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
+            style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', background: ORANGE, color: '#fff', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(20,18,15,.3)', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
         </div>
       )}
       {rawTb && rawSel && (
@@ -1908,7 +1908,22 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
-      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null }} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html, label, isSection) => {
+        if (isSection) {
+          // Gallery picks drop in as their OWN section (like PagePilot) — a top-level, fully-editable node,
+          // placed right after the section the "+" was on. Basic Elements still insert as an inline piece.
+          const curSecId = pendingInsert.current?.ref.sectionId || rawSel?.ref.sectionId || sel?.sectionId
+          apply((d) => {
+            const idx = curSecId ? d.sections.findIndex((s) => s.id === curSecId) : -1
+            const { doc: nd, newRef } = insertSection(d, newRawSection(html, label), idx >= 0 ? idx + 1 : undefined)
+            queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) })
+            return nd
+          })
+        } else {
+          const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label))
+        }
+        setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null
+      }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
       {imgAI && <ImageAIModal productName={doc.productRef?.importedProduct?.title || ''} busy={galleryAIbusy} onCreate={(p) => runImageAI(p)} onClose={() => setImgAI(null)} />}
     </div>
@@ -1916,16 +1931,27 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 }
 
 /* ── Add Block modal: PagePilot-style tabbed picker — Basic Elements (atomic pieces) + Gallery (ready-made). ── */
-function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: string) => void; onClose: () => void }) {
-  const [tab, setTab] = useState<'basic' | 'gallery'>('basic')
+function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: string, isSection?: boolean) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<'basic' | 'gallery'>('gallery')
   const [q, setQ] = useState('')
+  const [cat, setCat] = useState<string>('All')
   const query = q.trim().toLowerCase()
   const basics = BASIC_ELEMENTS.filter((it) => !query || it.label.toLowerCase().includes(query))
-  const galleries = RAW_LIBRARY.filter((it) => !query || it.label.toLowerCase().includes(query))
-  const tabBtn = (t: 'basic' | 'gallery', lbl: string): React.CSSProperties => ({ flex: 1, border: 0, background: tab === t ? '#fff' : 'transparent', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 700, color: INK, cursor: 'pointer', boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,.12)' : 'none' })
+  // Gallery = the ready-made SECTION library (each drops in as its OWN editable section, PagePilot-style),
+  // grouped into the same categories as PagePilot's Add-Block gallery.
+  const catOf = (id: string) => SECTION_CAT[id] || 'Layout'
+  const galleries = SECTION_LIBRARY.filter((it) => (cat === 'All' || catOf(it.id) === cat) && (!query || it.label.toLowerCase().includes(query)))
+  const catCounts: Record<string, number> = { All: SECTION_LIBRARY.length }
+  for (const c of SECTION_CAT_ORDER) catCounts[c] = SECTION_LIBRARY.filter((it) => catOf(it.id) === c).length
+  const tabBtn = (t: 'basic' | 'gallery'): React.CSSProperties => ({ flex: 1, border: 0, background: tab === t ? '#fff' : 'transparent', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 700, color: INK, cursor: 'pointer', boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,.12)' : 'none' })
+  const navItem = (label: string, n: number) => (
+    <button key={label} onClick={() => setCat(label)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', border: 0, background: cat === label ? WASH : 'transparent', color: cat === label ? ORANGE : INK, borderRadius: 9, padding: '8px 10px', fontSize: 13, fontWeight: cat === label ? 800 : 600, cursor: 'pointer', textAlign: 'left' }}>
+      <span>{label}</span><span style={{ fontSize: 11, color: FAINT }}>{n}</span>
+    </button>
+  )
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '48px 24px' }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: 'min(920px,95vw)', maxHeight: '86vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px -20px rgba(20,18,15,.55)' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: 'min(1000px,95vw)', maxHeight: '86vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px -20px rgba(20,18,15,.55)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px 14px' }}>
           <span style={{ fontSize: 20, fontWeight: 800, color: INK }}>Add Block</span>
           <div style={{ flex: 1 }} />
@@ -1933,8 +1959,8 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
         </div>
         <div style={{ padding: '0 22px' }}>
           <div style={{ display: 'flex', gap: 4, background: '#f1f0ee', borderRadius: 12, padding: 4 }}>
-            <button onClick={() => setTab('gallery')} style={tabBtn('gallery', 'Gallery')}>Gallery</button>
-            <button onClick={() => setTab('basic')} style={tabBtn('basic', 'Basic Elements')}>Basic Elements</button>
+            <button onClick={() => setTab('gallery')} style={tabBtn('gallery')}>Gallery</button>
+            <button onClick={() => setTab('basic')} style={tabBtn('basic')}>Basic Elements</button>
           </div>
         </div>
         <div style={{ padding: '14px 22px 0' }}>
@@ -1943,11 +1969,11 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
             <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" autoFocus style={{ flex: 1, border: 0, outline: 'none', fontSize: 13.5, color: INK }} />
           </div>
         </div>
-        <div style={{ overflowY: 'auto', padding: 22 }}>
-          {tab === 'basic' ? (
+        {tab === 'basic' ? (
+          <div style={{ overflowY: 'auto', padding: 22 }}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
               {basics.map((it) => (
-                <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: '20px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: INK }}
+                <button key={it.id} onClick={() => onPick(it.html, it.label, false)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: '20px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: INK }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE; e.currentTarget.style.background = WASH }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = '#fff' }}>
                   <span style={{ color: INK }}>{it.icon}</span>
                   <span style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'center', lineHeight: 1.25 }}>{it.label}</span>
@@ -1955,20 +1981,29 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
               ))}
               {!basics.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No elements match “{q}”.</div>}
             </div>
-          ) : (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
-              {galleries.map((it) => (
-                <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
-                  <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-                    <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
-                  </div>
-                  <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
-                </button>
-              ))}
-              {!galleries.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No sections match “{q}”.</div>}
+          </div>
+        ) : (
+          <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+            <div style={{ width: 210, flex: 'none', borderRight: `1px solid ${LINE}`, overflowY: 'auto', padding: '14px 12px', display: 'flex', flexDirection: 'column', gap: 2 }}>
+              {navItem('All', catCounts.All)}
+              {SECTION_CAT_ORDER.map((c) => navItem(c, catCounts[c] || 0))}
             </div>
-          )}
-        </div>
+            <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+                {galleries.map((it) => (
+                  <button key={it.id} onClick={() => onPick(it.html, it.label, true)} title={`Add ${it.label} section`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE }}>
+                    <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+                      <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                    </div>
+                    <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
+                  </button>
+                ))}
+                {!galleries.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No sections match “{q}”.</div>}
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
