@@ -2133,7 +2133,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
             <ShowOnRow getVal={getVal} onStyle={onStyle} />
           </div>
           <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
             <NumRow label="Top" prop="padding-top" max={60} getVal={getVal} onStyle={onStyle} />
             <NumRow label="Bottom" prop="padding-bottom" max={60} getVal={getVal} onStyle={onStyle} />
             <NumRow label="Left" prop="padding-left" max={60} getVal={getVal} onStyle={onStyle} />
@@ -2259,7 +2259,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
                   <ShowOnRow getVal={getVal} onStyle={onStyle} />
                 </div>
                 <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+                  <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
                   <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
                   <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
                   <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
@@ -2341,7 +2341,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Computed automatically from Price & Compare-at.</div>
             </div>
             <div style={sec}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
               <NumRow label="Top" prop="padding-top" max={60} getVal={getVal} onStyle={onStyle} />
               <NumRow label="Bottom" prop="padding-bottom" max={60} getVal={getVal} onStyle={onStyle} />
               <NumRow label="Left" prop="padding-left" max={60} getVal={getVal} onStyle={onStyle} />
@@ -2359,7 +2359,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
             <NumRow label="Width" prop="width" min={10} max={100} unit="%" getVal={getVal} onStyle={onStyle} />
           </div>
           <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Margin</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Margin</div>
             <NumRow label="Top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
             <NumRow label="Bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
           </div>
@@ -2386,7 +2386,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               <ColorField label="Color" prop="color" getVal={starGet} onStyle={starSet} />
             </div>
             <div style={sec}>
-              <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+              <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
               <NumRow label="Top" prop="padding-top" max={40} getVal={getVal} onStyle={onStyle} />
               <NumRow label="Bottom" prop="padding-bottom" max={40} getVal={getVal} onStyle={onStyle} />
             </div>
@@ -2420,7 +2420,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
             <ShowOnRow getVal={iconStyleVal} onStyle={onIconStyle} />
           </div>
           <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
-            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
             <NumRow label="Top" prop="padding-top" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
             <NumRow label="Bottom" prop="padding-bottom" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
             <NumRow label="Left" prop="padding-left" max={40} getVal={iconStyleVal} onStyle={onIconStyle} />
@@ -2515,7 +2515,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <BorderWidthRow getVal={getVal} onStyle={onStyle} />
         <SegRow label="Rounded corners source" prop="__rcsrc" options={[['custom', 'Custom'], ['dynamic', 'Dynamic']]} getVal={() => getVal('border-radius') ? 'custom' : 'dynamic'} onStyle={(_p, v) => onStyle('border-radius', v === 'custom' ? (getVal('border-radius') || '8px') : '')} />
         {getVal('border-radius') !== '' && <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '10px 0 2px' }}>Padding</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '10px 0 2px' }}>Padding</div>
         <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
@@ -2887,7 +2887,7 @@ function SecHead({ children, device, onDevice }: { children: React.ReactNode; de
   const ico = (active: boolean, d: React.ReactNode) => ({ border: 0, background: active ? '#fff' : 'transparent', borderRadius: 6, width: 26, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: active ? INK : SUB, boxShadow: active ? '0 1px 2px rgba(0,0,0,.12)' : 'none', padding: 0 } as React.CSSProperties)
   return (
     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, marginTop: 2 }}>
-      <div style={{ fontSize: 14, fontWeight: 600, color: INK }}>{children}</div>
+      <div style={{ fontSize: 14, fontWeight: 800, color: INK }}>{children}</div>
       {device && onDevice && (
         <div style={{ display: 'inline-flex', gap: 2, background: '#f1f0ee', borderRadius: 8, padding: 2 }}>
           <button title="Desktop" onClick={() => onDevice('base')} style={ico(device !== 'mobile', null)}><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 20h8M12 17v3" /></svg></button>
@@ -3035,7 +3035,7 @@ type RowBase = { label: string; prop: string; getVal: (p: string) => string; onS
 const ROW: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, minHeight: 30, padding: '5px 0' }
 const LBL: React.CSSProperties = { fontSize: 13, color: '#4a4843', fontWeight: 500, flex: 'none', width: 92 }
 const numBox: React.CSSProperties = { width: 44, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 6px', fontSize: 12.5, boxSizing: 'border-box', textAlign: 'center', color: INK }
-const selBox: React.CSSProperties = { flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', fontSize: 12.5, cursor: 'pointer', background: '#fff', boxSizing: 'border-box', color: INK }
+const selBox: React.CSSProperties = { flex: 1, minWidth: 0, border: `1px solid ${LINE}`, borderRadius: 8, padding: '7px 9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', background: '#fff', boxSizing: 'border-box', color: INK }
 // Number + slider: edits locally while dragging/typing, commits on release / blur (so a re-render never
 // interrupts the interaction). Slider knob is dark to match PagePilot; `unit` shows px / % / col.
 function NumRow({ label, prop, min = 0, max = 120, unit = 'px', getVal, onStyle }: RowBase & { min?: number; max?: number; unit?: string }) {
@@ -3305,14 +3305,14 @@ function GroupSettings({ getVal, onStyle, device, onDevice, onClass, classVal }:
         <ShowOnRow getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={sec}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Padding</div>
         <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
       </div>
       <div style={sec}>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Margin</div>
+        <div style={{ fontSize: 14, fontWeight: 800, color: INK, margin: '0 0 2px' }}>Margin</div>
         <NumRow label="Top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
         <NumRow label="Left" prop="margin-left" max={80} getVal={getVal} onStyle={onStyle} />
