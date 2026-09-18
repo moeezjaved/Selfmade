@@ -380,10 +380,11 @@ function render(c: FilledContent, o: RenderOpts): string {
   // aria-hidden duplicate set → seamless marquee loop (skipped in the editor tree, like Rotating Benefits)
   const seenDup = seenSrc.map((p) => seenItem(p).replace('<div class="qitem"', '<div class="qitem" aria-hidden="true"')).join('')
 
-  // As Seen On — a Rotating Content marquee of press Logos (wordmarks; no quotes).
-  const slogo = (p: any) => `<span class="sllogo">${escp(p.title || p.label)}</span>`
-  const slItems = seenSrc.map(slogo).join('')
-  const slDup = seenSrc.map((p) => slogo(p).replace('<span class="sllogo"', '<span class="sllogo" aria-hidden="true"')).join('')
+  // As Seen On — a Rotating Content marquee of fixed press Logos (wordmarks; not AI-filled — press outlets are generic).
+  const slNames = (arr(c.press_logos).length ? arr(c.press_logos).map((p: any) => p.label || p.title) : ['Forbes', 'Vogue', 'Cosmopolitan', "Women's Health", 'Allure', 'New Scientist'])
+  const slogo = (name: any) => `<span class="sllogo">${escp(name)}</span>`
+  const slItems = slNames.map(slogo).join('')
+  const slDup = slNames.map((name: any) => slogo(name).replace('<span class="sllogo"', '<span class="sllogo" aria-hidden="true"')).join('')
 
   // Statistics With Percentages — Item Group (Percentage Circle [proportional ring] + Text) per stat.
   const stats = (arr(c.stats).length ? arr(c.stats) : [
