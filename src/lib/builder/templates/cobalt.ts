@@ -112,10 +112,14 @@ const css = `
 .pgbld .warn b{color:#b06a1c}
 
 /* 2 · PILL STRIP */
-.pgbld .strip{background:var(--blue);padding:12px 0}
-.pgbld .strip .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.pgbld .strip .p{display:inline-flex;align-items:center;gap:7px;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.24);color:#fff;border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700}
-.pgbld .strip .p::before{content:'✓';font-weight:900}
+/* Rotating Benefits — a horizontally-scrolling marquee band (matches PagePilot's rotating benefits row). */
+.pgbld .strip{background:var(--soft2);padding:14px 0;overflow:hidden}
+.pgbld .strip .striptrack{display:flex;width:max-content;gap:12px;animation:sfmarquee 30s linear infinite}
+.pgbld .strip:hover .striptrack{animation-play-state:paused}
+.pgbld .strip .row{display:flex;gap:12px;flex-wrap:nowrap;flex:none}
+.pgbld .strip .p{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:8px 16px;font-size:13px;font-weight:700;white-space:nowrap;box-shadow:0 1px 4px -2px rgba(20,18,15,.18)}
+.pgbld .strip .p::before{content:'✓';font-weight:900;color:var(--blue)}
+@keyframes sfmarquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 6px))}}
 
 /* 3 · TRUSTED */
 .pgbld .trust{background:var(--soft);padding:48px 0}
@@ -332,7 +336,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div></div></section>
 
   <!-- 2 · PILL STRIP -->
-  <section class="strip"><div class="wrap"><div class="row">${strip}</div></div></section>
+  <section class="strip"><div class="striptrack"><div class="row">${strip}</div><div class="row" aria-hidden="true">${strip}</div></div></section>
 
   <!-- 3 · TRUSTED -->
   <section class="trust"><div class="wrap"><div class="grid">
