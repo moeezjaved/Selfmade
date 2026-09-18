@@ -638,8 +638,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`) as HTMLElement | null
       node?.setAttribute('data-sel', '1')
       // Selecting a section/block/element (from the tree or canvas) scrolls the preview to it — like Shopify.
-      // 'nearest' means a canvas click on an already-visible node won't jump.
-      node?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
+      // A whole-section pick centers it; a block/element uses 'nearest' so an already-visible node won't jump.
+      // behavior:'auto' (instant, not smooth) is deliberate: the floating toolbar re-measures right after this
+      // in its own effect, and a smooth animation would leave it measuring the PRE-scroll position — so the
+      // arrows would land on whichever section was visible before (the one above). Instant scroll = correct.
+      const isSection = !sel.blockId && !sel.elementId
+      node?.scrollIntoView({ block: isSection ? 'center' : 'nearest', behavior: 'auto' })
     }
   }, [sel, canvasHtml])
 
