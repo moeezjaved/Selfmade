@@ -633,18 +633,25 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   useEffect(() => {
     const root = canvasRef.current
     if (!root) return
-    root.querySelectorAll('[data-sel="1"]').forEach((n) => n.removeAttribute('data-sel'))
-    if (sel) {
-      const node = root.querySelector(`[data-node-id="${sel.elementId || sel.blockId || sel.sectionId}"]`) as HTMLElement | null
-      node?.setAttribute('data-sel', '1')
-      // Selecting a section/block/element (from the tree or canvas) scrolls the preview to it — like Shopify.
-      // A whole-section pick centers it; a block/element uses 'nearest' so an already-visible node won't jump.
-      // behavior:'auto' (instant, not smooth) is deliberate: the floating toolbar re-measures right after this
-      // in its own effect, and a smooth animation would leave it measuring the PRE-scroll position — so the
-      // arrows would land on whichever section was visible before (the one above). Instant scroll = correct.
-      const isSection = !sel.blockId && !sel.elementId
-      node?.scrollIntoView({ block: isSection ? 'center' : 'nearest', behavior: 'auto' })
+    const selId = sel && (sel.elementId || sel.blockId || sel.sectionId)
+    // Apply the [data-sel] highlight, retrying across a few frames: the rendered node can lag a frame behind
+    // a tree click (canvas innerHTML re-commit), and without the retry the outline silently never lands.
+    const applyMark = () => {
+      root.querySelectorAll('[data-sel="1"]').forEach((n) => { if (n.getAttribute('data-node-id') !== selId) n.removeAttribute('data-sel') })
+      if (selId) (root.querySelector(`[data-node-id="${selId}"]`) as HTMLElement | null)?.setAttribute('data-sel', '1')
     }
+    applyMark()
+    const r1 = requestAnimationFrame(() => { applyMark(); requestAnimationFrame(applyMark) })
+    if (sel && selId) {
+      // Instant (not smooth) scroll is deliberate: the floating toolbar re-measures in its own effect right
+      // after this, and a smooth animation would leave it measuring the PRE-scroll position — so the arrows
+      // would land on whichever section was visible before (the one above). A whole-section pick aligns to the
+      // top so the section + its toolbar are clearly in view; a block/element uses 'nearest' to avoid jumping.
+      const isSection = !sel.blockId && !sel.elementId
+      const node = root.querySelector(`[data-node-id="${selId}"]`) as HTMLElement | null
+      node?.scrollIntoView({ block: isSection ? 'start' : 'nearest', behavior: 'auto' })
+    }
+    return () => cancelAnimationFrame(r1)
   }, [sel, canvasHtml])
 
   const onCanvasClick = useCallback((e: React.MouseEvent) => {
