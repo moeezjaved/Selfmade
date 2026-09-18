@@ -107,10 +107,10 @@ type RawOp = 'up' | 'down' | 'hide' | 'delete' | 'img' | 'style' | 'insert' | 's
 const RICH_INLINE = new Set(['SPAN', 'B', 'STRONG', 'I', 'EM', 'U', 'A', 'BR', 'SUP', 'SUB', 'MARK', 'SMALL', 'FONT'])
 // Ready-made pieces you can drop into a template section (styled to sit in the .pgbld design generically).
 const RAW_INSERTS: { id: string; label: string; html: string }[] = [
-  { id: 'heading', label: 'Heading', html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:24px;font-weight:800;text-align:center;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
-  { id: 'text', label: 'Text', html: '<div class="wrap" style="padding:6px 0"><p style="font-size:15px;line-height:1.6;text-align:center;margin:8px auto;max-width:640px;color:#5b5750">New paragraph — double-click to edit this text.</p></div>' },
-  { id: 'image', label: 'Image', html: '<div class="wrap" style="padding:6px 0;text-align:center"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="max-width:100%;border-radius:14px"></div>' },
-  { id: 'button', label: 'Button', html: '<div class="wrap" style="padding:10px 0;text-align:center"><a href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Button</a></div>' },
+  { id: 'heading', label: 'Heading', html: '<div class="sfb" style="padding:8px 0"><h3 style="font-size:24px;font-weight:800;margin:0;color:inherit">New heading</h3></div>' },
+  { id: 'text', label: 'Text', html: '<div class="sfb" style="padding:8px 0"><p style="font-size:15px;line-height:1.7;margin:0;color:inherit">New paragraph — double-click to edit this text.</p></div>' },
+  { id: 'image', label: 'Image', html: '<div class="sfb" style="padding:8px 0"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="display:block;width:100%;height:auto;border-radius:14px"></div>' },
+  { id: 'button', label: 'Button', html: '<div class="sfb" style="padding:10px 0"><a href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Button</a></div>' },
   { id: 'divider', label: 'Divider', html: '<div class="sfdiv" style="height:1px;width:100%;background:#e7e3dd;border:0;margin:16px 0"></div>' },
   { id: 'icon', label: 'Icon', html: '<div class="wrap" style="padding:6px 0;text-align:center"><span style="display:inline-flex;color:#3f4bd6"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg></span></div>' },
   { id: 'rating', label: 'Rating', html: '<div class="rlabel" style="padding:6px 0;font-size:14px;color:#6a6e93"><span class="stars" style="color:#f5a623;letter-spacing:1px">★★★★★</span> <span class="rtext">Rated 4.9/5 by 1,200+ people</span></div>' },
@@ -122,14 +122,14 @@ const RAW_INSERTS: { id: string; label: string; html: string }[] = [
 const be = (p: React.ReactNode) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{p}</svg>
 const IC_PLACE = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg>'
 const BASIC_ELEMENTS: { id: string; label: string; icon: React.ReactNode; html: string }[] = [
-  { id: 'be-text', label: 'Text', icon: be(<><path d="M4 7h16M4 12h16M4 17h10" /></>), html: '<div class="wrap" style="padding:6px 0"><p style="font-size:15px;line-height:1.6;margin:8px 0;color:#5b5750">New text block — double-click to edit.</p></div>' },
-  { id: 'be-heading', label: 'Heading', icon: be(<><path d="M6 4v16M18 4v16M6 12h12" /></>), html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:26px;font-weight:800;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
-  { id: 'be-button', label: 'Button', icon: be(<><rect x="3" y="8" width="18" height="8" rx="4" /><path d="M8 12h8" /></>), html: '<div class="wrap" style="padding:10px 0"><a class="btn" href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:12px;font-weight:800;text-decoration:none">Button</a></div>' },
-  { id: 'be-modal', label: 'Modal', icon: be(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></>), html: '<div class="wrap" style="padding:10px 0"><a class="btn" href="#sfm-NID" style="display:inline-block;background:#3f4bd6;color:#fff;padding:12px 26px;border-radius:12px;font-weight:800;text-decoration:none">Open popup</a></div><div id="sfm-NID" class="sfmodal"><div class="sfmodal-card"><a href="#" class="sfmodal-close" aria-label="Close">×</a><h3 style="font-size:22px;font-weight:800;margin:0 0 8px;color:#1b1a17">Popup title</h3><p style="margin:0;color:#5b5750;line-height:1.6">Your popup content goes here. Edit this text and add blocks inside.</p></div></div>' },
-  { id: 'be-icon', label: 'Icon', icon: be(<><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.4 2.4 4.6-5" /></>), html: `<div class="wrap" style="padding:6px 0;text-align:center"><span class="pico" style="display:inline-flex;color:#3f4bd6">${IC_PLACE}</span></div>` },
-  { id: 'be-author', label: 'Author', icon: be(<><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></>), html: '<div class="wrap" style="padding:10px 0"><div class="who" style="display:flex;align-items:center;gap:12px"><span class="avim" style="width:44px;height:44px;border-radius:50%;background:#eef0fe;color:#3f4bd6;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none">A</span><div><div style="font-weight:800;color:#1b1a17">Author Name</div><div style="color:#6a6e93;font-size:13px">Verified Buyer</div></div></div></div>' },
-  { id: 'be-image', label: 'Image', icon: be(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 15l-5-5L5 20" /></>), html: '<div class="wrap" style="padding:6px 0;text-align:center"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="max-width:100%;border-radius:14px"></div>' },
-  { id: 'be-video', label: 'Video', icon: be(<><rect x="3" y="5" width="14" height="14" rx="2" /><path d="M21 8l-4 4 4 4V8z" /></>), html: '<div class="wrap" style="padding:6px 0"><video controls playsinline style="width:100%;border-radius:14px;background:#000;aspect-ratio:16/9;display:block"></video></div>' },
+  { id: 'be-text', label: 'Text', icon: be(<><path d="M4 7h16M4 12h16M4 17h10" /></>), html: '<div class="sfb" style="padding:8px 0"><p style="font-size:15px;line-height:1.7;margin:0;color:inherit">New text block — double-click to edit.</p></div>' },
+  { id: 'be-heading', label: 'Heading', icon: be(<><path d="M6 4v16M18 4v16M6 12h12" /></>), html: '<div class="sfb" style="padding:8px 0"><h3 style="font-size:24px;font-weight:800;margin:0;color:inherit">New heading</h3></div>' },
+  { id: 'be-button', label: 'Button', icon: be(<><rect x="3" y="8" width="18" height="8" rx="4" /><path d="M8 12h8" /></>), html: '<div class="sfb" style="padding:10px 0"><a class="btn" href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:12px;font-weight:800;text-decoration:none">Button</a></div>' },
+  { id: 'be-modal', label: 'Modal', icon: be(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></>), html: '<div class="sfb" style="padding:10px 0"><a class="btn" href="#sfm-NID" style="display:inline-block;background:#3f4bd6;color:#fff;padding:12px 26px;border-radius:12px;font-weight:800;text-decoration:none">Open popup</a></div><div id="sfm-NID" class="sfmodal"><div class="sfmodal-card"><a href="#" class="sfmodal-close" aria-label="Close">×</a><h3 style="font-size:22px;font-weight:800;margin:0 0 8px;color:#1b1a17">Popup title</h3><p style="margin:0;color:#5b5750;line-height:1.6">Your popup content goes here. Edit this text and add blocks inside.</p></div></div>' },
+  { id: 'be-icon', label: 'Icon', icon: be(<><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.4 2.4 4.6-5" /></>), html: `<div class="sfb" style="padding:8px 0"><span class="pico" style="display:inline-flex;color:#3f4bd6">${IC_PLACE}</span></div>` },
+  { id: 'be-author', label: 'Author', icon: be(<><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></>), html: '<div class="sfb" style="padding:10px 0"><div class="who" style="display:flex;align-items:center;gap:12px"><span class="avim" style="width:44px;height:44px;border-radius:50%;background:#eef0fe;color:#3f4bd6;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none">A</span><div><div style="font-weight:800;color:#1b1a17">Author Name</div><div style="color:#6a6e93;font-size:13px">Verified Buyer</div></div></div></div>' },
+  { id: 'be-image', label: 'Image', icon: be(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 15l-5-5L5 20" /></>), html: '<div class="sfb" style="padding:8px 0"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="display:block;width:100%;height:auto;border-radius:14px"></div>' },
+  { id: 'be-video', label: 'Video', icon: be(<><rect x="3" y="5" width="14" height="14" rx="2" /><path d="M21 8l-4 4 4 4V8z" /></>), html: '<div class="sfb" style="padding:8px 0"><video controls playsinline style="display:block;width:100%;height:auto;aspect-ratio:16/9;border-radius:14px;background:#000"></video></div>' },
   { id: 'be-groupv', label: 'Group (Vertical)', icon: be(<><rect x="4" y="3" width="16" height="7" rx="1.5" /><rect x="4" y="14" width="16" height="7" rx="1.5" /></>), html: '<div style="display:flex;flex-direction:column;gap:12px;padding:6px 0"><p style="margin:0;color:#5b5750">Group — add blocks inside.</p></div>' },
   { id: 'be-grouph', label: 'Group (Horizontal)', icon: be(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /></>), html: '<div style="display:flex;gap:14px;align-items:center;padding:6px 0"><p style="margin:0;flex:1;color:#5b5750">Group — add blocks inside.</p></div>' },
   { id: 'be-carousel', label: 'Carousel', icon: be(<><rect x="7" y="6" width="10" height="12" rx="2" /><path d="M3 9v6M21 9v6" /></>), html: `<div class="reccar" style="display:flex;gap:14px;overflow-x:auto;padding:6px 2px">${[1, 2, 3].map((i) => `<div class="reccard" style="flex:0 0 240px;max-width:240px"><img src="https://placehold.co/480x480/eef0fe/3f4bd6?text=Slide+${i}" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px"></div>`).join('')}</div>` },
@@ -440,6 +440,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // "+" that opens Add Block and inserts exactly there (before/after that block).
   const [insertLine, setInsertLine] = useState<null | { top: number; left: number; width: number; ref: NodeRef; path: number[]; mode: 'before' | 'after' }>(null)
   const hoverRaf = useRef(0)
+  // Captured insert location for the inline "+" line — set on "+" click, read synchronously by rawInsertAt
+  // (avoids relying on setRawSel/setRawInsertTarget landing before the modal's onPick fires).
+  const pendingInsert = useRef<null | { ref: NodeRef; path: number[]; mode: 'after' | 'append' | 'before' }>(null)
   // Highlight the specific piece under the cursor inside a raw section (PagePilot highlights the exact block).
   const onCanvasHover = useCallback((e: React.MouseEvent) => {
     if (hoverRaf.current) return
@@ -449,7 +452,28 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       hoverRaf.current = 0
       const target = t.closest('[data-node-type="element:raw"]') as HTMLElement | null
       if (!target) { setHoverBox(null); setInsertLine(null); return }
-      const item = snapUp(t, target)
+      let item = snapUp(t, target)
+      // Hovering a gap / empty space (snapUp bottomed out at the section root) → find the container directly
+      // under the cursor and anchor to the sibling block nearest the gap, so the "+" line shows anywhere
+      // between blocks (PagePilot feel) instead of grabbing the whole enclosing column.
+      if (!item || item === target) {
+        const cx = e.clientX
+        // Among block-sized descendants whose column covers the cursor X and that sit within ~52px of the cursor Y,
+        // pick the SMALLEST-area one — the specific block beside the gap, not the big column that merely contains it.
+        let best: HTMLElement | null = null, bestArea = Infinity, bestDy = Infinity
+        for (const k of Array.from(target.querySelectorAll<HTMLElement>('*'))) {
+          if (k.classList?.contains('garr')) continue
+          const p = subPathTo(k, target); if (!p || !p.length) continue
+          const rr = k.getBoundingClientRect()
+          if (rr.height < 18 || rr.width < 60) continue
+          if (cx < rr.left - 8 || cx > rr.right + 8) continue
+          const dy = cy < rr.top ? rr.top - cy : cy > rr.bottom ? cy - rr.bottom : 0
+          if (dy > 52) continue
+          const area = rr.width * rr.height
+          if (area < bestArea - 1 || (Math.abs(area - bestArea) <= 1 && dy < bestDy)) { bestArea = area; bestDy = dy; best = k }
+        }
+        item = best as HTMLElement
+      }
       if (!item || item === target || item.classList?.contains('garr')) { setHoverBox(null); setInsertLine(null); return }
       const r = item.getBoundingClientRect()
       setHoverBox({ top: r.top, left: r.left, width: r.width, height: r.height })
@@ -458,11 +482,11 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       const id = target.getAttribute('data-node-id') || ''
       let ref: NodeRef | null = null
       if (doc) for (const s of doc.sections) for (const b of s.blocks) for (const el of b.elements) if (el.id === id) ref = { sectionId: s.id, blockId: b.id, elementId: el.id }
-      const edge = Math.min(28, r.height * 0.32)
+      // PagePilot feel: hovering ANYWHERE over a block shows the insertion line at the nearest gap —
+      // cursor in the top half → line above (insert before); bottom half → line below (insert after).
       if (ref && path && path.length && r.height > 24) {
-        if (cy <= r.top + edge) setInsertLine({ top: r.top, left: r.left, width: r.width, ref, path, mode: 'before' })
-        else if (cy >= r.bottom - edge) setInsertLine({ top: r.bottom, left: r.left, width: r.width, ref, path, mode: 'after' })
-        else setInsertLine(null)
+        const before = cy < r.top + r.height / 2
+        setInsertLine({ top: before ? r.top : r.bottom, left: r.left, width: r.width, ref, path, mode: before ? 'before' : 'after' })
       } else setInsertLine(null)
     })
   }, [doc])
@@ -1376,16 +1400,26 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   // Insert a block at a chosen spot: 'append' drops it INSIDE the target container (PagePilot's per-container
   // "Add block" — e.g. below Product Gallery / inside Product Details); 'after' drops it as a sibling.
   const rawInsertAt = useCallback((insertHtml: string) => {
-    if (!rawSel) return
-    const target = rawInsertTarget || { path: rawSel.path, mode: 'after' as const }
-    rawEditHtml(rawSel.ref, (box) => {
+    // Prefer the synchronously-captured location from the inline "+" line (no state-timing race);
+    // fall back to rawInsertTarget/rawSel for the per-container "Add block" paths.
+    const pend = pendingInsert.current
+    const ref = pend?.ref || rawSel?.ref
+    if (!ref) return
+    const target = pend || rawInsertTarget || (rawSel ? { path: rawSel.path, mode: 'after' as const } : null)
+    if (!target) return
+    let ok = false
+    rawEditHtml(ref, (box) => {
       let node: HTMLElement = box
       for (const i of target.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      if (node === box) return   // path didn't resolve — don't silently insert nowhere
       if (target.mode === 'append') node.insertAdjacentHTML('beforeend', insertHtml)
       else if (target.mode === 'before') node.insertAdjacentHTML('beforebegin', insertHtml)
       else node.insertAdjacentHTML('afterend', insertHtml)
+      ok = true
     })
+    pendingInsert.current = null
     setRawInsertTarget(null)
+    return ok
   }, [rawSel, rawInsertTarget, rawEditHtml])
   // Drag-reorder a raw piece: move the dragged path to before/after the drop-target path.
   const rawMove = useCallback((fromPath: number[], toPath: number[], after: boolean) => {
@@ -1434,6 +1468,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       selectRawPath(ref, lastPath, false)
     } else {
       selectRawPath(ref, node.path, node.isImg)
+      pendingInsert.current = { ref, path: node.path, mode: 'append' }
       setRawInsertTarget({ path: node.path, mode: 'append' })
       setRawLibOpen(true)
     }
@@ -1655,7 +1690,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
                 {open && rawEl && (
                   <>
                     {renderRawOutline(outlineNodes, rawEl.ref, 1)}
-                    <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) { selectRawPath(rawEl.ref, last.path, last.isImg); setRawInsertTarget({ path: last.path, mode: 'after' }) } setRawLibOpen(true) }} depth={1} />
+                    <AddBtn label="Add block" onClick={() => { const kids = buildRawOutline(rawEl.html); const last = kids[kids.length - 1]; if (last) { selectRawPath(rawEl.ref, last.path, last.isImg); pendingInsert.current = { ref: rawEl.ref, path: last.path, mode: 'after' }; setRawInsertTarget({ path: last.path, mode: 'after' }) } else { pendingInsert.current = null } setRawLibOpen(true) }} depth={1} />
                   </>
                 )}
                 {open && !rawEl && s.blocks.map((b) => {
@@ -1809,7 +1844,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {insertLine && (
         <div style={{ position: 'fixed', top: insertLine.top - 1, left: insertLine.left, width: insertLine.width, height: 2, background: '#3f6bff', zIndex: 30, pointerEvents: 'none' }}>
           <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
-            onClick={(e) => { e.stopPropagation(); setRawSel({ ref: insertLine.ref, path: insertLine.path, isImg: false }); setRawInsertTarget({ path: insertLine.path, mode: insertLine.mode }); setRawLibOpen(true); setInsertLine(null) }}
+            onClick={(e) => { e.stopPropagation(); pendingInsert.current = { ref: insertLine.ref, path: insertLine.path, mode: insertLine.mode }; setRawSel({ ref: insertLine.ref, path: insertLine.path, isImg: false }); setRawInsertTarget({ path: insertLine.path, mode: insertLine.mode }); setRawLibOpen(true); setInsertLine(null) }}
             title="Add a block here"
             style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', background: '#3f6bff', color: '#fff', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(20,18,15,.3)', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
         </div>
@@ -1827,7 +1862,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <TbBtn title="Move up" onClick={() => rawOp('up')}>{TB_ICON.up}</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>{TB_ICON.down}</TbBtn>
           <TbDiv />
-          <TbText title="Add a block after this" onClick={() => { setRawInsertTarget(null); setRawLibOpen(true) }}>Add block</TbText>
+          <TbText title="Add a block after this" onClick={() => { pendingInsert.current = null; setRawInsertTarget(null); setRawLibOpen(true) }}>Add block</TbText>
           <TbDiv />
           <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>{TB_ICON.trash}</TbBtn>
           {rawAddOpen && (
@@ -1862,7 +1897,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
-      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null); pendingInsert.current = null }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
       {imgAI && <ImageAIModal productName={doc.productRef?.importedProduct?.title || ''} busy={galleryAIbusy} onCreate={(p) => runImageAI(p)} onClose={() => setImgAI(null)} />}
     </div>
