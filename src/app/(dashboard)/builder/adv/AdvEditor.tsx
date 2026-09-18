@@ -465,7 +465,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           if (k.classList?.contains('garr')) continue
           const p = subPathTo(k, target); if (!p || !p.length) continue
           const rr = k.getBoundingClientRect()
-          if (rr.height < 18 || rr.width < 60) continue
+          if (rr.height < 14 || rr.width < 60) continue
           if (cx < rr.left - 8 || cx > rr.right + 8) continue
           const dy = cy < rr.top ? rr.top - cy : cy > rr.bottom ? cy - rr.bottom : 0
           if (dy > 52) continue
@@ -484,7 +484,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       if (doc) for (const s of doc.sections) for (const b of s.blocks) for (const el of b.elements) if (el.id === id) ref = { sectionId: s.id, blockId: b.id, elementId: el.id }
       // PagePilot feel: hovering ANYWHERE over a block shows the insertion line at the nearest gap —
       // cursor in the top half → line above (insert before); bottom half → line below (insert after).
-      if (ref && path && path.length && r.height > 24) {
+      if (ref && path && path.length && r.height >= 14) {
         const before = cy < r.top + r.height / 2
         setInsertLine({ top: before ? r.top : r.bottom, left: r.left, width: r.width, ref, path, mode: before ? 'before' : 'after' })
       } else setInsertLine(null)
