@@ -2057,7 +2057,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>The product is added dynamically — there’s no link to set.</div>
         </div>
       )}
-      {isSave && (
+      {isSave && !isPrice && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 10, marginTop: 2, color: INK }}>Save Badge</div>
           <label style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, fontSize: 12.5, fontWeight: 600, color: INK, cursor: 'pointer', marginBottom: 8 }}>
