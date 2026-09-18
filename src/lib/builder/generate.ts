@@ -119,6 +119,16 @@ export async function generatePage(
     }
   }
 
+  // Real Shopify variant options (Size / Color / …) → the template's variant picker, so shoppers see the
+  // ACTUAL choices instead of AI-invented offers. Uses the first meaningful option group; its name becomes
+  // the picker label. (The template renders `variants` as .vopt buttons and `variant_label` as the heading.)
+  const importedOptions: { name: string; values: string[] }[] = Array.isArray((imported as any)?.options) ? (imported as any).options : []
+  const opt = importedOptions.find((o) => o?.values?.length)
+  if (opt && 'variants' in content) {
+    content['variants'] = opt.values.slice(0, 8).map((v, i) => ({ label: v, sel: i === 0 }))
+    if ('variant_label' in content) content['variant_label'] = opt.name || 'Choose an option'
+  }
+
   // ── d. RENDER OPTS ──
   const renderOpts: RenderOpts = {
     productName,

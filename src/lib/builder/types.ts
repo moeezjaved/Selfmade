@@ -67,6 +67,8 @@ export interface ImportedProduct {
   features?: string[]
   /** real customer review snippets → seeds testimonials with genuine sentiment */
   reviews?: { name?: string; rating?: number; body: string }[]
+  /** real Shopify variant options (name + values) → the variant picker shows the ACTUAL choices */
+  options?: { name: string; values: string[] }[]
   sourceUrl?: string
 }
 

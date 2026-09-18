@@ -110,6 +110,7 @@ export async function POST(req: NextRequest) {
       ratingCount: fromLd?.ratingCount,
       features: ((dropletProduct?.features && dropletProduct.features.length ? dropletProduct.features : (fromLd?.features && fromLd.features.length ? fromLd.features : (html ? featureBullets(html) : []))) || []).slice(0, 8),
       reviews: (fromLd?.reviews || []).slice(0, 8),
+      options: shopify?.options,
       sourceUrl: url.toString(),
     }
     product.image = product.images?.[0] || null
@@ -184,6 +185,11 @@ async function tryShopifyJson(url: URL): Promise<ImportedProduct | null> {
       description: p.body_html ? stripHtml(String(p.body_html)).slice(0, 1200) : undefined,
       brand: p.vendor ? String(p.vendor).slice(0, 80) : undefined,
       sku: variants.find((v) => v?.sku)?.sku || null,
+      options: Array.isArray(p.options)
+        ? p.options
+            .map((o: any) => ({ name: String(o?.name || '').slice(0, 40), values: (Array.isArray(o?.values) ? o.values : []).map((v: any) => String(v).slice(0, 40)).filter(Boolean).slice(0, 12) }))
+            .filter((o: any) => o.name && o.values.length && !/^title$/i.test(o.name))   // Shopify's default single-variant "Title"/"Default Title" isn't a real choice
+        : undefined,
       sourceUrl: url.toString(),
     }
   } catch { return null }
