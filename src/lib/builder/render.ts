@@ -256,6 +256,57 @@ function sectionRawHtml(s: Section): string {
   return out.join('')
 }
 
+// ── Gallery → Swiper.js (matches PagePilot: a real swiper carousel — swipe, pagination dots, synced
+// thumbnails — on the PUBLISHED storefront). The editor keeps the static `.gwrap`/`.thumbs` markup for
+// editing; at publish time we rebuild that region into Swiper markup and inject the library + init once. */
+const SWIPER_CSS_URL = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css'
+const SWIPER_JS_URL = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js'
+const swiperInitScript = `<script>(function(){function go(){if(!window.Swiper){return setTimeout(go,120)}document.querySelectorAll('.pgsw').forEach(function(g){if(g.dataset.sw)return;g.dataset.sw='1';var t=g.querySelector('.pgsw-thumbs');var th=t?new window.Swiper(t,{slidesPerView:'auto',spaceBetween:8,watchSlidesProgress:true,freeMode:true}):null;var o={spaceBetween:12,pagination:{el:g.querySelector('.swiper-pagination'),clickable:true},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')}};if(th)o.thumbs={swiper:th};new window.Swiper(g.querySelector('.pgsw-main'),o)})}go()})();</script>`
+/** Rebuild the first `.gwrap`(+`.thumbs`) gallery in a body string into Swiper markup. Defensive: if the
+ * expected structure isn't found, returns the body unchanged (no breakage). */
+function swiperizeGallery(body: string): string {
+  const gwrapM = body.match(/<div class="gwrap">([\s\S]*?)<\/div>/)
+  if (!gwrapM) return body
+  const thumbM = body.match(/<div class="thumbs"[^>]*>([\s\S]*?)<\/div>/)
+  const mainImg = (gwrapM[1].match(/<img[^>]*>/) || [])[0] || ''
+  const thumbImgs = thumbM ? (thumbM[1].match(/<img[^>]*>/g) || []) : []
+  const srcOf = (t: string) => (t.match(/src="([^"]*)"/) || [])[1] || ''
+  const srcs = (thumbImgs.length ? thumbImgs : [mainImg]).map(srcOf).filter(Boolean)
+  if (!srcs.length) return body
+  const cls = (t: string) => (t.match(/class="([^"]*)"/) || [])[1] || ''
+  const mainCls = cls(mainImg) || 'hbottle'
+  const mainSlides = srcs.map((s) => `<div class="swiper-slide"><img class="${mainCls}" src="${s}" alt="" loading="lazy"></div>`).join('')
+  const thumbSlides = srcs.map((s) => `<div class="swiper-slide"><img src="${s}" alt="" loading="lazy"></div>`).join('')
+  const arrows = (gwrapM[1].match(/<button class="garr[^>]*>[^<]*<\/button>/g) || [])
+  const prev = (arrows.find((a) => /gprev/.test(a)) || '<button class="garr gprev pgsw-prev" aria-label="Previous image">‹</button>').replace('gprev', 'gprev pgsw-prev')
+  const next = (arrows.find((a) => /gnext/.test(a)) || '<button class="garr gnext pgsw-next" aria-label="Next image">›</button>').replace('gnext', 'gnext pgsw-next')
+  const sw = `<div class="pgsw"><div class="swiper pgsw-main"><div class="swiper-wrapper">${mainSlides}</div>${prev}${next}<div class="swiper-pagination"></div></div><div class="swiper pgsw-thumbs thumbs"><div class="swiper-wrapper">${thumbSlides}</div></div></div>`
+  let out = body.replace(gwrapM[0], sw)
+  if (thumbM) out = out.replace(thumbM[0], '')
+  return out
+}
+/** Wrap a published body with the Swiper library + init, only when it actually contains a swiperized gallery. */
+function withSwiperAssets(body: string): string {
+  if (!body.includes('class="pgsw"')) return body
+  return `<link rel="stylesheet" href="${SWIPER_CSS_URL}"><script src="${SWIPER_JS_URL}"></script>${body}${swiperInitScript}`
+}
+// Layout CSS for the swiperized gallery (appended to the published css, since publish uses doc.rawCss not baseCss).
+const GALLERY_SW_CSS = `
+.pgbld .pgsw{position:relative}
+.pgbld .pgsw-main{border-radius:12px;overflow:hidden;margin-bottom:12px}
+.pgbld .pgsw-main .swiper-slide img{display:block;width:100%;aspect-ratio:4/5;object-fit:contain;background:var(--soft,#f3f4fb)}
+.pgbld .pgsw-thumbs .swiper-wrapper{align-items:center}
+.pgbld .pgsw-thumbs .swiper-slide{width:56px!important;height:auto}
+.pgbld .pgsw-thumbs .swiper-slide img{display:block;width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line,#e4e4ef);cursor:pointer;opacity:.6;transition:opacity .15s,border-color .15s}
+.pgbld .pgsw-thumbs .swiper-slide-thumb-active img{opacity:1;border-color:var(--blue,#3f4bd6);border-width:2px}
+.pgbld .pgsw .swiper-pagination{position:static;margin-top:8px}
+.pgbld .pgsw .swiper-pagination-bullet-active{background:var(--blue,#3f4bd6)}
+.pgbld .pgsw-main .garr{position:absolute;top:50%;transform:translateY(-50%);z-index:3}
+.pgbld .pgsw-main .gprev{left:8px}.pgbld .pgsw-main .gnext{right:8px}
+.pgbld .pgsw-main .swiper-button-disabled{opacity:.35;cursor:default}
+`
+const withSwiperCss = (css: string, body: string): string => body.includes('class="pgsw"') ? `${css}\n${GALLERY_SW_CSS}` : css
+
 /** Render the doc for Shopify publish: body + css where each <section> becomes an editable native theme
  * section. The wrapper is renamed to `pgbld` so shopify-sections.splitPageIntoSections() splits per section
  * (matching every other builder template's publish path — canonical structure / native-theme editability). */
@@ -273,9 +324,10 @@ export function renderDocForPublish(doc: PageDoc, product?: RenderProduct): { bo
   const allRaw = visible.length > 0 && visible.every((s) => s.type === 'raw' && !!sectionRawHtml(s))
   if (doc.rawCss && allRaw) {
     const inner = visible.map((s) => pgbldInner(sectionRawHtml(s)).trim()).filter(Boolean).join('\n')
-    return { body: `<div class="pgbld">${inner}</div>`, css: doc.rawCss }
+    const body = withSwiperAssets(swiperizeGallery(`<div class="pgbld">${inner}</div>`))
+    return { body, css: withSwiperCss(doc.rawCss, body) }
   }
   const { html, css } = renderDoc(doc, { mode: 'publish', device: 'base', product })
-  const body = html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')
-  return { body, css }
+  const body = withSwiperAssets(swiperizeGallery(html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')))
+  return { body, css: withSwiperCss(css, body) }
 }
