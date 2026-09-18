@@ -197,9 +197,14 @@ const css = `
 .pgbld .frname{font-weight:800;font-size:13.5px;color:var(--ink)}
 .pgbld .frstars{color:#4a56ea;font-size:13px;letter-spacing:1px}
 .pgbld .frq{font-size:13px;color:var(--sub);margin:0;line-height:1.55}
-.pgbld .press{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:26px;padding-top:22px;border-top:1px solid var(--line)}
-.pgbld .press .pq b{font-family:'Fraunces',Georgia,serif;font-size:16px;display:block;margin-bottom:5px}
-.pgbld .press .pq p{font-size:11.5px;color:var(--sub);margin:0;font-style:italic}
+/* 6b · AS SEEN ON WITH QUOTES (marquee) */
+.pgbld .seen{background:#fff;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:18px 0;overflow:hidden}
+.pgbld .seen .seentrack{display:flex;width:max-content;gap:40px;align-items:center;animation:sfmarquee2 38s linear infinite}
+.pgbld .seen:hover .seentrack{animation-play-state:paused}
+.pgbld .qitem{display:inline-flex;align-items:center;gap:16px;flex:none;white-space:nowrap}
+.pgbld .qlogo{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:19px;color:var(--ink);letter-spacing:.01em}
+.pgbld .qquote{font-size:13.5px;color:var(--sub);font-style:italic}
+@keyframes sfmarquee2{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 20px))}}
 
 /* 7 · STATS */
 .pgbld .stats{padding:52px 0}
@@ -250,7 +255,6 @@ const css = `
   .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .numbf .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
   .pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
-  .pgbld .press{grid-template-columns:1fr}
 }
 @media(max-width:520px){
   .pgbld .hcre .mid{grid-template-columns:1fr}
@@ -316,11 +320,18 @@ function render(c: FilledContent, o: RenderOpts): string {
     { name: 'Theo L.', quote: 'Clean and simple. I feel focused for hours and my mood is noticeably better through the week.' },
   ]).slice(0, 6).map((t: any) => `<div class="frev">${img(t.image || P, escp(t.name), 'frimg', 'Image')}<div class="frwho"><span class="ic">${VERIFIED}</span><span class="frname">${escp(t.name)}</span></div><div class="frstars">★★★★★</div><p class="frq">${esc(t.quote)}</p></div>`).join('')
 
-  const press = (arr(c.press_quotes).length ? arr(c.press_quotes) : [
+  // As Seen On with Quotes — a marquee (Rotating Content) of Item = press Logo (wordmark) + Quote.
+  const seenSrc = (arr(c.press_quotes).length ? arr(c.press_quotes) : [
     { title: 'New Scientist', body: 'The ultimate upgrade for clean mental clarity and focus.' },
-    { title: 'Bloomberg', body: 'It perks up effortless way to just your morning routine.' },
+    { title: 'Bloomberg', body: 'An effortless way to perk up your whole morning routine.' },
     { title: 'Cosmopolitan', body: 'A calm, steady lift the whole team swears by now.' },
-  ]).slice(0, 3).map((p: any) => `<div class="pq"><b>${escp(p.title || p.label)}</b><p>${esc(p.body)}</p></div>`).join('')
+    { title: 'Forbes', body: 'A genuine standout in the daily wellness category.' },
+    { title: 'Vogue', body: 'It quietly became part of my everyday ritual.' },
+  ]).slice(0, 6)
+  const seenItem = (p: any) => `<div class="qitem"><span class="qlogo">${escp(p.title || p.label)}</span><span class="qquote">${esc(p.body)}</span></div>`
+  const seenItems = seenSrc.map(seenItem).join('')
+  // aria-hidden duplicate set → seamless marquee loop (skipped in the editor tree, like Rotating Benefits)
+  const seenDup = seenSrc.map((p) => seenItem(p).replace('<div class="qitem"', '<div class="qitem" aria-hidden="true"')).join('')
 
   const stats = (arr(c.stats).length ? arr(c.stats) : [
     { label: '97%', body: 'Felt reliable clarity in every drop.' }, { label: '96%', body: 'Gained brain fuel for a sharper edge.' }, { label: '98%', body: 'Maintained steady focus without any crashes.' }, { label: '89%', body: 'Found a lighter, more motivated mood.' },
@@ -431,8 +442,10 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="sectsub">${escp(c.reviews_intro || 'Join our growing community of people who made this part of their daily routine.')}</div>
     </div>
     <div class="rcar">${revs}</div>
-    <div class="press">${press}</div>
   </div></section>
+
+  <!-- 6b · AS SEEN ON WITH QUOTES -->
+  <section class="seen"><div class="seentrack">${seenItems}${seenDup}</div></section>
 
   <!-- 7 · STATS -->
   <section class="stats"><div class="wrap">
@@ -545,7 +558,7 @@ export const cobaltV1: PageTemplate = {
     { key: 'reviews_sub', type: 'text', label: 'Reviews rating line' },
     { key: 'reviews_intro', type: 'text', label: 'Reviews subtitle' },
     { key: 'testimonials', type: 'testimonials', label: 'Reviews (6)', count: 6, hint: 'name + quote.' },
-    { key: 'press_quotes', type: 'reasons', label: 'Press quotes (3)', count: 3, hint: 'title = publication; body = the quote.' },
+    { key: 'press_quotes', type: 'reasons', label: 'As-seen-on quotes (6)', count: 6, hint: 'title = publication name (shown as a wordmark); body = a short one-line quote.' },
     { key: 'stats_head', type: 'text', label: 'Stats heading' },
     { key: 'stats_sub', type: 'text', label: 'Stats subhead' },
     { key: 'stats', type: 'reasons', label: 'Stats (4)', count: 4, hint: 'label = a percentage like "97%"; body = what improved.' },
