@@ -335,8 +335,9 @@ function buildRawOutline(html: string): RawOutlineNode[] {
   // Decorative gallery arrows (‹ ›) aren't structural blocks — hide them from the outline. Keep original child
   // indices for the path.
   const realKids = (el: HTMLElement) => (Array.from(el.children) as HTMLElement[]).map((k, i) => ({ k, i })).filter((x) => !x.k.classList.contains('garr') && x.k.tagName !== 'STYLE')
-  // A wrapper is "named" (a real block, keep its row) if it was renamed or its class maps to a friendly name.
-  const isNamed = (el: HTMLElement) => !!(el.getAttribute('data-name') || RAW_FRIENDLY[friendlyClassOf(el)])
+  // A wrapper is "named" (a real block, keep its row) if it was renamed or its class maps to a friendly name —
+  // EXCEPT pure-layout wrappers (.wrap/.grid → "Row"), which PagePilot never shows, so they still collapse.
+  const isNamed = (el: HTMLElement) => { const n = el.getAttribute('data-name') || RAW_FRIENDLY[friendlyClassOf(el)]; return !!n && n !== 'Row' }
   const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
     if (budget-- <= 0) return null
     let cur: HTMLElement = el, curPath = path
