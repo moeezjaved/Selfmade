@@ -143,6 +143,8 @@ function baseCss(tokens: DesignTokens): string {
 /* per-element responsive visibility ("Show on" — desktop / mobile) */
 @media(max-width:768px){.sf-hide-mob{display:none!important}}
 @media(min-width:769px){.sf-hide-desk{display:none!important}}
+/* payment-icon size (editor "Icons → Size" sets --payw on the .pays row) */
+.pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
 
 /* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
 /* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */

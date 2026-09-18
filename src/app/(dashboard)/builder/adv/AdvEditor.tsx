@@ -1911,6 +1911,32 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 8, color: INK }}>Icons</div>
           <SegRow label="Alignment" prop="__paysalign" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right'], ['between', 'Space']]} getVal={() => paysAlign} onStyle={(_p, v) => onPaysAlign(v)} />
           <NumRow label="Gap" prop="__paysgap" min={0} max={30} unit="px" getVal={() => paysGap} onStyle={(_p, v) => onPaysGap(v)} />
+          <NumRow label="Size" prop="--payw" min={20} max={64} unit="px" getVal={getVal} onStyle={onStyle} />
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
+            <ColorField label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+            <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
+            <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+            <BorderWidthRow getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Rounded corners" prop="border-radius" max={40} getVal={getVal} onStyle={onStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <SecHead>Visibility</SecHead>
+            <ShowOnRow getVal={getVal} onStyle={onStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+            <NumRow label="Top" prop="padding-top" max={60} getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Bottom" prop="padding-bottom" max={60} getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Left" prop="padding-left" max={60} getVal={getVal} onStyle={onStyle} />
+            <NumRow label="Right" prop="padding-right" max={60} getVal={getVal} onStyle={onStyle} />
+          </div>
+          <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+            <SecHead>Custom</SecHead>
+            <div style={{ fontSize: 12, fontWeight: 600, color: SUB, marginBottom: 6 }}>Class</div>
+            <input defaultValue={getVal('__class')} key={getVal('__class')} placeholder="my-class" onBlur={(e) => onStyle('__class', e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+              style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+          </div>
         </div>
       )}
       {isRing && (
