@@ -997,6 +997,30 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       el.style.display = show ? '' : 'none'
     })
   }, [rawSel, rawEditHtml])
+  // ── Price block (matches PagePilot's Price panel: Price / Compare-at / Badge sub-sections) ───────────────
+  const priceRow = useCallback((): HTMLElement | null => {
+    const n = rawNodeEl(); if (!n) return null
+    return (n.classList?.contains('price') ? n : (n.querySelector('.price') || n.closest('.price'))) as HTMLElement | null
+  }, [rawNodeEl])
+  const rawIsPrice = useCallback((): boolean => { const p = priceRow(); return !!(p && p.querySelector('.now')) }, [priceRow])
+  // Read/write inline style on a price sub-part (.now sale price / .was compare-at / .save badge).
+  const pricePartVal = useCallback((part: string, prop: string): string => {
+    const row = priceRow(); const el = row?.querySelector('.' + part) as HTMLElement | null; if (!el) return ''
+    if (prop === '__show') return el.style.display === 'none' ? '1' : ''
+    return el.style.getPropertyValue(prop) || ''
+  }, [priceRow])
+  const setPricePart = useCallback((part: string, prop: string, val: string) => {
+    if (!rawSel) return
+    rawEditHtml(rawSel.ref, (box) => {
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      const row = (node.classList?.contains('price') ? node : (node.querySelector('.price') || node.closest('.price'))) as HTMLElement | null
+      if (!row) return
+      const el = row.querySelector('.' + part) as HTMLElement | null; if (!el) return
+      if (prop === '__show') { el.style.display = val === '1' ? 'none' : ''; return }
+      if (val) el.style.setProperty(prop, val); else el.style.removeProperty(prop)
+    })
+  }, [rawSel, rawEditHtml])
   // ── List-item icon (matches PagePilot: pick / remove the icon on a benefit or ingredient row) ────────────
   const iconHolderEl = useCallback((): HTMLElement | null => {
     const n = rawNodeEl(); if (!n) return null
@@ -1526,6 +1550,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               vpickStyleVal={vpickStyleVal} onVpickTextStyle={setVpickTextStyle} vpickGap={vpickGapVal()} onVpickGap={setVpickGap}
               isCart={rawIsCart()} cart={cartCfg()} onCart={setCart}
               isSave={rawIsSave()} saveMode={saveCfg().mode} saveShow={saveCfg().show} onSaveBadge={setSaveBadge}
+              isPrice={rawIsPrice()} priceVal={pricePartVal} onPrice={setPricePart}
               isIconItem={rawIsIconItem()} itemIcon={itemIcon()} onItemIcon={setItemIcon}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
               hasChildren={rawHasBlockChildren()}
@@ -1821,7 +1846,7 @@ function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick
     </div>
   )
 }
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isPrice, priceVal, onPrice, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isPrice: boolean; priceVal: (part: string, prop: string) => string; onPrice: (part: string, prop: string, val: string) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1843,7 +1868,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   }
   // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
   // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
-  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave
+  const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave || isPrice
   // A container/group (block-level children, no special role) gets PagePilot's dedicated Group panel instead of
   // the generic Typography/Appearance rows.
   const isGroup = hasChildren && !isMedia && !isText && !isLink && text === ''
@@ -2043,6 +2068,44 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Computed automatically from Price & Compare price — updates when you change them.</div>
         </div>
       )}
+      {isPrice && (() => {
+        const nowGet = (p: string) => priceVal('now', p), nowSet = (p: string, v: string) => onPrice('now', p, v)
+        const wasGet = (p: string) => priceVal('was', p), wasSet = (p: string, v: string) => onPrice('was', p, v)
+        const sec: React.CSSProperties = { borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }
+        return (
+          <div>
+            <div style={{ paddingTop: 2 }}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Price</div>
+              <ColorField label="Text color" prop="color" getVal={nowGet} onStyle={nowSet} />
+              <FontField label="Font" prop="font-family" getVal={nowGet} onStyle={nowSet} />
+              <NumRow label="Size" prop="font-size" min={12} max={64} getVal={nowGet} onStyle={nowSet} />
+              <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={nowGet} onStyle={nowSet} />
+              <SelRow label="Case" prop="text-transform" options={[['none', 'Default'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']]} getVal={nowGet} onStyle={nowSet} />
+              <ColorField label="Background" prop="background-color" getVal={nowGet} onStyle={nowSet} />
+            </div>
+            <div style={sec}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Compare-at price</div>
+              <ToggleRow label="Show compare-at" on={priceVal('was', '__show') !== '1'} onChange={(v) => onPrice('was', '__show', v ? '' : '1')} />
+              <ColorField label="Text color" prop="color" getVal={wasGet} onStyle={wasSet} />
+              <NumRow label="Size" prop="font-size" min={10} max={40} getVal={wasGet} onStyle={wasSet} />
+              <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold']]} getVal={wasGet} onStyle={wasSet} />
+            </div>
+            <div style={sec}>
+              <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Badge</div>
+              <ToggleRow label="Show badge" on={saveShow} onChange={(v) => onSaveBadge({ show: v })} />
+              <SegRow label="Type" prop="__savetype" options={[['percent', 'Percentage'], ['value', 'Value']]} getVal={() => saveMode} onStyle={(_p, v) => onSaveBadge({ mode: v as 'percent' | 'value' })} />
+              <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Computed automatically from Price & Compare-at.</div>
+            </div>
+            <div style={sec}>
+              <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+              <NumRow label="Top" prop="padding-top" max={60} getVal={getVal} onStyle={onStyle} />
+              <NumRow label="Bottom" prop="padding-bottom" max={60} getVal={getVal} onStyle={onStyle} />
+              <NumRow label="Left" prop="padding-left" max={60} getVal={getVal} onStyle={onStyle} />
+              <NumRow label="Right" prop="padding-right" max={60} getVal={getVal} onStyle={onStyle} />
+            </div>
+          </div>
+        )
+      })()}
       {isIconItem && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, marginTop: 2, color: INK }}>Icon</div>
