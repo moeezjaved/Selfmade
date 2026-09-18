@@ -123,10 +123,14 @@ const css = `
 .pgbld .warn b{color:#b06a1c}
 
 /* 2 · PILL STRIP */
-.pgbld .strip{background:var(--soft);border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:12px 0}
-.pgbld .strip .row{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
-.pgbld .strip .p{display:inline-flex;align-items:center;gap:7px;background:#fff;border:1px solid var(--line);color:var(--blue);border-radius:999px;padding:6px 14px;font-size:12px;font-weight:700}
-.pgbld .strip .p::before{content:'✓';font-weight:900}
+/* Rotating Benefits — a horizontally-scrolling marquee band of icon pills (matches PagePilot's rotating row). */
+.pgbld .strip{background:var(--blue);padding:16px 0;overflow:hidden}
+.pgbld .strip .striptrack{display:flex;width:max-content;gap:14px;animation:sfmarquee 30s linear infinite}
+.pgbld .strip:hover .striptrack{animation-play-state:paused}
+.pgbld .strip .benfc{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--ink);border-radius:999px;padding:10px 20px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px -3px rgba(20,18,15,.25);flex:none}
+.pgbld .strip .benfc .pico{display:inline-flex;color:var(--blue);flex:none}
+.pgbld .strip .benfc .pico svg{width:16px;height:16px}
+@keyframes sfmarquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 7px))}}
 
 /* 3 · TRUSTED */
 .pgbld .trust{background:var(--soft);padding:48px 0}
@@ -309,8 +313,10 @@ function render(c: FilledContent, o: RenderOpts): string {
   // Split a money string into symbol / amount / code spans so the editor can show/hide the currency symbol & code.
   const mny = (s: any): string => { const str = String(s || ''); const m = str.match(/^(\D*)([\d.,\s]*\d)(.*)$/); if (!m) return escp(str); const sym = m[1].trim(), amt = m[2].trim(), code = m[3].trim(); return `${sym ? `<span class="cur">${escp(sym)}</span>` : ''}<span class="amt">${escp(amt)}</span>${code ? `<span class="code"> ${escp(code)}</span>` : ''}` }
 
-  const strip = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Purifies The Scalp', 'Simple Pre-Wash Ritual', 'Cruelty-Free & Vegan', 'Lightweight, Non-Greasy', 'No Harsh Sulfates'].map((l) => ({ label: l })))
-    .map((p) => `<span class="p">${escp(p.label)}</span>`).join('')
+  const stripPills = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Purifies The Scalp', 'Simple Pre-Wash Ritual', 'Cruelty-Free & Vegan', 'Lightweight, Non-Greasy', 'No Harsh Sulfates'].map((l) => ({ label: l })))
+    .map((p, i) => `<div class="benfc"><span class="pico">${benefitCheckIcon(i)}</span><span class="ptext">${escp(p.label)}</span></div>`)
+  const strip = stripPills.join('')
+  const stripDup = stripPills.map((h) => h.replace('<div class="benfc"', '<div class="benfc" aria-hidden="true"')).join('')
 
   const sci = (arr(c.sci_points).length ? arr(c.sci_points) : [
     { title: 'Cold-Pressed Citrus Oil', body: 'Brightens and gently clarifies the scalp.' },
@@ -410,7 +416,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div></section>
 
   <!-- 2 · PILL STRIP -->
-  <section class="strip"><div class="wrap"><div class="row">${strip}</div></div></section>
+  <section class="strip"><div class="striptrack">${strip}${stripDup}</div></section>
 
   <!-- 3 · TRUSTED -->
   <section class="trust"><div class="wrap"><div class="grid">
