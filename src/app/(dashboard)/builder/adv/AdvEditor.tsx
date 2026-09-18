@@ -436,26 +436,41 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
   const [rawTb, setRawTb] = useState<null | { top: number; left: number; below: boolean }>(null)
   const [rawBox, setRawBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // selection highlight rect
   const [hoverBox, setHoverBox] = useState<null | { top: number; left: number; width: number; height: number }>(null)  // hover highlight rect (PagePilot-style)
+  // PagePilot-style inline "+" insertion line: hovering near a block's top/bottom edge shows a blue line + a
+  // "+" that opens Add Block and inserts exactly there (before/after that block).
+  const [insertLine, setInsertLine] = useState<null | { top: number; left: number; width: number; ref: NodeRef; path: number[]; mode: 'before' | 'after' }>(null)
   const hoverRaf = useRef(0)
   // Highlight the specific piece under the cursor inside a raw section (PagePilot highlights the exact block).
   const onCanvasHover = useCallback((e: React.MouseEvent) => {
     if (hoverRaf.current) return
     const t = e.target as HTMLElement
+    const cy = e.clientY
     hoverRaf.current = requestAnimationFrame(() => {
       hoverRaf.current = 0
       const target = t.closest('[data-node-type="element:raw"]') as HTMLElement | null
-      if (!target) { setHoverBox(null); return }
+      if (!target) { setHoverBox(null); setInsertLine(null); return }
       const item = snapUp(t, target)
-      if (!item || item === target || item.classList?.contains('garr')) { setHoverBox(null); return }
+      if (!item || item === target || item.classList?.contains('garr')) { setHoverBox(null); setInsertLine(null); return }
       const r = item.getBoundingClientRect()
       setHoverBox({ top: r.top, left: r.left, width: r.width, height: r.height })
+      // Near the block's top/bottom edge → show the inline "+" insertion line (before / after this block).
+      const path = subPathTo(item, target)
+      const id = target.getAttribute('data-node-id') || ''
+      let ref: NodeRef | null = null
+      if (doc) for (const s of doc.sections) for (const b of s.blocks) for (const el of b.elements) if (el.id === id) ref = { sectionId: s.id, blockId: b.id, elementId: el.id }
+      const edge = Math.min(28, r.height * 0.32)
+      if (ref && path && path.length && r.height > 24) {
+        if (cy <= r.top + edge) setInsertLine({ top: r.top, left: r.left, width: r.width, ref, path, mode: 'before' })
+        else if (cy >= r.bottom - edge) setInsertLine({ top: r.bottom, left: r.left, width: r.width, ref, path, mode: 'after' })
+        else setInsertLine(null)
+      } else setInsertLine(null)
     })
-  }, [])
+  }, [doc])
   // Close the inline image-URL field whenever the selected piece changes.
   useEffect(() => { setImgUrlOpen(false) }, [rawSel?.ref.elementId, rawSel?.path.join('.')])
   const [rawAddOpen, setRawAddOpen] = useState(false)          // the quick "add a piece" menu for a raw section
   const [rawLibOpen, setRawLibOpen] = useState(false)          // the full block LIBRARY (previews) modal
-  const [rawInsertTarget, setRawInsertTarget] = useState<null | { path: number[]; mode: 'after' | 'append' }>(null)  // where a picked block lands
+  const [rawInsertTarget, setRawInsertTarget] = useState<null | { path: number[]; mode: 'after' | 'append' | 'before' }>(null)  // where a picked block lands
   const rawDrag = useRef<number[] | null>(null)                // path of the raw piece being dragged
 
   const history = useRef<PageDoc[]>([])
@@ -1367,6 +1382,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       let node: HTMLElement = box
       for (const i of target.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
       if (target.mode === 'append') node.insertAdjacentHTML('beforeend', insertHtml)
+      else if (target.mode === 'before') node.insertAdjacentHTML('beforebegin', insertHtml)
       else node.insertAdjacentHTML('afterend', insertHtml)
     })
     setRawInsertTarget(null)
@@ -1680,7 +1696,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
         {/* ── center: live canvas ── */}
         <main ref={mainRef} style={{ flex: 1, overflow: 'auto', padding: 24, display: 'flex', justifyContent: 'center' }} onClick={(e) => { if (e.target === e.currentTarget) setSel(null) }}>
           <div style={{ zoom, width: canvasWidth, background: '#fff', borderRadius: 12, boxShadow: '0 2px 20px rgba(20,18,15,.08)', overflow: 'hidden', alignSelf: 'flex-start' } as React.CSSProperties}>
-            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} onMouseMove={onCanvasHover} onMouseLeave={() => setHoverBox(null)} onDragStart={onCanvasDragStart} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
+            <div ref={canvasRef} onClick={onCanvasClick} onDoubleClick={onCanvasDouble} onMouseMove={onCanvasHover} onMouseLeave={() => { setHoverBox(null); setInsertLine(null) }} onDragStart={onCanvasDragStart} onDragOver={onCanvasDragOver} onDrop={onCanvasDrop} dangerouslySetInnerHTML={{ __html: canvasHtml }} />
           </div>
         </main>
 
@@ -1788,6 +1804,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       )}
       {hoverBox && (!rawBox || hoverBox.top !== rawBox.top || hoverBox.left !== rawBox.left) && (
         <div style={{ position: 'fixed', top: hoverBox.top - 1, left: hoverBox.left - 1, width: hoverBox.width + 2, height: hoverBox.height + 2, border: `1.5px dashed ${ORANGE}`, borderRadius: 5, zIndex: 28, pointerEvents: 'none' }} />
+      )}
+      {/* PagePilot-style inline insertion line: a blue rule + a "+" that opens Add Block at this exact spot. */}
+      {insertLine && (
+        <div style={{ position: 'fixed', top: insertLine.top - 1, left: insertLine.left, width: insertLine.width, height: 2, background: '#3f6bff', zIndex: 30, pointerEvents: 'none' }}>
+          <button onMouseDown={(e) => { e.preventDefault(); e.stopPropagation() }}
+            onClick={(e) => { e.stopPropagation(); setRawSel({ ref: insertLine.ref, path: insertLine.path, isImg: false }); setRawInsertTarget({ path: insertLine.path, mode: insertLine.mode }); setRawLibOpen(true); setInsertLine(null) }}
+            title="Add a block here"
+            style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 26, height: 26, borderRadius: '50%', background: '#3f6bff', color: '#fff', border: '2px solid #fff', boxShadow: '0 2px 8px rgba(20,18,15,.3)', cursor: 'pointer', pointerEvents: 'auto', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, lineHeight: 1, padding: 0 }}>+</button>
+        </div>
       )}
       {rawTb && rawSel && (
         <div style={{ position: 'fixed', top: rawTb.top, left: rawTb.left, transform: rawTb.below ? 'none' : 'translateY(-100%)', display: 'flex', alignItems: 'center', gap: 1, ...TB_BAR, zIndex: 31 }} onClick={(e) => e.stopPropagation()}>
