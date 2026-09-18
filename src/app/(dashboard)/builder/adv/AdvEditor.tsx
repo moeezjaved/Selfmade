@@ -2217,6 +2217,34 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               <button onClick={() => { if (urlDraft.trim()) { replaceImg(urlDraft.trim()); setUrlDraft(''); onUrlOpen(false) } }} style={{ border: 0, background: ORANGE, color: '#fff', borderRadius: 8, padding: '0 14px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Set</button>
             </div>
           )}
+          {(() => {
+            const filt = getVal('filter')
+            const gray = (filt.match(/grayscale\(([\d.]+)/) || [])[1] || ''
+            const inv = /invert\((?!0)/.test(filt)
+            const setFilt = (g: string, i: boolean) => { const p: string[] = []; if (g && g !== '0') p.push(`grayscale(${g}%)`); if (i) p.push('invert(100%)'); onStyle('filter', p.join(' ')) }
+            return (
+              <div style={{ marginTop: 4 }}>
+                <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 10 }}>
+                  <SecHead device={device} onDevice={onDevice}>Size</SecHead>
+                  <SelRow label="Aspect ratio" prop="aspect-ratio" options={[['1/1', 'Square'], ['4/3', 'Landscape 4:3'], ['3/4', 'Portrait 3:4'], ['16/9', 'Wide 16:9'], ['auto', 'Original']]} getVal={getVal} onStyle={onStyle} />
+                  <NumRow label="Width" prop="width" min={10} max={100} unit="%" getVal={getVal} onStyle={onStyle} />
+                  <SegRow label="Height" prop="__ih" options={[['fit', 'Fit'], ['fill', 'Fill']]} getVal={() => (getVal('height') === '100%' ? 'fill' : 'fit')} onStyle={(_p, v) => onStyle('height', v === 'fill' ? '100%' : '')} />
+                  <SelRow label="Object fit" prop="object-fit" options={[['cover', 'Cover'], ['contain', 'Contain'], ['fill', 'Fill']]} getVal={getVal} onStyle={onStyle} />
+                  <SelRow label="Object position" prop="object-position" options={[['center', 'Center'], ['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
+                </div>
+                <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
+                  <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
+                  <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
+                  <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+                  <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+                  <SelRow label="Box shadow" prop="box-shadow" options={[['0 1px 3px rgba(0,0,0,.12)', 'Small'], ['0 8px 20px -6px rgba(0,0,0,.2)', 'Medium'], ['0 20px 44px -14px rgba(0,0,0,.3)', 'Large']]} getVal={getVal} onStyle={onStyle} />
+                  <NumRow label="Opacity" prop="opacity" min={0} max={100} unit="" getVal={() => { const o = getVal('opacity'); return o ? String(Math.round(parseFloat(o) * 100)) : '' }} onStyle={(_p, v) => onStyle('opacity', v ? String(parseInt(v) / 100) : '')} />
+                  <NumRow label="Grayscale" prop="__gray" min={0} max={100} unit="" getVal={() => gray} onStyle={(_p, v) => setFilt(v, inv)} />
+                  <ToggleRow label="Invert" on={inv} onChange={(v) => setFilt(gray, v)} />
+                </div>
+              </div>
+            )
+          })()}
         </div>
       )}
       {isCart && (
