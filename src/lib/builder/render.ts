@@ -143,6 +143,10 @@ function baseCss(tokens: DesignTokens): string {
 /* per-element responsive visibility ("Show on" — desktop / mobile) */
 @media(max-width:768px){.sf-hide-mob{display:none!important}}
 @media(min-width:769px){.sf-hide-desk{display:none!important}}
+/* button behaviours: hover text colour (--hc) + hover animation (editor Button panel) */
+.pgbld [style*="--hc"]:hover{color:var(--hc)!important}
+.pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+.pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
 /* payment-icon size (editor "Icons → Size" sets --payw on the .pays row) */
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
 /* gallery thumbnail + arrow controls (editor sets CSS vars on the .thumbs / .gwrap elements; the targeted
@@ -328,6 +332,19 @@ function swiperizeCarousel(body: string, containerCls: string, cardCls: string):
   const sw = `<div class="pgsw pgsw-rev"><div class="swiper pgsw-rmain"><div class="swiper-wrapper">${slides}</div>${prev}${next}<div class="swiper-pagination"></div></div></div>`
   return body.slice(0, open) + sw + body.slice(end)
 }
+// Editor utilities that the raw publish path (doc.rawCss only, no baseCss) would otherwise miss — button hover
+// colour/animation, per-element responsive visibility, and payment-icon sizing — so they work on the live page too.
+const PUBLISH_UTIL_CSS = `
+@media(max-width:768px){.sf-hide-mob{display:none!important}}
+@media(min-width:769px){.sf-hide-desk{display:none!important}}
+.pgbld [style*="--hc"]:hover{color:var(--hc)!important}
+.pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+.pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
+.pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
+`
+// Wires button "Actions" (data-sfaction) on the published page: scroll, add-to-cart, checkout, do-nothing.
+const sfActionScript = `<script>(function(){document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('[data-sfaction]');if(!a)return;var k=a.getAttribute('data-sfaction');if(k==='nothing'){e.preventDefault();return}if(k==='scroll-top'){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'})}else if(k==='scroll-el'){e.preventDefault();var t=document.querySelector('.buybox,.vpick,.hero');if(t)t.scrollIntoView({behavior:'smooth',block:'center'})}else if(k==='checkout'){e.preventDefault();window.location.href='/checkout'}else if(k==='add-cart'){e.preventDefault();var b=document.querySelector('form[action*="/cart/add"] [type=submit],form[action*="/cart/add"] button,[name=add],.buybox button');if(b){b.click()}else{window.location.href='/cart'}}});})();</script>`
+const withActionScript = (body: string): string => body.includes('data-sfaction') ? `${body}${sfActionScript}` : body
 /** Turn the review + recommended-product carousels into Swiper markup on publish (editor keeps static scroll). */
 function swiperizeReviews(body: string): string {
   let out = swiperizeCarousel(body, 'rcar', 'frev')
@@ -390,10 +407,10 @@ export function renderDocForPublish(doc: PageDoc, product?: RenderProduct): { bo
   const allRaw = visible.length > 0 && visible.every((s) => s.type === 'raw' && !!sectionRawHtml(s))
   if (doc.rawCss && allRaw) {
     const inner = visible.map((s) => pgbldInner(sectionRawHtml(s)).trim()).filter(Boolean).join('\n')
-    const body = withSwiperAssets(swiperizeReviews(swiperizeGallery(`<div class="pgbld">${inner}</div>`)))
-    return { body, css: withSwiperCss(doc.rawCss, body) }
+    const body = withActionScript(withSwiperAssets(swiperizeReviews(swiperizeGallery(`<div class="pgbld">${inner}</div>`))))
+    return { body, css: withSwiperCss(doc.rawCss, body) + PUBLISH_UTIL_CSS }
   }
   const { html, css } = renderDoc(doc, { mode: 'publish', device: 'base', product })
-  const body = withSwiperAssets(swiperizeReviews(swiperizeGallery(html.replace('<div class="sf-page">', '<div class="pgbld sf-page">'))))
+  const body = withActionScript(withSwiperAssets(swiperizeReviews(swiperizeGallery(html.replace('<div class="sf-page">', '<div class="pgbld sf-page">')))))
   return { body, css: withSwiperCss(css, body) }
 }

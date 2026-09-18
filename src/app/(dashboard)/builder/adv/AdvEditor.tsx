@@ -859,6 +859,19 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       apply((d) => patchElementContent(d, ref2, { html: box.innerHTML }))
       return
     }
+    // Button behaviours stored as attributes/classes (open-in-new-tab, click action, hover animation) — set on the
+    // element node like __class, so they survive re-edits and publish (a small script wires data-sfaction on the live page).
+    if ((prop === '__opentab' || prop === '__action' || prop === '__hoveranim') && typeof document !== 'undefined') {
+      const box = document.createElement('div'); box.innerHTML = html
+      let node: HTMLElement = box
+      for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
+      if (prop === '__opentab') { if (value === '1') { node.setAttribute('target', '_blank'); node.setAttribute('rel', 'noopener') } else { node.removeAttribute('target'); node.removeAttribute('rel') } }
+      else if (prop === '__hoveranim') { node.classList.toggle('sf-hover-anim', value === '1') }
+      else if (prop === '__action') { if (value) { node.setAttribute('data-sfaction', value); if ((node.getAttribute('href') || '') === '') node.setAttribute('href', '#') } else { node.removeAttribute('data-sfaction') } }
+      const refA = rawSel.ref
+      apply((d) => patchElementContent(d, refA, { html: box.innerHTML }))
+      return
+    }
     const next = rawHtmlOp(html, rawSel.path, 'style', `${prop}::${value}`)
     if (next === html) return
     const ref = rawSel.ref
@@ -870,6 +883,9 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (prop === '__class') return n.getAttribute('data-cc') || ''
     if (prop === '__hidemob') return n.classList.contains('sf-hide-mob') ? '1' : ''
     if (prop === '__hidedesk') return n.classList.contains('sf-hide-desk') ? '1' : ''
+    if (prop === '__opentab') return n.getAttribute('target') === '_blank' ? '1' : ''
+    if (prop === '__action') return n.getAttribute('data-sfaction') || ''
+    if (prop === '__hoveranim') return n.classList.contains('sf-hover-anim') ? '1' : ''
     return n.style.getPropertyValue(prop) || ''
   }, [rawNodeEl])
   // The selected piece's PagePilot-style name (panel heading) + its editable text (panel content field, only
@@ -2433,14 +2449,43 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           </div>
         </div>
       )}
-      {isLink && !isCart && (
+      {isLink && !isCart && (() => {
+        const action = getVal('__action')
+        const mode = action ? 'actions' : 'link'
+        return (
         <div style={{ marginBottom: 14 }}>
-          <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Link</div>
-          <input defaultValue={href} placeholder="https://…  or  /products/handle" onBlur={(e) => { const v = e.target.value.trim(); if (v !== href) onHref(v) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-            style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
-          <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Where this button/link goes when clicked.</div>
+          <SecHead device={device} onDevice={onDevice}>Button</SecHead>
+          <SegRow label="Type" prop="__type" options={[['link', 'Link'], ['actions', 'Actions']]} getVal={() => mode} onStyle={(_p, v) => onStyle('__action', v === 'actions' ? (action || 'scroll-top') : '')} />
+          {mode === 'link' ? (
+            <div style={{ marginTop: 10 }}>
+              <div style={{ fontSize: 12.5, fontWeight: 700, marginBottom: 6, color: INK }}>Link</div>
+              <input defaultValue={href} placeholder="https://…  or  /products/handle" onBlur={(e) => { const v = e.target.value.trim(); if (v !== href) onHref(v) }} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+                style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+              <div style={{ fontSize: 11, color: FAINT, margin: '4px 0 8px' }}>Where this button/link goes when clicked.</div>
+              <ToggleRow label="Open in new tab" on={getVal('__opentab') === '1'} onChange={(v) => onStyle('__opentab', v ? '1' : '')} />
+            </div>
+          ) : (
+            <div style={{ marginTop: 10 }}>
+              <SelRow label="On click" prop="__action" options={[['scroll-top', 'Scroll to top'], ['scroll-el', 'Scroll to buy box'], ['add-cart', 'Add to cart'], ['checkout', 'Checkout'], ['nothing', 'Do nothing']]} getVal={() => action} onStyle={(_p, v) => onStyle('__action', v)} />
+              <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Choose what happens when the button is clicked.</div>
+            </div>
+          )}
+          <div style={{ borderTop: `1px solid ${LINE}`, marginTop: 12, paddingTop: 12 }}>
+            <ColorField label="Branding Background Color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+            <ColorField label="Branding Text Color" prop="color" getVal={getVal} onStyle={onStyle} />
+            <ColorField label="Hover Text Color" prop="--hc" getVal={getVal} onStyle={onStyle} />
+            <ToggleRow label="Hover Animation" on={getVal('__hoveranim') === '1'} onChange={(v) => onStyle('__hoveranim', v ? '1' : '')} />
+            <SelRow label="Border Style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
+            {getVal('border-style') && getVal('border-style') !== 'none' && (<>
+              <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+              <BorderWidthRow getVal={getVal} onStyle={onStyle} />
+            </>)}
+            <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+            <SelRow label="Box Shadow" prop="box-shadow" options={[['', 'None'], ['0 2px 6px rgba(20,18,15,.12)', 'Small'], ['0 6px 16px rgba(20,18,15,.16)', 'Medium'], ['0 12px 28px rgba(20,18,15,.22)', 'Large']]} getVal={getVal} onStyle={onStyle} />
+          </div>
         </div>
-      )}
+        )
+      })()}
       {isCart || isSave || isPrice || isReviews || isDivider ? null : isText ? (
         <RichText key={html.length + ':' + name} html={html} onCommit={onHtml} context={textContext} />
       ) : text !== '' && (
@@ -2511,7 +2556,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Turn a device off to hide this element there.</div>
       </div>
       )}
-      {!isMedia && !isGroup && (
+      {!isMedia && !isGroup && !isLink && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
         <ColorField label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
@@ -3096,6 +3141,7 @@ const hsvToHex = (h: number, s: number, v: number): string => {
 }
 const hexToHsv = (hex: string): { h: number; s: number; v: number } => {
   let h = (hex || '').replace('#', ''); if (h.length === 3) h = h.split('').map((c) => c + c).join('')
+  if (h.length === 8) h = h.slice(0, 6)   // strip alpha (#rrggbbaa) for hue/sat/val
   if (!/^[0-9a-fA-F]{6}$/.test(h)) h = '363636'
   const r = parseInt(h.slice(0, 2), 16) / 255, g = parseInt(h.slice(2, 4), 16) / 255, b = parseInt(h.slice(4, 6), 16) / 255
   const max = Math.max(r, g, b), min = Math.min(r, g, b), d = max - min
@@ -3105,8 +3151,11 @@ const hexToHsv = (hex: string): { h: number; s: number; v: number } => {
 function ColorPicker({ value, onChange, onRemove }: { value: string; onChange: (hex: string) => void; onRemove: () => void }) {
   const [hsv, setHsv] = useState(() => hexToHsv(value))
   const [hex, setHex] = useState(() => (hsvToHex(hexToHsv(value).h, hexToHsv(value).s, hexToHsv(value).v)).slice(1))
+  // Alpha (opacity) — parsed from an 8-digit hex if present; emitted as #rrggbbaa when < 100%.
+  const [alpha, setAlpha] = useState(() => { const m = (value || '').match(/^#[0-9a-fA-F]{6}([0-9a-fA-F]{2})$/); return m ? Math.round(parseInt(m[1], 16) / 255 * 100) : 100 })
   const sqRef = useRef<HTMLDivElement | null>(null); const hueRef = useRef<HTMLDivElement | null>(null)
-  const apply = (n: { h: number; s: number; v: number }) => { setHsv(n); const hx = hsvToHex(n.h, n.s, n.v); setHex(hx.slice(1)); onChange(hx) }
+  const emit = (hx: string, a: number) => onChange(a >= 100 ? hx : hx + Math.round(a / 100 * 255).toString(16).padStart(2, '0'))
+  const apply = (n: { h: number; s: number; v: number }) => { setHsv(n); const hx = hsvToHex(n.h, n.s, n.v); setHex(hx.slice(1)); emit(hx, alpha) }
   const drag = (handler: (e: { clientX: number; clientY: number }) => void) => (e: React.MouseEvent) => { e.preventDefault(); handler(e); const mv = (ev: MouseEvent) => handler(ev); const up = () => { document.removeEventListener('mousemove', mv); document.removeEventListener('mouseup', up) }; document.addEventListener('mousemove', mv); document.addEventListener('mouseup', up) }
   const onSq = (e: { clientX: number; clientY: number }) => { const el = sqRef.current; if (!el) return; const r = el.getBoundingClientRect(); const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); const y = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height)); apply({ ...hsv, s: x, v: 1 - y }) }
   const onHue = (e: { clientX: number; clientY: number }) => { const el = hueRef.current; if (!el) return; const r = el.getBoundingClientRect(); const x = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); apply({ ...hsv, h: x * 360 }) }
@@ -3120,7 +3169,14 @@ function ColorPicker({ value, onChange, onRemove }: { value: string; onChange: (
       </div>
       <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 12, border: `1px solid ${LINE}`, borderRadius: 8, padding: '6px 9px' }}>
         <span style={{ color: FAINT, fontSize: 13 }}>#</span>
-        <input value={hex} onChange={(e) => { const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6); setHex(v); if (v.length === 6 || v.length === 3) { const full = v.length === 3 ? v.split('').map((c) => c + c).join('') : v; setHsv(hexToHsv('#' + full)); onChange('#' + full) } }} style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontSize: 13, color: INK, letterSpacing: '.04em' }} />
+        <input value={hex} onChange={(e) => { const v = e.target.value.replace(/[^0-9a-fA-F]/g, '').slice(0, 6); setHex(v); if (v.length === 6 || v.length === 3) { const full = v.length === 3 ? v.split('').map((c) => c + c).join('') : v; setHsv(hexToHsv('#' + full)); emit('#' + full, alpha) } }} style={{ flex: 1, minWidth: 0, border: 0, outline: 'none', fontSize: 13, color: INK, letterSpacing: '.04em' }} />
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginTop: 12 }}>
+        <div style={{ position: 'relative', flex: 1, height: 12, borderRadius: 999, background: `linear-gradient(to right, transparent, ${hsvToHex(hsv.h, hsv.s, hsv.v)}), repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0/10px 10px` }}>
+          <input type="range" min={0} max={100} value={alpha} onChange={(e) => { const a = parseInt(e.target.value); setAlpha(a); emit(hsvToHex(hsv.h, hsv.s, hsv.v), a) }} style={{ position: 'absolute', inset: 0, width: '100%', margin: 0, opacity: 0, cursor: 'pointer' }} />
+          <div style={{ position: 'absolute', left: `${alpha}%`, top: '50%', transform: 'translate(-50%,-50%)', width: 15, height: 15, borderRadius: '50%', background: '#fff', boxShadow: '0 0 0 1px rgba(0,0,0,.3)', pointerEvents: 'none' }} />
+        </div>
+        <span style={{ fontSize: 12, color: SUB, width: 38, textAlign: 'right' }}>{alpha}%</span>
       </div>
       <button onClick={onRemove} style={{ width: '100%', marginTop: 12, border: 0, background: '#e0402f', color: '#fff', borderRadius: 9, padding: '9px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 7 }}>🗑 Remove color</button>
     </div>
@@ -3133,7 +3189,7 @@ function ColorField({ label, prop, getVal, onStyle }: RowBase) {
   const [tab, setTab] = useState<'custom' | 'template'>('custom')
   const cur = getVal(prop)
   const name = TEMPLATE_COLORS.find(([, v]) => v === cur)?.[0] || (cur ? 'Custom' : 'Default')
-  const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(cur) ? cur : '#000000'
+  const hex = /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/.test(cur) ? cur : '#000000'
   return (
     <div style={ROW}>
       <span style={LBL}>{label}</span>
