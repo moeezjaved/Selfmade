@@ -22,6 +22,9 @@ const CHK = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke=
 const CHKline = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="#3f4bd6" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4 4 10-11"/></svg>'
 const XMARK = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#b9bcd6" stroke-width="2.4" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
 const XMARKr = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="#e2557a" stroke-width="2.6" stroke-linecap="round"><path d="M7 7l10 10M17 7L7 17"/></svg>'
+// Nicer filled/circled comparison marks (PagePilot style): a solid brand-blue check circle, a soft-red cross circle.
+const CHK_CIRCLE = '<svg viewBox="0 0 24 24" width="21" height="21"><circle cx="12" cy="12" r="11" fill="#3f4bd6"/><path d="M7 12.4l3.2 3.2L17.2 8.4" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+const X_CIRCLE = '<svg viewBox="0 0 24 24" width="21" height="21"><circle cx="12" cy="12" r="11" fill="#fbe3ea"/><path d="M8.4 8.4l7.2 7.2M15.6 8.4l-7.2 7.2" fill="none" stroke="#e2557a" stroke-width="2.2" stroke-linecap="round"/></svg>'
 const HEART = '<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.5-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 11c0 5.5-7 10-7 10z"/></svg>'
 const VERIFIED = '<svg viewBox="0 0 24 24" width="15" height="15" fill="#3f4bd6" stroke="none"><path d="M12 1.5l2.6 1.9 3.2-.2 1 3 2.7 1.8-1.2 3 .0 .0 1.2 3-2.7 1.8-1 3-3.2-.2L12 22.5l-2.6-1.9-3.2.2-1-3L2.5 16l1.2-3-1.2-3 2.7-1.8 1-3 3.2.2z"/><path d="M8.5 12.2l2.3 2.3 4.7-4.9" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>'
 const S = (p: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${p}</svg>`
@@ -165,18 +168,18 @@ const css = `
 
 /* 5 · VERSUS + BENEFITS */
 .pgbld .vs{padding:8px 0 52px}
-.pgbld .vs .grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
-.pgbld .vs h2{font-size:24px;font-weight:800;margin-bottom:6px}
-.pgbld .vs .vsub{font-size:13px;color:var(--sub);margin-bottom:18px}
-.pgbld .vcard{background:var(--soft);border:1px solid var(--line);border-radius:18px;padding:18px;display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
-.pgbld .vcol h5{font-size:12px;font-weight:800;text-align:center;margin-bottom:10px}
-.pgbld .vcol .r{display:flex;align-items:flex-start;gap:7px;font-size:11px;font-weight:600;margin-bottom:9px;color:var(--ink)}
-.pgbld .vcol.o .r{color:var(--sub)}
-.pgbld .vcol .r .ic{flex:none;margin-top:1px;display:inline-flex}
+.pgbld .vs .grid{display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:center}
+.pgbld .vs h2{font-size:26px;font-weight:800;margin-bottom:10px}
+.pgbld .vs h2 .hl{color:var(--blue)}
+.pgbld .vs .lgroup .vsub{font-size:15px;color:var(--sub);font-weight:500;margin-bottom:20px;line-height:1.6}
+.pgbld .vcard{background:var(--soft);border:1px solid var(--line);border-radius:18px;padding:20px;display:grid;grid-template-columns:1fr auto 1fr;gap:14px;align-items:center}
+.pgbld .vcol h5{font-size:12.5px;font-weight:800;text-align:center;margin-bottom:12px;color:var(--ink)}
+.pgbld .vcol .r{display:flex;align-items:center;gap:9px;font-size:12.5px;font-weight:700;margin-bottom:11px;color:var(--ink)}
+.pgbld .vcol.o .r{color:var(--sub);font-weight:600}
+.pgbld .vcol .r .ic{flex:none;display:inline-flex}
 .pgbld .vcol .r .ic svg{display:block}
 .pgbld .vcol .r .rt{flex:1}
 .pgbld .vmid,.pgbld .vmid.ph{width:86px;aspect-ratio:3/5;border-radius:10px;min-height:0}
-.pgbld .ben h2 .hl{color:var(--blue)}
 .pgbld .brow{display:flex;gap:13px;margin-bottom:15px;align-items:flex-start}
 .pgbld .brow .n{width:30px;height:30px;border-radius:50%;background:var(--soft2);color:var(--blue);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex:none}
 .pgbld .brow .t b{font-size:13.5px}
@@ -233,7 +236,7 @@ const css = `
 .pgbld .hguar .hgico svg{width:34px;height:34px}
 .pgbld .hguar .hgel h2{font-size:26px;font-weight:800;color:#fff}
 .pgbld .hguar .hgel h2 .hl{color:#cdd3ff}
-.pgbld .hguar .hgel p{font-size:14px;color:#dfe2fb;line-height:1.6;margin:0;max-width:420px}
+.pgbld .hguar .hgel p{font-size:14px;color:#eef0ff;font-weight:500;line-height:1.6;margin:0;max-width:420px}
 .pgbld .hguar .hgbtn{display:inline-block;background:#fff;color:var(--blue);font-weight:800;font-size:14px;padding:13px 28px;border-radius:12px;text-decoration:none}
 .pgbld .hguar .pays{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin-top:4px}
 
@@ -345,17 +348,9 @@ function render(c: FilledContent, o: RenderOpts): string {
   ]).slice(0, 5).map((b: any, i: number) => `<div class="brow"><span class="pico">${benefitCheckIcon(i)}</span><div class="btg"><div class="btitle">${escp(b.title || b.label)}</div><div class="bdesc">${escp(b.body || '')}</div></div></div>`).join('')
 
   const vGood = (arr(c.vs_ours).length ? arr(c.vs_ours) : ['USP-Grade Purity', 'Accurate Microdosing', 'Rapid Brain & Energy Boost', 'Clean Taste, No Bitterness', 'Leakproof, Stable Formula'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r"><span class="ic">${CHKline}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${CHK_CIRCLE}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
   const vBad = (arr(c.vs_others).length ? arr(c.vs_others) : ['Unverified Purity', 'Inconsistent Dosing', 'Slower Absorption', 'Harsh Chemical Taste', 'Leaky, Unstable Packaging'].map((l) => ({ label: l })))
-    .map((r) => `<div class="r"><span class="ic">${XMARKr}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
-
-  const bens = (arr(c.benefits).length ? arr(c.benefits) : [
-    { title: 'Sustained Cellular Energy', body: 'Fuel your mitochondria for steady stamina that lasts all day without the caffeine crash.' },
-    { title: 'Instant Mental Clarity', body: 'Clear away brain fog in minutes to feel sharper and more present during demanding tasks.' },
-    { title: 'Reliable Neuroprotection', body: 'Defend your brain against oxidative stress to maintain long-term cognitive health and resilience.' },
-    { title: 'Elevated Daily Motivation', body: 'Transform stress into flow and enjoy an uplifted mood that keeps you moving forward.' },
-    { title: 'Triple Tested Purity', body: 'Trust in pharmaceutical-grade quality with every batch tested in protective cobalt glass.' },
-  ]).slice(0, 5).map((b: any, i: number) => `<div class="brow"><div class="n">${i + 1}</div><div class="t"><b>${escp(b.title || b.label)}</b><p>${esc(b.body)}</p></div></div>`).join('')
+    .map((r) => `<div class="r"><span class="ic">${X_CIRCLE}</span><span class="rt">${escp(r.label)}</span></div>`).join('')
 
   // Reviews Carousel — Featured Review cards (image + verified reviewer + stars + quote), swiperized on publish.
   const revs = (arr(c.testimonials).length ? arr(c.testimonials) : [
@@ -485,19 +480,17 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   <!-- 5 · VERSUS + BENEFITS -->
   <section class="vs"><div class="wrap"><div class="grid">
-    <div>
+    <div class="lgroup">
       <h2>${hl(c.vs_head || 'How We Compare vs. The Rest')}</h2>
-      <div class="vsub">${esc(c.vs_sub || 'USP-Grade Purity. Accurate Microdosing. Fast Brain & Energy Support — Without The Bitterness.')}</div>
+      <p class="vsub">${bd(c.vs_sub || 'USP-Grade Purity. Accurate Microdosing. Fast Brain & Energy Support — without the bitterness.')}</p>
+      <a class="btn" style="width:auto" href="${esc(o.ctaHref || '#')}">${escp(c.vs_cta || 'Get Yours Now')}</a>
+    </div>
+    <div class="rgroup">
       <div class="vcard">
         <div class="vcol"><h5>${escp(c.vs_ours_label || o.productName)}</h5>${vGood}</div>
         <div>${img(c.image_vs || P, o.productName, 'vmid', '')}</div>
         <div class="vcol o"><h5>${escp(c.vs_others_label || 'Other Brands')}</h5>${vBad}</div>
       </div>
-    </div>
-    <div class="ben">
-      <h2>${hl(c.ben_head || '5 Everyday Benefits of using **Us**')}</h2>
-      <div class="vsub">${esc(c.ben_sub || 'Power your body with clean mitochondrial support.')}</div>
-      ${bens}
     </div>
   </div></div></section>
 
@@ -654,14 +647,12 @@ export const cobaltV1: PageTemplate = {
     { key: 'image_sci', type: 'image', role: 'product', label: 'Science card product image' },
     { key: 'vs_head', type: 'text', label: 'Versus heading' },
     { key: 'vs_sub', type: 'text', label: 'Versus subhead' },
+    { key: 'vs_cta', type: 'text', label: 'Versus button' },
     { key: 'vs_ours_label', type: 'text', label: 'Versus — our column label' },
     { key: 'vs_others_label', type: 'text', label: 'Versus — their column label' },
     { key: 'vs_ours', type: 'list', label: 'Versus — our strengths', count: 5, hint: 'Each label only.' },
     { key: 'vs_others', type: 'list', label: 'Versus — their weaknesses', count: 5, hint: 'Each label only.' },
     { key: 'image_vs', type: 'image', role: 'product', label: 'Versus card product image' },
-    { key: 'ben_head', type: 'text', label: 'Benefits heading', hint: 'Accent brand with ** ** (e.g. "…using **Bluven**").' },
-    { key: 'ben_sub', type: 'text', label: 'Benefits subhead' },
-    { key: 'benefits', type: 'reasons', label: 'Numbered benefits (5)', count: 5, hint: 'title + body.' },
     { key: 'reviews_head', type: 'text', label: 'Reviews heading' },
     { key: 'reviews_sub', type: 'text', label: 'Reviews rating line' },
     { key: 'reviews_intro', type: 'text', label: 'Reviews subtitle' },

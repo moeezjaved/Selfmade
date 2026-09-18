@@ -147,6 +147,9 @@ function baseCss(tokens: DesignTokens): string {
 .pgbld [style*="--hc"]:hover{color:var(--hc)!important}
 .pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
+/* default CTA hover across all templates */
+.pgbld .btn,.pgbld .hgbtn,.pgbld .satcbtn,.pgbld .cta a,.pgbld a.cta{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+.pgbld .btn:hover,.pgbld .hgbtn:hover,.pgbld .satcbtn:hover,.pgbld .cta a:hover,.pgbld a.cta:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 10px 24px -12px rgba(20,18,15,.45)}
 /* payment-icon size (editor "Icons → Size" sets --payw on the .pays row) */
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
 /* gallery thumbnail + arrow controls (editor sets CSS vars on the .thumbs / .gwrap elements; the targeted
@@ -340,6 +343,8 @@ const PUBLISH_UTIL_CSS = `
 .pgbld [style*="--hc"]:hover{color:var(--hc)!important}
 .pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
+.pgbld .btn,.pgbld .hgbtn,.pgbld .satcbtn,.pgbld .cta a,.pgbld a.cta{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+.pgbld .btn:hover,.pgbld .hgbtn:hover,.pgbld .satcbtn:hover,.pgbld .cta a:hover,.pgbld a.cta:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 10px 24px -12px rgba(20,18,15,.45)}
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
 `
 // Wires button "Actions" (data-sfaction) on the published page: scroll, add-to-cart, checkout, do-nothing.
