@@ -1243,34 +1243,26 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     })
   }, [rawSel, rawEditHtml])
   const [galleryAIbusy, setGalleryAIbusy] = useState(false)
+  const [imgAI, setImgAI] = useState<null | { target: 'image' | 'gallery' }>(null)   // "Create AI Product Image" modal
   // Create with AI — generate a product image (Gemini) via /api/builder/image and add it to the gallery.
-  const galleryCreateAI = useCallback(async () => {
-    if (!rawSel) return
-    const prompt = window.prompt('Describe the product image you want to create:')
-    if (!prompt || !prompt.trim()) return
+  const galleryCreateAI = useCallback(() => { if (rawSel) setImgAI({ target: 'gallery' }) }, [rawSel])
+  // Create with AI for a SINGLE image block (matches PagePilot's "Create with AI" on the image uploader).
+  const imageCreateAI = useCallback(() => { if (rawSel) setImgAI({ target: 'image' }) }, [rawSel])
+  // Actually run the generation from the "Create AI Product Image" modal (Gemini via /api/builder/image).
+  const runImageAI = useCallback(async (prompt: string) => {
+    if (!rawSel || !prompt.trim()) return
+    const target = imgAI?.target || 'image'
     const n = rawNodeEl()
-    const ref = (n?.querySelector(galleryMainSel) as HTMLImageElement | null)?.getAttribute('src') || undefined
+    const ref = target === 'gallery' ? ((n?.querySelector(galleryMainSel) as HTMLImageElement | null)?.getAttribute('src') || undefined) : (rawImgSrc() || undefined)
     setGalleryAIbusy(true)
     try {
       const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'generate', prompt: prompt.trim(), referenceUrl: ref }) })
       const j = await r.json()
-      if (j.url) rawGalleryAdd(j.url); else window.alert(j.error || 'Could not generate the image.')
+      if (j.url) { if (target === 'gallery') rawGalleryAdd(j.url); else rawSetImg(j.url); setImgAI(null) }
+      else window.alert(j.error || 'Could not generate the image.')
     } catch { window.alert('Could not generate the image — please try again.') }
     finally { setGalleryAIbusy(false) }
-  }, [rawSel, rawNodeEl, rawGalleryAdd])
-  // Create with AI for a SINGLE image block (matches PagePilot's "Create with AI" on the image uploader).
-  const imageCreateAI = useCallback(async () => {
-    if (!rawSel) return
-    const prompt = window.prompt('Describe the image you want to create:')
-    if (!prompt || !prompt.trim()) return
-    setGalleryAIbusy(true)
-    try {
-      const r = await fetch('/api/builder/image', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mode: 'generate', prompt: prompt.trim(), referenceUrl: rawImgSrc() || undefined }) })
-      const j = await r.json()
-      if (j.url) rawSetImg(j.url); else window.alert(j.error || 'Could not generate the image.')
-    } catch { window.alert('Could not generate the image — please try again.') }
-    finally { setGalleryAIbusy(false) }
-  }, [rawSel, rawImgSrc, rawSetImg])
+  }, [rawSel, imgAI, rawNodeEl, rawImgSrc, rawGalleryAdd, rawSetImg])
   // ── Payment Providers (matches PagePilot: real icons + a show/hide toggle list) ───────────────────────
   const rawIsPays = useCallback((): boolean => {
     const n = rawNodeEl(); if (!n) return false
@@ -1799,6 +1791,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
       {rawLibOpen && <RawLibraryModal onPick={(html, label) => { rawInsertAt(stampName(html, label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
+      {imgAI && <ImageAIModal productName={doc.productRef?.importedProduct?.title || ''} busy={galleryAIbusy} onCreate={(p) => runImageAI(p)} onClose={() => setImgAI(null)} />}
     </div>
   )
 }
@@ -2224,7 +2217,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
       {singleImg && (
         <div style={{ marginBottom: 14 }}>
           <div style={{ fontSize: 12.5, fontWeight: 800, marginBottom: 8 }}>Image</div>
-          {imgSrc && <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#faf9f7', marginBottom: 8 }}><img src={imgSrc} alt="" style={{ display: 'block', width: '100%', maxHeight: 180, objectFit: 'contain' }} /></div>}
+          {imgSrc && <div style={{ position: 'relative', borderRadius: 12, overflow: 'hidden', border: `1px solid ${LINE}`, background: '#fff', marginBottom: 8, padding: 8 }}><img src={imgSrc} alt="" style={{ display: 'block', width: '100%', maxHeight: 180, objectFit: 'contain' }} /></div>}
           <DropZone label={imgSrc ? 'Replace image' : 'Drag & Drop or click to select image'} busy={busy} onPick={() => pickFile((url) => replaceImg(url))} />
           <button disabled={aiBusy} onClick={onImageAI} style={{ width: '100%', marginTop: 8, border: 0, background: 'linear-gradient(90deg,#f5e9ff,#ffe9f0)', color: '#b23aa0', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontWeight: 800, cursor: aiBusy ? 'default' : 'pointer', opacity: aiBusy ? 0.6 : 1 }}>{aiBusy ? 'Creating…' : '✨ Create with AI'}</button>
           <button onClick={() => onUrlOpen(!urlOpen)} style={{ width: '100%', marginTop: 8, border: `1px solid ${urlOpen ? ORANGE : LINE}`, background: '#fff', color: urlOpen ? ORANGE : SUB, borderRadius: 10, padding: '9px 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>🔗 Use image URL</button>
@@ -2815,6 +2808,38 @@ function SettingsModal({ doc, onChange, onClose }: { doc: PageDoc; onChange: (p:
   )
 }
 
+// "Create AI Product Image" modal — matches PagePilot's rich generator (prompt with @product/@avatar chips,
+// Style / Language / Model / Aspect options, Create button) instead of a native prompt().
+function ImageAIModal({ productName, busy, onCreate, onClose }: { productName: string; busy: boolean; onCreate: (prompt: string) => void; onClose: () => void }) {
+  const [prompt, setPrompt] = useState('')
+  const [aspect, setAspect] = useState('auto')
+  const submit = () => { const base = prompt.trim() || `A clean product photo of ${productName || 'the product'} on a white background`; const withAspect = aspect === 'auto' ? base : `${base} (${aspect} aspect ratio)`; onCreate(withAspect.replace(/@product/gi, productName || 'the product').replace(/@avatar/gi, 'a happy customer')) }
+  const chip = (icon: string, label: string): React.CSSProperties => ({ display: 'inline-flex', alignItems: 'center', gap: 6, border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'default', whiteSpace: 'nowrap' })
+  return (
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.35)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ width: 620, maxWidth: '94vw', background: '#fff', borderRadius: 18, padding: 22, boxShadow: '0 24px 70px rgba(20,18,15,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <div style={{ fontSize: 17, fontWeight: 800, color: INK }}>Create AI Product Image</div>
+          <button onClick={onClose} style={{ border: 0, background: 'transparent', color: FAINT, fontSize: 20, cursor: 'pointer', lineHeight: 1 }}>×</button>
+        </div>
+        <textarea autoFocus value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="An image of @product used by @avatar…" rows={3}
+          style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 12, padding: '12px 14px', fontSize: 14, color: INK, boxSizing: 'border-box', resize: 'vertical', fontFamily: 'inherit', marginBottom: 12, lineHeight: 1.5 }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <span style={chip('', '')}>🖼 Product</span>
+          <span style={chip('', '')}>👤 Avatar</span>
+          <span style={chip('', '')}>🎨 Style</span>
+          <span style={chip('', '')}>🌐 English</span>
+          <select value={aspect} onChange={(e) => setAspect(e.target.value)} style={{ border: `1px solid ${LINE}`, background: '#fff', color: INK, borderRadius: 999, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}>
+            <option value="auto">Auto</option><option value="square">Square</option><option value="portrait">Portrait</option><option value="landscape">Landscape</option>
+          </select>
+          <div style={{ flex: 1 }} />
+          <button disabled={busy} onClick={submit} style={{ border: 0, background: busy ? '#b9b6f0' : '#5b53e8', color: '#fff', borderRadius: 10, padding: '9px 20px', fontSize: 13.5, fontWeight: 800, cursor: busy ? 'default' : 'pointer' }}>{busy ? 'Creating…' : 'Create →'}</button>
+        </div>
+        <div style={{ fontSize: 11.5, color: FAINT, marginTop: 12 }}>Tip: use <b>@product</b> for the product name. AI images use credits and may need a paid plan.</div>
+      </div>
+    </div>
+  )
+}
 function Modal({ title, hint, children, onClose }: { title: string; hint?: string; children: React.ReactNode; onClose: () => void }) {
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.28)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
