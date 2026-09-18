@@ -325,37 +325,41 @@ function stampName(html: string, label: string): string {
 }
 /** Parse a raw slice's HTML into a nested outline. Collapses single-child layout wrappers so the tree shows
  *  meaningful pieces, not scaffolding; caps nodes + depth so it stays fast and legible. */
+// Leaf blocks that PagePilot shows as ONE row (never expanded into Group/Icon/Text children) even though they
+// contain sub-elements — they each have their own dedicated settings panel.
+const RAW_ATOMIC_LABELS = new Set(['Product Gallery', 'Product Title', 'Reviews Number', 'Divider', 'Ingredients List', 'Benefit Checks', 'Price', 'Sale Price', 'Compare Price', 'Variant Picker', 'Payment Icons', 'Save Badge', 'Percentage Circle', 'Logo', 'Image', 'Product Image'])
 function buildRawOutline(html: string): RawOutlineNode[] {
   if (typeof document === 'undefined' || !html) return []
   const box = document.createElement('div'); box.innerHTML = html
-  let budget = 800
-  // Decorative gallery arrows (‹ ›) aren't structural blocks — hide them from the outline so the gallery
-  // still reads as one "Product Image" (matches PagePilot). Keep original child indices for the path.
+  let budget = 1400
+  // Decorative gallery arrows (‹ ›) aren't structural blocks — hide them from the outline. Keep original child
+  // indices for the path.
   const realKids = (el: HTMLElement) => (Array.from(el.children) as HTMLElement[]).map((k, i) => ({ k, i })).filter((x) => !x.k.classList.contains('garr') && x.k.tagName !== 'STYLE')
+  // A wrapper is "named" (a real block, keep its row) if it was renamed or its class maps to a friendly name.
+  const isNamed = (el: HTMLElement) => !!(el.getAttribute('data-name') || RAW_FRIENDLY[friendlyClassOf(el)])
   const walk = (el: HTMLElement, path: number[], depth: number): RawOutlineNode | null => {
     if (budget-- <= 0) return null
     let cur: HTMLElement = el, curPath = path
-    // descend through wrappers that hold a single element child and add no own text (pure layout)
-    while (depth < 12) {
+    // Collapse ONLY unnamed pure-layout single-child wrappers (a `.wrap`/`.grid` passthrough) — PagePilot has no
+    // such scaffolding rows. A NAMED block, or one that adds its own text, always keeps its row (full granularity).
+    while (depth < 14) {
       const rk = realKids(cur)
-      if (rk.length !== 1) break
+      if (rk.length !== 1 || isNamed(cur)) break
       const only = rk[0].k
-      // "own text" ignores decorative arrow buttons (‹ ›) so the gallery's .gwrap collapses to its image —
-      // reads as one "Product Image", not a nested "Product Gallery" with its own duplicate Images panel.
       let ownRaw = cur.textContent || ''
       for (const c of Array.from(cur.children) as HTMLElement[]) if (c.classList?.contains('garr')) ownRaw = ownRaw.replace(c.textContent || '', '')
       const own = ownRaw.replace(only.textContent || '', '').trim()
       if (own) break
       cur = only; curPath = [...curPath, rk[0].i]
     }
+    const label = rawLabelFor(cur)
     const kids = realKids(cur)
     let children: RawOutlineNode[] = []
-    // Some pieces are ONE self-contained block with a dedicated panel (Payment Icons has its own provider
-    // toggles + alignment). Don't expand them into per-icon Group/Text rows — that just duplicates the same
-    // settings on every descendant. Treat them as a single leaf, matching PagePilot's one "Payment Icons" block.
-    const atomic = cur.classList?.contains('pays') || cur.classList?.contains('payicon')
-    if (!atomic && kids.length > 1 && depth < 6) children = kids.map(({ k, i }) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
-    return { path: curPath, label: rawLabelFor(cur), isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
+    // Atomic = a self-contained leaf block (its own panel). Everything else expands FULLY into its child rows
+    // (Group (Horizontal/Vertical) → Icon / Text / …), matching PagePilot's deep tree.
+    const atomic = cur.classList?.contains('pays') || cur.classList?.contains('payicon') || RAW_ATOMIC_LABELS.has(label) || rawIsImg(cur)
+    if (!atomic && kids.length >= 1 && depth < 9) children = kids.map(({ k, i }) => walk(k, [...curPath, i], depth + 1)).filter(Boolean) as RawOutlineNode[]
+    return { path: curPath, label, isImg: rawIsImg(cur), hidden: cur.style?.display === 'none', children }
   }
   return (Array.from(box.children) as HTMLElement[]).map((k, i) => walk(k, [i], 0)).filter(Boolean) as RawOutlineNode[]
 }
