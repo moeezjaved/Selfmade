@@ -228,7 +228,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
   // sections / lists
-  strip: 'Pill Strip', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
+  striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
   fgrid: 'Feature Cards', rev: 'Review', revs: 'Reviews', press: 'Press', plogo: 'Logo', vs: 'Comparison',
   gold: 'Comparison', avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',
@@ -330,7 +330,7 @@ function stampName(html: string, label: string): string {
  *  meaningful pieces, not scaffolding; caps nodes + depth so it stays fast and legible. */
 // Leaf blocks that PagePilot shows as ONE row (never expanded into Group/Icon/Text children) even though they
 // contain sub-elements — they each have their own dedicated settings panel.
-const RAW_ATOMIC_LABELS = new Set(['Product Gallery', 'Product Title', 'Reviews Number', 'Divider', 'Ingredients List', 'Benefit Checks', 'Price', 'Sale Price', 'Compare Price', 'Variant Picker', 'Payment Icons', 'Save Badge', 'Percentage Circle', 'Logo', 'Image', 'Product Image', 'Add to Cart'])
+const RAW_ATOMIC_LABELS = new Set(['Product Gallery', 'Product Title', 'Reviews Number', 'Divider', 'Ingredients List', 'Benefit Checks', 'Price', 'Sale Price', 'Compare Price', 'Variant Picker', 'Payment Icons', 'Save Badge', 'Percentage Circle', 'Logo', 'Image', 'Product Image', 'Add to Cart', 'Icon'])
 function buildRawOutline(html: string): RawOutlineNode[] {
   if (typeof document === 'undefined' || !html) return []
   const box = document.createElement('div'); box.innerHTML = html

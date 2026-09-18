@@ -116,10 +116,9 @@ const css = `
 .pgbld .strip{background:var(--blue);padding:16px 0;overflow:hidden}
 .pgbld .strip .striptrack{display:flex;width:max-content;gap:14px;animation:sfmarquee 30s linear infinite}
 .pgbld .strip:hover .striptrack{animation-play-state:paused}
-.pgbld .strip .row{display:flex;gap:14px;flex-wrap:nowrap;flex:none}
-.pgbld .strip .p{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--ink);border-radius:999px;padding:10px 20px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px -3px rgba(20,18,15,.25)}
-.pgbld .strip .p .pico{display:inline-flex;color:var(--blue);flex:none}
-.pgbld .strip .p .pico svg{width:16px;height:16px}
+.pgbld .strip .benfc{display:inline-flex;align-items:center;gap:9px;background:#fff;color:var(--ink);border-radius:999px;padding:10px 20px;font-size:14px;font-weight:700;white-space:nowrap;box-shadow:0 2px 8px -3px rgba(20,18,15,.25);flex:none}
+.pgbld .strip .benfc .pico{display:inline-flex;color:var(--blue);flex:none}
+.pgbld .strip .benfc .pico svg{width:16px;height:16px}
 @keyframes sfmarquee{from{transform:translateX(0)}to{transform:translateX(calc(-50% - 7px))}}
 
 /* 3 · TRUSTED */
@@ -253,8 +252,11 @@ function render(c: FilledContent, o: RenderOpts): string {
   const accItems = (arr(c.info_sections).length ? arr(c.info_sections) : [{ label: 'Description', body: 'What it is and what’s inside.' }, { label: 'How to use', body: 'A few drops daily, on or under the tongue.' }, { label: 'Shipping & Returns', body: 'Fast, tracked delivery and a money-back guarantee.' }])
     .map((s, i) => `<details${i === 0 ? ' open' : ''}><summary>${escp(s.label)}</summary><div class="body">${esc(s.body)}</div></details>`).join('')
 
-  const strip = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Sustained Cellular Energy', 'Simple Daily Drops', 'Triple Lab Tested', 'Instant Mental Clarity', 'No Jittery Crash'].map((l) => ({ label: l })))
-    .map((p, i) => `<span class="p"><span class="pico">${benefitCheckIcon(i)}</span>${escp(p.label)}</span>`).join('')
+  const stripPills = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Sustained Cellular Energy', 'Simple Daily Drops', 'Triple Lab Tested', 'Instant Mental Clarity', 'No Jittery Crash'].map((l) => ({ label: l })))
+    .map((p, i) => `<div class="benfc"><span class="pico">${benefitCheckIcon(i)}</span><span class="ptext">${escp(p.label)}</span></div>`)
+  const strip = stripPills.join('')
+  // duplicate set (aria-hidden, skipped in the tree) makes the marquee loop seamlessly
+  const stripDup = stripPills.map((h) => h.replace('<div class="benfc"', '<div class="benfc" aria-hidden="true"')).join('')
 
   const sci = (arr(c.sci_points).length ? arr(c.sci_points) : [
     { title: 'Pharmaceutical-Grade Methylene Blue', body: 'The one true form, sourced at the highest standard.' },
@@ -337,7 +339,7 @@ function render(c: FilledContent, o: RenderOpts): string {
   </div></div></section>
 
   <!-- 2 · PILL STRIP -->
-  <section class="strip"><div class="striptrack"><div class="row">${strip}</div><div class="row" aria-hidden="true">${strip}</div></div></section>
+  <section class="strip"><div class="striptrack">${strip}${stripDup}</div></section>
 
   <!-- 3 · TRUSTED -->
   <section class="trust"><div class="wrap"><div class="grid">
