@@ -887,6 +887,12 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
     if (kids.length && !kids.every((k) => RICH_INLINE.has(k.tagName))) return false
     return !!(n.textContent || '').trim()
   }, [rawNodeEl, rawSel])
+  // A container/group = a raw element with block-level element children (not just inline rich text). Drives the
+  // PagePilot "Group" settings panel (Layout / Size / Background / Borders / Visibility / Padding / Margin).
+  const rawHasBlockChildren = useCallback((): boolean => {
+    const n = rawNodeEl(); if (!n) return false
+    return Array.from(n.children).some((k) => !RICH_INLINE.has(k.tagName))
+  }, [rawNodeEl])
   const rawHtml = useCallback((): string => { const n = rawNodeEl(); return n ? n.innerHTML : '' }, [rawNodeEl])
   const rawSetHtml = useCallback((h: string) => { if (rawSel) rawApplyAt(rawSel.ref, rawSel.path, 'sethtml', h) }, [rawSel, rawApplyAt])
   // Link/button destination editing (bug: "Shop Now button not working" — make its link editable in-editor).
@@ -1522,6 +1528,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
               isSave={rawIsSave()} saveMode={saveCfg().mode} saveShow={saveCfg().show} onSaveBadge={setSaveBadge}
               isIconItem={rawIsIconItem()} itemIcon={itemIcon()} onItemIcon={setItemIcon}
               urlOpen={imgUrlOpen} onUrlOpen={setImgUrlOpen} device={device} onDevice={setDevice} onRename={rawRename}
+              hasChildren={rawHasBlockChildren()}
               getVal={rawStyleVal} onStyle={rawStyle} onOp={rawOp} onClear={() => setRawSel(null)} />
           ) : !sel ? (
             <div><div style={{ fontSize: 16, fontWeight: 800, color: INK, marginBottom: 6 }}>Customize your template</div><div style={{ color: FAINT, fontSize: 13, lineHeight: 1.6 }}>Select a section or block in the sidebar to start.</div></div>
@@ -1814,7 +1821,7 @@ function IconPicker({ value, onPick, allowNone = true }: { value: string; onPick
     </div>
   )
 }
-function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
+function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, textContext, isLink, href, onHref, gallery, onGalleryAdd, onGalleryRemove, onGalleryReplace, onSetImg, uploadImage, isGallery, sticky, onSticky, onCreateAI, aiBusy, isPays, paysActive, onTogglePay, paysAlign, paysGap, onPaysAlign, onPaysGap, isRing, ringPct, ringSize, ringDur, onRingPct, onRingSize, onRingDur, isLogo, logoImg, onLogoImage, isAcc, accRows, onAccAdd, onAccRemove, isVpick, vpickList, vpickOpts, onVpickStyle, onVpickAdd, onVpickRemove, vpickStyleVal, onVpickTextStyle, vpickGap, onVpickGap, isCart, cart, onCart, isSave, saveMode, saveShow, onSaveBadge, isIconItem, itemIcon, onItemIcon, urlOpen, onUrlOpen, device, onDevice, onRename, hasChildren, getVal, onStyle, onOp, onClear }: { name: string; text: string; onText: (t: string) => void; isImg: boolean; isText: boolean; html: string; onHtml: (h: string) => void; textContext: string; isLink: boolean; href: string; onHref: (u: string) => void; isRing: boolean; ringPct: string; ringSize: string; ringDur: string; onRingPct: (v: string) => void; onRingSize: (v: string) => void; onRingDur: (v: string) => void; isLogo: boolean; logoImg: string; onLogoImage: (u: string) => void; isAcc: boolean; accRows: string[]; onAccAdd: () => void; onAccRemove: (i: number) => void; isVpick: boolean; vpickList: boolean; vpickOpts: string[]; onVpickStyle: (list: boolean) => void; onVpickAdd: () => void; onVpickRemove: (i: number) => void; vpickStyleVal: (prop: string) => string; onVpickTextStyle: (prop: string, v: string) => void; vpickGap: string; onVpickGap: (v: string) => void; isCart: boolean; cart: { icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }; onCart: (patch: Partial<{ icon: string; label: string; show: boolean; pos: 'left' | 'right'; size: number }>) => void; isSave: boolean; saveMode: 'percent' | 'value'; saveShow: boolean; onSaveBadge: (patch: Partial<{ mode: 'percent' | 'value'; show: boolean }>) => void; isIconItem: boolean; itemIcon: string; onItemIcon: (icon: string) => void; device: Device; onDevice: (d: Device) => void; onRename: (name: string) => void; hasChildren: boolean; gallery: { src: string; path: number[] }[] | null; onGalleryAdd: (url: string) => void; onGalleryRemove: (path: number[]) => void; onGalleryReplace: (path: number[], url: string) => void; onSetImg: (url: string) => void; uploadImage: (f: File) => Promise<string | null>; isGallery: boolean; sticky: boolean; onSticky: (v: boolean) => void; onCreateAI: () => void; aiBusy: boolean; isPays: boolean; paysActive: string[]; onTogglePay: (id: string) => void; paysAlign: string; paysGap: string; onPaysAlign: (v: string) => void; onPaysGap: (v: string) => void; urlOpen: boolean; onUrlOpen: (v: boolean) => void; getVal: (p: string) => string; onStyle: (p: string, v: string) => void; onOp: (op: RawOp) => void; onClear: () => void }) {
   const [draft, setDraft] = useState(text)   // content field — commit on blur (key remounts per piece)
   const [busy, setBusy] = useState(false)    // an image upload is in flight
   const [urlDraft, setUrlDraft] = useState('')   // inline "image URL" field value
@@ -1837,7 +1844,10 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
   // Media / special blocks (gallery, image, ring, pays, logo, variant, accordion) get their OWN controls —
   // the generic Text typography + Box rows are irrelevant there (PagePilot doesn't show them). Hide them.
   const isMedia = isImg || gallery != null || isGallery || isPays || isRing || isLogo || isVpick || isAcc || isCart || isSave
-  const showTextStyle = !isMedia && (isText || text !== '' || isLink)   // typography only where there's real text
+  // A container/group (block-level children, no special role) gets PagePilot's dedicated Group panel instead of
+  // the generic Typography/Appearance rows.
+  const isGroup = hasChildren && !isMedia && !isText && !isLink && text === ''
+  const showTextStyle = !isMedia && !isGroup && (isText || text !== '' || isLink)   // typography only where there's real text
   // The multi-image "Images N/15" manager belongs ONLY on the real Product Gallery. A block that merely CONTAINS
   // an image (a review avatar, a single lifestyle photo) gets a plain single-image replace instead — so the
   // Featured Review's image is edited on the Featured Review, never duplicated onto Product Details. (Bug: the
@@ -2054,6 +2064,9 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
           <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Edit the words here, or double-click the text on the canvas.</div>
         </div>
       )}
+      {isGroup && (
+        <GroupSettings getVal={getVal} onStyle={onStyle} device={device} onDevice={onDevice} onClass={(v) => onStyle('__class', v)} classVal={getVal('__class')} />
+      )}
       {showTextStyle && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Typography</SecHead>
@@ -2074,7 +2087,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <IconSegRow label="Alignment" prop="text-align" getVal={getVal} onStyle={onStyle} options={[['left', alignIcon(<path d="M3 6h18M3 12h11M3 18h15" />)], ['center', alignIcon(<path d="M3 6h18M6 12h12M4 18h16" />)], ['right', alignIcon(<path d="M3 6h18M10 12h11M6 18h15" />)]]} />
       </div>
       )}
-      {(showTextStyle || !isMedia) && (
+      {(showTextStyle || !isMedia) && !isGroup && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead>Visibility</SecHead>
         <div style={ROW}>
@@ -2089,7 +2102,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <div style={{ fontSize: 11, color: FAINT, marginTop: 4 }}>Turn a device off to hide this element there.</div>
       </div>
       )}
-      {!isMedia && (
+      {!isMedia && !isGroup && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead device={device} onDevice={onDevice}>Appearance</SecHead>
         <ColorField label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
@@ -2105,7 +2118,7 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
         <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
       </div>
       )}
-      {(showTextStyle || !isMedia) && (
+      {(showTextStyle || !isMedia) && !isGroup && (
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }}>
         <SecHead>Custom</SecHead>
         <div style={{ fontSize: 12, fontWeight: 600, color: SUB, marginBottom: 6 }}>Class</div>
@@ -2767,6 +2780,99 @@ function PlainSel({ label, value, onChange, options }: { label: string; value: s
       <select value={value} onChange={(e) => onChange(e.target.value)} style={selBox}>
         {options.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
       </select>
+    </div>
+  )
+}
+// A PagePilot-style pill toggle row (label + on/off switch), for boolean group settings (Wrap, Sticky…).
+function ToggleRow({ label, on, onChange, hint }: { label: string; on: boolean; onChange: (v: boolean) => void; hint?: string }) {
+  return (
+    <div style={{ padding: '5px 0' }}>
+      <div style={ROW}>
+        <span style={{ ...LBL, width: 'auto', flex: 1 }}>{label}</span>
+        <button onClick={() => onChange(!on)} style={{ flex: 'none', width: 40, height: 22, borderRadius: 999, border: 0, background: on ? ORANGE : '#d7d5d0', position: 'relative', cursor: 'pointer', transition: 'background .15s' }}>
+          <span style={{ position: 'absolute', top: 2, left: on ? 20 : 2, width: 18, height: 18, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 2px rgba(0,0,0,.3)', transition: 'left .15s' }} />
+        </button>
+      </div>
+      {hint && <div style={{ fontSize: 11, color: FAINT, marginTop: 2 }}>{hint}</div>}
+    </div>
+  )
+}
+// The desktop/mobile "Show on" control shared by every block's Visibility section.
+function ShowOnRow({ getVal, onStyle }: { getVal: (p: string) => string; onStyle: (p: string, v: string) => void }) {
+  return (
+    <div style={ROW}>
+      <span style={LBL}>Show on</span>
+      <div style={{ flex: 1, minWidth: 0, display: 'flex', gap: 6 }}>
+        {([['__hidedesk', 'Desktop', alignIcon(<><rect x="2" y="4" width="20" height="13" rx="2" /><path d="M8 20h8M12 17v3" /></>)], ['__hidemob', 'Mobile', alignIcon(<><rect x="7" y="2" width="10" height="20" rx="2" /><path d="M11 18h2" /></>)]] as [string, string, React.ReactNode][]).map(([p, lbl, icon]) => {
+          const shown = getVal(p) !== '1'
+          return <button key={p} onClick={() => onStyle(p, shown ? '1' : '')} style={{ flex: 1, border: `1px solid ${shown ? ORANGE : LINE}`, background: shown ? WASH : '#fff', color: shown ? INK : SUB, borderRadius: 9, padding: '7px 6px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, fontSize: 12, fontWeight: 600 }}>{icon}{lbl}</button>
+        })}
+      </div>
+    </div>
+  )
+}
+// Group / container settings panel (PagePilot's Group / "Best Seller Badge" panel), structural parity: every
+// control maps to real inline CSS the raw element can carry (flex / size / background / border / spacing).
+function GroupSettings({ getVal, onStyle, device, onDevice, onClass, classVal }: { getVal: (p: string) => string; onStyle: (p: string, v: string) => void; device: Device; onDevice: (d: Device) => void; onClass: (v: string) => void; classVal: string }) {
+  const dir = getVal('flex-direction') === 'column' ? 'column' : 'row'
+  const setDir = (v: string) => { onStyle('display', 'flex'); onStyle('flex-direction', v) }
+  const wIsFit = (() => { const v = getVal('width'); return v === 'auto' || v === 'fit-content' })()
+  const hIsFit = (() => { const v = getVal('height'); return v === 'auto' || v === 'fit-content' })()
+  const sec: React.CSSProperties = { borderTop: `1px solid ${LINE}`, paddingTop: 14, marginTop: 14 }
+  return (
+    <div>
+      <div style={{ paddingTop: 2 }}>
+        <SecHead device={device} onDevice={onDevice}>Layout</SecHead>
+        <SegRow label="Direction" prop="flex-direction" options={[['row', 'Horizontal'], ['column', 'Vertical']]} getVal={() => dir} onStyle={(_p, v) => setDir(v)} />
+        <IconSegRow label="Position X" prop="justify-content" getVal={getVal} onStyle={onStyle} options={[['flex-start', alignIcon(<path d="M3 6h18M3 12h11M3 18h15" />)], ['center', alignIcon(<path d="M3 6h18M6 12h12M4 18h16" />)], ['flex-end', alignIcon(<path d="M3 6h18M10 12h11M6 18h15" />)], ['space-between', alignIcon(<path d="M3 6h18M3 12h18M3 18h18" />)]]} />
+        <IconSegRow label="Position Y" prop="align-items" getVal={getVal} onStyle={onStyle} options={[['flex-start', alignIcon(<path d="M4 4h16M7 9v11M17 9v7" />)], ['center', alignIcon(<path d="M4 12h16M9 6v12M15 8v8" />)], ['flex-end', alignIcon(<path d="M4 20h16M7 4v11M17 8v7" />)]]} />
+        <ToggleRow label="Wrap" on={getVal('flex-wrap') === 'wrap'} onChange={(v) => onStyle('flex-wrap', v ? 'wrap' : '')} hint="Wrap elements to the next line when the content is too wide." />
+        <NumRow label="Gap" prop="gap" max={80} getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <SecHead device={device} onDevice={onDevice}>Size</SecHead>
+        <SegRow label="Width" prop="__gw" options={[['fill', 'Fill'], ['fit', 'Fit']]} getVal={() => wIsFit ? 'fit' : 'fill'} onStyle={(_p, v) => onStyle('width', v === 'fit' ? 'auto' : '100%')} />
+        <SegRow label="Height" prop="__gh" options={[['fill', 'Fill'], ['fit', 'Fit']]} getVal={() => hIsFit ? 'fit' : 'fill'} onStyle={(_p, v) => onStyle('height', v === 'fit' ? 'auto' : '100%')} />
+      </div>
+      <div style={sec}>
+        <SecHead device={device} onDevice={onDevice}>Background</SecHead>
+        <ColorField label="Background color" prop="background-color" getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <SecHead device={device} onDevice={onDevice}>Borders</SecHead>
+        <SelRow label="Border style" prop="border-style" options={[['none', 'None'], ['solid', 'Solid'], ['dashed', 'Dashed'], ['dotted', 'Dotted']]} getVal={getVal} onStyle={onStyle} />
+        <ColorField label="Border color" prop="border-color" getVal={getVal} onStyle={onStyle} />
+        <BorderWidthRow getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Rounded corners" prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />
+        <SelRow label="Box shadow" prop="box-shadow" options={[['0 1px 3px rgba(0,0,0,.12)', 'Small'], ['0 6px 16px -6px rgba(0,0,0,.18)', 'Medium'], ['0 18px 40px -14px rgba(0,0,0,.28)', 'Large']]} getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <SecHead>Visibility</SecHead>
+        <SelRow label="Overflow" prop="overflow" options={[['visible', 'Visible'], ['hidden', 'Hidden'], ['scroll', 'Scroll'], ['auto', 'Auto']]} getVal={getVal} onStyle={onStyle} />
+        <ToggleRow label="Sticky" on={getVal('position') === 'sticky'} onChange={(v) => { onStyle('position', v ? 'sticky' : ''); onStyle('top', v ? '12px' : '') }} hint="Stick this group to the top as the page scrolls." />
+        <ShowOnRow getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Padding</div>
+        <NumRow label="Top" prop="padding-top" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Bottom" prop="padding-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Left" prop="padding-left" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Right" prop="padding-right" max={80} getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <div style={{ fontSize: 12.5, fontWeight: 600, color: '#4a4843', margin: '0 0 2px' }}>Margin</div>
+        <NumRow label="Top" prop="margin-top" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Bottom" prop="margin-bottom" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Left" prop="margin-left" max={80} getVal={getVal} onStyle={onStyle} />
+        <NumRow label="Right" prop="margin-right" max={80} getVal={getVal} onStyle={onStyle} />
+      </div>
+      <div style={sec}>
+        <SecHead>Custom</SecHead>
+        <div style={{ fontSize: 12, fontWeight: 600, color: SUB, marginBottom: 6 }}>Class</div>
+        <input defaultValue={classVal} key={classVal} placeholder="my-class another-class" onBlur={(e) => onClass(e.target.value.trim())} onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+          style={{ width: '100%', border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 11px', fontSize: 12.5, color: INK, boxSizing: 'border-box' }} />
+        <div style={{ fontSize: 11, color: FAINT, marginTop: 5 }}>Add custom CSS classes to the group, separated by spaces.</div>
+      </div>
     </div>
   )
 }
