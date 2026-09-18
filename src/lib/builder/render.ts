@@ -153,6 +153,10 @@ function baseCss(tokens: DesignTokens): string {
 .pgbld .thumbs[style*="--abc"] img.on{border-color:var(--abc)!important}
 .pgbld .gwrap[style*="--goff"] .gprev{left:var(--goff)!important}
 .pgbld .gwrap[style*="--goff"] .gnext{right:var(--goff)!important}
+/* variant picker "Swatches" style — options render as colour circles (editor sets --sw per option) */
+.pgbld .vpick.swatch .vopts{display:flex;flex-wrap:wrap;gap:10px}
+.pgbld .vpick.swatch .vopt{width:34px;height:34px;min-width:0;padding:0;border-radius:50%;background:var(--sw,#d7d5d0)!important;font-size:0;line-height:0;overflow:hidden;border:1px solid rgba(0,0,0,.12)}
+.pgbld .vpick.swatch .vopt.on{outline:2px solid var(--blue,#3f4bd6);outline-offset:2px}
 
 /* ── section library layouts (Phase 4) — driven by section/block classes so canvas == publish ── */
 /* grid/list sections: a centered wrapping row; the section head (width:100%) sits on its own line */
