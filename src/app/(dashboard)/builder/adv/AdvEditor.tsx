@@ -230,7 +230,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
   // sections / lists
-  striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
+  striptrack: 'Rotating Content', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Stats', card: 'Card', feat: 'Feature',
   fgrid: 'Feature Cards', rev: 'Review', revs: 'Reviews', press: 'Press', plogo: 'Logo', vs: 'Comparison',
   gold: 'Comparison', avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',
@@ -291,7 +291,7 @@ function rawIsImg(el: HTMLElement): boolean {
 // PagePilot's exact section names, keyed by the bespoke templates' section-root class. These WIN over the
 // stored/heading name so the tree reads one-to-one with PagePilot (e.g. the reviews grid → "Reviews Carousel").
 const PP_SECTION_NAME: Record<string, string> = {
-  pcre: 'Image with Numbered Benefits',
+  numbf: 'Image with Numbered Benefits', pcre: 'Image with Numbered Benefits',
   strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
   feat: 'Image with Feature Cards', how: 'Image with Text', gold: 'Product Comparison',
   seen: 'As Seen On with Quotes', hguar: 'Happiness Guarantee', recs: 'Recommended Products', satc: 'Sticky Add to Cart',

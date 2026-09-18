@@ -147,6 +147,21 @@ const css = `
 .pgbld .sci .im,.pgbld .sci .im.ph{aspect-ratio:3/4;border-radius:12px;min-height:0}
 .pgbld .sci .brand{margin-top:14px;font-size:11px;color:#b7bcea}.pgbld .sci .brand b{color:#fff;font-size:14px;display:block}
 
+/* 4b · IMAGE WITH NUMBERED BENEFITS */
+.pgbld .numbf{padding:8px 0 52px}
+.pgbld .numbf .grid{display:grid;grid-template-columns:1fr 1.05fr;gap:44px;align-items:center}
+.pgbld .numbf .imgcol .numbimg,.pgbld .numbf .imgcol .numbimg.ph{width:100%;aspect-ratio:4/5;object-fit:cover;border-radius:18px;background:var(--soft2);min-height:0}
+.pgbld .numbf .contcol h2{font-size:26px;font-weight:800;margin-bottom:10px}
+.pgbld .numbf .contcol h2 .hl{color:var(--blue)}
+.pgbld .numbf .nsub{font-size:14px;color:var(--sub);margin-bottom:22px;line-height:1.6}
+.pgbld .numbf .bcard{display:flex;flex-direction:column;gap:18px}
+.pgbld .numbf .brow{display:flex;gap:14px;align-items:flex-start;margin-bottom:0}
+.pgbld .numbf .brow .pico{width:38px;height:38px;border-radius:11px;background:var(--soft2);color:var(--blue);display:flex;align-items:center;justify-content:center;flex:none}
+.pgbld .numbf .brow .pico svg{width:19px;height:19px}
+.pgbld .numbf .btg{flex:1}
+.pgbld .numbf .btitle{font-size:15px;font-weight:800;color:var(--ink);margin-bottom:3px}
+.pgbld .numbf .bdesc{font-size:13px;color:var(--sub);line-height:1.55}
+
 /* 5 · VERSUS + BENEFITS */
 .pgbld .vs{padding:8px 0 52px}
 .pgbld .vs .grid{display:grid;grid-template-columns:1fr 1fr;gap:40px;align-items:start}
@@ -221,7 +236,7 @@ const css = `
 .pgbld .final .cta .pays span{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.24);color:#d5d8f7}
 
 @media(max-width:900px){
-  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
+  .pgbld .hero .grid,.pgbld .trust .grid,.pgbld .how .grid,.pgbld .numbf .grid,.pgbld .vs .grid,.pgbld .gold .grid,.pgbld .final .grid{grid-template-columns:1fr}
   .pgbld .rgrid,.pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
   .pgbld .press{grid-template-columns:1fr}
@@ -258,6 +273,13 @@ function render(c: FilledContent, o: RenderOpts): string {
   const strip = stripPills.join('')
   // duplicate set (aria-hidden, skipped in the tree) makes the marquee loop seamlessly
   const stripDup = stripPills.map((h) => h.replace('<div class="benfc"', '<div class="benfc" aria-hidden="true"')).join('')
+  // Image with Numbered Benefits — a Benefits Card of numbered rows (icon + title + description) beside an image.
+  const numbRows = (arr(c.numb_benefits).length ? arr(c.numb_benefits) : [
+    { title: 'Absorbs excess oil', body: 'Effortlessly lift away buildup for a fresh, airy finish that lasts.' },
+    { title: 'Refreshes flat hair', body: 'Clarifying botanicals bring dull strands back to vibrant life.' },
+    { title: 'Natural citrus boost', body: 'Cold-pressed oils purify the scalp for an invigorating reset.' },
+    { title: 'Pre-wash prep', body: 'Balances your hair for a total reset before your favourite shampoo.' },
+  ]).slice(0, 5).map((b: any, i: number) => `<div class="brow"><span class="pico">${benefitCheckIcon(i)}</span><div class="btg"><div class="btitle">${escp(b.title || b.label)}</div><div class="bdesc">${escp(b.body || '')}</div></div></div>`).join('')
 
   const vGood = (arr(c.vs_ours).length ? arr(c.vs_ours) : ['USP-Grade Purity', 'Accurate Microdosing', 'Rapid Brain & Energy Boost', 'Clean Taste, No Bitterness', 'Leakproof, Stable Formula'].map((l) => ({ label: l })))
     .map((r) => `<div class="r">${CHKline}${escp(r.label)}</div>`).join('')
@@ -356,6 +378,16 @@ function render(c: FilledContent, o: RenderOpts): string {
       <a class="btn" style="width:auto" href="${esc(o.ctaHref || '#')}">${escp(c.how_cta || 'Buy It Now')}</a>
     </div>
     <div class="rgroup">${img(c.image_sci || c.image_g2 || P, o.productName, 'howimg', 'Product')}</div>
+  </div></div></section>
+
+  <!-- 4b · IMAGE WITH NUMBERED BENEFITS -->
+  <section class="numbf"><div class="wrap"><div class="grid">
+    <div class="imgcol">${img(c.image_numb || c.image_trust1 || P, o.productName, 'numbimg', 'Image')}</div>
+    <div class="contcol">
+      <h2>${hl(c.numb_head || 'Everything you need in **one daily ritual**')}</h2>
+      <p class="nsub">${bd(c.numb_sub || 'Four reasons thousands make this the first thing they reach for every morning.')}</p>
+      <div class="bcard">${numbRows}</div>
+    </div>
   </div></div></section>
 
   <!-- 5 · VERSUS + BENEFITS -->
@@ -471,6 +503,10 @@ export const cobaltV1: PageTemplate = {
     { key: 'how_body1', type: 'richtext', role: 'body', label: 'How-it-works paragraph 1' },
     { key: 'how_body2', type: 'richtext', role: 'body', label: 'How-it-works paragraph 2' },
     { key: 'how_cta', type: 'text', label: 'How-it-works button' },
+    { key: 'numb_head', type: 'text', label: 'Numbered-benefits heading', hint: 'Accent 1-2 words with ** ** (e.g. "one daily **ritual**").' },
+    { key: 'numb_sub', type: 'richtext', role: 'body', label: 'Numbered-benefits subhead' },
+    { key: 'numb_benefits', type: 'reasons', label: 'Numbered benefits (4)', count: 4, hint: 'title = short benefit; body = one supporting line.' },
+    { key: 'image_numb', type: 'image', role: 'lifestyle', label: 'Numbered-benefits image' },
     { key: 'sci_head', type: 'text', label: 'Science card heading' },
     { key: 'sci_sub', type: 'text', label: 'Science card subhead' },
     { key: 'sci_points', type: 'reasons', label: 'Science ingredients (3)', count: 3, hint: 'title = ingredient; body = one line.' },
