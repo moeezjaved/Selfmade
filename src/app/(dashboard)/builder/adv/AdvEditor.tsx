@@ -2467,16 +2467,30 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
             : (<DropZone label="Drag & Drop or click to select image" busy={bgBusy} onPick={pickBg} />)}
           {bgImage && (<div style={{ marginTop: 8 }}>
             <SegRow label="Position" prop="background-position" options={[['top', 'Top'], ['center', 'Center'], ['bottom', 'Bottom']]} getVal={getVal} onStyle={onStyle} />
-            <SegRow label="Size" prop="background-size" options={[['cover', 'Cover'], ['contain', 'Contain']]} getVal={getVal} onStyle={onStyle} />
+            <SegRow label="Repeat" prop="background-repeat" options={[['no-repeat', 'No repeat'], ['repeat', 'Repeat']]} getVal={getVal} onStyle={onStyle} />
+            <SegRow label="Size" prop="background-size" options={[['auto', 'Auto'], ['cover', 'Cover'], ['contain', 'Contain']]} getVal={getVal} onStyle={onStyle} />
+            <SegRow label="Attachment" prop="background-attachment" options={[['scroll', 'Local'], ['fixed', 'Fixed']]} getVal={getVal} onStyle={onStyle} />
           </div>)}
         </div>
       </div>
       <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
-        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Spacing</div>
-        <NumRow label={L('Padding top')} prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
-        <NumRow label={L('Padding bottom')} prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
-        <NumRow label={L('Padding sides')} prop="padding-inline" max={120} getVal={getVal} onStyle={onStyle} />
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Padding</div>
+        <NumRow label={L('Top')} prop="padding-top" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Bottom')} prop="padding-bottom" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Left')} prop="padding-left" max={120} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Right')} prop="padding-right" max={120} getVal={getVal} onStyle={onStyle} />
       </div>
+      <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+        <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Margin</div>
+        <NumRow label={L('Top')} prop="margin-top" max={160} getVal={getVal} onStyle={onStyle} />
+        <NumRow label={L('Bottom')} prop="margin-bottom" max={160} getVal={getVal} onStyle={onStyle} />
+      </div>
+      {!mob && (
+        <div style={{ borderTop: `1px solid ${LINE}`, paddingTop: 12, marginTop: 12 }}>
+          <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Typography</div>
+          <SegRow label="Direction" prop="direction" options={[['ltr', 'LTR'], ['rtl', 'RTL']]} getVal={getVal} onStyle={onStyle} />
+        </div>
+      )}
     </div>
   )
 }
