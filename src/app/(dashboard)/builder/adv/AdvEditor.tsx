@@ -109,7 +109,10 @@ const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'text', label: 'Text', html: '<div class="wrap" style="padding:6px 0"><p style="font-size:15px;line-height:1.6;text-align:center;margin:8px auto;max-width:640px;color:#5b5750">New paragraph — double-click to edit this text.</p></div>' },
   { id: 'image', label: 'Image', html: '<div class="wrap" style="padding:6px 0;text-align:center"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="max-width:100%;border-radius:14px"></div>' },
   { id: 'button', label: 'Button', html: '<div class="wrap" style="padding:10px 0;text-align:center"><a href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:999px;font-weight:800;text-decoration:none">Button</a></div>' },
-  { id: 'divider', label: 'Divider', html: '<div class="wrap" style="padding:6px 0"><hr style="border:0;border-top:1px solid #e7e3dd;margin:14px 0"></div>' },
+  { id: 'divider', label: 'Divider', html: '<div class="sfdiv" style="height:1px;width:100%;background:#e7e3dd;border:0;margin:16px 0"></div>' },
+  { id: 'icon', label: 'Icon', html: '<div class="wrap" style="padding:6px 0;text-align:center"><span style="display:inline-flex;color:#3f4bd6"><svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg></span></div>' },
+  { id: 'rating', label: 'Rating', html: '<div class="rlabel" style="padding:6px 0;font-size:14px;color:#6a6e93"><span class="stars" style="color:#f5a623;letter-spacing:1px">★★★★★</span> <span class="rtext">Rated 4.9/5 by 1,200+ people</span></div>' },
+  { id: 'group', label: 'Group', html: '<div style="display:flex;gap:12px;align-items:center;padding:6px 0"><div style="flex:1"><p style="margin:0;font-size:14px;color:#5b5750">Group item — add blocks inside.</p></div></div>' },
 ]
 // Richer ready-made blocks for the "Add block" LIBRARY (self-contained inline styles → render in previews
 // and drop cleanly into any template section). Each is inserted after the selected piece.
