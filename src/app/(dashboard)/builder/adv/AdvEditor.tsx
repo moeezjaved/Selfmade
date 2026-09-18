@@ -116,6 +116,33 @@ const RAW_INSERTS: { id: string; label: string; html: string }[] = [
   { id: 'rating', label: 'Rating', html: '<div class="rlabel" style="padding:6px 0;font-size:14px;color:#6a6e93"><span class="stars" style="color:#f5a623;letter-spacing:1px">★★★★★</span> <span class="rtext">Rated 4.9/5 by 1,200+ people</span></div>' },
   { id: 'group', label: 'Group', html: '<div style="display:flex;gap:12px;align-items:center;padding:6px 0"><div style="flex:1"><p style="margin:0;font-size:14px;color:#5b5750">Group item — add blocks inside.</p></div></div>' },
 ]
+// ── Basic Elements (PagePilot's "Add Block → Basic Elements" tab) ────────────────────────────────────
+// Atomic pieces, each a self-contained HTML slice that inserts into a section and maps to our tree names/panels
+// (a `.btn`→Button panel, `.pico`→Icon panel, `.ring`→Percentage Circle panel, `.pdesc`→Description, …).
+const be = (p: React.ReactNode) => <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">{p}</svg>
+const IC_PLACE = '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M8.5 12.5l2.4 2.4 4.6-5"/></svg>'
+const BASIC_ELEMENTS: { id: string; label: string; icon: React.ReactNode; html: string }[] = [
+  { id: 'be-text', label: 'Text', icon: be(<><path d="M4 7h16M4 12h16M4 17h10" /></>), html: '<div class="wrap" style="padding:6px 0"><p style="font-size:15px;line-height:1.6;margin:8px 0;color:#5b5750">New text block — double-click to edit.</p></div>' },
+  { id: 'be-heading', label: 'Heading', icon: be(<><path d="M6 4v16M18 4v16M6 12h12" /></>), html: '<div class="wrap" style="padding:6px 0"><h3 style="font-size:26px;font-weight:800;margin:10px 0;color:#1b1a17">New heading</h3></div>' },
+  { id: 'be-button', label: 'Button', icon: be(<><rect x="3" y="8" width="18" height="8" rx="4" /><path d="M8 12h8" /></>), html: '<div class="wrap" style="padding:10px 0"><a class="btn" href="#" style="display:inline-block;background:#3f4bd6;color:#fff;padding:14px 30px;border-radius:12px;font-weight:800;text-decoration:none">Button</a></div>' },
+  { id: 'be-modal', label: 'Modal', icon: be(<><rect x="3" y="5" width="18" height="14" rx="2" /><path d="M3 9h18" /></>), html: '<div class="wrap" style="padding:10px 0"><a class="btn" href="#sfm-NID" style="display:inline-block;background:#3f4bd6;color:#fff;padding:12px 26px;border-radius:12px;font-weight:800;text-decoration:none">Open popup</a></div><div id="sfm-NID" class="sfmodal"><div class="sfmodal-card"><a href="#" class="sfmodal-close" aria-label="Close">×</a><h3 style="font-size:22px;font-weight:800;margin:0 0 8px;color:#1b1a17">Popup title</h3><p style="margin:0;color:#5b5750;line-height:1.6">Your popup content goes here. Edit this text and add blocks inside.</p></div></div>' },
+  { id: 'be-icon', label: 'Icon', icon: be(<><circle cx="12" cy="12" r="9" /><path d="M8.5 12.5l2.4 2.4 4.6-5" /></>), html: `<div class="wrap" style="padding:6px 0;text-align:center"><span class="pico" style="display:inline-flex;color:#3f4bd6">${IC_PLACE}</span></div>` },
+  { id: 'be-author', label: 'Author', icon: be(<><circle cx="12" cy="8" r="4" /><path d="M4 20c0-4 4-6 8-6s8 2 8 6" /></>), html: '<div class="wrap" style="padding:10px 0"><div class="who" style="display:flex;align-items:center;gap:12px"><span class="avim" style="width:44px;height:44px;border-radius:50%;background:#eef0fe;color:#3f4bd6;display:inline-flex;align-items:center;justify-content:center;font-weight:800;flex:none">A</span><div><div style="font-weight:800;color:#1b1a17">Author Name</div><div style="color:#6a6e93;font-size:13px">Verified Buyer</div></div></div></div>' },
+  { id: 'be-image', label: 'Image', icon: be(<><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="8.5" cy="9.5" r="1.5" /><path d="M21 15l-5-5L5 20" /></>), html: '<div class="wrap" style="padding:6px 0;text-align:center"><img src="https://placehold.co/900x520/eeeeee/999999?text=Image" alt="" style="max-width:100%;border-radius:14px"></div>' },
+  { id: 'be-video', label: 'Video', icon: be(<><rect x="3" y="5" width="14" height="14" rx="2" /><path d="M21 8l-4 4 4 4V8z" /></>), html: '<div class="wrap" style="padding:6px 0"><video controls playsinline style="width:100%;border-radius:14px;background:#000;aspect-ratio:16/9;display:block"></video></div>' },
+  { id: 'be-groupv', label: 'Group (Vertical)', icon: be(<><rect x="4" y="3" width="16" height="7" rx="1.5" /><rect x="4" y="14" width="16" height="7" rx="1.5" /></>), html: '<div style="display:flex;flex-direction:column;gap:12px;padding:6px 0"><p style="margin:0;color:#5b5750">Group — add blocks inside.</p></div>' },
+  { id: 'be-grouph', label: 'Group (Horizontal)', icon: be(<><rect x="3" y="4" width="7" height="16" rx="1.5" /><rect x="14" y="4" width="7" height="16" rx="1.5" /></>), html: '<div style="display:flex;gap:14px;align-items:center;padding:6px 0"><p style="margin:0;flex:1;color:#5b5750">Group — add blocks inside.</p></div>' },
+  { id: 'be-carousel', label: 'Carousel', icon: be(<><rect x="7" y="6" width="10" height="12" rx="2" /><path d="M3 9v6M21 9v6" /></>), html: `<div class="reccar" style="display:flex;gap:14px;overflow-x:auto;padding:6px 2px">${[1, 2, 3].map((i) => `<div class="reccard" style="flex:0 0 240px;max-width:240px"><img src="https://placehold.co/480x480/eef0fe/3f4bd6?text=Slide+${i}" alt="" style="width:100%;aspect-ratio:1;object-fit:cover;border-radius:14px"></div>`).join('')}</div>` },
+  { id: 'be-masonry', label: 'Masonry', icon: be(<><rect x="3" y="3" width="7" height="10" rx="1.5" /><rect x="14" y="3" width="7" height="6" rx="1.5" /><rect x="3" y="16" width="7" height="5" rx="1.5" /><rect x="14" y="12" width="7" height="9" rx="1.5" /></>), html: `<div style="columns:3;column-gap:12px;padding:6px 0">${[420, 300, 380, 260, 340, 300].map((h, i) => `<img src="https://placehold.co/400x${h}/eef0fe/3f4bd6?text=${i + 1}" alt="" style="width:100%;border-radius:12px;margin-bottom:12px;display:block">`).join('')}</div>` },
+  { id: 'be-rotating', label: 'Rotating Content', icon: be(<><path d="M21 12a9 9 0 1 1-3-6.7" /><path d="M21 4v4h-4" /></>), html: `<div style="overflow:hidden;padding:8px 0"><div class="sltrack" style="display:flex;gap:40px;width:max-content;align-items:center">${['Free Shipping', '30-Day Returns', 'Secure Checkout', 'Loved by 10,000+', 'Cruelty-Free'].map((t) => `<span style="font-weight:700;color:#1b1a17;white-space:nowrap">${t}</span>`).join('')}</div></div>` },
+  { id: 'be-accordion', label: 'Accordion', icon: be(<><rect x="3" y="4" width="18" height="5" rx="1.5" /><rect x="3" y="12" width="18" height="8" rx="1.5" /><path d="M17 6.5h1M17 15h1" /></>), html: `<div class="acc" style="max-width:680px;margin:6px auto;display:flex;flex-direction:column;gap:10px">${[['What is included?', 'Describe what the customer gets.'], ['How does it work?', 'Explain the how in one or two lines.'], ['What is your return policy?', '30-day money-back guarantee.']].map(([q, a]) => `<details style="background:#fff;border:1px solid #e7e3dd;border-radius:12px;padding:14px 16px"><summary style="font-weight:700;color:#1b1a17;cursor:pointer">${q}</summary><div style="margin-top:8px;color:#6a6e93;line-height:1.6">${a}</div></details>`).join('')}</div>` },
+  { id: 'be-numcircle', label: 'Number Circle', icon: be(<><circle cx="12" cy="12" r="9" /><path d="M11 8h1v8" /></>), html: '<div class="wrap" style="padding:6px 0;text-align:center"><div style="width:52px;height:52px;border-radius:50%;background:#eef0fe;color:#3f4bd6;display:inline-flex;align-items:center;justify-content:center;font-weight:900;font-size:20px">1</div></div>' },
+  { id: 'be-pctcircle', label: 'Percentage Circle', icon: be(<><circle cx="12" cy="12" r="9" /><path d="M12 3a9 9 0 0 1 9 9" stroke="#3f4bd6" strokeWidth="2.4" /></>), html: '<div class="wrap" style="padding:6px 0;text-align:center"><div class="ring" style="--pt:90;width:92px;height:92px;border-radius:50%;background:conic-gradient(#3f4bd6 90%,#e5e7f5 0);display:inline-flex;align-items:center;justify-content:center"><div class="rc" style="width:72px;height:72px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-weight:900;color:#3f4bd6">90%</div></div></div>' },
+  { id: 'be-html', label: 'Custom HTML/Liquid', icon: be(<><path d="M8 8l-4 4 4 4M16 8l4 4-4 4M13 6l-2 12" /></>), html: '<div class="wrap" style="padding:6px 0"><div style="border:1px dashed #cfcabf;border-radius:10px;padding:16px;font-family:ui-monospace,monospace;color:#6a6e93;font-size:13px">&lt;!-- Custom HTML / Liquid --&gt; Add your code here.</div></div>' },
+  { id: 'be-pdesc', label: 'Product Description', icon: be(<><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></>), html: '<div class="wrap" style="padding:6px 0"><div class="pdesc" style="font-size:15px;line-height:1.7;color:#5b5750">Your product description will appear here.</div></div>' },
+  { id: 'be-spacer', label: 'Spacer', icon: be(<><path d="M12 4v16M8 8l4-4 4 4M8 16l4 4 4-4" /></>), html: '<div style="height:40px"></div>' },
+  { id: 'be-timeline', label: 'Timeline Row', icon: be(<><circle cx="6" cy="12" r="2.5" /><path d="M6 4v5M6 15v5M11 12h9" /></>), html: '<div style="display:flex;gap:14px;align-items:flex-start;padding:8px 0"><div style="width:38px;height:38px;border-radius:50%;background:#eef0fe;color:#3f4bd6;display:flex;align-items:center;justify-content:center;font-weight:800;flex:none">1</div><div><div style="font-weight:800;color:#1b1a17;margin-bottom:2px">Step title</div><p style="margin:0;color:#6a6e93;font-size:14px">Step description goes here.</p></div></div>' },
+]
 // Richer ready-made blocks for the "Add block" LIBRARY (self-contained inline styles → render in previews
 // and drop cleanly into any template section). Each is inserted after the selected piece.
 const RAW_LIBRARY: { id: string; label: string; html: string }[] = [
@@ -237,7 +264,7 @@ const RAW_FRIENDLY: Record<string, string> = {
   satcbar: 'Container', satcinfo: 'Product Info', satctitle: 'Product Title',
   vcard: 'Comparison Table', vcol: 'Comparison Column', r: 'Comparison Row', rt: 'Text', ben: 'Benefits',
   avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
-  buybox: 'Product Details', grid: 'Row', wrap: 'Row',
+  sfmodal: 'Modal', buybox: 'Product Details', grid: 'Row', wrap: 'Row',
 }
 // Pick the class on this element that has a friendly name (so "rpill foo" → Eyebrow Badge), else the first.
 function friendlyClassOf(el: HTMLElement): string {
@@ -1775,7 +1802,7 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
           <TbBtn title="Move up" onClick={() => rawOp('up')}>{TB_ICON.up}</TbBtn>
           <TbBtn title="Move down" onClick={() => rawOp('down')}>{TB_ICON.down}</TbBtn>
           <TbDiv />
-          <TbText title="Add a piece after this" onClick={() => setRawAddOpen((o) => !o)}>Add block</TbText>
+          <TbText title="Add a block after this" onClick={() => { setRawInsertTarget(null); setRawLibOpen(true) }}>Add block</TbText>
           <TbDiv />
           <TbBtn title="Delete" onClick={() => rawOp('delete')} danger>{TB_ICON.trash}</TbBtn>
           {rawAddOpen && (
@@ -1810,33 +1837,66 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
 
       {showProduct && <EditProductModal doc={doc} onChange={onProduct} onClose={() => setShowProduct(false)} />}
       {showMenu && <SettingsModal doc={doc} onChange={onSettings} onClose={() => setShowMenu(false)} />}
-      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { rawInsertAt(stampName(html, label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
+      {rawLibOpen && <RawLibraryModal onPick={(html, label) => { const uid = 'x' + Math.random().toString(36).slice(2, 8); rawInsertAt(stampName(html.replace(/NID/g, uid), label)); setRawLibOpen(false) }} onClose={() => { setRawLibOpen(false); setRawInsertTarget(null) }} />}
       {sectionLibOpen && <SectionLibraryModal onPick={(html, name) => { apply((d) => { const { doc: nd, newRef } = insertSection(d, newRawSection(html, name)); queueMicrotask(() => { setSel(newRef); setExpanded((x) => new Set(x).add(newRef.sectionId)) }); return nd }); setSectionLibOpen(false) }} onClose={() => setSectionLibOpen(false)} />}
       {imgAI && <ImageAIModal productName={doc.productRef?.importedProduct?.title || ''} busy={galleryAIbusy} onCreate={(p) => runImageAI(p)} onClose={() => setImgAI(null)} />}
     </div>
   )
 }
 
-/* ── Block library: a gallery of ready-made pieces (rendered previews) to drop into a template section. ── */
+/* ── Add Block modal: PagePilot-style tabbed picker — Basic Elements (atomic pieces) + Gallery (ready-made). ── */
 function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: string) => void; onClose: () => void }) {
+  const [tab, setTab] = useState<'basic' | 'gallery'>('basic')
+  const [q, setQ] = useState('')
+  const query = q.trim().toLowerCase()
+  const basics = BASIC_ELEMENTS.filter((it) => !query || it.label.toLowerCase().includes(query))
+  const galleries = RAW_LIBRARY.filter((it) => !query || it.label.toLowerCase().includes(query))
+  const tabBtn = (t: 'basic' | 'gallery', lbl: string): React.CSSProperties => ({ flex: 1, border: 0, background: tab === t ? '#fff' : 'transparent', borderRadius: 10, padding: '10px', fontSize: 14, fontWeight: 700, color: INK, cursor: 'pointer', boxShadow: tab === t ? '0 1px 3px rgba(0,0,0,.12)' : 'none' })
   return (
-    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 16, width: 'min(860px,94vw)', maxHeight: '86vh', overflow: 'auto', boxShadow: '0 20px 60px -20px rgba(20,18,15,.5)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '16px 20px', borderBottom: `1px solid ${LINE}`, position: 'sticky', top: 0, background: '#fff' }}>
-          <span style={{ fontFamily: SERIF, fontSize: 20 }}>Block library</span>
-          <span style={{ fontSize: 12.5, color: SUB }}>Click one to add it into this section</span>
+    <div onClick={onClose} style={{ position: 'fixed', inset: 0, background: 'rgba(20,18,15,.45)', zIndex: 60, display: 'flex', alignItems: 'flex-start', justifyContent: 'center', padding: '48px 24px' }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: '#fff', borderRadius: 18, width: 'min(920px,95vw)', maxHeight: '86vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', boxShadow: '0 24px 70px -20px rgba(20,18,15,.55)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '18px 22px 14px' }}>
+          <span style={{ fontSize: 20, fontWeight: 800, color: INK }}>Add Block</span>
           <div style={{ flex: 1 }} />
           <button onClick={onClose} style={{ ...iconTopBtn, fontSize: 18 }}>✕</button>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14, padding: 20 }}>
-          {RAW_LIBRARY.map((it) => (
-            <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
-              <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-                <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
-              </div>
-              <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
-            </button>
-          ))}
+        <div style={{ padding: '0 22px' }}>
+          <div style={{ display: 'flex', gap: 4, background: '#f1f0ee', borderRadius: 12, padding: 4 }}>
+            <button onClick={() => setTab('gallery')} style={tabBtn('gallery', 'Gallery')}>Gallery</button>
+            <button onClick={() => setTab('basic')} style={tabBtn('basic', 'Basic Elements')}>Basic Elements</button>
+          </div>
+        </div>
+        <div style={{ padding: '14px 22px 0' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, border: `1px solid ${LINE}`, borderRadius: 10, padding: '9px 12px' }}>
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke={FAINT} strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4-4" /></svg>
+            <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search…" autoFocus style={{ flex: 1, border: 0, outline: 'none', fontSize: 13.5, color: INK }} />
+          </div>
+        </div>
+        <div style={{ overflowY: 'auto', padding: 22 }}>
+          {tab === 'basic' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(140px,1fr))', gap: 12 }}>
+              {basics.map((it) => (
+                <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: '20px 10px', cursor: 'pointer', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10, color: INK }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE; e.currentTarget.style.background = WASH }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.background = '#fff' }}>
+                  <span style={{ color: INK }}>{it.icon}</span>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, textAlign: 'center', lineHeight: 1.25 }}>{it.label}</span>
+                </button>
+              ))}
+              {!basics.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No elements match “{q}”.</div>}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+              {galleries.map((it) => (
+                <button key={it.id} onClick={() => onPick(it.html, it.label)} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+                  <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
+                    <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                  </div>
+                  <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
+                </button>
+              ))}
+              {!galleries.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No sections match “{q}”.</div>}
+            </div>
+          )}
         </div>
       </div>
     </div>

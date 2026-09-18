@@ -150,6 +150,9 @@ function baseCss(tokens: DesignTokens): string {
 /* default CTA hover across all templates */
 .pgbld .btn,.pgbld .hgbtn,.pgbld .satcbtn,.pgbld .cta a,.pgbld a.cta{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .btn:hover,.pgbld .hgbtn:hover,.pgbld .satcbtn:hover,.pgbld .cta a:hover,.pgbld a.cta:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 10px 24px -12px rgba(20,18,15,.45)}
+/* Modal (Add Block → Modal): shown inline & editable in the EDITOR; publish turns it into a :target overlay (PUBLISH_UTIL_CSS) */
+.pgbld .sfmodal-card{background:#fff;border:1px solid var(--sf-line,#e7e3dd);border-radius:16px;padding:24px;position:relative;max-width:460px;margin:10px 0}
+.pgbld .sfmodal-close{position:absolute;top:6px;right:14px;font-size:24px;line-height:1;color:#8a8a8a;text-decoration:none}
 /* payment-icon size (editor "Icons → Size" sets --payw on the .pays row) */
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
 /* gallery thumbnail + arrow controls (editor sets CSS vars on the .thumbs / .gwrap elements; the targeted
@@ -346,6 +349,10 @@ const PUBLISH_UTIL_CSS = `
 .pgbld .btn,.pgbld .hgbtn,.pgbld .satcbtn,.pgbld .cta a,.pgbld a.cta{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .btn:hover,.pgbld .hgbtn:hover,.pgbld .satcbtn:hover,.pgbld .cta a:hover,.pgbld a.cta:hover{transform:translateY(-1px);filter:brightness(1.04);box-shadow:0 10px 24px -12px rgba(20,18,15,.45)}
 .pgbld .pays[style*="--payw"] .payicon svg{width:var(--payw)!important;height:auto!important}
+.pgbld .sfmodal{display:none;position:fixed;inset:0;background:rgba(20,18,15,.5);z-index:9999;align-items:center;justify-content:center;padding:20px}
+.pgbld .sfmodal:target{display:flex}
+.pgbld .sfmodal-card{background:#fff;border-radius:16px;max-width:460px;width:100%;padding:28px 24px;position:relative;box-shadow:0 24px 70px -20px rgba(0,0,0,.5)}
+.pgbld .sfmodal-close{position:absolute;top:8px;right:14px;font-size:26px;line-height:1;color:#8a8a8a;text-decoration:none}
 `
 // Wires button "Actions" (data-sfaction) on the published page: scroll, add-to-cart, checkout, do-nothing.
 const sfActionScript = `<script>(function(){document.addEventListener('click',function(e){var a=e.target.closest&&e.target.closest('[data-sfaction]');if(!a)return;var k=a.getAttribute('data-sfaction');if(k==='nothing'){e.preventDefault();return}if(k==='scroll-top'){e.preventDefault();window.scrollTo({top:0,behavior:'smooth'})}else if(k==='scroll-el'){e.preventDefault();var t=document.querySelector('.buybox,.vpick,.hero');if(t)t.scrollIntoView({behavior:'smooth',block:'center'})}else if(k==='checkout'){e.preventDefault();window.location.href='/checkout'}else if(k==='add-cart'){e.preventDefault();var b=document.querySelector('form[action*="/cart/add"] [type=submit],form[action*="/cart/add"] button,[name=add],.buybox button');if(b){b.click()}else{window.location.href='/cart'}}});})();</script>`
