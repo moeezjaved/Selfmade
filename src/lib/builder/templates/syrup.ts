@@ -297,6 +297,17 @@ function render(c: FilledContent, o: RenderOpts): string {
 
   const variants = (arr(c.variants).length ? arr(c.variants) : [{ label: 'Buy 1' }, { label: 'Buy 2 · Save 10%' }, { label: 'Buy 3 · Save 20%' }, { label: 'Subscribe · Save 25%' }])
     .slice(0, 4).map((v: any, i: number) => `<button class="vopt${(v.sel || i === 0) ? ' on' : ''}" type="button">${escp(v.label)}</button>`).join('')
+  // Multiple option groups (real Shopify options: Color + Size + …) → one .vpick per group; falls back to the
+  // single `variants` picker when the product has just one option.
+  const vgroups = arr(c.variant_groups)
+  const vpickers = vgroups.length
+    ? vgroups.map((g: any) => {
+        const opts = arr(g.values).slice(0, 12).map((v: any, i: number) => `<button class="vopt${i === 0 ? ' on' : ''}" type="button">${escp(typeof v === 'string' ? v : (v?.label || ''))}</button>`).join('')
+        return `<div class="vpick"><div class="vlabel">${escp(g.name || 'Choose an option')}</div><div class="vopts">${opts}</div></div>`
+      }).join('')
+    : `<div class="vpick"><div class="vlabel">${escp(c.variant_label || 'Make a Choice')}</div><div class="vopts">${variants}</div></div>`
+  // Split a money string into symbol / amount / code spans so the editor can show/hide the currency symbol & code.
+  const mny = (s: any): string => { const str = String(s || ''); const m = str.match(/^(\D*)([\d.,\s]*\d)(.*)$/); if (!m) return escp(str); const sym = m[1].trim(), amt = m[2].trim(), code = m[3].trim(); return `${sym ? `<span class="cur">${escp(sym)}</span>` : ''}<span class="amt">${escp(amt)}</span>${code ? `<span class="code"> ${escp(code)}</span>` : ''}` }
 
   const strip = (arr(c.strip_pills).length ? arr(c.strip_pills) : ['Purifies The Scalp', 'Simple Pre-Wash Ritual', 'Cruelty-Free & Vegan', 'Lightweight, Non-Greasy', 'No Harsh Sulfates'].map((l) => ({ label: l })))
     .map((p) => `<span class="p">${escp(p.label)}</span>`).join('')
@@ -372,8 +383,8 @@ function render(c: FilledContent, o: RenderOpts): string {
       <h1 class="ptitle">${esc(c.headline || o.productName)}</h1>
       <div class="rlabel"><span class="stars">★★★★★</span> <span class="rtext">${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</span></div>
       <div class="hchecks">${checks}</div>
-      <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
-      <div class="vpick"><div class="vlabel">${escp(c.variant_label || 'Make a Choice')}</div><div class="vopts">${variants}</div></div>
+      <div class="price">${c.compare_at ? `<span class="was">${mny(c.compare_at)}</span>` : ''}${price ? `<span class="now">${mny(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
+      ${vpickers}
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(String(c.cta_label || 'Add to Cart').toUpperCase())}</a>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money-Back Guarantee')}</span><span>📦 ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="pays">${paysRowInner()}</div>

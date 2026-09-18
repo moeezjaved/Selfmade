@@ -232,6 +232,8 @@ const css = `
 function render(c: FilledContent, o: RenderOpts): string {
   const P = o.productImage
   const price = o.priceLabel || ''
+  // Split a money string into symbol / amount / code spans so the editor can show/hide the currency symbol & code.
+  const mny = (s: any): string => { const str = String(s || ''); const m = str.match(/^(\D*)([\d.,\s]*\d)(.*)$/); if (!m) return escp(str); const sym = m[1].trim(), amt = m[2].trim(), code = m[3].trim(); return `${sym ? `<span class="cur">${escp(sym)}</span>` : ''}<span class="amt">${escp(amt)}</span>${code ? `<span class="code"> ${escp(code)}</span>` : ''}` }
 
   const pills = (arr(c.hero_pills).length ? arr(c.hero_pills) : [
     { a: 'Supercharges', b: 'Brainpower' }, { a: 'Increases', b: 'Oxygen Utilization' }, { a: 'Supports', b: 'Mitochondria' }, { a: 'Balances', b: 'Mood & Stress' }, { a: 'High-Potency', b: 'Ultra-Pure' },
@@ -317,7 +319,7 @@ function render(c: FilledContent, o: RenderOpts): string {
       <h1 class="ptitle">${esc(c.headline || o.productName)}</h1>
       <div class="rlabel"><span class="stars">★★★★★</span> <span class="rtext">${escp(c.rating_label || `Rated ${o.rating?.stars || '4.9'} by 17,873 buyers`)}</span></div>
       <div class="hchecks">${checks}</div>
-      <div class="price">${c.compare_at ? `<span class="was">${escp(c.compare_at)}</span>` : ''}${price ? `<span class="now">${esc(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
+      <div class="price">${c.compare_at ? `<span class="was">${mny(c.compare_at)}</span>` : ''}${price ? `<span class="now">${mny(price)}</span>` : ''}${c.save_pill ? `<span class="save">${escp(c.save_pill)}</span>` : ''}</div>
       <a class="btn" href="${esc(o.ctaHref || '#')}">🛒 ${escp(String(c.cta_label || 'Add to Cart').toUpperCase())}</a>
       <div class="grow"><span>🛡 ${escp(c.guarantee_line || '30-Day Money-Back Guarantee')}</span><span>📦 ${escp(c.returns_line || '30 Day Returns')}</span></div>
       <div class="pays">${paysRowInner()}</div>

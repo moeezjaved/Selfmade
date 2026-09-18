@@ -1016,9 +1016,13 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       for (const i of rawSel.path) { const k = node.children[i] as HTMLElement | undefined; if (!k) { node = box; break } node = k }
       const row = (node.classList?.contains('price') ? node : (node.querySelector('.price') || node.closest('.price'))) as HTMLElement | null
       if (!row) return
-      const el = row.querySelector('.' + part) as HTMLElement | null; if (!el) return
-      if (prop === '__show') { el.style.display = val === '1' ? 'none' : ''; return }
-      if (val) el.style.setProperty(prop, val); else el.style.removeProperty(prop)
+      // 'cur'/'code' (currency symbol / code) exist inside BOTH .now and .was, so toggle every match; the price
+      // sub-parts (.now/.was/.save) are unique so this also covers them.
+      const els = Array.from(row.querySelectorAll('.' + part)) as HTMLElement[]; if (!els.length) return
+      els.forEach((el) => {
+        if (prop === '__show') { el.style.display = val === '1' ? 'none' : ''; return }
+        if (val) el.style.setProperty(prop, val); else el.style.removeProperty(prop)
+      })
     })
   }, [rawSel, rawEditHtml])
   // ── Divider (matches PagePilot's Divider block: colour / thickness / width / margin) ─────────────────────
@@ -2188,6 +2192,8 @@ function RawElementSettings({ name, text, onText, isImg, isText, html, onHtml, t
               <SelRow label="Weight" prop="font-weight" options={[['400', 'Regular'], ['500', 'Medium'], ['600', 'Semibold'], ['700', 'Bold'], ['800', 'Extrabold'], ['900', 'Black']]} getVal={nowGet} onStyle={nowSet} />
               <SelRow label="Case" prop="text-transform" options={[['none', 'Default'], ['uppercase', 'UPPERCASE'], ['lowercase', 'lowercase'], ['capitalize', 'Capitalize']]} getVal={nowGet} onStyle={nowSet} />
               <ColorField label="Background" prop="background-color" getVal={nowGet} onStyle={nowSet} />
+              <ToggleRow label="Show currency symbol" on={priceVal('cur', '__show') !== '1'} onChange={(v) => onPrice('cur', '__show', v ? '' : '1')} />
+              <ToggleRow label="Show currency code" on={priceVal('code', '__show') !== '1'} onChange={(v) => onPrice('code', '__show', v ? '' : '1')} />
             </div>
             <div style={sec}>
               <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 8, color: INK }}>Compare-at price</div>

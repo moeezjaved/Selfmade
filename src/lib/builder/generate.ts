@@ -123,12 +123,15 @@ export async function generatePage(
   // ACTUAL choices instead of AI-invented offers. Uses the first meaningful option group; its name becomes
   // the picker label. (The template renders `variants` as .vopt buttons and `variant_label` as the heading.)
   const importedOptions: { name: string; values: string[] }[] = Array.isArray((imported as any)?.options) ? (imported as any).options : []
-  const opt = importedOptions.find((o) => o?.values?.length)
-  if (opt) {
+  const realGroups = importedOptions.filter((o) => o?.values?.length)
+  if (realGroups.length) {
     // Set unconditionally — the variant slot may not be in the AI schema (templates render `c.variants` with a
     // hardcoded fallback), so writing it here is what makes the picker show the REAL options.
-    content['variants'] = opt.values.slice(0, 8).map((v, i) => ({ label: v, sel: i === 0 }))
-    content['variant_label'] = opt.name || 'Choose an option'
+    // `variant_groups` drives one picker PER option group (Color + Size + …); `variants`/`variant_label` keep
+    // the single-picker path working for templates that only read those.
+    content['variant_groups'] = realGroups.map((g) => ({ name: g.name, values: g.values.slice(0, 12) }))
+    content['variants'] = realGroups[0].values.slice(0, 8).map((v, i) => ({ label: v, sel: i === 0 }))
+    content['variant_label'] = realGroups[0].name || 'Choose an option'
   }
 
   // ── d. RENDER OPTS ──
