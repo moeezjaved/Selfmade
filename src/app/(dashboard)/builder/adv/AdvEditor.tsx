@@ -230,10 +230,11 @@ const RAW_FRIENDLY: Record<string, string> = {
   gallery: 'Product Gallery', thumbs: 'Thumbnails', hbottle: 'Product Image', gimg: 'Product Image',
   hcre: 'Creative', mid: 'Image + Pills', hd: 'Headline', sd: 'Subhead', ppills: 'Benefit Pills', pill: 'Pill',
   // sections / lists
-  striptrack: 'Rotating Content', seentrack: 'Rotating Content', qitem: 'Item', qlogo: 'Logo', qquote: 'Quote', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Percentages Group', card: 'Card',
+  striptrack: 'Rotating Content', seentrack: 'Rotating Content', sltrack: 'Rotating Content', sllogo: 'Logo', qitem: 'Item', qlogo: 'Logo', qquote: 'Quote', benfc: 'Benefit Container', pico: 'Icon', ptext: 'Text', lgroup: 'Left Group', rgroup: 'Right Group', howimg: 'Image', imgcol: 'Image Column', contcol: 'Content Column', bcard: 'Benefits Card', btg: 'Benefit Text Group', btitle: 'Benefit Title', bdesc: 'Benefit Description', nsub: 'Subtitle', stars: 'Stars', stat: 'Stat', sgrid: 'Percentages Group', card: 'Card',
   fhead: 'Headings Group', hgel: 'Elements', rev: 'Review', press: 'Press', plogo: 'Logo',
   rvtitle: 'Title Group', ratedby: 'Rated by', rcar: 'Carousel', frev: 'Featured Review', frwho: 'Reviewer', frstars: 'Stars', frq: 'Text', frname: 'Text',
   reccar: 'Carousel', reccard: 'Product Card', rectitle: 'Product Title', recprice: 'Price',
+  satcbar: 'Container', satcinfo: 'Product Info', satctitle: 'Product Title',
   vcard: 'Comparison Table', vcol: 'Comparison Column', r: 'Comparison Row', rt: 'Text', ben: 'Benefits',
   avim: 'Avatar', q: 'Quote', who: 'Reviewer', buy: 'Add to Cart', btn: 'Add to Cart',
   buybox: 'Product Details', grid: 'Row', wrap: 'Row',
@@ -298,7 +299,7 @@ const PP_SECTION_NAME: Record<string, string> = {
   numbf: 'Image with Numbered Benefits', pcre: 'Image with Numbered Benefits',
   strip: 'Rotating Benefits', vs: 'Product Differences', revs: 'Reviews Carousel', stats: 'Statistics With Percentages',
   feat: 'Image with Feature Cards', how: 'Image with Text', gold: 'Product Comparison',
-  seen: 'As Seen On with Quotes', hguar: 'Happiness Guarantee', recs: 'Recommended Products', satc: 'Sticky Add to Cart',
+  seen: 'As Seen On with Quotes', seenl: 'As Seen On', hguar: 'Happiness Guarantee', recs: 'Recommended Products', satc: 'Sticky Add to Cart',
 }
 function rawSectionName(html: string, fallback: string): string {
   if (typeof document === 'undefined' || !html) return fallback

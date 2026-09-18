@@ -248,6 +248,23 @@ const css = `
 .pgbld .recprice .rwas{color:var(--sub);font-weight:500;text-decoration:line-through}
 .pgbld .recprice .roff{background:var(--blue);color:#fff;font-size:10px;font-weight:800;padding:2px 7px;border-radius:5px}
 
+/* 11 · STICKY ADD TO CART */
+.pgbld .satc{position:sticky;bottom:0;z-index:50}
+.pgbld .satcbar{display:flex;align-items:center;justify-content:space-between;gap:14px;background:#fff;border-top:1px solid var(--line);box-shadow:0 -6px 22px -14px rgba(20,18,15,.4);padding:12px 20px}
+.pgbld .satcgroup{display:flex;align-items:center;gap:12px;min-width:0}
+.pgbld .satcimg,.pgbld .satcimg.ph{width:44px;height:44px;border-radius:10px;object-fit:cover;background:var(--soft2);flex:none;min-height:0}
+.pgbld .satcinfo{min-width:0}
+.pgbld .satctitle{font-size:14px;font-weight:800;color:var(--ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.pgbld .satcbtn{flex:none;background:var(--blue);color:#fff;font-weight:800;font-size:14px;padding:12px 26px;border-radius:12px;text-decoration:none}
+
+/* 9d · AS SEEN ON (logos marquee) */
+.pgbld .seenl{padding:8px 0 40px;overflow:hidden}
+.pgbld .slhead{text-align:center;margin-bottom:18px}
+.pgbld .slhead .secttl{font-size:15px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--sub)}
+.pgbld .seenl .sltrack{display:flex;width:max-content;gap:56px;align-items:center;animation:sfmarquee2 34s linear infinite}
+.pgbld .seenl:hover .sltrack{animation-play-state:paused}
+.pgbld .sllogo{font-family:'Fraunces',Georgia,serif;font-weight:600;font-size:22px;color:var(--ink);opacity:.7;white-space:nowrap;flex:none}
+
 /* 9 · GOLD STANDARD (comparison table) */
 .pgbld .gold{padding:52px 0;background:var(--soft)}
 .pgbld .gold .grid{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:center}
@@ -362,6 +379,11 @@ function render(c: FilledContent, o: RenderOpts): string {
   const seenItems = seenSrc.map(seenItem).join('')
   // aria-hidden duplicate set → seamless marquee loop (skipped in the editor tree, like Rotating Benefits)
   const seenDup = seenSrc.map((p) => seenItem(p).replace('<div class="qitem"', '<div class="qitem" aria-hidden="true"')).join('')
+
+  // As Seen On — a Rotating Content marquee of press Logos (wordmarks; no quotes).
+  const slogo = (p: any) => `<span class="sllogo">${escp(p.title || p.label)}</span>`
+  const slItems = seenSrc.map(slogo).join('')
+  const slDup = seenSrc.map((p) => slogo(p).replace('<span class="sllogo"', '<span class="sllogo" aria-hidden="true"')).join('')
 
   // Statistics With Percentages — Item Group (Percentage Circle [proportional ring] + Text) per stat.
   const stats = (arr(c.stats).length ? arr(c.stats) : [
@@ -539,6 +561,12 @@ function render(c: FilledContent, o: RenderOpts): string {
     <div class="reccar">${recProducts}</div>
   </div></section>
 
+  <!-- 9d · AS SEEN ON (logos) -->
+  <section class="seenl"><div class="wrap">
+    <div class="slhead"><h2 class="secttl">${hl(c.seenl_head || 'As Seen On')}</h2></div>
+    <div class="sltrack">${slItems}${slDup}</div>
+  </div></section>
+
   <!-- 10 · FINAL CTA -->
   <section class="final"><div class="wrap"><div class="grid">
     <div class="prod">
@@ -555,6 +583,17 @@ function render(c: FilledContent, o: RenderOpts): string {
       <div class="pays">${paysRowInner()}</div>
     </div>
   </div></div></section>
+
+  <!-- 11 · STICKY ADD TO CART -->
+  <section class="satc"><div class="satcbar">
+    <div class="satcgroup">
+      ${img(c.image_satc || P, o.productName, 'satcimg', 'Image')}
+      <div class="satcinfo">
+        <div class="satctitle">${escp(c.satc_title || o.productName)}</div>
+      </div>
+    </div>
+    <a class="satcbtn" href="${esc(o.ctaHref || '#')}">${escp(c.satc_cta || 'Add to Cart')}</a>
+  </div></section>
 
   </div>`
 }
@@ -638,6 +677,10 @@ export const cobaltV1: PageTemplate = {
     { key: 'hguar_cta', type: 'text', label: 'Happiness-guarantee button' },
     { key: 'image_hguar', type: 'image', role: 'lifestyle', label: 'Happiness-guarantee image' },
     { key: 'recs_head', type: 'text', label: 'Recommended-products heading', hint: 'Accent 1-2 words with ** ** (e.g. "You May Also **Like**").' },
+    { key: 'seenl_head', type: 'text', label: 'As-seen-on (logos) heading' },
+    { key: 'satc_title', type: 'text', label: 'Sticky bar product name' },
+    { key: 'satc_cta', type: 'text', label: 'Sticky bar button' },
+    { key: 'image_satc', type: 'image', role: 'product', label: 'Sticky bar thumbnail' },
     { key: 'gold_head', type: 'text', label: 'Gold-standard heading' },
     { key: 'gold_body', type: 'richtext', role: 'body', label: 'Gold-standard paragraph' },
     { key: 'gold_cta', type: 'text', label: 'Gold-standard button' },
