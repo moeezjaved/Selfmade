@@ -304,9 +304,12 @@ const css = `
   .pgbld .hguar .hgimg,.pgbld .hguar .hgimg.ph{min-height:220px}
   .pgbld .sgrid{grid-template-columns:1fr 1fr}
   .pgbld .fgrid{grid-template-columns:1fr}
+  /* Mobile: product image first (like a normal PDP), then pills, then the headline — not text/pills on top. */
+  .pgbld .hcre{display:flex;flex-direction:column}
+  .pgbld .hcre .mid{order:-1;display:flex;flex-direction:column-reverse;gap:14px}
+  .pgbld .hcre .ppills{flex-direction:row;flex-wrap:wrap;justify-content:center}
 }
 @media(max-width:520px){
-  .pgbld .hcre .mid{grid-template-columns:1fr}
   .pgbld .sgrid{grid-template-columns:1fr}
   .pgbld .frev{flex-basis:82%;max-width:82%}
   .pgbld .reccard{flex-basis:62%;max-width:62%}

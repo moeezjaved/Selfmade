@@ -682,11 +682,15 @@ export default function AdvEditor({ pageId }: { pageId: string }) {
       box.querySelectorAll('[data-mob]').forEach((el) => { try { const o = JSON.parse(el.getAttribute('data-mob') || '{}'); for (const k in o) (el as HTMLElement).style.setProperty(k, o[k]) } catch { /* noop */ } })
       body = box.innerHTML
     }
+    // Ensure the template's `.pgbld`-scoped CSS (title font, etc.) applies in the editor exactly like on publish.
+    // Publish always wraps the page in `.pgbld`; if a page's stored section HTML doesn't already carry it, the
+    // editor would drop those scoped styles (e.g. the Fraunces title font) and look different from the live page.
+    const wrapped = body.includes('class="pgbld"') || body.includes("class='pgbld'") ? body : `<div class="pgbld">${body}</div>`
     return `<style>${css}
 [data-node-id]{outline:1px dashed transparent;outline-offset:-1px;transition:outline-color .1s}
 [data-node-id]:hover{outline-color:rgba(224,47,6,.35);cursor:pointer}
 [data-sel="1"]{outline:2px solid ${ORANGE} !important;outline-offset:-2px}
-</style>${body}`
+</style>${wrapped}`
   }, [doc, device, product])
 
   /* mark the selected node in the rendered DOM + attach click selection */
@@ -2888,8 +2892,10 @@ function RawSectionSettings({ name, getVal, onStyle, full, onFull, gridVal, onGr
         <div style={{ fontSize: 13.5, fontWeight: 700, marginBottom: 12, marginTop: 2, color: INK }}>Layout</div>
         <SegRow label="Width" prop="__full" options={[['0', 'Contained'], ['1', 'Full']]} getVal={() => (full ? '1' : '0')} onStyle={(_p, v) => onFull(v === '1')} />
         <SegRow label={L('Content alignment')} prop="text-align" options={[['left', 'Left'], ['center', 'Center'], ['right', 'Right']]} getVal={getVal} onStyle={onStyle} />
-        {!mob && <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />}
-        {!mob && <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />}
+        {/* Product Information is a fixed 2-column buy-box layout (gallery + details) — a Columns control there does
+            nothing useful and confused testers, so hide it (PagePilot has no column setting on Product Information). */}
+        {!mob && name !== 'Product Information' && <NumRow label="Columns" prop="__cols" min={1} max={6} unit="col" getVal={() => cols || ''} onStyle={(_p, v) => onCols(v)} />}
+        {!mob && name !== 'Product Information' && <NumRow label="Gap" prop="gap" max={80} getVal={gridVal} onStyle={onGrid} />}
         <SegRow label="Rounded corners source" prop="__rcs" options={[['custom', 'Custom'], ['dynamic', 'Dynamic']]} getVal={() => (roundedCustom ? 'custom' : 'dynamic')} onStyle={(_p, v) => { const c = v === 'custom'; setRoundedCustom(c); if (!c) onStyle('border-radius', '') }} />
         {roundedCustom && <NumRow label={L('Rounded corners')} prop="border-radius" max={60} getVal={getVal} onStyle={onStyle} />}
       </div>

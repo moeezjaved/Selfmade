@@ -343,6 +343,8 @@ function swiperizeCarousel(body: string, containerCls: string, cardCls: string):
 const PUBLISH_UTIL_CSS = `
 @media(max-width:768px){.sf-hide-mob{display:none!important}}
 @media(min-width:769px){.sf-hide-desk{display:none!important}}
+/* Mobile PDP: product image first, then pills, then headline (applies to older pages on re-publish too). */
+@media(max-width:900px){.pgbld .hcre{display:flex;flex-direction:column}.pgbld .hcre .mid{order:-1;display:flex;flex-direction:column-reverse;gap:14px;grid-template-columns:1fr}.pgbld .hcre .ppills{flex-direction:row;flex-wrap:wrap;justify-content:center}}
 .pgbld [style*="--hc"]:hover{color:var(--hc)!important}
 .pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
