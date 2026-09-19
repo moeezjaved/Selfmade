@@ -2059,7 +2059,7 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
                     {/* PagePilot layout: bold label on top, then a roomy preview area with the whole section scaled + centered. */}
                     <div style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 800, color: INK }}>{it.label}</div>
                     <div style={{ height: 190, overflow: 'hidden', background: '#faf9f7', borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <div style={{ width: 960, transform: 'scale(.26)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                      <div style={{ width: 560, transform: 'scale(.46)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
                     </div>
                   </button>
                 ))}
@@ -2142,8 +2142,8 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
               {shown.map((it) => (
                 <button key={it.id} onClick={() => { onPick(it.html, it.label); onClose() }} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', contentVisibility: 'auto', containIntrinsicSize: '0 188px' } as React.CSSProperties}>
                   <div style={{ padding: '10px 12px 6px', fontSize: 13, fontWeight: 700, color: INK }}>{it.label}</div>
-                  <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', position: 'relative', borderTop: `1px solid ${LINE}` }}>
-                    <div style={{ width: 960, transform: 'scale(.25)', transformOrigin: 'top left', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                  <div style={{ height: 180, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ width: 560, transform: 'scale(.46)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
                   </div>
                 </button>
               ))}
