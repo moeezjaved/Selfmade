@@ -278,6 +278,11 @@ const SWIPER_JS_URL = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.
 const swiperInitScript = `<script>(function(){function go(){if(!window.Swiper){return setTimeout(go,120)}document.querySelectorAll('.pgsw').forEach(function(g){if(g.dataset.sw)return;g.dataset.sw='1';if(g.classList.contains('pgsw-rev')){new window.Swiper(g.querySelector('.pgsw-rmain'),{slidesPerView:1.15,spaceBetween:16,breakpoints:{640:{slidesPerView:2.2},1024:{slidesPerView:3.4}},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')},pagination:{el:g.querySelector('.swiper-pagination'),clickable:true}});return}var t=g.querySelector('.pgsw-thumbs');var th=t?new window.Swiper(t,{slidesPerView:'auto',spaceBetween:8,watchSlidesProgress:true,freeMode:true}):null;var o={spaceBetween:12,pagination:{el:g.querySelector('.swiper-pagination'),clickable:true},navigation:{nextEl:g.querySelector('.pgsw-next'),prevEl:g.querySelector('.pgsw-prev')}};if(th)o.thumbs={swiper:th};new window.Swiper(g.querySelector('.pgsw-main'),o)})}go()})();</script>`
 /** Rebuild the first `.gwrap`(+`.thumbs`) gallery in a body string into Swiper markup. Defensive: if the
  * expected structure isn't found, returns the body unchanged (no breakage). */
+// Publish the product gallery as a PURE-CSS gallery (radio inputs) — no external Swiper, which many Shopify
+// themes' CSP block/slow (that's why it used to render as a stacked column with dead arrows/thumbnails). This
+// works with zero JavaScript: click a thumbnail (a <label>) to swap the main image, and the ‹ › arrows are
+// per-slide labels pointing at the previous/next image.
+let galUid = 0
 function swiperizeGallery(body: string): string {
   const gwrapM = body.match(/<div class="gwrap">([\s\S]*?)<\/div>/)
   if (!gwrapM) return body
@@ -289,13 +294,15 @@ function swiperizeGallery(body: string): string {
   if (!srcs.length) return body
   const cls = (t: string) => (t.match(/class="([^"]*)"/) || [])[1] || ''
   const mainCls = cls(mainImg) || 'hbottle'
-  const mainSlides = srcs.map((s) => `<div class="swiper-slide"><img class="${mainCls}" src="${s}" alt="" loading="lazy"></div>`).join('')
-  const thumbSlides = srcs.map((s) => `<div class="swiper-slide"><img src="${s}" alt="" loading="lazy"></div>`).join('')
-  const arrows = (gwrapM[1].match(/<button class="garr[^>]*>[^<]*<\/button>/g) || [])
-  const prev = (arrows.find((a) => /gprev/.test(a)) || '<button class="garr gprev pgsw-prev" aria-label="Previous image">‹</button>').replace('gprev', 'gprev pgsw-prev')
-  const next = (arrows.find((a) => /gnext/.test(a)) || '<button class="garr gnext pgsw-next" aria-label="Next image">›</button>').replace('gnext', 'gnext pgsw-next')
-  const sw = `<div class="pgsw"><div class="swiper pgsw-main"><div class="swiper-wrapper">${mainSlides}</div>${prev}${next}<div class="swiper-pagination"></div></div><div class="swiper pgsw-thumbs thumbs"><div class="swiper-wrapper">${thumbSlides}</div></div></div>`
-  let out = body.replace(gwrapM[0], sw)
+  const n = srcs.length
+  const uid = `g${(galUid++).toString(36)}`
+  const radios = srcs.map((_, i) => `<input type="radio" name="${uid}" id="${uid}-${i}" class="pgr"${i === 0 ? ' checked' : ''}>`).join('')
+  const slides = srcs.map((s, i) => `<div class="pgslide" data-i="${i}"><img class="${mainCls}" src="${s}" alt="" loading="lazy">${n > 1 ? `<label class="garr gprev" for="${uid}-${(i - 1 + n) % n}" aria-label="Previous image">‹</label><label class="garr gnext" for="${uid}-${(i + 1) % n}" aria-label="Next image">›</label>` : ''}</div>`).join('')
+  const thumbs = n > 1 ? `<div class="pgthumbs">${srcs.map((s, i) => `<label class="pgthumb" for="${uid}-${i}"><img src="${s}" alt="" loading="lazy"></label>`).join('')}</div>` : ''
+  const rules = srcs.map((_, i) => `#${uid}-${i}:checked~.pgstage .pgslide[data-i="${i}"]{display:block}#${uid}-${i}:checked~.pgthumbs .pgthumb:nth-child(${i + 1}) img{opacity:1;border-color:var(--blue,#3f4bd6);border-width:2px}`).join('')
+  const style = `<style>${rules}</style>`
+  const gal = `<div class="pcssgal">${radios}<div class="pgstage">${slides}</div>${thumbs}${style}</div>`
+  let out = body.replace(gwrapM[0], gal)
   if (thumbM) out = out.replace(thumbM[0], '')
   return out
 }
@@ -345,6 +352,17 @@ const PUBLISH_UTIL_CSS = `
 @media(min-width:769px){.sf-hide-desk{display:none!important}}
 /* Mobile PDP: product image first, then pills, then headline (applies to older pages on re-publish too). */
 @media(max-width:900px){.pgbld .hcre{display:flex;flex-direction:column}.pgbld .hcre .mid{order:-1;display:flex;flex-direction:column-reverse;gap:14px;grid-template-columns:1fr}.pgbld .hcre .ppills{flex-direction:row;flex-wrap:wrap;justify-content:center}}
+/* Pure-CSS product gallery (no external JS — works on any Shopify theme). Radio-driven main image + thumbnails + arrows. */
+.pgbld .pcssgal{position:relative}
+.pgbld .pcssgal .pgr{position:absolute;width:0;height:0;opacity:0;pointer-events:none}
+.pgbld .pcssgal .pgstage{position:relative;border-radius:12px;overflow:hidden;background:var(--soft,#f3f4fb)}
+.pgbld .pcssgal .pgslide{display:none}
+.pgbld .pcssgal .pgslide img{display:block;width:100%;aspect-ratio:4/5;object-fit:contain}
+.pgbld .pcssgal .garr{position:absolute;top:50%;transform:translateY(-50%);width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.95);border:1px solid var(--line,#e1e4f6);display:grid;place-items:center;font-size:19px;color:var(--ink,#191b3a);cursor:pointer;box-shadow:0 3px 10px rgba(0,0,0,.16);z-index:2;line-height:1}
+.pgbld .pcssgal .gprev{left:8px}.pgbld .pcssgal .gnext{right:8px}
+.pgbld .pcssgal .pgthumbs{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.pgbld .pcssgal .pgthumb{cursor:pointer;display:block;line-height:0}
+.pgbld .pcssgal .pgthumb img{width:56px;height:56px;object-fit:cover;border-radius:9px;border:1px solid var(--line,#e1e4f6);opacity:.55;transition:opacity .15s,border-color .15s}
 .pgbld [style*="--hc"]:hover{color:var(--hc)!important}
 .pgbld .sf-hover-anim{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
 .pgbld .sf-hover-anim:hover{transform:translateY(-1px);filter:brightness(1.04)}
