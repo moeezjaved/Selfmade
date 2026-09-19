@@ -2020,10 +2020,12 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
             <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
                 {galleries.map((it) => (
-                  <button key={it.id} onClick={() => onPick(it.html, it.label, true)} title={`Add ${it.label} section`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}
+                  <button key={it.id} onClick={() => onPick(it.html, it.label, true)} title={`Add ${it.label} section`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', contentVisibility: 'auto', containIntrinsicSize: '0 188px' } as React.CSSProperties}
                     onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE }}>
-                    <div style={{ height: 120, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 12 }}>
-                      <div style={{ width: '100%', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                    {/* Scale a full-width render of the section down into the tile — a proportional miniature (PagePilot style),
+                        not the squished 240px crop. content-visibility above keeps off-screen tiles from rendering. */}
+                    <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', position: 'relative' }}>
+                      <div style={{ width: 960, transform: 'scale(.25)', transformOrigin: 'top left', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
                     </div>
                     <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
                   </button>
@@ -2102,10 +2104,10 @@ function SectionLibraryModal({ onPick, onClose }: { onPick: (html: string, name:
             {cat !== 'All' && <div style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: '.08em', textTransform: 'uppercase', color: FAINT, marginBottom: 12 }}>{cat}</div>}
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
               {shown.map((it) => (
-                <button key={it.id} onClick={() => { onPick(it.html, it.label); onClose() }} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left' }}>
+                <button key={it.id} onClick={() => { onPick(it.html, it.label); onClose() }} title={`Add ${it.label}`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', contentVisibility: 'auto', containIntrinsicSize: '0 188px' } as React.CSSProperties}>
                   <div style={{ padding: '10px 12px 6px', fontSize: 13, fontWeight: 700, color: INK }}>{it.label}</div>
-                  <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTop: `1px solid ${LINE}` }}>
-                    <div style={{ width: 900, transform: 'scale(.34)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                  <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', position: 'relative', borderTop: `1px solid ${LINE}` }}>
+                    <div style={{ width: 960, transform: 'scale(.25)', transformOrigin: 'top left', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
                   </div>
                 </button>
               ))}
