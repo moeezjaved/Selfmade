@@ -2028,16 +2028,15 @@ function RawLibraryModal({ onPick, onClose }: { onPick: (html: string, label: st
               {SECTION_CAT_ORDER.map((c) => navItem(c, catCounts[c] || 0))}
             </div>
             <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 14 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))', gap: 16 }}>
                 {galleries.map((it) => (
-                  <button key={it.id} onClick={() => onPick(it.html, it.label, true)} title={`Add ${it.label} section`} style={{ border: `1px solid ${LINE}`, borderRadius: 12, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', contentVisibility: 'auto', containIntrinsicSize: '0 188px' } as React.CSSProperties}
-                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE }}>
-                    {/* Scale a full-width render of the section down into the tile — a proportional miniature (PagePilot style),
-                        not the squished 240px crop. content-visibility above keeps off-screen tiles from rendering. */}
-                    <div style={{ height: 150, overflow: 'hidden', background: '#faf9f7', position: 'relative' }}>
-                      <div style={{ width: 960, transform: 'scale(.25)', transformOrigin: 'top left', pointerEvents: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
+                  <button key={it.id} onClick={() => onPick(it.html, it.label, true)} title={`Add ${it.label} section`} style={{ border: `1px solid ${LINE}`, borderRadius: 14, background: '#fff', padding: 0, cursor: 'pointer', overflow: 'hidden', textAlign: 'left', contentVisibility: 'auto', containIntrinsicSize: '0 250px', display: 'flex', flexDirection: 'column' } as React.CSSProperties}
+                    onMouseEnter={(e) => { e.currentTarget.style.borderColor = ORANGE; e.currentTarget.style.boxShadow = '0 6px 20px -10px rgba(20,18,15,.3)' }} onMouseLeave={(e) => { e.currentTarget.style.borderColor = LINE; e.currentTarget.style.boxShadow = 'none' }}>
+                    {/* PagePilot layout: bold label on top, then a roomy preview area with the whole section scaled + centered. */}
+                    <div style={{ padding: '11px 14px', fontSize: 13.5, fontWeight: 800, color: INK }}>{it.label}</div>
+                    <div style={{ height: 190, overflow: 'hidden', background: '#faf9f7', borderTop: `1px solid ${LINE}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 960, transform: 'scale(.26)', transformOrigin: 'center', pointerEvents: 'none', flex: 'none' }} dangerouslySetInnerHTML={{ __html: it.html }} />
                     </div>
-                    <div style={{ padding: '9px 12px', fontSize: 13, fontWeight: 700, color: INK, borderTop: `1px solid ${LINE}` }}>{it.label}</div>
                   </button>
                 ))}
                 {!galleries.length && <div style={{ gridColumn: '1/-1', textAlign: 'center', color: FAINT, fontSize: 13, padding: 20 }}>No sections match “{q}”.</div>}
