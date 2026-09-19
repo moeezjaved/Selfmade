@@ -311,9 +311,9 @@ const RAW_FRIENDLY: Record<string, string> = {
   rvtitle: 'Title Group', ratedby: 'Rated by', rcar: 'Carousel', frev: 'Featured Review', frwho: 'Reviewer', frstars: 'Stars', frq: 'Text', frname: 'Text',
   frcar: 'Carousel', frtrack: 'Rotating Content', frcard: 'Review', frprev: 'Arrow', frnext: 'Arrow',
   // Gallery-block pieces (Social Proof / Trust / Benefits) — named so every piece is a clean, editable tree node.
-  plogo: 'Logo', press: 'Logos', pays: 'Payment Icons', avim: 'Image', avs: 'Avatars', stars: 'Stars', vcar: 'Carousel', vcard: 'Video',
-  tbc: 'Trust Badge', tbt: 'Text', tbs: 'Text', rnum: 'Rating', rtext: 'Text', rbt: 'Text', ratedby: 'Rating', tpilot: 'Trustpilot',
-  frq: 'Text', frname: 'Text', rcard: 'Review Card', rcwho: 'Reviewer', rcname: 'Text', rcq: 'Text',
+  avs: 'Avatars', vcar: 'Carousel',
+  tbc: 'Trust Badge', tbt: 'Text', tbs: 'Text', rnum: 'Rating', rtext: 'Text', rbt: 'Text', tpilot: 'Trustpilot',
+  rcard: 'Review Card', rcwho: 'Reviewer', rcname: 'Text', rcq: 'Text',
   g90: 'Guarantee', g90t: 'Text', g90s: 'Text', mbg: 'Guarantee', mbt: 'Text', mbs: 'Text', bsb: 'Best Seller', bsbt: 'Text', bsbs: 'Text',
   btrust: 'Row', bti: 'Trust Item', spot: 'Benefit', spott: 'Text', spots: 'Text',
   tli: 'List', tlirow: 'List Item', tlit: 'Text', benr: 'Row', benri: 'Benefit', benrt: 'Text', ingl: 'List', inglrow: 'Ingredient', inglt: 'Text',
